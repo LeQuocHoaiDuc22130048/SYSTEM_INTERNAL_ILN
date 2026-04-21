@@ -72,7 +72,7 @@ smart-wms-root/
 ```json
 {
   "status": "Thành công",
-  "data": { ... },
+  "data": { },
   "message": "Mô tả ngắn gọn về kết quả"
 }
 ```
