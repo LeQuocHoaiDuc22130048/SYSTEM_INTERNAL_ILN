@@ -9,7 +9,7 @@
 		<relativePath/>
 	</parent>
 	<groupId>com.suachuabientan</groupId>
-	<artifactId>import_export</artifactId>
+	<artifactId>system_internal</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name/>
 	<description/>
