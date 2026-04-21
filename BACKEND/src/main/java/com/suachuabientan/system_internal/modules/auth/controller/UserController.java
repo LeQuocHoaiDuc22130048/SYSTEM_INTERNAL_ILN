@@ -16,11 +16,13 @@ import java.util.List;
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
 @RequiredArgsConstructor
 public class UserController {
-    UserService  userService;
+    UserService userService;
 
     @GetMapping("/users")
     public ApiResponse<List<UserResponse>> getAll() {
         List<UserResponse> list = userService.getAllUsers();
         return ApiResponse.success(list, "Lấy danh sách thành công");
     }
+
+
 }
