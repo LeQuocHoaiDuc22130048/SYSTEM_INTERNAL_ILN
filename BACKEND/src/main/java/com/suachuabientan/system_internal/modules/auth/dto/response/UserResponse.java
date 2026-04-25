@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.modules.auth.dto;
+package com.suachuabientan.system_internal.modules.auth.dto.response;
 
 import lombok.Data;
 import lombok.experimental.FieldDefaults;

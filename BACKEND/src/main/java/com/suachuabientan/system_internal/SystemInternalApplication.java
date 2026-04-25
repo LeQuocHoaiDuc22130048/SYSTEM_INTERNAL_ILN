@@ -6,11 +6,9 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import java.util.TimeZone;
 
 @SpringBootApplication
-public class ImportExportApplication {
-
+public class SystemInternalApplication {
 	public static void main(String[] args) {
 		TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
-		SpringApplication.run(ImportExportApplication.class, args);
+		SpringApplication.run(SystemInternalApplication.class, args);
 	}
-
 }

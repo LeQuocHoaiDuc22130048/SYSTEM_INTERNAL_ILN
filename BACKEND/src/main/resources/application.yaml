@@ -43,6 +43,15 @@ logging:
 
   # 6. CUSTOM APP PROPERTIES (Cấu hình JWT)
 app:
+  init:
+    boss:
+      username: ${BOSS_USER}
+      password: ${BOSS_PASS}
+      full-name: "Đỗ Xuân Vỹ"
+    admin:
+      username: ${ADMIN_USER}
+      password: ${ADMIN_PASS}
+      full-name: "Admin System"
   jwt:
     secret: 49bd017fed0abe7d529c48151ca5c6b5c231610d6b1560c53e50bf48682e5ba6
     expiration-ms: 604800000 # 24 giờ

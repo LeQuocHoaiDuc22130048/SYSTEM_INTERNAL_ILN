@@ -17,13 +17,4 @@ public class ApiResponse<T> {
 
     @Builder.Default
     LocalDateTime timestamp = LocalDateTime.now();
-
-    // Helper method để tạo nhanh response thành công
-    public static <T> ApiResponse<T> success(T data, String message) {
-        return ApiResponse.<T>builder()
-                .status("Thành công")
-                .message(message)
-                .data(data)
-                .build();
-    }
 }
