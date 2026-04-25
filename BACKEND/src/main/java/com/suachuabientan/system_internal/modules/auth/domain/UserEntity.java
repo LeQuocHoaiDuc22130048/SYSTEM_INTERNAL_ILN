@@ -2,16 +2,14 @@ package com.suachuabientan.system_internal.modules.auth.domain;
 
 import com.suachuabientan.system_internal.common.model.BaseEntity;
 import jakarta.persistence.*;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 import lombok.experimental.FieldDefaults;
 
 @Entity
 @Table(name = "users")
 @Getter
 @Setter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE)
@@ -30,9 +28,6 @@ public class UserEntity extends BaseEntity {
     String fullName;
 
     String role;
-
-    @Column(columnDefinition = "TEXT")
-    String faceVector;
 
     boolean isActive = true;
 }

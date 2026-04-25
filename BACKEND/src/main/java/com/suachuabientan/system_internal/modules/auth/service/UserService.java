@@ -1,10 +1,11 @@
 package com.suachuabientan.system_internal.modules.auth.service;
 
-import com.suachuabientan.system_internal.modules.auth.dto.UserResponse;
+import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
+import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 
 import java.util.List;
 
 public interface UserService {
-    List<UserResponse> getAllUsers();
-    UserResponse getUserByUsername(String username);
+    LoginResponse login(LoginRequest loginRequest);
 }
