@@ -9,16 +9,17 @@ import org.springframework.http.HttpStatus;
 @AllArgsConstructor
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE, makeFinal = true)
 public enum ErrorCode {
-    SYSTEM_ERROR("ERR_000", "Lỗi hệ thống không xác định", HttpStatus.INTERNAL_SERVER_ERROR),
-    INVALID_INPUT("ERR_001", "Dữ liệu đầu vào không hợp lệ", HttpStatus.BAD_REQUEST),
+    SYSTEM_ERROR(999, "Lỗi hệ thống không xác định", HttpStatus.INTERNAL_SERVER_ERROR),
+    INVALID_INPUT(100, "Dữ liệu đầu vào không hợp lệ", HttpStatus.BAD_REQUEST),
 
-    UNAUTHORIZED("AUTH_001", "Tên đăng nhập hoặc mật khẩu không chính xác", HttpStatus.UNAUTHORIZED),
-    AUTH_002("AUTH_002", "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.", HttpStatus.FORBIDDEN),
+    UNAUTHORIZED(300, "Tên đăng nhập hoặc mật khẩu không chính xác", HttpStatus.UNAUTHORIZED),
+    AUTH_002(301, "Tài khoản của bạn đã bị vô hiệu hóa. Vui lòng liên hệ quản trị viên.", HttpStatus.FORBIDDEN),
+    AUTH_003(302, "Nhân viên đã tồn tại", HttpStatus.BAD_REQUEST),
 
-    QR_NOT_FOUND("INV_001", "Mã QR không tồn tại trên hệ thống", HttpStatus.NOT_FOUND),
-    DUPLICATE_ACTION("INV_002", "Thao tác này đã được thực hiện", HttpStatus.CONFLICT);
+    QR_NOT_FOUND(400, "Mã QR không tồn tại trên hệ thống", HttpStatus.NOT_FOUND),
+    DUPLICATE_ACTION(401    , "Thao tác này đã được thực hiện", HttpStatus.CONFLICT);
 
-    String code;
+    int code;
     String message;
     HttpStatus httpStatus;
 }

@@ -42,7 +42,7 @@ public class DataInitializer implements CommandLineRunner {
                     .username(adminUsername)
                     .password(passwordEncoder.encode(adminPassword))
                     .fullName(adminFullName)
-                    .role(Roles.ADMIN.getDisplayName())
+                    .role(Roles.ADMIN)
                     .isActive(true)
                     .build();
 
@@ -54,7 +54,7 @@ public class DataInitializer implements CommandLineRunner {
                     .username(bossUsername)
                     .password(passwordEncoder.encode(bossPassword))
                     .fullName(bossFullName)
-                    .role(Roles.BOSS.getDisplayName())
+                    .role(Roles.BOSS)
                     .isActive(true)
                     .build();
 

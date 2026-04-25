@@ -11,16 +11,23 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    @ExceptionHandler(BusinessException.class)
-    public ResponseEntity<ApiResponse<String>> handleBusinessException(BusinessException e) {
+    @ExceptionHandler(value = AppException.class)
+    public ResponseEntity<ApiResponse> handleBusinessException(AppException e) {
         ErrorCode errorCode = e.getErrorCode();
-
-        ApiResponse<String> response = ApiResponse.<String>builder()
-                .status("Thất bại")
+        ApiResponse apiResponse = ApiResponse.builder()
+                .code(errorCode.getCode())
                 .message(errorCode.getMessage())
-                .data(errorCode.getCode())
-                .timestamp(LocalDateTime.now()) 
                 .build();
-        return new ResponseEntity<>(response, errorCode.getHttpStatus());
+
+        return ResponseEntity.badRequest().body(apiResponse);
+    }
+
+    @ExceptionHandler(value = Exception.class)
+    public ResponseEntity<ApiResponse> handleRuntimeException(RuntimeException e) {
+        ApiResponse apiResponse = ApiResponse.builder()
+                .code(ErrorCode.SYSTEM_ERROR.getCode())
+                .message(ErrorCode.SYSTEM_ERROR.getMessage())
+                .build();
+        return ResponseEntity.badRequest().body(apiResponse);
     }
 }

@@ -9,4 +9,6 @@ public interface UserRepository extends JpaRepository<UserEntity, String> {
 
     //Tìm kiếm người dùng bằng username
     Optional<UserEntity> findByUsername(String username);
+
+    boolean existsByUsername(String username);
 }

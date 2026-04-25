@@ -1,18 +1,19 @@
 package com.suachuabientan.system_internal.modules.auth.service.implement;
 
-import com.suachuabientan.system_internal.common.dto.ApiResponse;
-import com.suachuabientan.system_internal.common.enums.BusinessStatus;
-import com.suachuabientan.system_internal.common.exception.BusinessException;
+import com.suachuabientan.system_internal.common.exception.AppException;
 import com.suachuabientan.system_internal.common.enums.ErrorCode;
 import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.UserCreationRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
+import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import com.suachuabientan.system_internal.modules.auth.security.JwtTokenProvider;
 import com.suachuabientan.system_internal.modules.auth.service.BlacklistService;
 import com.suachuabientan.system_internal.modules.auth.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import lombok.extern.slf4j.Slf4j;
@@ -21,8 +22,8 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -38,6 +39,7 @@ public class UserServiceImplement implements UserService {
     AuthenticationManager authenticationManager;
     JwtTokenProvider tokenProvider;
     BlacklistService blacklistService;
+    private final PasswordEncoder passwordEncoder;
 
     @Override
     public LoginResponse login(LoginRequest loginRequest) {
@@ -48,7 +50,7 @@ public class UserServiceImplement implements UserService {
 
             SecurityContextHolder.getContext().setAuthentication(authentication);
 
-            UserEntity user = userRepository.findByUsername(loginRequest.getUsername()).orElseThrow(() -> new BusinessException(ErrorCode.UNAUTHORIZED));
+            UserEntity user = userRepository.findByUsername(loginRequest.getUsername()).orElseThrow(() -> new AppException(ErrorCode.UNAUTHORIZED));
 
             String jwt = tokenProvider.generateToken(user.getUsername());
 
@@ -59,11 +61,11 @@ public class UserServiceImplement implements UserService {
             return response;
 
         } catch (BadCredentialsException e) {
-            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+            throw new AppException(ErrorCode.UNAUTHORIZED);
         } catch (DisabledException e) {
-            throw new BusinessException(ErrorCode.AUTH_002);
+            throw new AppException(ErrorCode.AUTH_002);
         } catch (Exception e) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR);
+            throw new AppException(ErrorCode.SYSTEM_ERROR);
         }
     }
 
@@ -91,5 +93,21 @@ public class UserServiceImplement implements UserService {
             log.error("Lỗi khi đăng xuất: {}", e.getMessage());
             return false;
         }
+    }
+
+    @Override
+    @Transactional
+    public UserResponse createEmployee(UserCreationRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) throw new AppException(ErrorCode.AUTH_003);
+
+        String password = passwordEncoder.encode(request.getPassword());
+        UserEntity newUser = UserEntity.builder()
+                .username(request.getUsername())
+                .password(password)
+                .role(request.getRole())
+                .isActive(true)
+                .build();
+
+        return userMapper.toResponse(userRepository.save(newUser));
     }
 }

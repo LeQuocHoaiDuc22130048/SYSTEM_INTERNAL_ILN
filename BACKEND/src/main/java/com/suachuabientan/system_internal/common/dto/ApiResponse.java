@@ -11,10 +11,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @FieldDefaults(level = AccessLevel.PRIVATE)
 public class ApiResponse<T> {
-    String status;
+    @Builder.Default
+    int code = 1000;
     String message;
     T data;
-
-    @Builder.Default
-    LocalDateTime timestamp = LocalDateTime.now();
 }

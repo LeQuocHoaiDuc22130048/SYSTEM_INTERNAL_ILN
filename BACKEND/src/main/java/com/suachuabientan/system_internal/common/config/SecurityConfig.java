@@ -1,5 +1,6 @@
 package com.suachuabientan.system_internal.common.config;
 
+import com.suachuabientan.system_internal.common.enums.Roles;
 import lombok.RequiredArgsConstructor;
 import lombok.experimental.FieldDefaults;
 import org.springframework.context.annotation.Bean;
@@ -36,14 +37,16 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/v1/auth/login").permitAll()
+                        .requestMatchers("/api/v1/auth/**").permitAll()
+
+                        .requestMatchers("/api/v1/users/**").hasAuthority("ADMIN")
 
                         // Các tính năng truy cập từ xa
-                        .requestMatchers("/api/v1/finance/**").hasAnyAuthority("ADMIN", "MANAGER")
-                        .requestMatchers("/api/v1/reports/**").hasAnyAuthority("ADMIN", "MANAGER")
+                        .requestMatchers("/api/v1/finance/**").hasAnyAuthority(Roles.BOSS.name(), Roles.ADMIN.name(), Roles.MANAGER.name())
+                        .requestMatchers("/api/v1/reports/**").hasAnyAuthority(Roles.BOSS.name(), Roles.ADMIN.name(), Roles.MANAGER.name())
 
                         // Tính năng chung của kho
-                        .requestMatchers("/api/v1/inventory/**").hasAnyAuthority("ADMIN", "STAFF", "MANAGER")
+                        .requestMatchers("/api/v1/inventory/**").hasAnyAuthority(Roles.BOSS.name(), Roles.ADMIN.name(), Roles.STAFF.name(), Roles.MANAGER.name())
 
                         .anyRequest().authenticated()
                 )

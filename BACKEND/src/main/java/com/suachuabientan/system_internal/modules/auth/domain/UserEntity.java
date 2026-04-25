@@ -1,5 +1,6 @@
 package com.suachuabientan.system_internal.modules.auth.domain;
 
+import com.suachuabientan.system_internal.common.enums.Roles;
 import com.suachuabientan.system_internal.common.model.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
@@ -27,7 +28,9 @@ public class UserEntity extends BaseEntity {
 
     String fullName;
 
-    String role;
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    Roles role;
 
     boolean isActive = true;
 }
