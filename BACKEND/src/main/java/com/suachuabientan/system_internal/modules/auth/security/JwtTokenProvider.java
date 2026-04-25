@@ -52,6 +52,17 @@ public class JwtTokenProvider {
         return claims.getSubject();
     }
 
+
+    // Lấy expiration date từ JWT token
+    public Date getExpirationDateFromToken(String token) {
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(getSigningKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+        return claims.getExpiration();
+    }
+
     //Kiểm tra token có hợp lệ không
     public boolean validateToken(String token) {
         try {

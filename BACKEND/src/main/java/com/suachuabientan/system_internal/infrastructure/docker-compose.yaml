@@ -19,7 +19,20 @@ services:
       # Tự động chạy script tạo bảng khi khởi động lần đầu
       - ./init-db:/docker-entrypoint-initdb.d
 
-  # 2. Database Management: Adminer (Giao diện quản lý DB trên trình duyệt)
+  # 2. Cache: Redis (Dùng cho blacklist JWT token khi logout)
+  redis:
+    image: redis:7-alpine
+    container_name: system_internal_inl_redis
+    restart: always
+    environment:
+      TZ: Asia/Ho_Chi_Minh
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  # 3. Database Management: Adminer (Giao diện quản lý DB trên trình duyệt)
   adminer:
     image: adminer
     container_name: system_internal_inl_adminer
@@ -31,3 +44,4 @@ services:
 
 volumes:
   postgres_data:
+  redis_data:
