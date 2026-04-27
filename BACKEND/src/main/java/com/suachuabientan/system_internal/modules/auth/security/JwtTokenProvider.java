@@ -19,8 +19,8 @@ public class JwtTokenProvider {
     @Value("${app.jwt.secret}")
     String jwtSecret;
 
-    @Value("${app.jwt.expiration-ms}")
-    Long jwtExpirationMs;
+    @Value("${app.jwt.access-expiration-ms}")
+    Long jwtAccessExpirationMs;
 
 
     // Tạo SecretKey từ chuỗi secret trong cấu hình
@@ -32,7 +32,7 @@ public class JwtTokenProvider {
     // Tạo Jwt token dựa trên Username
     public String generateToken(String username) {
         Date now = new Date();
-        Date expiration = new Date(now.getTime() + jwtExpirationMs);
+        Date expiration = new Date(now.getTime() + jwtAccessExpirationMs);
 
         return Jwts.builder()
                 .setSubject(username)

@@ -2,8 +2,10 @@ package com.suachuabientan.system_internal.modules.auth.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.UserCreationRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
+import com.suachuabientan.system_internal.modules.auth.dto.response.RefreshTokenResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -33,6 +35,14 @@ public class UserController {
         return ApiResponse.<Boolean>builder()
                 .message(isLogout ? "Đăng xuất thành công" : "Đăng xuất thất bại")
                 .data(isLogout)
+                .build();
+    }
+
+    @PostMapping("/auth/refresh-token")
+    public ApiResponse<RefreshTokenResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest request) {
+        return ApiResponse.<RefreshTokenResponse>builder()
+                .message("Refresh token thành công")
+                .data(userService.refreshToken(request))
                 .build();
     }
 

@@ -64,7 +64,8 @@ app:
       full-name: ${ADMIN_FULL_NAME}
   jwt:
     secret: ${JWT_SECRET}
-    expiration-ms: ${JWT_EXPIRATION_MS:604800000}
+    access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:1800000}  # 30 minutes
+    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}  # 7 days
 
 # 8. DEVELOPMENT SPECIFIC
 dev:
