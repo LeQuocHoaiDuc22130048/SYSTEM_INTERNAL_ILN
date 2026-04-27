@@ -13,8 +13,13 @@ import lombok.experimental.FieldDefaults;
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE)
 public class LoginResponse {
     String accessToken;
+
+    @Builder.Default
     String tokenType = "Bearer";
+
     String username;
+
     String fullName;
+
     String role;
 }

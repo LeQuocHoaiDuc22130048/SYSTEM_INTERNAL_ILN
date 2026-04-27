@@ -1,7 +1,6 @@
 package com.suachuabientan.system_internal.modules.auth.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
-import com.suachuabientan.system_internal.common.enums.BusinessStatus;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.UserCreationRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
@@ -21,7 +20,7 @@ public class UserController {
     UserService userService;
 
     @PostMapping("/auth/login")
-    public ApiResponse<LoginResponse> login(@RequestBody LoginRequest loginRequest) {
+    public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest loginRequest) {
         return ApiResponse.<LoginResponse>builder()
                 .message("Đăng nhập thành công")
                 .data(userService.login(loginRequest))

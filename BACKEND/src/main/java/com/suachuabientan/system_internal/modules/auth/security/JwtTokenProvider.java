@@ -79,8 +79,6 @@ public class JwtTokenProvider {
             log.error("Token không được hỗ trợ (Unsupported JWT token)");
         } catch (IllegalArgumentException ex) {
             log.error("Chuỗi Claims trống (JWT claims string is empty)");
-        } catch (SignatureException ex) {
-            log.error("Chữ ký Token không khớp (Invalid JWT signature)");
         }
         return false;
     }
