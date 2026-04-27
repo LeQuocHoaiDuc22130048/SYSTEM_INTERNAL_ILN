@@ -5,8 +5,8 @@ spring:
   # 1. DATABASE CONFIGURATION (PostgreSQL in Docker)
   datasource:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:system_internal_inl}?options=-c+timezone%3DAsia%2FHo_Chi_Minh
-    username: ${DB_USER:admin}
-    password: ${DB_PASSWORD:admin@123}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   # 2. JPA / HIBERNATE CONFIGURATION
@@ -55,15 +55,15 @@ logging:
 app:
   init:
     boss:
-      username: ${BOSS_USER:boss}
-      password: ${BOSS_PASS:boss@123}
-      full-name: ${BOSS_FULL_NAME:"Đỗ Xuân Vỹ"}
+      username: ${BOSS_USER}
+      password: ${BOSS_PASS}
+      full-name: ${BOSS_FULL_NAME}
     admin:
-      username: ${ADMIN_USER:admin}
-      password: ${ADMIN_PASS:admin@123}
-      full-name: ${ADMIN_FULL_NAME:"Admin System"}
+      username: ${ADMIN_USER}
+      password: ${ADMIN_PASS}
+      full-name: ${ADMIN_FULL_NAME}
   jwt:
-    secret: ${JWT_SECRET:49bd017fed0abe7d529c48151ca5c6b5c231610d6b1560c53e50bf48682e5ba6}
+    secret: ${JWT_SECRET}
     expiration-ms: ${JWT_EXPIRATION_MS:604800000}
 
 # 8. DEVELOPMENT SPECIFIC

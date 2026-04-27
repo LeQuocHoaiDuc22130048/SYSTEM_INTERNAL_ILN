@@ -1,0 +1,97 @@
+spring:
+  application:
+    name: system-internal-inl-backend-prod
+
+  # 1. DATABASE CONFIGURATION (Production PostgreSQL)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}?options=-c+timezone%3DUTC
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+  # 2. JPA / HIBERNATE CONFIGURATION
+  jpa:
+    hibernate:
+      ddl-auto: validate  # Production mode - validate only
+    show-sql: false  # Disable SQL logging in production
+    properties:
+      hibernate:
+        jdbc:
+          timezone: UTC
+        format_sql: false
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+
+  # 3. REDIS CONFIGURATION
+  data:
+    redis:
+      host: ${REDIS_HOST}
+      port: ${REDIS_PORT}
+      password: ${REDIS_PASSWORD}  # Optional: if Redis requires auth
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+
+  # 4. FILE UPLOAD
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+
+# 5. SERVER CONFIGURATION
+server:
+  port: ${SERVER_PORT:8080}
+  error:
+    include-message: never  # Don't expose error details in production
+    include-stack-trace: false
+    include-exception: false
+  compression:
+    enabled: true
+    mime-types: application/json,application/xml,text/html,text/xml,text/plain
+
+# 6. LOGGING CONFIGURATION
+logging:
+  level:
+    root: WARN
+    com.suachuabientan.system_internal: INFO
+    org.hibernate.SQL: WARN
+  file:
+    name: /var/log/system-internal/application.log
+  logback:
+    rollingpolicy:
+      max-file-size: 10MB
+      max-history: 30
+
+# 7. CUSTOM APP PROPERTIES
+app:
+  init:
+    boss:
+      username: ${BOSS_USER}
+      password: ${BOSS_PASS}
+      full-name: ${BOSS_FULL_NAME}
+    admin:
+      username: ${ADMIN_USER}
+      password: ${ADMIN_PASS}
+      full-name: ${ADMIN_FULL_NAME}
+  jwt:
+    secret: ${JWT_SECRET}
+    expiration-ms: ${JWT_EXPIRATION_MS}
+
+# 8. PRODUCTION SPECIFIC
+prod:
+  enabled: true
+  security:
+    cors:
+      enabled: true
+      allowed-origins: ${CORS_ALLOWED_ORIGINS}
+    rate-limiting:
+      enabled: true
+      requests-per-minute: 60
