@@ -11,16 +11,10 @@ import lombok.experimental.FieldDefaults;
 @AllArgsConstructor
 @NoArgsConstructor
 @FieldDefaults(level = lombok.AccessLevel.PRIVATE)
-public class LoginResponse {
+public class RefreshTokenResponse {
     String accessToken;
     String refreshToken;
-
+    
     @Builder.Default
     String tokenType = "Bearer";
-
-    String username;
-
-    String fullName;
-
-    String role;
 }

@@ -2,15 +2,19 @@ package com.suachuabientan.system_internal.modules.auth.service.implement;
 
 import com.suachuabientan.system_internal.common.exception.AppException;
 import com.suachuabientan.system_internal.common.enums.ErrorCode;
+import com.suachuabientan.system_internal.modules.auth.domain.RefreshToken;
 import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.UserCreationRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
+import com.suachuabientan.system_internal.modules.auth.dto.response.RefreshTokenResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import com.suachuabientan.system_internal.modules.auth.security.JwtTokenProvider;
 import com.suachuabientan.system_internal.modules.auth.service.BlacklistService;
+import com.suachuabientan.system_internal.modules.auth.service.RefreshTokenService;
 import com.suachuabientan.system_internal.modules.auth.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
@@ -39,6 +43,7 @@ public class UserServiceImplement implements UserService {
     AuthenticationManager authenticationManager;
     JwtTokenProvider tokenProvider;
     BlacklistService blacklistService;
+    RefreshTokenService refreshTokenService;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -54,9 +59,13 @@ public class UserServiceImplement implements UserService {
 
             String jwt = tokenProvider.generateToken(user.getUsername());
 
+            // Tạo refresh token
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getUsername());
+
             LoginResponse response = userMapper.toLoginResponse(user);
 
             response.setAccessToken(jwt);
+            response.setRefreshToken(refreshToken.getToken());
 
             return response;
 
@@ -92,6 +101,26 @@ public class UserServiceImplement implements UserService {
         } catch (Exception e) {
             log.error("Lỗi khi đăng xuất: {}", e.getMessage());
             return false;
+        }
+    }
+
+    @Override
+    public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
+        try {
+            String newAccessToken = refreshTokenService.refreshToken(request.getRefreshToken());
+
+            // Tạo refresh token mới (rotation)
+            String username = tokenProvider.getUsernameFromToken(newAccessToken);
+            RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(username);
+
+            return RefreshTokenResponse.builder()
+                    .accessToken(newAccessToken)
+                    .refreshToken(newRefreshToken.getToken())
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Lỗi khi refresh token: {}", e.getMessage());
+            throw new AppException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
     }
 
