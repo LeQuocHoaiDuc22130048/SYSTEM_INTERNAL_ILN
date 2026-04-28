@@ -19,12 +19,12 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class RefreshTokenService {
 
-    RefreshTokenRepository refreshTokenRepository;
-    UserRepository userRepository;
-    JwtTokenProvider jwtTokenProvider;
+    final RefreshTokenRepository refreshTokenRepository;
+    final UserRepository userRepository;
+    final JwtTokenProvider jwtTokenProvider;
 
     @Value("${app.jwt.refresh-expiration-ms}")
     Long refreshTokenDurationMs;
@@ -33,7 +33,7 @@ public class RefreshTokenService {
      * Tạo refresh token mới cho user
      */
     @Transactional
-    public RefreshToken createRefreshToken( String userId) {
+    public RefreshToken createRefreshToken(Long userId) {
         UserEntity user = userRepository.findById(userId)
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
 
@@ -115,7 +115,7 @@ public class RefreshTokenService {
      * Xóa tất cả refresh token của user
      */
     @Transactional
-    public void deleteByUserId(String userId) {
+    public void deleteByUserId(Long userId) {
         refreshTokenRepository.deleteByUser_Id(userId);
     }
 }

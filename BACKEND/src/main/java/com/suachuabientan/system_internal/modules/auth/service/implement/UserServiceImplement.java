@@ -60,7 +60,7 @@ public class UserServiceImplement implements UserService {
             String jwt = tokenProvider.generateToken(user.getUsername());
 
             // Tạo refresh token
-            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getUsername());
+            RefreshToken refreshToken = refreshTokenService.createRefreshToken(user.getId());
 
             LoginResponse response = userMapper.toLoginResponse(user);
 
@@ -107,11 +107,15 @@ public class UserServiceImplement implements UserService {
     @Override
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
         try {
-            String newAccessToken = refreshTokenService.refreshToken(request.getRefreshToken());
+            // Tìm và xác thực refresh token
+            RefreshToken refreshToken = refreshTokenService.findByToken(request.getRefreshToken());
+            refreshTokenService.verifyExpiration(refreshToken);
+
+            // Tạo access token mới
+            String newAccessToken = tokenProvider.generateToken(refreshToken.getUser().getUsername());
 
             // Tạo refresh token mới (rotation)
-            String username = tokenProvider.getUsernameFromToken(newAccessToken);
-            RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(username);
+            RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(refreshToken.getUser().getId());
 
             return RefreshTokenResponse.builder()
                     .accessToken(newAccessToken)

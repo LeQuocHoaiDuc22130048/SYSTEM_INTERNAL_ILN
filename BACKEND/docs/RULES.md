@@ -84,3 +84,15 @@ smart-wms-root/
 * **Transaction:** Sử dụng` @Transactional` cho các nghiệp vụ có nhiều bước ghi dữ liệu (ví dụ: Xuất kho đồng thời cập nhật nhật ký).
 
 * **Logging:** Sử dụng @Slf4j của Lombok. Không dùng System.out.println. Chỉ log các thông tin quan trọng hoặc lỗi.
+
+## 8. QUY TẮC BẢO MẬT (SECURITY)
+* **JWT:** Sử dụng JWT để xác thực và phân quyền người dùng. Mỗi token phải chứa thông tin về vai trò (role) của người dùng.
+* **Mật khẩu:** Luôn mã hóa mật khẩu bằng BCrypt trước khi lưu vào database.
+* **XSS & SQL Injection:** Sử dụng Prepared Statements hoặc ORM (Hibernate) để tránh SQL Injection. Kiểm tra và làm sạch dữ liệu đầu vào để ngăn chặn XSS.
+
+## 9. QUY TẮC HIỆN THỰC SERVICE 
+* Mỗi Service phải chỉ chứa logic nghiệp vụ, không chứa logic liên quan đến database (đó là nhiệm vụ của Repository).
+* Service phải gọi Repository để thực hiện các thao tác với database, sau đó sử dụng Mapper để chuyển đổi Entity sang DTO trước khi trả về Controller.
+* Phải có interface cho mỗi Service để đảm bảo tính linh hoạt và dễ dàng mở rộng trong tương lai.
+* Ví dụ: InventoryService sẽ có các phương thức như `getDeviceList()`, `addDevice(DeviceRequestDTO deviceRequest)`, `updateDevice(Long id, DeviceRequestDTO deviceRequest)`, `deleteDevice(Long id)`, và tất cả các phương thức này sẽ gọi Repository để thực hiện thao tác với database, sau đó sử dụng Mapper để chuyển đổi Entity sang DTO trước khi trả về Controller.
+* Service cũng phải xử lý các tình huống ngoại lệ (Exception) và trả về thông tin lỗi một cách rõ ràng cho Controller, để Controller có thể trả về phản hồi phù hợp cho Client (Flutter).

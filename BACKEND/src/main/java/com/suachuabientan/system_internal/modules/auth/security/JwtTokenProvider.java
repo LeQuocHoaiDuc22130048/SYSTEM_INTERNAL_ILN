@@ -42,7 +42,7 @@ public class JwtTokenProvider {
                 .compact();
     }
 
-    // Lấy user từ trong JWT token
+    // Lấy username từ trong JWT token
     public String getUsernameFromToken(String token) {
         Claims claims = Jwts.parserBuilder()
                 .setSigningKey(getSigningKey())

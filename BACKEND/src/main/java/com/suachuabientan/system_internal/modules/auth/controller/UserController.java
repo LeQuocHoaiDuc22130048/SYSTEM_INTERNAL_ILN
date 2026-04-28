@@ -46,7 +46,7 @@ public class UserController {
                 .build();
     }
 
-    @PostMapping("/create")
+    @PostMapping("/create_user")
     public ApiResponse<UserResponse> createUser(@Valid @RequestBody UserCreationRequest request) {
         return ApiResponse.<UserResponse>builder()
                 .message("Tạo nhân viên thành công")
