@@ -1,64 +1,99 @@
 spring:
   application:
-    name: system-internal-inl-backend
+    name: ims-backend
 
-    # 1. DATABASE CONFIGURATION (PostgreSQL in Docker)
   datasource:
-    url: jdbc:postgresql://localhost:5432/system_internal_inl?options=-c+timezone%3DAsia%2FHo_Chi_Minh
-    username: admin
-    password: admin@123
-    driver-class-name: org.postgresql.Driver
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ims_db}
+    username: ${DB_USER:ims_user}
+    password: ${DB_PASSWORD:ims_pass}
+    hikari:
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 30000
 
-    # 2. JPA / HIBERNATE CONFIGURATION
   jpa:
     hibernate:
-        # Tự động cập nhật cấu trúc bảng dựa trên Entity (Phù hợp giai đoạn Dev)
-      ddl-auto: create
-    show-sql: true # Hiển thị câu lệnh SQL trong Console để dễ debug
+      ddl-auto: validate
+    show-sql: false
     properties:
       hibernate:
-        jdbc:
-          timezone: Asia/Ho_Chi_Minh
-        format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        default_schema: public
 
-  # 4. REDIS CONFIGURATION (Dùng cho blacklist JWT token)
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
 
-  # 5. FILE UPLOAD (Cho Face ID photo hoặc ảnh linh kiện)
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false   # Instant → ISO-8601 string, không phải số
+    deserialization:
+      fail-on-unknown-properties: false
+    time-zone: UTC
+
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 5MB
+      max-file-size: 10MB
+      max-request-size: 50MB
 
-  # 4. SERVER CONFIGURATION
-server:
-  port: 8888
-  error:
-    include-message: always # Hiển thị lỗi chi tiết để Flutter dễ xử lý
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:XBaT8nr/RJsy359hdDc5B/PThvb9Nt7d5tb80ZZKA/s=}
+  access-token-expiration: 900000       # 15 phút (ms)
+  refresh-token-expiration: 604800000   # 7 ngày (ms)
 
-  # 5. LOGGING CONFIGURATION (Tuân thủ RULES.md)
+# App Configuration
+app:
+  # ── Tài khoản mặc định khởi tạo khi startup ──────────────────────────
+  # ⚠️ Override bằng biến môi trường trong production!
+  init:
+    super-admin:
+      username: ${SUPER_ADMIN_USERNAME:superadmin}
+      email: ${SUPER_ADMIN_EMAIL:superadmin@company.com}
+      password: ${SUPER_ADMIN_PASSWORD:Admin@123456}   # BẮT BUỘC đổi khi deploy
+      full-name: ${SUPER_ADMIN_FULL_NAME:Super Administrator}
+    admin:
+      username: ${ADMIN_USERNAME:}                     # Để trống nếu không cần
+      email: ${ADMIN_EMAIL:}
+      password: ${ADMIN_PASSWORD:}
+      full-name: ${ADMIN_FULL_NAME:Administrator}
+
+  face-service-url: ${FACE_SERVICE_URL:http://localhost:8001}
+#  minio:
+#    endpoint: ${MINIO_ENDPOINT:http://localhost:9000}
+#    access-key: ${MINIO_ACCESS_KEY:minioadmin}
+#    secret-key: ${MINIO_SECRET_KEY:minioadmin}
+#    bucket-name: ${MINIO_BUCKET:ims-files}
+  board:
+    overdue-hours: 48
+  cors:
+    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8080}
+
+  flyway:
+    repair-on-startup: ${FLYWAY_REPAIR_ON_STARTUP:false}
+
+# Springdoc OpenAPI
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+
+# Logging
 logging:
   level:
-    root: INFO
-    com.smartwms: DEBUG # Log chi tiết logic của dự án
-    org.hibernate.SQL: DEBUG
-
-  # 6. CUSTOM APP PROPERTIES (Cấu hình JWT)
-app:
-  init:
-    boss:
-      username: ${BOSS_USER}
-      password: ${BOSS_PASS}
-      full-name: "Đỗ Xuân Vỹ"
-    admin:
-      username: ${ADMIN_USER}
-      password: ${ADMIN_PASS}
-      full-name: "Admin System"
-  jwt:
-    secret: ${JWT_SECRET:49bd017fed0abe7d529c48151ca5c6b5c231610d6b1560c53e50bf48682e5ba6}
-    access-expiration-ms: ${JWT_ACCESS_EXPIRATION_MS:1800000}
-    refresh-expiration-ms: ${JWT_REFRESH_EXPIRATION_MS:604800000}
+    com.company.ims: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{correlationId}] %logger{36} - %msg%n"

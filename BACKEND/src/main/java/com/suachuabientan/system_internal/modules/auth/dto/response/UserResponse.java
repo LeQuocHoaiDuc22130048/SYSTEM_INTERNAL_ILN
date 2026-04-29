@@ -1,18 +1,21 @@
 package com.suachuabientan.system_internal.modules.auth.dto.response;
 
-import lombok.Data;
-import lombok.experimental.FieldDefaults;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
+import java.util.UUID;
 
-@Data
-@FieldDefaults(level = lombok.AccessLevel.PRIVATE)
-public class UserResponse {
-    Long id;
-    String username;
-    String fullName;
-    String email;
-    String role;
-    boolean isActive;
-    LocalDateTime createdAt;
-}
+public record UserResponse (
+        UUID id,
+        String username,
+        String fullName,
+        String email,
+        String employeeCode,
+        String department,
+        String phone,
+        String role,
+        String status,
+        String avatarUrl,
+        Boolean faceEnrolled,
+        Instant approvedAt,
+        Instant createdAt
+) {}

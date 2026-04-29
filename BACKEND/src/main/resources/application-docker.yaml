@@ -1,0 +1,4 @@
+app:
+  flyway:
+    repair-on-startup: true
+
