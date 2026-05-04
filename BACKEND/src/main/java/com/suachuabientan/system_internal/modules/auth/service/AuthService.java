@@ -3,6 +3,7 @@ package com.suachuabientan.system_internal.modules.auth.service;
 import com.suachuabientan.system_internal.common.enums.UserRole;
 import com.suachuabientan.system_internal.common.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
+import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
 import com.suachuabientan.system_internal.common.util.JwtUtil;
 import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
@@ -23,9 +24,8 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
-    private final AuthenticationManager authenticationManager;
     private final UserMapper userMapper;
+    private final EmployeeCodeGenerator  employeeCodeGenerator;
 
     /*
      * Đăng ký tài khoản mới — trạng thái PENDING_APPROVAL, chưa được login (SEC-03).
@@ -40,11 +40,14 @@ public class AuthService {
             throw new BusinessException("Email '" + request.email() + "' đã được sử dụng", 409);
         }
 
+        String employeeCode = employeeCodeGenerator.generate(request.department());
+
         UserEntity user = UserEntity.builder()
                 .username(request.username())
                 .email(request.email().toLowerCase())
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .fullName(request.fullName())
+                .employeeCode(employeeCode)
                 .department(request.department())
                 .phone(request.phone())
                 .role(UserRole.EMPLOYEE)

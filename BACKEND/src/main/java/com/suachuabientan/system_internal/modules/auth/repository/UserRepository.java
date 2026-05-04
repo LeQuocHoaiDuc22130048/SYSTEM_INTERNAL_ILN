@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.nio.channels.FileChannel;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -42,4 +43,13 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
                    OR LOWER(u.email) LIKE LOWER(CONCAT('%', :keyword, '%')))
             """)
     Page<UserEntity> searchUsers(@Param("keyword") String keyword, Pageable pageable);
+
+
+    @Query("""
+            SELECT MAX(CAST(SUBSTRING(u.employeeCode, LENGTH(:prefix) + 1) AS integer))
+            FROM UserEntity u
+            WHERE u.employeeCode LIKE CONCAT(:prefix, '%')
+              AND u.isDeleted = false
+            """)
+    Optional<Integer> findMaxSequenceByPrefix(@Param("prefix") String prefix);
 }

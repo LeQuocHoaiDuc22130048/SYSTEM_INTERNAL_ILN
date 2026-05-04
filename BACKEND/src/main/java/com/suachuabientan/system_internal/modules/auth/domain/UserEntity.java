@@ -5,6 +5,8 @@ import com.suachuabientan.system_internal.common.enums.UserStatus;
 import com.suachuabientan.system_internal.common.model.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -63,11 +65,13 @@ public class UserEntity extends BaseEntity {
     // ── Phân quyền & trạng thái ───────────────────────────────────────────
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 20)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false, columnDefinition = "user_role")
     private UserRole role = UserRole.EMPLOYEE;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 25)
+    @JdbcTypeCode(SqlTypes.NAMED_ENUM)
+    @Column(nullable = false, columnDefinition = "user_status")
     private UserStatus status = UserStatus.PENDING_APPROVAL;
 
     // ── Duyệt tài khoản ───────────────────────────────────────────────────
