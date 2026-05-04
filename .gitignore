@@ -35,4 +35,4 @@ build/
 
 .settings.json
 
-docs/
+**/docs/
