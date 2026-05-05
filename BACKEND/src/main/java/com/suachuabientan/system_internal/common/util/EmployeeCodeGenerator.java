@@ -3,7 +3,7 @@ package com.suachuabientan.system_internal.common.util;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.flywaydb.core.internal.util.StringUtils;
+import org.springframework.util.StringUtils;
 import org.springframework.stereotype.Component;
 
 import java.time.Year;

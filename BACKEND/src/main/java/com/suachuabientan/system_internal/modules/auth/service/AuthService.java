@@ -3,19 +3,29 @@ package com.suachuabientan.system_internal.modules.auth.service;
 import com.suachuabientan.system_internal.common.enums.UserRole;
 import com.suachuabientan.system_internal.common.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
+import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
 import com.suachuabientan.system_internal.common.util.JwtUtil;
+import com.suachuabientan.system_internal.modules.auth.domain.RefreshToken;
 import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
+import com.suachuabientan.system_internal.modules.auth.repository.RefreshTokenRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.Instant;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -25,7 +35,10 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final UserMapper userMapper;
-    private final EmployeeCodeGenerator  employeeCodeGenerator;
+    private final EmployeeCodeGenerator employeeCodeGenerator;
+    private final AuthenticationManager authenticationManager;
+    private final JwtUtil jwtUtil;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     /*
      * Đăng ký tài khoản mới — trạng thái PENDING_APPROVAL, chưa được login (SEC-03).
@@ -36,15 +49,12 @@ public class AuthService {
         if (userRepository.existsByUsernameAndIsDeletedFalse(request.username())) {
             throw new BusinessException("Tên đăng nhập " + request.username() + "' đã tồn tại", 409);
         }
-        if (userRepository.existsByEmailAndIsDeletedFalse(request.email())) {
-            throw new BusinessException("Email '" + request.email() + "' đã được sử dụng", 409);
-        }
+
 
         String employeeCode = employeeCodeGenerator.generate(request.department());
 
         UserEntity user = UserEntity.builder()
                 .username(request.username())
-                .email(request.email().toLowerCase())
                 .passwordHash(passwordEncoder.encode(request.password()))
                 .fullName(request.fullName())
                 .employeeCode(employeeCode)
@@ -56,8 +66,142 @@ public class AuthService {
                 .build();
 
         UserEntity saved = userRepository.save(user);
-        log.info("Tài khoản mới đăng ký: username={}, email={}", saved.getUsername(), saved.getEmail());
+        log.info("Tài khoản mới đăng ký: username={}", saved.getUsername());
 
         return userMapper.toResponse(saved);
+    }
+
+    /*
+     * Đăng nhập — chỉ tài khoản ACTIVE mới được login (SEC-03).
+     */
+    @Transactional
+    public LoginResponse login(LoginRequest request) {
+        authenticationManager.authenticate(
+                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                        request.username(), request.password()
+                )
+        );
+
+        UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(request.username())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        if (!user.isActive()) {
+            throw new BusinessException(buildLoginBlockMessage(user.getStatus()), 403);
+        }
+
+        String accessToken = jwtUtil.generateAccessToken(
+                user.getId(), user.getUsername(), user.getRole().name());
+        String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+
+        log.info("Đăng nhập thành công: userId={}, role={}", user.getId(), user.getRole());
+
+        return new LoginResponse(
+                accessToken, refreshToken, "Bearer", 900L,
+                new LoginResponse.UserInfo(user.getId(), user.getUsername(), user.getFullName(),
+                        user.getRole().name(), user.getStatus().name(),
+                        user.getAvatarUrl(), user.getDepartment())
+        );
+    }
+
+    /*
+     * Refresh token — kiểm tra refresh token hợp lệ và chưa hết hạn, sau đó cấp mới access token (SEC-03).
+     */
+    @Transactional
+    public LoginResponse refreshToken(RefreshTokenRequest request) {
+        String rawToken = request.refreshToken();
+
+        if (!jwtUtil.isTokenValid(rawToken) || !jwtUtil.isRefreshToken(rawToken))
+            throw new BusinessException("Refresh token không hợp lệ hoặc đã hết hạn", 401);
+
+        String tokenHash = jwtUtil.hashToken(rawToken);
+        RefreshToken storedToken = refreshTokenRepository.findByTokenHashAndRevokedFalse(tokenHash)
+                .orElseThrow(() -> new BusinessException("Refresh token không hợp lệ hoặc đã bị thu hồi", 401));
+
+        if (!storedToken.isValid()) throw new BusinessException("Refresh token đã hết hạn", 401);
+
+        UUID userId = jwtUtil.extractUserId(rawToken);
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        if (!user.isActive())
+            throw new BusinessException("Tài khoản đã bị khóa", 403);
+
+        storedToken.revoke();
+        refreshTokenRepository.save(storedToken);
+
+        String newAccessToken = jwtUtil.generateAccessToken(
+                user.getId(), user.getUsername(), user.getRole().name());
+
+        String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
+        saveRefreshToken(user.getId(), newRefreshToken, storedToken.getDeviceInfo());
+
+        return buildLoginResponse(newAccessToken, newRefreshToken, user);
+    }
+
+
+    /*
+     * Logout — revoke refresh token hiện tại.
+     */
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        String tokenHash = jwtUtil.hashToken(rawRefreshToken);
+        refreshTokenRepository.findByTokenHashAndRevokedFalse(tokenHash).
+                ifPresent(t -> {
+                    t.revoke();
+                    refreshTokenRepository.save(t);
+                    log.info("Logout: revoke tokenid={}", t.getId());
+                });
+    }
+
+    /**
+     * Logout tất cả thiết bị — revoke toàn bộ refresh token của user.
+     */
+
+    @Transactional
+    public void logoutAllDevices(UUID userId) {
+        refreshTokenRepository.revokeAllByUserId(userId);
+        log.info("Logout all devices: userId={}", userId);
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────
+    private String buildLoginBlockMessage(UserStatus status) {
+        return switch (status) {
+            case PENDING_APPROVAL -> "Tài khoản chưa được duyệt. Vui lòng liên hệ quản lý.";
+            case SUSPENDED -> "Tài khoản đã bị tạm khoá. Vui lòng liên hệ Admin.";
+            case DELETED -> "Tài khoản không tồn tại.";
+            case REGISTERED -> "Tài khoản chưa hoàn tất đăng ký.";
+            default -> "Không thể đăng nhập. Vui lòng liên hệ hỗ trợ.";
+        };
+    }
+
+    private void saveRefreshToken(UUID id, String newRefreshToken, String deviceInfo) {
+        RefreshToken token = RefreshToken.builder()
+                .userId(id)
+                .tokenHash(jwtUtil.hashToken(newRefreshToken))
+                .expiresAt(Instant.now().plusMillis(jwtUtil.getRefreshTokenExpiration()))
+                .revoked(false)
+                .deviceInfo(deviceInfo)
+                .createdAt(Instant.now())
+                .build();
+        refreshTokenRepository.save(token);
+    }
+
+    private LoginResponse buildLoginResponse(String newAccessToken, String newRefreshToken, UserEntity user) {
+        return new LoginResponse(
+                newAccessToken,
+                newRefreshToken,
+                "Bearer",
+                900L,
+                new LoginResponse.UserInfo(
+                        user.getId(),
+                        user.getUsername(),
+                        user.getFullName(),
+                        user.getRole().name(),
+                        user.getStatus().name(),
+                        user.getAvatarUrl(),
+                        user.getDepartment()
+                )
+        );
     }
 }

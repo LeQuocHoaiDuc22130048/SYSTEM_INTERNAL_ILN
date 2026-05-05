@@ -11,10 +11,6 @@ public record RegisterRequest (
         @Pattern(regexp = "^[a-zA-Z0-9._]+$", message = "Tên đăng nhập chỉ chứa chữ, số, dấu chấm và gạch dưới")
         String username,
 
-        @NotBlank(message = "Email không được để trống")
-        @Email(message = "Email không đúng định dạng")
-        String email,
-
         /**
          * Tối thiểu 8 ký tự, có chữ hoa, chữ thường, số — SEC-04.
          */
