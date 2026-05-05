@@ -1,0 +1,23 @@
+spring:
+  datasource:
+    url: ${PROD_DB_URL}
+    username: ${PROD_DB_USERNAME}
+    password: ${PROD_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+
+  data:
+    redis:
+      host: ${PROD_REDIS_HOST}
+      password: ${PROD_REDIS_PASSWORD}
+
+logging:
+  level:
+    root: WARN
+    com.yourproject: INFO

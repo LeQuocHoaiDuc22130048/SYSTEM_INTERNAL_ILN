@@ -8,7 +8,6 @@ public record UserResponse (
         UUID id,
         String username,
         String fullName,
-        String email,
         String employeeCode,
         String department,
         String phone,
