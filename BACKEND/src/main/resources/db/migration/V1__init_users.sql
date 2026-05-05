@@ -80,20 +80,7 @@ CREATE TABLE IF NOT EXISTS user_registration_requests
 
 CREATE INDEX idx_reg_requests_user ON user_registration_requests (user_id);
 
--- Bảng refresh tokens (lưu để hỗ trợ revoke)
-CREATE TABLE IF NOT EXISTS refresh_tokens
-(
-    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id     UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    token_hash  VARCHAR(255) NOT NULL UNIQUE,           -- Hash của refresh token
-    expires_at  TIMESTAMP   NOT NULL,
-    is_revoked  BOOLEAN     NOT NULL DEFAULT FALSE,
-    device_info VARCHAR(255),                           -- Thông tin thiết bị
-    created_at  TIMESTAMP   NOT NULL DEFAULT NOW()
-    );
 
-CREATE INDEX idx_refresh_tokens_user    ON refresh_tokens (user_id);
-CREATE INDEX idx_refresh_tokens_hash    ON refresh_tokens (token_hash) WHERE is_revoked = FALSE;
 
 -- =============================================================
 -- Tài khoản mặc định được khởi tạo qua DataInitializer

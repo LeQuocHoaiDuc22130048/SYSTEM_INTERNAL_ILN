@@ -1,5 +1,6 @@
 package com.suachuabientan.system_internal.modules.auth.service;
 
+import com.suachuabientan.system_internal.common.enums.ApprovalAction;
 import com.suachuabientan.system_internal.common.enums.UserRole;
 import com.suachuabientan.system_internal.common.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
@@ -8,6 +9,7 @@ import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
 import com.suachuabientan.system_internal.common.util.JwtUtil;
 import com.suachuabientan.system_internal.modules.auth.domain.RefreshToken;
 import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
@@ -19,10 +21,13 @@ import com.suachuabientan.system_internal.modules.auth.repository.UserRepository
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -40,7 +45,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final RefreshTokenRepository refreshTokenRepository;
 
-    /*
+    /**
      * Đăng ký tài khoản mới — trạng thái PENDING_APPROVAL, chưa được login (SEC-03).
      */
 
@@ -71,7 +76,7 @@ public class AuthService {
         return userMapper.toResponse(saved);
     }
 
-    /*
+    /**
      * Đăng nhập — chỉ tài khoản ACTIVE mới được login (SEC-03).
      */
     @Transactional
@@ -103,7 +108,7 @@ public class AuthService {
         );
     }
 
-    /*
+    /**
      * Refresh token — kiểm tra refresh token hợp lệ và chưa hết hạn, sau đó cấp mới access token (SEC-03).
      */
     @Transactional
@@ -140,7 +145,7 @@ public class AuthService {
     }
 
 
-    /*
+    /**
      * Logout — revoke refresh token hiện tại.
      */
     @Transactional
@@ -162,6 +167,82 @@ public class AuthService {
     public void logoutAllDevices(UUID userId) {
         refreshTokenRepository.revokeAllByUserId(userId);
         log.info("Logout all devices: userId={}", userId);
+    }
+
+    // ── Approve / Reject ──────────────────────────────────────────────────
+    /**
+     * Duyệt hoặc từ chối tài khoản nhân viên.
+     * Chỉ ADMIN và MANAGER mới có quyền — kiểm tra tại Controller qua @PreAuthorize.
+     */
+    @Transactional
+    public UserResponse processUserApproval(UUID targetUserId, ApproveUserRequest request, UUID reviewerUserId) {
+        UserEntity target = userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng " + targetUserId));
+
+        if(!target.isPending()) throw new BusinessException("Tài khoản không ở trạng thái chờ duyệt");
+
+        if (request.action() == ApprovalAction.APPROVE) {
+            target.approve(reviewerUserId);
+            log.info("Process user approval: userId={}", targetUserId);
+        } else {
+            if (!StringUtils.hasText(request.note())) throw new BusinessException("Lý do từ chối không được để trống");
+
+            target.reject(reviewerUserId, request.note());
+            log.info("Từ chối tài khoản: userId={}, rejectedBy={}, reason={}", targetUserId, reviewerUserId, request.note());
+        }
+        return userMapper.toResponse(userRepository.save(target));
+    }
+
+    // ── Query ─────────────────────────────────────────────────────────────
+
+    /**
+     * Danh sách tài khoản đang chờ duyệt — phân trang (SEC-03).
+     */
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getPendingUsers(Pageable pageable) {
+        return userRepository.findByStatusAndIsDeletedFalse(UserStatus.PENDING_APPROVAL, pageable)
+                .map(userMapper::toResponse);
+    }
+
+
+    /**
+     * Tìm kiếm nhân viên — phân trang, có keyword.
+     */
+    @Transactional(readOnly = true)
+    public Page<UserResponse> searchUsers(String keyword, Pageable pageable) {
+        return userRepository.searchUsers(keyword, pageable)
+                .map(userMapper::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public UserResponse getUserById(UUID userId) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + userId));
+        return userMapper.toResponse(user);
+    }
+
+    // ── Suspend / Delete ──────────────────────────────────────────────────
+
+    @Transactional
+    public UserResponse suspendUser(UUID targetUserId, UUID performedByUserId) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetUserId));
+
+        user.suspend();
+        log.info("Khoá tài khoản: userId={}, by={}", targetUserId, performedByUserId);
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public void deleteUser(UUID targetUserId, UUID performedByUserId) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetUserId));
+
+        // Soft delete — không xóa thật (DB rules)
+        user.softDelete(performedByUserId);
+        user.setStatus(UserStatus.DELETED);
+        userRepository.save(user);
+        log.info("Xoá tài khoản (soft): userId={}, by={}", targetUserId, performedByUserId);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
