@@ -13,7 +13,6 @@ CREATE TABLE IF NOT EXISTS users
 
     -- Thông tin đăng nhập
     username         VARCHAR(50)     NOT NULL UNIQUE,
-    email            VARCHAR(150)    NOT NULL UNIQUE,
     password_hash    VARCHAR(255)    NOT NULL,
 
     -- Thông tin cá nhân (bắt buộc)
@@ -56,7 +55,6 @@ CREATE TABLE IF NOT EXISTS users
 
 -- Indexes
 CREATE INDEX idx_users_username   ON users (username) WHERE is_deleted = FALSE;
-CREATE INDEX idx_users_email      ON users (email) WHERE is_deleted = FALSE;
 CREATE INDEX idx_users_role       ON users (role) WHERE is_deleted = FALSE;
 CREATE INDEX idx_users_status     ON users (status) WHERE is_deleted = FALSE;
 CREATE INDEX idx_users_emp_code   ON users (employee_code) WHERE is_deleted = FALSE;
@@ -97,23 +95,8 @@ CREATE TABLE IF NOT EXISTS refresh_tokens
 CREATE INDEX idx_refresh_tokens_user    ON refresh_tokens (user_id);
 CREATE INDEX idx_refresh_tokens_hash    ON refresh_tokens (token_hash) WHERE is_revoked = FALSE;
 
--- Seed tài khoản SUPER_ADMIN mặc định
--- Password: Admin@123456 (BCrypt strength 12)
-INSERT INTO users (id, username, email, password_hash, full_name, role, status, created_at, updated_at, is_deleted)
-VALUES (
-           gen_random_uuid(),
-           'superadmin',
-           'superadmin@company.com',
-           '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj4J/Gu5TQ0e',
-           'Super Administrator',
-           'SUPER_ADMIN',
-           'ACTIVE',
-           NOW(),
-           NOW(),
-           FALSE
-       );
-
-ALTER TABLE users
-ALTER COLUMN date_of_birth
-TYPE TIMESTAMPTZ
-USING date_of_birth::timestamp with time zone;
+-- =============================================================
+-- Tài khoản mặc định được khởi tạo qua DataInitializer
+-- (Spring Boot ApplicationRunner) khi ứng dụng startup.
+-- Xem: com.company.ims.config.DataInitializer
+-- =============================================================
