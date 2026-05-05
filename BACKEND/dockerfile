@@ -1,26 +1,10 @@
-# ===== Stage 1: Build =====
-FROM maven:3.9.9-eclipse-temurin-21 AS build
-
+FROM maven:3.9.6-eclipse-temurin-21 AS build
 WORKDIR /app
+COPY . .
+RUN mvn clean package -DskipTests
 
-# Copy mvnw and wrapper (if present) and pom, then download deps
-COPY mvnw mvnw
-COPY .mvn .mvn
-COPY pom.xml .
-RUN mvn -B -DskipTests dependency:go-offline
-
-# Copy source and build
-COPY src ./src
-
-RUN mvn -B -DskipTests clean package
-
-# ===== Stage 2: Run =====
-FROM eclipse-temurin:21-jdk-alpine
-
+FROM eclipse-temurin:21-jre-jammy
 WORKDIR /app
-
 COPY --from=build /app/target/*.jar app.jar
-
 EXPOSE 8080
-
 ENTRYPOINT ["java", "-jar", "app.jar"]

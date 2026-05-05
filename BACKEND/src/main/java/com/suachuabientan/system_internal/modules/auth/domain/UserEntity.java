@@ -9,6 +9,7 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -25,8 +26,7 @@ public class UserEntity extends BaseEntity {
     @Column(nullable = false, unique = true, length = 50)
     private String username;
 
-    @Column(nullable = false, unique = true, length = 150)
-    private String email;
+
 
     @Column(name = "password_hash", nullable = false)
     private String passwordHash;
@@ -55,9 +55,9 @@ public class UserEntity extends BaseEntity {
     @Column(name = "national_id", length = 500)
     private String nationalId;
 
-    /** Ngày sinh — lưu dạng Instant (UTC), chỉ lấy phần date khi hiển thị */
+    /** Ngày sinh — lưu dạng LocalDate */
     @Column(name = "date_of_birth")
-    private Instant dateOfBirth;
+    private LocalDate dateOfBirth;
 
     @Column(columnDefinition = "TEXT")
     private String address;

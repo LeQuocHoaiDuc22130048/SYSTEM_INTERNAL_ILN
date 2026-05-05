@@ -8,5 +8,7 @@ public record LoginRequest (
         String username,
 
         @NotBlank(message = "Mật khẩu không được để trống")
-        String password
+        String password,
+
+        String deviceInfo
 ) {}
