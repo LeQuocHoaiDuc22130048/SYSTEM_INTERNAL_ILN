@@ -8,12 +8,15 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     Optional<UserEntity> findByUsernameAndIsDeletedFalse(String username);
+
+    Page<UserEntity> findByStatusInAndIsDeletedFalse(List<UserStatus> statuses, Pageable pageable);
 
     Optional<UserEntity> findByIdAndIsDeletedFalse(UUID id);
 
@@ -30,11 +33,14 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
      * Tìm kiếm nhân viên theo tên hoặc mã nhân viên.
      */
     @Query("""
+            
             SELECT u FROM UserEntity u
-            WHERE u.isDeleted = false
-              AND (:keyword IS NULL
-                   OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', :keyword, '%'))
-                   OR LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', :keyword, '%')))
+               WHERE u.isDeleted = false
+                 AND (
+                   COALESCE(TRIM(:keyword), '') = ''
+                   OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', TRIM(:keyword), '%'))
+                   OR LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', TRIM(:keyword), '%'))
+                 )
             """)
     Page<UserEntity> searchUsers(@Param("keyword") String keyword, Pageable pageable);
 
