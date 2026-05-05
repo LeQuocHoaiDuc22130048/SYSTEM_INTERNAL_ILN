@@ -18,7 +18,6 @@ import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.RefreshTokenRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
