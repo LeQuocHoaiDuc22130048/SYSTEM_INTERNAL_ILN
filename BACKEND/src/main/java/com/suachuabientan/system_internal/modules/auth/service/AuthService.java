@@ -9,6 +9,7 @@ import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
 import com.suachuabientan.system_internal.common.util.JwtUtil;
 import com.suachuabientan.system_internal.modules.auth.domain.RefreshToken;
 import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.domain.UserRegistrationRequestEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
@@ -17,6 +18,7 @@ import com.suachuabientan.system_internal.modules.auth.dto.response.LoginRespons
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.RefreshTokenRepository;
+import com.suachuabientan.system_internal.modules.auth.repository.UserRegistrationRequestRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -43,6 +46,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRegistrationRequestRepository userRegistrationRequestRepository;
 
     /**
      * Đăng ký tài khoản mới — trạng thái PENDING_APPROVAL, chưa được login (SEC-03).
@@ -68,6 +72,8 @@ public class AuthService {
                 .status(UserStatus.PENDING_APPROVAL)
                 .faceEnrolled(false)
                 .build();
+
+
 
         UserEntity saved = userRepository.save(user);
         log.info("Tài khoản mới đăng ký: username={}", saved.getUsername());
@@ -96,6 +102,7 @@ public class AuthService {
         String accessToken = jwtUtil.generateAccessToken(
                 user.getId(), user.getUsername(), user.getRole().name());
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
+        saveRefreshToken(user.getId(), refreshToken, request.deviceInfo());
 
         log.info("Đăng nhập thành công: userId={}, role={}", user.getId(), user.getRole());
 
@@ -189,6 +196,18 @@ public class AuthService {
             target.reject(reviewerUserId, request.note());
             log.info("Từ chối tài khoản: userId={}, rejectedBy={}, reason={}", targetUserId, reviewerUserId, request.note());
         }
+
+        //ghi vào history
+        UserRegistrationRequestEntity history = UserRegistrationRequestEntity.builder()
+                .userId(targetUserId)
+                .action(request.action().name())
+                .reviewedBy(reviewerUserId)
+                .note(request.note())
+                .reviewedAt(Instant.now())
+                .build();
+
+        userRegistrationRequestRepository.save(history);
+
         return userMapper.toResponse(userRepository.save(target));
     }
 
@@ -209,7 +228,18 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public Page<UserResponse> searchUsers(String keyword, Pageable pageable) {
-        return userRepository.searchUsers(keyword, pageable)
+        String kw = (keyword == null || keyword.trim().isEmpty() ? null : keyword.trim());
+        return userRepository.searchUsers(kw, pageable)
+                .map(userMapper::toResponse);
+    }
+
+    /**
+     * Danh sách nhân viên
+     */
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getUsers(Pageable pageable) {
+        List<UserStatus> statuses = List.of(UserStatus.ACTIVE, UserStatus.SUSPENDED);
+        return userRepository.findByStatusInAndIsDeletedFalse(statuses, pageable)
                 .map(userMapper::toResponse);
     }
 
@@ -229,6 +259,20 @@ public class AuthService {
 
         user.suspend();
         log.info("Khoá tài khoản: userId={}, by={}", targetUserId, performedByUserId);
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    @Transactional
+    public UserResponse unsuspendUser(UUID targetUserId, UUID performedByUserId) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetUserId));
+
+        if (user.getStatus() != UserStatus.SUSPENDED) {
+            throw new BusinessException("Chỉ có thể mở khóa tài khoản đang bị khóa");
+        }
+
+        user.activate();
+        log.info("Mở khóa tài khoản: userId={}, by={}", targetUserId, performedByUserId);
         return userMapper.toResponse(userRepository.save(user));
     }
 

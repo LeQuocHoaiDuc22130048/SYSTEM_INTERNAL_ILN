@@ -59,28 +59,6 @@ CREATE INDEX idx_users_role       ON users (role) WHERE is_deleted = FALSE;
 CREATE INDEX idx_users_status     ON users (status) WHERE is_deleted = FALSE;
 CREATE INDEX idx_users_emp_code   ON users (employee_code) WHERE is_deleted = FALSE;
 
--- Bảng lịch sử duyệt tài khoản
-CREATE TABLE IF NOT EXISTS user_registration_requests
-(
-    id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id      UUID         NOT NULL REFERENCES users (id),
-    action       VARCHAR(20)  NOT NULL CHECK (action IN ('APPROVE', 'REJECT')),
-    reviewed_by  UUID         NOT NULL REFERENCES users (id),
-    note         TEXT,
-    reviewed_at  TIMESTAMP    NOT NULL DEFAULT NOW(),
-
-    -- Audit
-    created_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
-    updated_at   TIMESTAMP    NOT NULL DEFAULT NOW(),
-    created_by   UUID REFERENCES users (id),
-    updated_by   UUID REFERENCES users (id),
-    is_deleted   BOOLEAN      NOT NULL DEFAULT FALSE,
-    deleted_at   TIMESTAMP
-    );
-
-CREATE INDEX idx_reg_requests_user ON user_registration_requests (user_id);
-
-
 
 -- =============================================================
 -- Tài khoản mặc định được khởi tạo qua DataInitializer

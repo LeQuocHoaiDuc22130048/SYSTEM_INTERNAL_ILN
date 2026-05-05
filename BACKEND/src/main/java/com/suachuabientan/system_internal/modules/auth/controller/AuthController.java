@@ -83,6 +83,8 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(user));
     }
 
+    // ── Admin / Manager endpoints ─────────────────────────────────────────
+
     @Operation(summary = "Danh sách tài khoản chờ duyệt")
     @GetMapping("/users/pending")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
@@ -112,6 +114,13 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(authService.searchUsers(keyword, pageable)));
     }
 
+    @GetMapping("/users/active-suspended")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Page<UserResponse>>> getActiveAndSuspendedUsers(
+            @PageableDefault(size = 20, sort = "fullName") Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(authService.getUsers(pageable)));
+    }
+
     @Operation(summary = "Chi tiết nhân viên")
     @GetMapping("/users/{userId}")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN') or #userId == authentication.principal.id")
@@ -130,6 +139,16 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(authService.suspendUser(userId, performerId)));
     }
 
+    @Operation(summary = "Mở khóa tài khoản nhân viên")
+    @PatchMapping("/users/{userId}/unsuspend")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> unsuspendUser(
+            @PathVariable UUID userId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UUID performerId = extractUserId(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(authService.unsuspendUser(userId, performerId)));
+    }
+
     @Operation(summary = "Xoá tài khoản nhân viên (soft delete)")
     @DeleteMapping("/users/{userId}")
     @PreAuthorize("hasRole('SUPER_ADMIN')")
@@ -140,8 +159,10 @@ public class AuthController {
         authService.deleteUser(userId, performerId);
         return ResponseEntity.ok(ApiResponse.success(null, "Xoá tài khoản thành công"));
     }
-    // ── Helper ────────────────────────────────────────────────────────────
 
+
+
+    // ── Helper ────────────────────────────────────────────────────────────
     /**
      * Lấy UUID từ UserDetails — tạm thời lookup theo username.
      * Sẽ được refactor khi tích hợp CustomUserDetails.

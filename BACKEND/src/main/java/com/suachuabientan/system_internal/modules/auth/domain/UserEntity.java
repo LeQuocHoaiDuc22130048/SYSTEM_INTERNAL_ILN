@@ -138,5 +138,7 @@ public class UserEntity extends BaseEntity {
         this.status = UserStatus.SUSPENDED;
     }
 
-
+    public void activate() {
+        this.status = UserStatus.ACTIVE;
+    }
 }
