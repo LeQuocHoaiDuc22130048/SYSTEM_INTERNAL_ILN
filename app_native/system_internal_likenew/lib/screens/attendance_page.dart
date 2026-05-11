@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../widgets/status_badge.dart';
 import '../data/mock_data.dart';
+import 'face_attendance_page.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -98,7 +100,7 @@ class _AttendancePageState extends State<AttendancePage>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
+                            color: AppColors.primary.withOpacity(0.3),
                             blurRadius: 20,
                             offset: const Offset(0, 8),
                           ),
@@ -151,28 +153,50 @@ class _AttendancePageState extends State<AttendancePage>
                                   ],
                                 ],
                               ),
-                              ElevatedButton(
-                                onPressed: () {
-                                  _handleCheckInOut();
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white.withValues(alpha: 0.2),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 24,
-                                    vertical: 16,
+                              Column(
+                                children: [
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(builder: (context) => const FaceAttendancePage()),
+                                      );
+                                    },
+                                    icon: const Icon(LucideIcons.scanFace, size: 18),
+                                    label: const Text('Quét khuôn mặt'),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: Colors.white,
+                                      foregroundColor: AppColors.primary,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 12,
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
                                   ),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: () {
+                                      _handleCheckInOut();
+                                    },
+                                    style: TextButton.styleFrom(
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 20,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _hasCheckedIn ? 'Check-out (Thẻ)' : 'Check-in (Thẻ)',
+                                      style: const TextStyle(
+                                        fontSize: 13,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
                                   ),
-                                ),
-                                child: Text(
-                                  _hasCheckedIn ? 'Check-out' : 'Check-in',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                ],
                               ),
                             ],
                           ),
@@ -252,7 +276,7 @@ class _AttendancePageState extends State<AttendancePage>
             color: AppColors.infoLight,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: AppColors.info.withValues(alpha: 0.3),
+              color: AppColors.info.withOpacity(0.3),
             ),
           ),
           child: Row(

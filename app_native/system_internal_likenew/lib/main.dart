@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import 'screens/account_approval_page.dart';
 import 'screens/attendance_page.dart';
 import 'screens/dashboard_page.dart';
 import 'screens/employees_page.dart';
 import 'screens/login_page.dart';
+import 'screens/messages_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/repair_orders_page.dart';
 import 'screens/warehouse_page.dart';
@@ -68,6 +71,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
+  bool _isSidebarExpanded = true;
 
   final List<Widget> _pages = [
     const DashboardPage(),
@@ -77,6 +81,7 @@ class _MainScreenState extends State<MainScreen> {
     const MessagesPage(),
     const NotificationsPage(),
     const EmployeesPage(),
+    const AccountApprovalPage(),
   ];
 
   final List<NavigationItem> _navItems = [
@@ -112,246 +117,681 @@ class _MainScreenState extends State<MainScreen> {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDark;
 
-    return Scaffold(
-      appBar: AppBar(
-        toolbarHeight: 56,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-        surfaceTintColor: Colors.transparent,
-        centerTitle: true,
-        leading: Builder(
-          builder: (context) {
-            return IconButton(
-              icon: const Icon(Icons.menu, size: 22),
-              onPressed: () => Scaffold.of(context).openDrawer(),
-              tooltip: 'Menu',
-            );
-          },
-        ),
-        title: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                color: Theme.of(context).primaryColor,
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Center(
-                child: Text(
-                  'IMS',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 900;
+
+        if (isWide) {
+          return Scaffold(
+            body: Row(
+              children: [
+                _SideNavigation(
+                  currentIndex: _currentIndex,
+                  isDark: isDark,
+                  isExpanded: _isSidebarExpanded,
+                  onIndexChanged: (index) =>
+                      setState(() => _currentIndex = index),
+                  onToggleExpand: () =>
+                      setState(() => _isSidebarExpanded = !_isSidebarExpanded),
+                  themeProvider: themeProvider,
+                ),
+                Expanded(
+                  child: IndexedStack(index: _currentIndex, children: _pages),
+                ),
+              ],
+            ),
+          );
+        }
+
+        return Scaffold(
+          appBar: AppBar(
+            toolbarHeight: 56,
+            elevation: 0,
+            scrolledUnderElevation: 0,
+            backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+            surfaceTintColor: Colors.transparent,
+            centerTitle: true,
+            leading: Builder(
+              builder: (context) {
+                return IconButton(
+                  icon: const Icon(Icons.menu, size: 22),
+                  onPressed: () => Scaffold.of(context).openDrawer(),
+                  tooltip: 'Menu',
+                );
+              },
+            ),
+            title: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'IMS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
+                Text(
+                  'TechFix IMS',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              _BadgeIconButton(
+                icon: Icons.notifications_outlined,
+                badge: '3',
+                tooltip: 'Thông báo',
+                onPressed: () => setState(() => _currentIndex = 5),
+              ),
+              const SizedBox(width: 8),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(1),
+              child: Container(
+                height: 1,
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
               ),
             ),
-            const SizedBox(width: 8),
-            Text(
-              'TechFix IMS',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimaryLight,
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          _BadgeIconButton(
-            icon: Icons.notifications_outlined,
-            badge: '3',
-            tooltip: 'Thông báo',
-            onPressed: () {},
           ),
-          const SizedBox(width: 8),
-        ],
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(1),
-          child: Container(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-        ),
-      ),
-      drawer: Drawer(
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            DrawerHeader(
-              decoration: BoxDecoration(color: Theme.of(context).primaryColor),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 56,
-                    height: 56,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Center(
-                      child: Text(
-                        'IMS',
+          drawer: Drawer(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                DrawerHeader(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).primaryColor,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Center(
+                          child: Text(
+                            'IMS',
+                            style: TextStyle(
+                              color: Theme.of(context).primaryColor,
+                              fontSize: 20,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'TechFix IMS',
                         style: TextStyle(
-                          color: Theme.of(context).primaryColor,
+                          color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                    ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        'Admin',
+                        style: TextStyle(color: Colors.white70, fontSize: 14),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'TechFix IMS',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  const Text(
-                    'Admin',
-                    style: TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                ],
+                ),
+                _DrawerDestination(
+                  icon: Icons.dashboard_outlined,
+                  label: 'Dashboard',
+                  selected: _currentIndex == 0,
+                  onTap: () => _selectFromDrawer(context, 0),
+                ),
+                _DrawerDestination(
+                  icon: Icons.build_outlined,
+                  label: 'Đơn sửa chữa',
+                  selected: _currentIndex == 1,
+                  onTap: () => _selectFromDrawer(context, 1),
+                ),
+                _DrawerDestination(
+                  icon: Icons.inventory_2_outlined,
+                  label: 'Kho bo mạch',
+                  selected: _currentIndex == 2,
+                  onTap: () => _selectFromDrawer(context, 2),
+                ),
+                _DrawerDestination(
+                  icon: Icons.access_time_outlined,
+                  label: 'Chấm công',
+                  selected: _currentIndex == 3,
+                  onTap: () => _selectFromDrawer(context, 3),
+                ),
+                _DrawerDestination(
+                  icon: Icons.chat_bubble_outline,
+                  label: 'Tin nhắn',
+                  selected: _currentIndex == 4,
+                  onTap: () => _selectFromDrawer(context, 4),
+                ),
+                _DrawerDestination(
+                  icon: Icons.person_add_outlined,
+                  label: 'Duyệt tài khoản',
+                  selected: _currentIndex == 7,
+                  onTap: () => _selectFromDrawer(context, 7),
+                ),
+                const Divider(),
+                ListTile(
+                  leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
+                  title: Text(isDark ? 'Chế độ sáng' : 'Chế độ tối'),
+                  onTap: themeProvider.toggleTheme,
+                ),
+                ListTile(
+                  leading: const Icon(Icons.settings_outlined),
+                  title: const Text('Cài đặt'),
+                  onTap: () {
+                    Navigator.pop(context);
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.logout),
+                  title: const Text('Đăng xuất'),
+                  onTap: () {
+                    Navigator.pushReplacementNamed(context, '/login');
+                  },
+                ),
+              ],
+            ),
+          ),
+          body: IndexedStack(index: _currentIndex, children: _pages),
+          bottomNavigationBar: Container(
+            decoration: BoxDecoration(
+              color: isDark ? AppColors.surfaceDark : Colors.white,
+              border: Border(
+                top: BorderSide(
+                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                ),
               ),
             ),
-            _DrawerDestination(
-              icon: Icons.dashboard_outlined,
-              label: 'Dashboard',
-              selected: _currentIndex == 0,
-              onTap: () => _selectFromDrawer(context, 0),
-            ),
-            _DrawerDestination(
-              icon: Icons.build_outlined,
-              label: 'Đơn sửa chữa',
-              selected: _currentIndex == 1,
-              onTap: () => _selectFromDrawer(context, 1),
-            ),
-            _DrawerDestination(
-              icon: Icons.inventory_2_outlined,
-              label: 'Kho bo mạch',
-              selected: _currentIndex == 2,
-              onTap: () => _selectFromDrawer(context, 2),
-            ),
-            _DrawerDestination(
-              icon: Icons.access_time_outlined,
-              label: 'Chấm công',
-              selected: _currentIndex == 3,
-              onTap: () => _selectFromDrawer(context, 3),
-            ),
-            _DrawerDestination(
-              icon: Icons.chat_bubble_outline,
-              label: 'Tin nhắn',
-              selected: _currentIndex == 4,
-              onTap: () => _selectFromDrawer(context, 4),
-            ),
-            const Divider(),
-            ListTile(
-              leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-              title: Text(isDark ? 'Chế độ sáng' : 'Chế độ tối'),
-              onTap: themeProvider.toggleTheme,
-            ),
-            ListTile(
-              leading: const Icon(Icons.settings_outlined),
-              title: const Text('Cài đặt'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.logout),
-              title: const Text('Đăng xuất'),
-              onTap: () {
-                Navigator.pushReplacementNamed(context, '/login');
-              },
-            ),
-          ],
-        ),
-      ),
-      body: IndexedStack(index: _currentIndex, children: _pages),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: isDark ? AppColors.surfaceDark : Colors.white,
-          border: Border(
-            top: BorderSide(
-              color: isDark ? AppColors.borderDark : AppColors.borderLight,
-            ),
-          ),
-        ),
-        child: SafeArea(
-          top: false,
-          child: SizedBox(
-            height: 56,
-            child: Row(
-              children: List.generate(_navItems.length, (index) {
-                final item = _navItems[index];
-                final isSelected = _currentIndex == index;
-                final color = isSelected
-                    ? Theme.of(context).primaryColor
-                    : (isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight);
+            child: SafeArea(
+              top: false,
+              child: SizedBox(
+                height: 56,
+                child: Row(
+                  children: List.generate(_navItems.length, (index) {
+                    final item = _navItems[index];
+                    final isSelected = _currentIndex == index;
+                    final color = isSelected
+                        ? Theme.of(context).primaryColor
+                        : (isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight);
 
-                return Expanded(
-                  child: InkWell(
-                    onTap: () => setState(() => _currentIndex = index),
-                    child: Stack(
-                      alignment: Alignment.center,
-                      clipBehavior: Clip.none,
-                      children: [
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                    return Expanded(
+                      child: InkWell(
+                        onTap: () => setState(() => _currentIndex = index),
+                        child: Stack(
+                          alignment: Alignment.center,
+                          clipBehavior: Clip.none,
                           children: [
-                            Icon(
-                              isSelected ? item.activeIcon : item.icon,
-                              size: 20,
-                              color: color,
+                            Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  isSelected ? item.activeIcon : item.icon,
+                                  size: 20,
+                                  color: color,
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  item.label,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: isSelected
+                                        ? FontWeight.w700
+                                        : FontWeight.w500,
+                                    color: color,
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              item.label,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: isSelected
-                                    ? FontWeight.w700
-                                    : FontWeight.w500,
-                                color: color,
+                            if (index == 4)
+                              Positioned(
+                                top: 10,
+                                right: 22,
+                                child: _BadgePill(text: '4', size: 14),
                               ),
-                            ),
                           ],
                         ),
-                        if (index == 4)
-                          Positioned(
-                            top: 10,
-                            right: 22,
-                            child: _BadgePill(text: '4', size: 14),
-                          ),
-                      ],
-                    ),
-                  ),
-                );
-              }),
+                      ),
+                    );
+                  }),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   void _selectFromDrawer(BuildContext context, int index) {
     setState(() => _currentIndex = index);
     Navigator.pop(context);
+  }
+}
+
+class _SideNavigation extends StatelessWidget {
+  final int currentIndex;
+  final bool isDark;
+  final bool isExpanded;
+  final ValueChanged<int> onIndexChanged;
+  final VoidCallback onToggleExpand;
+  final ThemeProvider themeProvider;
+
+  const _SideNavigation({
+    required this.currentIndex,
+    required this.isDark,
+    required this.isExpanded,
+    required this.onIndexChanged,
+    required this.onToggleExpand,
+    required this.themeProvider,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final bgColor = isDark
+        ? const Color(0xFF111C2E)
+        : const Color(0xFF111C2E); // Dark blue like in image
+    final activeColor = AppColors.primary;
+    final textSecondary = Colors.white.withValues(alpha: 0.5);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      width: isExpanded ? 240 : 80,
+      color: bgColor,
+      child: Column(
+        children: [
+          // Logo
+          Padding(
+            padding: const EdgeInsets.all(24),
+            child: Row(
+              children: [
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Center(
+                    child: Text(
+                      'IMS',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                if (isExpanded) ...[
+                  const SizedBox(width: 12),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'TechFix IMS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        'Internal Management',
+                        style: TextStyle(color: Colors.white54, fontSize: 10),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              children: [
+                if (isExpanded) _CategoryLabel('MENU CHÍNH'),
+                _SideNavItem(
+                  icon: LucideIcons.layoutDashboard,
+                  label: 'Dashboard',
+                  isSelected: currentIndex == 0,
+                  onTap: () => onIndexChanged(0),
+                  isExpanded: isExpanded,
+                ),
+                _SideNavItem(
+                  icon: LucideIcons.wrench,
+                  label: 'Đơn sửa chữa',
+                  isSelected: currentIndex == 1,
+                  onTap: () => onIndexChanged(1),
+                  isExpanded: isExpanded,
+                ),
+                _SideNavItem(
+                  icon: LucideIcons.cpu,
+                  label: 'Kho bo mạch',
+                  isSelected: currentIndex == 2,
+                  onTap: () => onIndexChanged(2),
+                  isExpanded: isExpanded,
+                ),
+                _SideNavItem(
+                  icon: LucideIcons.clock,
+                  label: 'Chấm công',
+                  isSelected: currentIndex == 3,
+                  onTap: () => onIndexChanged(3),
+                  isExpanded: isExpanded,
+                ),
+                _SideNavItem(
+                  icon: LucideIcons.messageSquare,
+                  label: 'Tin nhắn',
+                  isSelected: currentIndex == 4,
+                  onTap: () => onIndexChanged(4),
+                  isExpanded: isExpanded,
+                  badge: '4',
+                ),
+                _SideNavItem(
+                  icon: LucideIcons.bell,
+                  label: 'Thông báo',
+                  isSelected: currentIndex == 5,
+                  onTap: () => onIndexChanged(5),
+                  isExpanded: isExpanded,
+                  badge: '3',
+                ),
+                const SizedBox(height: 16),
+                if (isExpanded) _CategoryLabel('QUẢN LÝ'),
+                _SideNavItem(
+                  icon: LucideIcons.users,
+                  label: 'Nhân viên',
+                  isSelected: currentIndex == 6,
+                  onTap: () => onIndexChanged(6),
+                  isExpanded: isExpanded,
+                ),
+                _SideNavItem(
+                  icon: LucideIcons.userPlus,
+                  label: 'Duyệt tài khoản',
+                  isSelected: currentIndex == 7,
+                  onTap: () => onIndexChanged(7),
+                  isExpanded: isExpanded,
+                  badge: '2',
+                ),
+              ],
+            ),
+          ),
+
+          // Footer items
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              children: [
+                _StatusSelector(isExpanded: isExpanded),
+                const SizedBox(height: 12),
+                _SideNavItem(
+                  icon: isDark ? LucideIcons.sun : LucideIcons.moon,
+                  label: isDark ? 'Chế độ sáng' : 'Chế độ tối',
+                  isSelected: false,
+                  onTap: themeProvider.toggleTheme,
+                  isExpanded: isExpanded,
+                ),
+                _SideNavItem(
+                  icon: LucideIcons.logOut,
+                  label: 'Đăng xuất',
+                  isSelected: false,
+                  onTap: () =>
+                      Navigator.pushReplacementNamed(context, '/login'),
+                  isExpanded: isExpanded,
+                ),
+                const SizedBox(height: 12),
+                _UserProfile(isExpanded: isExpanded),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  onPressed: onToggleExpand,
+                  icon: Icon(
+                    isExpanded
+                        ? LucideIcons.chevronLeft
+                        : LucideIcons.chevronRight,
+                    size: 16,
+                    color: Colors.white54,
+                  ),
+                  label: isExpanded
+                      ? const Text(
+                          'Thu gọn',
+                          style: TextStyle(color: Colors.white54, fontSize: 12),
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryLabel extends StatelessWidget {
+  final String label;
+  const _CategoryLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.3),
+          fontSize: 10,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
+      ),
+    );
+  }
+}
+
+class _SideNavItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+  final bool isExpanded;
+  final String? badge;
+
+  const _SideNavItem({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+    required this.isExpanded,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final activeColor = AppColors.primary;
+    final inactiveColor = Colors.white.withOpacity(0.6);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor : Colors.transparent,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                size: 20,
+                color: isSelected ? Colors.white : inactiveColor,
+              ),
+              if (isExpanded) ...[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : inactiveColor,
+                      fontSize: 13,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w500,
+                    ),
+                  ),
+                ),
+                if (badge != null)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white.withOpacity(0.2)
+                          : const Color(0xFFEF4444),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      badge!,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusSelector extends StatelessWidget {
+  final bool isExpanded;
+  const _StatusSelector({required this.isExpanded});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isExpanded)
+      return const Icon(LucideIcons.circle, color: Colors.amber, size: 12);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(LucideIcons.circle, color: Colors.amber, size: 12),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              'Demo: Super Admin',
+              style: TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+          ),
+          Icon(
+            LucideIcons.chevronDown,
+            size: 14,
+            color: Colors.white.withValues(alpha: 0.3),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _UserProfile extends StatelessWidget {
+  final bool isExpanded;
+  const _UserProfile({required this.isExpanded});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isExpanded) {
+      return const CircleAvatar(
+        radius: 18,
+        backgroundColor: AppColors.primary,
+        child: Text(
+          'NM',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 12,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        const CircleAvatar(
+          radius: 18,
+          backgroundColor: Color(0xFFD946EF),
+          child: Text(
+            'NM',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Nguyễn Văn Minh',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                'Super Admin - NV-2024-001',
+                style: TextStyle(color: Colors.white54, fontSize: 10),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

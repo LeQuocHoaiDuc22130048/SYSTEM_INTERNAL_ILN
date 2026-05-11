@@ -85,10 +85,10 @@ class _LoginPageState extends State<LoginPage> {
                 height: 384,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.blue.withValues(alpha: 0.1),
+                  color: Colors.blue.withOpacity(0.1),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withValues(alpha: 0.1),
+                      color: Colors.blue.withOpacity(0.1),
                       blurRadius: 120,
                       spreadRadius: 40,
                     ),

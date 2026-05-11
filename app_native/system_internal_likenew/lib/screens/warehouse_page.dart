@@ -36,15 +36,19 @@ class _WarehousePageState extends State<WarehousePage> {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final isLandscape = constraints.maxHeight < 650;
+
+            return Column(
+              children: [
+                // Header & Stats
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Expanded(
@@ -54,18 +58,18 @@ class _WarehousePageState extends State<WarehousePage> {
                                 Text(
                                   'Kho Bo mạch',
                                   style: TextStyle(
-                                    fontSize: 24,
+                                    fontSize: 22,
                                     fontWeight: FontWeight.bold,
                                     color: isDark
                                         ? AppColors.textPrimaryDark
                                         : AppColors.textPrimaryLight,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
                                   '${mockBoards.length} bo mạch trong kho',
                                   style: TextStyle(
-                                    fontSize: 14,
+                                    fontSize: 12,
                                     color: isDark
                                         ? AppColors.textSecondaryDark
                                         : AppColors.textSecondaryLight,
@@ -75,279 +79,415 @@ class _WarehousePageState extends State<WarehousePage> {
                             ),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () {
-                              // Open QR scanner
-                            },
-                            icon: const Icon(Icons.qr_code_scanner, size: 18),
-                            label: const Text('Quét QR'),
+                            onPressed: () {},
+                            icon: const Icon(Icons.qr_code_scanner, size: 16),
+                            label: const Text(
+                              'Quét QR',
+                              style: TextStyle(fontSize: 12),
+                            ),
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
+                                horizontal: 12,
+                                vertical: 10,
                               ),
                             ),
                           ),
                         ],
-                      )
-                      .animate()
-                      .fadeIn(duration: 400.ms)
-                      .slideY(begin: -0.2, end: 0, duration: 400.ms),
-                  const SizedBox(height: 16),
-
-                  // Stats
-                  // GridView.count(
-                  //   crossAxisCount: 4,
-                  //   shrinkWrap: true,
-                  //   physics: const NeverScrollableScrollPhysics(),
-                  //   mainAxisSpacing: 8,
-                  //   crossAxisSpacing: 8,
-                  //   childAspectRatio: 4.0,
-                  //   children: [
-                  //     _buildCompactStatCard(
-                  //       '${statusStats.totalBoards}',
-                  //       'Tổng',
-                  //       LucideIcons.cpu,
-                  //       AppColors.primary,
-                  //       isDark,
-                  //     ),
-                  //     _buildCompactStatCard(
-                  //       '${statusStats.availableBoards}',
-                  //       'Sẵn sàng',
-                  //       Icons.inventory_2_outlined,
-                  //       AppColors.success,
-                  //       isDark,
-                  //     ),
-                  //     _buildCompactStatCard(
-                  //       '${statusStats.checkedOutBoards}',
-                  //       'Đang dùng',
-                  //       LucideIcons.wrench,
-                  //       AppColors.warning,
-                  //       isDark,
-                  //     ),
-                  //     _buildCompactStatCard(
-                  //       '${statusStats.maintenanceBoards}',
-                  //       'Bảo trì',
-                  //       Icons.warning_amber,
-                  //       AppColors.error,
-                  //       isDark,
-                  //     ),
-                  //   ],
-                  // ),
-                  const SizedBox(height: 16),
-
-                  // Search and View Toggle
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          onChanged: (value) {
-                            setState(() {
-                              _searchQuery = value;
-                            });
-                          },
-                          decoration: InputDecoration(
-                            hintText: 'Tìm tên, mã QR, model...',
-                            prefixIcon: const Icon(Icons.search, size: 20),
-                            filled: true,
-                            fillColor: isDark
-                                ? AppColors.surfaceDark
-                                : Colors.white,
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: isDark
-                                    ? AppColors.borderDark
-                                    : AppColors.borderLight,
-                              ),
-                            ),
-                            enabledBorder: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(12),
-                              borderSide: BorderSide(
-                                color: isDark
-                                    ? AppColors.borderDark
-                                    : AppColors.borderLight,
-                              ),
-                            ),
-                            contentPadding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 12,
-                            ),
-                          ),
-                        ),
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.surfaceDark : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isDark
-                                ? AppColors.borderDark
-                                : AppColors.borderLight,
+                      const SizedBox(height: 12),
+
+                      // Responsive Stats
+                      if (isLandscape)
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildLandscapeStatCard(
+                                '${statusStats.totalBoards}',
+                                'Tổng',
+                                LucideIcons.cpu,
+                                AppColors.primary,
+                                isDark,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildLandscapeStatCard(
+                                '${statusStats.availableBoards}',
+                                'Sẵn sàng',
+                                Icons.inventory_2_outlined,
+                                AppColors.success,
+                                isDark,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildLandscapeStatCard(
+                                '${statusStats.checkedOutBoards}',
+                                'Đang dùng',
+                                LucideIcons.wrench,
+                                AppColors.warning,
+                                isDark,
+                              ),
+                              const SizedBox(width: 8),
+                              _buildLandscapeStatCard(
+                                '${statusStats.maintenanceBoards}',
+                                'Bảo trì',
+                                Icons.warning_amber,
+                                AppColors.error,
+                                isDark,
+                              ),
+                            ],
                           ),
+                        )
+                      else
+                        GridView.count(
+                          crossAxisCount: 2,
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: 6,
+                          crossAxisSpacing: 8,
+                          childAspectRatio: 4.5,
+                          children: [
+                            _buildCompactStatCard(
+                              '${statusStats.totalBoards}',
+                              'Tổng',
+                              LucideIcons.cpu,
+                              AppColors.primary,
+                              isDark,
+                            ),
+                            _buildCompactStatCard(
+                              '${statusStats.availableBoards}',
+                              'Sẵn sàng',
+                              Icons.inventory_2_outlined,
+                              AppColors.success,
+                              isDark,
+                            ),
+                            _buildCompactStatCard(
+                              '${statusStats.checkedOutBoards}',
+                              'Đang dùng',
+                              LucideIcons.wrench,
+                              AppColors.warning,
+                              isDark,
+                            ),
+                            _buildCompactStatCard(
+                              '${statusStats.maintenanceBoards}',
+                              'Bảo trì',
+                              Icons.warning_amber,
+                              AppColors.error,
+                              isDark,
+                            ),
+                          ],
                         ),
+                      const SizedBox(height: 12),
+
+                      // Search and View Toggle
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 36,
+                              child: TextField(
+                                onChanged: (value) {
+                                  setState(() {
+                                    _searchQuery = value;
+                                  });
+                                },
+                                style: const TextStyle(fontSize: 12),
+                                decoration: InputDecoration(
+                                  hintText: 'Tìm tên, mã QR, model...',
+                                  prefixIcon: const Icon(
+                                    Icons.search,
+                                    size: 18,
+                                  ),
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? AppColors.surfaceDark
+                                      : Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                          ? AppColors.borderDark
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                          ? AppColors.borderDark
+                                          : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? AppColors.surfaceDark
+                                  : Colors.white,
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? AppColors.borderDark
+                                    : AppColors.borderLight,
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isGridView = true;
+                                    });
+                                  },
+                                  constraints: const BoxConstraints(
+                                    minWidth: 36,
+                                    minHeight: 36,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  icon: Icon(
+                                    Icons.grid_view,
+                                    size: 18,
+                                    color: _isGridView
+                                        ? Colors.white
+                                        : (isDark
+                                              ? AppColors.textSecondaryDark
+                                              : AppColors.textSecondaryLight),
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: _isGridView
+                                        ? AppColors.primary
+                                        : Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                                IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _isGridView = false;
+                                    });
+                                  },
+                                  constraints: const BoxConstraints(
+                                    minWidth: 36,
+                                    minHeight: 36,
+                                  ),
+                                  padding: EdgeInsets.zero,
+                                  icon: Icon(
+                                    Icons.view_list,
+                                    size: 18,
+                                    color: !_isGridView
+                                        ? Colors.white
+                                        : (isDark
+                                              ? AppColors.textSecondaryDark
+                                              : AppColors.textSecondaryLight),
+                                  ),
+                                  style: IconButton.styleFrom(
+                                    backgroundColor: !_isGridView
+                                        ? AppColors.primary
+                                        : Colors.transparent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Filters
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isGridView = true;
-                                });
-                              },
-                              icon: Icon(
-                                Icons.grid_view,
-                                color: _isGridView
-                                    ? Colors.white
-                                    : (isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondaryLight),
-                              ),
-                              style: IconButton.styleFrom(
-                                backgroundColor: _isGridView
-                                    ? AppColors.primary
-                                    : Colors.transparent,
-                              ),
+                            _buildFilterChip('Tất cả', null, mockBoards.length),
+                            const SizedBox(width: 6),
+                            _buildFilterChip(
+                              'Sẵn sàng',
+                              BoardStatus.available,
+                              mockBoards
+                                  .where(
+                                    (b) => b.status == BoardStatus.available,
+                                  )
+                                  .length,
                             ),
-                            IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isGridView = false;
-                                });
-                              },
-                              icon: Icon(
-                                Icons.view_list,
-                                color: !_isGridView
-                                    ? Colors.white
-                                    : (isDark
-                                          ? AppColors.textSecondaryDark
-                                          : AppColors.textSecondaryLight),
-                              ),
-                              style: IconButton.styleFrom(
-                                backgroundColor: !_isGridView
-                                    ? AppColors.primary
-                                    : Colors.transparent,
-                              ),
+                            const SizedBox(width: 6),
+                            _buildFilterChip(
+                              'Đang dùng',
+                              BoardStatus.checkedOut,
+                              mockBoards
+                                  .where(
+                                    (b) => b.status == BoardStatus.checkedOut,
+                                  )
+                                  .length,
+                            ),
+                            const SizedBox(width: 6),
+                            _buildFilterChip(
+                              'Bảo trì',
+                              BoardStatus.maintenance,
+                              mockBoards
+                                  .where(
+                                    (b) => b.status == BoardStatus.maintenance,
+                                  )
+                                  .length,
                             ),
                           ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                ),
+                const SizedBox(height: 8),
 
-                  // Filters
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildFilterChip('Tất cả', null, mockBoards.length),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          'Sẵn sàng',
-                          BoardStatus.available,
-                          mockBoards
-                              .where((b) => b.status == BoardStatus.available)
-                              .length,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          'Đang dùng',
-                          BoardStatus.checkedOut,
-                          mockBoards
-                              .where((b) => b.status == BoardStatus.checkedOut)
-                              .length,
-                        ),
-                        const SizedBox(width: 8),
-                        _buildFilterChip(
-                          'Bảo trì',
-                          BoardStatus.maintenance,
-                          mockBoards
-                              .where((b) => b.status == BoardStatus.maintenance)
-                              .length,
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Board List
-            Expanded(
-              child: _filteredBoards.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('🔌', style: TextStyle(fontSize: 48)),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Không tìm thấy bo mạch',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Thử thay đổi bộ lọc',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                        ],
-                      ),
-                    )
-                  : _isGridView
-                  ? GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 4,
-                            mainAxisSpacing: 8,
-                            crossAxisSpacing: 8,
-                            childAspectRatio: 0.75,
-                          ),
-                      itemCount: _filteredBoards.length,
-                      itemBuilder: (context, index) {
-                        return _buildBoardGridCard(_filteredBoards[index])
-                            .animate()
-                            .fadeIn(duration: 400.ms, delay: (50 * index).ms)
-                            .slideY(
-                              begin: 0.2,
-                              end: 0,
-                              duration: 400.ms,
-                              delay: (50 * index).ms,
-                            );
-                      },
-                    )
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _filteredBoards.length,
-                      itemBuilder: (context, index) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildBoardListCard(_filteredBoards[index])
-                              .animate()
-                              .fadeIn(duration: 400.ms, delay: (50 * index).ms)
-                              .slideX(
-                                begin: -0.2,
-                                end: 0,
-                                duration: 400.ms,
-                                delay: (50 * index).ms,
+                // Board List
+                Expanded(
+                  child: _filteredBoards.isEmpty
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('🔌', style: TextStyle(fontSize: 48)),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Không tìm thấy bo mạch',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? AppColors.textPrimaryDark
+                                      : AppColors.textPrimaryLight,
+                                ),
                               ),
-                        );
-                      },
-                    ),
-            ),
-          ],
+                              const SizedBox(height: 4),
+                              Text(
+                                'Thử thay đổi bộ lọc',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _isGridView
+                      ? GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 4,
+                                mainAxisSpacing: 8,
+                                crossAxisSpacing: 8,
+                                childAspectRatio: 0.75,
+                              ),
+                          itemCount: _filteredBoards.length,
+                          itemBuilder: (context, index) {
+                            return _buildBoardGridCard(_filteredBoards[index])
+                                .animate()
+                                .fadeIn(
+                                  duration: 400.ms,
+                                  delay: (50 * index).ms,
+                                )
+                                .slideY(
+                                  begin: 0.2,
+                                  end: 0,
+                                  duration: 400.ms,
+                                  delay: (50 * index).ms,
+                                );
+                          },
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _filteredBoards.length,
+                          itemBuilder: (context, index) {
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _buildBoardListCard(_filteredBoards[index])
+                                  .animate()
+                                  .fadeIn(
+                                    duration: 400.ms,
+                                    delay: (50 * index).ms,
+                                  )
+                                  .slideX(
+                                    begin: -0.2,
+                                    end: 0,
+                                    duration: 400.ms,
+                                    delay: (50 * index).ms,
+                                  ),
+                            );
+                          },
+                        ),
+                ),
+              ],
+            );
+          },
         ),
+      ),
+    );
+  }
+
+  Widget _buildLandscapeStatCard(
+    String value,
+    String label,
+    IconData icon,
+    Color color,
+    bool isDark,
+  ) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -384,7 +524,7 @@ class _WarehousePageState extends State<WarehousePage> {
       backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
       selectedColor: AppColors.primary,
       labelStyle: TextStyle(
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
         color: isSelected
             ? Colors.white
@@ -392,7 +532,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   ? AppColors.textSecondaryDark
                   : AppColors.textSecondaryLight),
       ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     );
   }
 
@@ -468,12 +608,12 @@ class _WarehousePageState extends State<WarehousePage> {
       onTap: () {
         _showBoardDetail(board);
       },
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
@@ -485,29 +625,29 @@ class _WarehousePageState extends State<WarehousePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
                     color: isDark
                         ? const Color(0xFF334155)
                         : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Stack(
                     children: [
                       const Center(
                         child: Icon(
                           LucideIcons.cpu,
-                          size: 18,
+                          size: 16,
                           color: Color(0xFF64748B),
                         ),
                       ),
                       Positioned(
-                        top: -2,
-                        right: -2,
+                        top: -1,
+                        right: -1,
                         child: Container(
-                          width: 10,
-                          height: 10,
+                          width: 8,
+                          height: 8,
                           decoration: BoxDecoration(
                             color: statusColor,
                             shape: BoxShape.circle,
@@ -515,7 +655,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               color: isDark
                                   ? AppColors.surfaceDark
                                   : Colors.white,
-                              width: 2,
+                              width: 1.5,
                             ),
                           ),
                         ),
@@ -524,8 +664,8 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                 ),
                 Container(
-                  width: 24,
-                  height: 24,
+                  width: 22,
+                  height: 22,
                   decoration: BoxDecoration(
                     color: isDark
                         ? const Color(0xFF334155)
@@ -534,17 +674,17 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                   child: const Icon(
                     Icons.qr_code,
-                    size: 14,
+                    size: 12,
                     color: Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
               board.name,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 fontWeight: FontWeight.w600,
                 color: isDark
                     ? AppColors.textPrimaryDark
@@ -553,22 +693,12 @@ class _WarehousePageState extends State<WarehousePage> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               board.qrCode,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 9,
                 fontFamily: 'monospace',
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              board.model,
-              style: TextStyle(
-                fontSize: 10,
                 color: isDark
                     ? AppColors.textSecondaryDark
                     : AppColors.textSecondaryLight,
@@ -576,12 +706,24 @@ class _WarehousePageState extends State<WarehousePage> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 1),
+            Text(
+              board.model,
+              style: TextStyle(
+                fontSize: 9,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
             Row(
               children: [
                 const Icon(
                   Icons.location_on_outlined,
-                  size: 10,
+                  size: 9,
                   color: Color(0xFF94A3B8),
                 ),
                 const SizedBox(width: 2),
@@ -589,7 +731,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   child: Text(
                     board.location,
                     style: const TextStyle(
-                      fontSize: 9,
+                      fontSize: 8,
                       color: Color(0xFF94A3B8),
                     ),
                     maxLines: 1,
@@ -599,7 +741,7 @@ class _WarehousePageState extends State<WarehousePage> {
               ],
             ),
             const Spacer(),
-            const Divider(height: 12),
+            const Divider(height: 8),
             StatusBadge(status: board.status, size: 'sm'),
           ],
         ),
