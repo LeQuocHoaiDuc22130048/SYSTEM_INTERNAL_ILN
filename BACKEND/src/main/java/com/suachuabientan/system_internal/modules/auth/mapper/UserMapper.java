@@ -1,6 +1,6 @@
 package com.suachuabientan.system_internal.modules.auth.mapper;
 
-import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;

@@ -1,6 +1,6 @@
 package com.suachuabientan.system_internal.config;
 
-import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;

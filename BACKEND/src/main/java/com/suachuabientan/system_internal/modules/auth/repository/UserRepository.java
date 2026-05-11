@@ -1,7 +1,7 @@
 package com.suachuabientan.system_internal.modules.auth.repository;
 
 import com.suachuabientan.system_internal.common.enums.UserStatus;
-import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

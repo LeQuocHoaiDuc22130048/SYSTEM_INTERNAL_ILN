@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.modules.auth.domain;
+package com.suachuabientan.system_internal.modules.auth.entity;
 
 import com.suachuabientan.system_internal.common.enums.UserRole;
 import com.suachuabientan.system_internal.common.enums.UserStatus;

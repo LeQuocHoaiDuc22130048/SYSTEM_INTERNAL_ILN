@@ -2,7 +2,7 @@ package com.suachuabientan.system_internal.config;
 
 import com.suachuabientan.system_internal.common.enums.UserRole;
 import com.suachuabientan.system_internal.common.enums.UserStatus;
-import com.suachuabientan.system_internal.modules.auth.domain.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

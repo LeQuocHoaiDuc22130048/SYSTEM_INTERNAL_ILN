@@ -1,6 +1,6 @@
 package com.suachuabientan.system_internal.modules.auth.repository;
 
-import com.suachuabientan.system_internal.modules.auth.domain.RefreshToken;
+import com.suachuabientan.system_internal.modules.auth.entity.RefreshToken;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;

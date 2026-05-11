@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.modules.auth.domain;
+package com.suachuabientan.system_internal.modules.auth.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
