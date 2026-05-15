@@ -1,0 +1,102 @@
+package com.suachuabientan.system_internal.modules.repair.entity;
+
+import com.suachuabientan.system_internal.common.model.BaseEntity;
+import com.suachuabientan.system_internal.modules.repair.enums.RepairStatus;
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "repair_orders")
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class RepairOrder extends BaseEntity {
+    /**
+     * Mã đơn — sinh tự động: RO-{YYYYMMDD}-{NNN}
+     * VD: RO-20240115-001
+     */
+    @Column(name = "order_code", nullable = false, unique = true, length = 30)
+    private String orderCode;
+
+    // ── Thông tin thiết bị ────────────────────────────────────
+
+    @Column(name = "device_name", nullable = false, length = 200)
+    private String deviceName;
+
+    /** VD: Laptop, Desktop, Màn hình, Máy in */
+    @Column(name = "device_type", length = 100)
+    private String deviceType;
+
+    // ── Thông tin khách hàng ──────────────────────────────────
+
+    @Column(name = "customer_name", nullable = false, length = 100)
+    private String customerName;
+
+    @Column(name = "customer_phone", nullable = false, length = 20)
+    private String customerPhone;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String description;
+
+    // ── Vòng đời đơn ─────────────────────────────────────────
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RepairStatus status = RepairStatus.PENDING;
+
+    /**
+     * Độ ưu tiên — số nhỏ hơn = ưu tiên cao hơn.
+     * Mặc định 100, Manager điều chỉnh qua drag & drop.
+     */
+    @Column(nullable = false)
+    private Integer priority = 100;
+
+    // ── Phân công ─────────────────────────────────────────────
+
+    /** Người tiếp nhận đơn */
+    @Column(name = "received_by", nullable = false)
+    private UUID receivedBy;
+
+    /** Kỹ thuật viên được assign — nullable khi mới tạo */
+    @Column(name = "assigned_to")
+    private UUID assignedTo;
+
+    // ── Mốc thời gian ─────────────────────────────────────────
+
+    @Column(name = "received_at", nullable = false)
+    private Instant receivedAt;
+
+    @Column(name = "estimated_done")
+    private Instant estimatedDone;
+
+    @Column(name = "started_at")
+    private Instant startedAt;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
+    @Column(name = "delivered_at")
+    private Instant deliveredAt;
+
+    // ── Helper methods ────────────────────────────────────────
+
+    public boolean isActive() {
+        return status == RepairStatus.PENDING || status == RepairStatus.IN_PROGRESS;
+    }
+
+    public boolean canTransitionTo(RepairStatus newStatus) {
+        return switch (this.status) {
+            case PENDING     -> newStatus == RepairStatus.IN_PROGRESS
+                    || newStatus == RepairStatus.CANCELLED;
+            case IN_PROGRESS -> newStatus == RepairStatus.COMPLETED
+                    || newStatus == RepairStatus.CANCELLED;
+            case COMPLETED   -> newStatus == RepairStatus.DELIVERED;
+            case DELIVERED, CANCELLED -> false; // Trạng thái cuối
+        };
+    }
+}
