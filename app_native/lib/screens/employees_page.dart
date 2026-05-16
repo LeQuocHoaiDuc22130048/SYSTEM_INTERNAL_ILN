@@ -12,8 +12,15 @@ class EmployeesPage extends StatefulWidget {
 }
 
 class _EmployeesPageState extends State<EmployeesPage> {
-  String _searchQuery = '';
-  UserRole? _roleFilter;
+  final ValueNotifier<String> _searchQuery = ValueNotifier('');
+  final ValueNotifier<UserRole?> _roleFilter = ValueNotifier(null);
+
+  @override
+  void dispose() {
+    _searchQuery.dispose();
+    _roleFilter.dispose();
+    super.dispose();
+  }
 
   void _showAddEmployeeSheet(BuildContext context) {
     showModalBottomSheet(
@@ -25,13 +32,15 @@ class _EmployeesPageState extends State<EmployeesPage> {
   }
 
   List<User> get _filteredEmployees {
+    final query = _searchQuery.value.toLowerCase();
+    final currentRole = _roleFilter.value;
     return mockUsers.where((user) {
       final matchesSearch =
-          _searchQuery.isEmpty ||
-          user.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          user.employeeId.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          (user.email.toLowerCase().contains(_searchQuery.toLowerCase()));
-      final matchesRole = _roleFilter == null || user.role == _roleFilter;
+          query.isEmpty ||
+          user.name.toLowerCase().contains(query) ||
+          user.employeeId.toLowerCase().contains(query) ||
+          (user.email.toLowerCase().contains(query));
+      final matchesRole = currentRole == null || user.role == currentRole;
       return matchesSearch && matchesRole;
     }).toList();
   }
@@ -39,9 +48,10 @@ class _EmployeesPageState extends State<EmployeesPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final wide = MediaQuery.of(context).size.width > 760;
+    final wide = MediaQuery.sizeOf(context).width > 760;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: Column(
           children: [
@@ -101,7 +111,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                           ),
                         ],
                       )
-                      .animate()
+                      .animate(target: 1)
                       .fadeIn(duration: 400.ms)
                       .slideY(begin: -0.2, end: 0, duration: 400.ms),
                   const SizedBox(height: 16),
@@ -109,9 +119,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                   // Search
                   TextField(
                     onChanged: (value) {
-                      setState(() {
-                        _searchQuery = value;
-                      });
+                      _searchQuery.value = value;
                     },
                     decoration: InputDecoration(
                       hintText: 'Tìm theo tên, mã NV...',
@@ -165,8 +173,12 @@ class _EmployeesPageState extends State<EmployeesPage> {
 
             // Employee List
             Expanded(
-              child: _filteredEmployees.isEmpty
-                  ? Center(
+              child: AnimatedBuilder(
+                animation: Listenable.merge([_searchQuery, _roleFilter]),
+                builder: (context, _) {
+                  final filtered = _filteredEmployees;
+                  if (filtered.isEmpty) {
+                    return Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -184,8 +196,9 @@ class _EmployeesPageState extends State<EmployeesPage> {
                           ),
                         ],
                       ),
-                    )
-                  : GridView.builder(
+                    );
+                  }
+                  return GridView.builder(
                       padding: const EdgeInsets.all(16),
                       gridDelegate:
                           const SliverGridDelegateWithFixedCrossAxisCount(
@@ -194,10 +207,10 @@ class _EmployeesPageState extends State<EmployeesPage> {
                             crossAxisSpacing: 12,
                             childAspectRatio: 0.85,
                           ),
-                      itemCount: _filteredEmployees.length,
+                      itemCount: filtered.length,
                       itemBuilder: (context, index) {
-                        return _buildEmployeeCard(_filteredEmployees[index])
-                            .animate()
+                        return _buildEmployeeCard(filtered[index])
+                            .animate(target: 1)
                             .fadeIn(duration: 400.ms, delay: (50 * index).ms)
                             .slideY(
                               begin: 0.2,
@@ -206,7 +219,9 @@ class _EmployeesPageState extends State<EmployeesPage> {
                               delay: (50 * index).ms,
                             );
                       },
-                    ),
+                    );
+                },
+              ),
             ),
           ],
         ),
@@ -215,29 +230,32 @@ class _EmployeesPageState extends State<EmployeesPage> {
   }
 
   Widget _buildFilterChip(String label, UserRole? role) {
-    final isSelected = _roleFilter == role;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _roleFilter = selected ? role : null;
-        });
+    return ValueListenableBuilder<UserRole?>(
+      valueListenable: _roleFilter,
+      builder: (context, currentRole, _) {
+        final isSelected = currentRole == role;
+        return FilterChip(
+          label: Text(label),
+          selected: isSelected,
+          onSelected: (selected) {
+            _roleFilter.value = selected ? role : null;
+          },
+          backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
+          selectedColor: AppColors.primary,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isSelected
+                ? Colors.white
+                : (isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        );
       },
-      backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
-      selectedColor: AppColors.primary,
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: isSelected
-            ? Colors.white
-            : (isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     );
   }
 
@@ -671,11 +689,9 @@ class _AddEmployeeSheetState extends State<_AddEmployeeSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      decoration: BoxDecoration(
+    return _KeyboardBottomPadding(
+      child: Container(
+        decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -819,6 +835,7 @@ class _AddEmployeeSheetState extends State<_AddEmployeeSheet> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -891,6 +908,24 @@ class _AddEmployeeSheetState extends State<_AddEmployeeSheet> {
           },
         ),
       ],
+    );
+  }
+}
+
+class _KeyboardBottomPadding extends StatelessWidget {
+  final Widget child;
+
+  const _KeyboardBottomPadding({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedPadding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOutCubic,
+      child: child,
     );
   }
 }

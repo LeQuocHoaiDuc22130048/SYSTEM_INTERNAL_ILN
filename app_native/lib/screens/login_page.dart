@@ -101,106 +101,36 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.gradientStart,
-              AppColors.gradientMiddle,
-              AppColors.gradientEnd,
-            ],
-          ),
-        ),
-        child: Stack(
-          children: [
-            // Dynamic Background effects
-            Positioned(
-              top: -MediaQuery.of(context).size.height * 0.2,
-              right: -MediaQuery.of(context).size.width * 0.1,
-              child: Container(
-                width: 400,
-                height: 400,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.blue.withValues(alpha: 0.1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withValues(alpha: 0.1),
-                      blurRadius: 120,
-                      spreadRadius: 40,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: -MediaQuery.of(context).size.height * 0.2,
-              left: -MediaQuery.of(context).size.width * 0.1,
-              child: Container(
-                width: 400,
-                height: 400,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.indigo.withValues(alpha: 0.1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.indigo.withValues(alpha: 0.1),
-                      blurRadius: 120,
-                      spreadRadius: 40,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Positioned(
-              top: MediaQuery.of(context).size.height / 2 - 250,
-              left: MediaQuery.of(context).size.width / 2 - 250,
-              child: Container(
-                width: 500,
-                height: 500,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.blue.withValues(alpha: 0.15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.blue.withValues(alpha: 0.15),
-                      blurRadius: 150,
-                      spreadRadius: 50,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Grid pattern
-            Positioned.fill(child: CustomPaint(painter: GridPainter())),
-
-            // Content
-            SafeArea(
+      resizeToAvoidBottomInset: false,
+      body: Stack(
+        children: [
+          const LoginBackground(),
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            resizeToAvoidBottomInset: true,
+            body: SafeArea(
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
-                  final height = constraints.maxHeight;
+                  final availableHeight = constraints.maxHeight;
+                  
                   final isDesktop = width >= 1024;
                   final isTablet = width >= 640 && width < 1024;
                   final isMobile = width < 640;
-                  final isShort = height < 600;
-                  final isKeyboardOpen = MediaQuery.of(context).viewInsets.bottom > 0;
+                  final isShort = availableHeight < 600;
 
                   // Determine branding scale
                   double brandingScale = 1.0;
                   if (isMobile) {
-                    brandingScale = isShort || isKeyboardOpen ? 0.5 : 0.8;
+                    brandingScale = isShort ? 0.45 : 0.65;
                   } else if (isTablet) {
                     brandingScale = 0.9;
                   }
 
                   return SingleChildScrollView(
-                    physics: const BouncingScrollPhysics(),
+                    physics: const ClampingScrollPhysics(),
                     child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: height),
+                      constraints: BoxConstraints(minHeight: availableHeight),
                       child: Padding(
                         padding: EdgeInsets.symmetric(
                           horizontal: isDesktop ? 60 : (isTablet ? 40 : 20),
@@ -239,9 +169,10 @@ class _LoginPageState extends State<LoginPage> {
                                       _buildBrandingSection(
                                         scale: brandingScale,
                                         isMobile: isMobile,
+                                        isShort: isShort,
                                       ),
                                       SizedBox(
-                                        height: (isShort || isKeyboardOpen) ? 16 : 40,
+                                        height: isShort ? 16 : 24,
                                       ),
                                       _buildFormCard(isDesktop: false),
                                       const SizedBox(height: 20),
@@ -255,13 +186,13 @@ class _LoginPageState extends State<LoginPage> {
                 },
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildBrandingSection({required double scale, required bool isMobile}) {
+  Widget _buildBrandingSection({required double scale, required bool isMobile, bool isShort = false}) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -273,49 +204,51 @@ class _LoginPageState extends State<LoginPage> {
             'assets/images/app_logo.png',
             fit: BoxFit.contain,
           ),
-        ).animate().fadeIn(duration: 600.ms).scale(
+        ).animate(target: 1).fadeIn(duration: 600.ms).scale(
               begin: const Offset(0.8, 0.8),
               duration: 600.ms,
             ),
-        SizedBox(height: 24 * scale),
-        Text(
-          'INVERTER LIKE NEW',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: isMobile ? 28 * scale : 40 * scale,
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-            letterSpacing: -0.5,
-          ),
-        ).animate().fadeIn(duration: 600.ms, delay: 100.ms).slideY(
-              begin: 0.3,
-              end: 0,
-              duration: 600.ms,
-              delay: 100.ms,
+        if (!isShort) ...[
+          SizedBox(height: 24 * scale),
+          Text(
+            'INVERTER LIKE NEW',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isMobile ? 28 * scale : 40 * scale,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+              letterSpacing: -0.5,
             ),
-        SizedBox(height: 12 * scale),
-        Text(
-          'Internal Management System',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: isMobile ? 12 * scale : 16 * scale,
-            color: Colors.white.withOpacity(0.7),
-            letterSpacing: 0.2,
-            fontWeight: FontWeight.w500,
-          ),
-        ).animate().fadeIn(duration: 600.ms, delay: 200.ms).slideY(
-              begin: 0.3,
-              end: 0,
-              duration: 600.ms,
-              delay: 200.ms,
+          ).animate(target: 1).fadeIn(duration: 600.ms, delay: 100.ms).slideY(
+                begin: 0.3,
+                end: 0,
+                duration: 600.ms,
+                delay: 100.ms,
+              ),
+          SizedBox(height: 12 * scale),
+          Text(
+            'Internal Management System',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: isMobile ? 12 * scale : 16 * scale,
+              color: Colors.white.withValues(alpha: 0.7),
+              letterSpacing: 0.2,
+              fontWeight: FontWeight.w500,
             ),
+          ).animate(target: 1).fadeIn(duration: 600.ms, delay: 200.ms).slideY(
+                begin: 0.3,
+                end: 0,
+                duration: 600.ms,
+                delay: 200.ms,
+              ),
+        ],
       ],
     );
   }
 
   Widget _buildFormCard({required bool isDesktop}) {
     return Container(
-          padding: EdgeInsets.all(isDesktop ? 40 : 32),
+          padding: EdgeInsets.all(isDesktop ? 40 : 24),
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(24),
@@ -416,7 +349,7 @@ class _LoginPageState extends State<LoginPage> {
                       ),
                     ],
                   ),
-                ).animate().fadeIn().shake(),
+                ).animate(target: 1).fadeIn().shake(),
                 const SizedBox(height: 24),
               ],
 
@@ -426,7 +359,7 @@ class _LoginPageState extends State<LoginPage> {
             ],
           ),
         )
-        .animate()
+        .animate(target: 1)
         .fadeIn(duration: 600.ms, delay: 300.ms)
         .slideY(begin: 0.2, end: 0);
   }
@@ -617,4 +550,90 @@ class GridPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class LoginBackground extends StatelessWidget {
+  const LoginBackground({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // Use sizeOf instead of of(context).size to prevent rebuilding on viewInsets changes
+    final size = MediaQuery.sizeOf(context);
+    
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.gradientStart,
+            AppColors.gradientMiddle,
+            AppColors.gradientEnd,
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -size.height * 0.2,
+            right: -size.width * 0.1,
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blue.withValues(alpha: 0.1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.1),
+                    blurRadius: 120,
+                    spreadRadius: 40,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -size.height * 0.2,
+            left: -size.width * 0.1,
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.indigo.withValues(alpha: 0.1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.indigo.withValues(alpha: 0.1),
+                    blurRadius: 120,
+                    spreadRadius: 40,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            top: size.height / 2 - 250,
+            left: size.width / 2 - 250,
+            child: Container(
+              width: 500,
+              height: 500,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blue.withValues(alpha: 0.15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.15),
+                    blurRadius: 150,
+                    spreadRadius: 50,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Positioned.fill(child: CustomPaint(painter: GridPainter())),
+        ],
+      ),
+    );
+  }
 }

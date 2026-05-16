@@ -125,7 +125,7 @@ class _FaceAttendancePageState extends State<FaceAttendancePage> {
                     letterSpacing: 2,
                     fontWeight: FontWeight.w600,
                   ),
-                ).animate().fadeIn(),
+                ).animate(target: 1).fadeIn(),
                 const Spacer(),
                 
                 // Scanning Frame
@@ -285,7 +285,7 @@ class _FaceAttendancePageState extends State<FaceAttendancePage> {
                               ),
                             ),
                             child: const Text('Xác nhận'),
-                          ).animate().fadeIn().scale(),
+                          ).animate(target: 1).fadeIn().scale(),
                         ),
                     ],
                   ),
@@ -297,8 +297,8 @@ class _FaceAttendancePageState extends State<FaceAttendancePage> {
 
           // Floating Back Button
           Positioned(
-            top: MediaQuery.of(context).padding.top + 10,
-            left: 20,
+            top: MediaQuery.paddingOf(context).top + 10,
+            left: 10,
             child: IconButton(
               icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
               onPressed: () => Navigator.pop(context),

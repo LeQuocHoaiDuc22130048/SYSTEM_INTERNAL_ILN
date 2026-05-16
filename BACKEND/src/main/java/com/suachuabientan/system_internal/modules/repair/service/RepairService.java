@@ -1,5 +1,6 @@
 package com.suachuabientan.system_internal.modules.repair.service;
 
+import com.suachuabientan.system_internal.common.enums.UserRole;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.common.util.OrderCodeGenerator;
@@ -18,6 +19,8 @@ import com.suachuabientan.system_internal.modules.repair.enums.RepairStatus;
 import com.suachuabientan.system_internal.modules.repository.RepairImageRepository;
 import com.suachuabientan.system_internal.modules.repository.RepairOrderRepository;
 import com.suachuabientan.system_internal.modules.repository.RepairTimelineRepository;
+import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
+import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -27,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @Slf4j
@@ -38,6 +42,7 @@ public class RepairService {
     private final RepairTimelineRepository repairTimelineRepository;
     private final UserRepository userRepository;
     private final OrderCodeGenerator orderCodeGenerator;
+    private final NotificationService notificationService;
 
     // ── Tạo đơn ──────────────────────────────────────────────
 
@@ -66,6 +71,7 @@ public class RepairService {
                 receivedByUserId);
 
         log.info("Tạo đơn sửa chữa: orderCode={}, by={}", orderCode, receivedByUserId);
+        notifyNewRepairOrder(saved);
         return toResponse(saved);
     }
 
@@ -109,7 +115,9 @@ public class RepairService {
         addTimeline(orderId, "Phân công kỹ thuật viên", note, managerId);
         log.info("Phân công đơn: orderId={}, technician={}, by={}", orderId, request.technicianId(), managerId);
 
-        return toResponse(repairOrderRepository.save(order));
+        RepairOrder saved = repairOrderRepository.save(order);
+        notifyOrderAssigned(saved, technician);
+        return toResponse(saved);
     }
 
     // ── Cập nhật trạng thái ───────────────────────────────────
@@ -150,6 +158,7 @@ public class RepairService {
         log.info("Cập nhật trạng thái: orderId={}, {} → {}, by={}",
                 orderId, oldStatus, request.status(), userId);
 
+        notifyStatusChanged(order, oldStatus);
         return toResponse(order);
     }
 
@@ -157,8 +166,12 @@ public class RepairService {
 
     @Transactional
     public void reorder(ReorderRequest request, UUID managerId) {
-        request.items().forEach(item ->
-                repairOrderRepository.updatePriority(item.orderId(), item.priority()));
+        request.items().forEach(item -> {
+            repairOrderRepository.updatePriority(item.orderId(), item.priority());
+            repairOrderRepository.findByIdAndIsDeletedFalse(item.orderId())
+                    .filter(order -> order.getAssignedTo() != null)
+                    .ifPresent(order -> notifyPriorityChanged(order, item.priority()));
+        });
 
         log.info("Cập nhật priority {} đơn bởi managerId={}", request.items().size(), managerId);
         addTimeline(
@@ -299,5 +312,67 @@ public class RepairService {
                 .createdAt(Instant.now())
                 .createdBy(performedBy)
                 .build());
+    }
+
+    private void notifyNewRepairOrder(RepairOrder order) {
+        notificationService.sendToRoles(
+                managerRoles(),
+                NotificationType.NEW_REPAIR_ORDER,
+                "Don sua chua moi",
+                STR."Don \{order.getOrderCode()} cua khach \{order.getCustomerName()} dang cho phan cong.",
+                "REPAIR_ORDER",
+                order.getId().toString(),
+                true);
+    }
+
+    private void notifyOrderAssigned(RepairOrder order, UserEntity technician) {
+        notificationService.sendToUser(
+                technician.getId(),
+                NotificationType.ORDER_ASSIGNED,
+                "Ban duoc phan cong don moi",
+                STR."Don \{order.getOrderCode()} - \{order.getDeviceName()} da duoc phan cong cho ban.",
+                "REPAIR_ORDER",
+                order.getId().toString(),
+                true);
+    }
+
+    private void notifyStatusChanged(RepairOrder order, RepairStatus oldStatus) {
+        if (order.getStatus() == RepairStatus.COMPLETED) {
+            notificationService.sendToUser(
+                    order.getReceivedBy(),
+                    NotificationType.ORDER_COMPLETED,
+                    "Don sua chua da hoan thanh",
+                    STR."Don \{order.getOrderCode()} da sua xong va san sang giao khach.",
+                    "REPAIR_ORDER",
+                    order.getId().toString(),
+                    true);
+            return;
+        }
+
+        if (order.getAssignedTo() != null && !Objects.equals(oldStatus, order.getStatus())) {
+            notificationService.sendToUser(
+                    order.getAssignedTo(),
+                    NotificationType.ORDER_STATUS_CHANGED,
+                    "Trang thai don da thay doi",
+                    STR."Don \{order.getOrderCode()} chuyen tu \{oldStatus.name()} sang \{order.getStatus().name()}.",
+                    "REPAIR_ORDER",
+                    order.getId().toString(),
+                    false);
+        }
+    }
+
+    private void notifyPriorityChanged(RepairOrder order, Integer priority) {
+        notificationService.sendToUser(
+                order.getAssignedTo(),
+                NotificationType.ORDER_PRIORITY_CHANGED,
+                "Uu tien don da thay doi",
+                STR."Don \{order.getOrderCode()} duoc cap nhat muc uu tien \{priority}.",
+                "REPAIR_ORDER",
+                order.getId().toString(),
+                false);
+    }
+
+    private List<UserRole> managerRoles() {
+        return List.of(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER);
     }
 }

@@ -106,7 +106,7 @@ class _ConversationListPageState extends State<_ConversationListPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = widget.isDark;
-    final wide = MediaQuery.of(context).size.width > 760;
+    final wide = MediaQuery.sizeOf(context).width > 760;
 
     // Filter conversations based on search query
     final filteredConversations = _conversations.where((conv) {
@@ -116,6 +116,7 @@ class _ConversationListPageState extends State<_ConversationListPage> {
     }).toList();
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: isDark ? AppColors.backgroundDark : Colors.white,
       body: SafeArea(
         child: Column(
@@ -148,7 +149,7 @@ class _ConversationListPageState extends State<_ConversationListPage> {
                     icon: Container(
                       padding: const EdgeInsets.all(6),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -592,54 +593,92 @@ class _ChatDetailPage extends StatelessWidget {
               child: Row(
                 children: [
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Chức năng đính kèm tệp đang phát triển'),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      );
+                    },
                     icon: const Icon(LucideIcons.paperclip, size: 19),
                     color: AppColors.textSecondaryLight,
                   ),
                   IconButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: const Text('Chức năng gửi ảnh đang phát triển'),
+                          behavior: SnackBarBehavior.floating,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                      );
+                    },
                     icon: const Icon(LucideIcons.image, size: 18),
                     color: AppColors.textSecondaryLight,
                   ),
                   Expanded(
-                    child: Container(
+                    child: SizedBox(
                       height: 38,
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? AppColors.backgroundDark
-                            : AppColors.backgroundLight,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.borderDark
-                              : AppColors.borderLight,
-                        ),
-                      ),
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        'Nhập tin nhắn...',
+                      child: TextField(
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                        decoration: InputDecoration(
+                          hintText: 'Nhập tin nhắn...',
+                          hintStyle: TextStyle(
+                            fontSize: 12,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                          filled: true,
+                          fillColor: isDark
+                              ? AppColors.backgroundDark
+                              : AppColors.backgroundLight,
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 0),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: BorderSide(
+                              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            borderSide: const BorderSide(
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryLight.withValues(alpha: 0.55),
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Icon(
-                      LucideIcons.send,
-                      size: 18,
-                      color: Colors.white,
+                  InkWell(
+                    onTap: () {},
+                    borderRadius: BorderRadius.circular(19),
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: const BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        LucideIcons.send,
+                        size: 18,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],
@@ -714,7 +753,7 @@ class _IncomingMessage extends StatelessWidget {
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.05),
+                      color: Colors.black.withValues(alpha: 0.05),
                       blurRadius: 4,
                       offset: const Offset(0, 1),
                     ),

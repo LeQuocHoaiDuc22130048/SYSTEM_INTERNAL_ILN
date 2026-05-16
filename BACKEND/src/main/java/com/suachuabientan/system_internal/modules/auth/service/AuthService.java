@@ -20,6 +20,8 @@ import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.RefreshTokenRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRegistrationRequestRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
+import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -47,6 +49,7 @@ public class AuthService {
     private final JwtUtil jwtUtil;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRegistrationRequestRepository userRegistrationRequestRepository;
+    private final NotificationService notificationService;
 
     /**
      * Đăng ký tài khoản mới — trạng thái PENDING_APPROVAL, chưa được login (SEC-03).
@@ -76,6 +79,7 @@ public class AuthService {
 
 
         UserEntity saved = userRepository.save(user);
+        notifyAccountPending(saved);
         log.info("Tài khoản mới đăng ký: username={}", saved.getUsername());
 
         return userMapper.toResponse(saved);
@@ -187,7 +191,8 @@ public class AuthService {
 
         if(!target.isPending()) throw new BusinessException("Tài khoản không ở trạng thái chờ duyệt");
 
-        if (request.action() == ApprovalAction.APPROVE) {
+        boolean approved = request.action() == ApprovalAction.APPROVE;
+        if (approved) {
             target.approve(reviewerUserId);
             log.info("Process user approval: userId={}", targetUserId);
         } else {
@@ -208,7 +213,9 @@ public class AuthService {
 
         userRegistrationRequestRepository.save(history);
 
-        return userMapper.toResponse(userRepository.save(target));
+        UserEntity saved = userRepository.save(target);
+        notifyAccountDecision(saved, approved);
+        return userMapper.toResponse(saved);
     }
 
     // ── Query ─────────────────────────────────────────────────────────────
@@ -327,5 +334,33 @@ public class AuthService {
                         user.getDepartment()
                 )
         );
+    }
+
+    private void notifyAccountPending(UserEntity user) {
+        notificationService.sendToRoles(
+                managerRoles(),
+                NotificationType.ACCOUNT_PENDING,
+                "Tai khoan moi cho duyet",
+                STR."\{user.getFullName()} vua dang ky tai khoan va dang cho duyet.",
+                "USER",
+                user.getId().toString(),
+                false);
+    }
+
+    private void notifyAccountDecision(UserEntity user, boolean approved) {
+        notificationService.sendToUser(
+                user.getId(),
+                approved ? NotificationType.ACCOUNT_APPROVED : NotificationType.ACCOUNT_REJECTED,
+                approved ? "Tai khoan da duoc duyet" : "Tai khoan bi tu choi",
+                approved
+                        ? "Tai khoan cua ban da duoc duyet. Ban co the dang nhap he thong."
+                        : STR."Tai khoan cua ban bi tu choi. Ly do: \{user.getRejectionReason()}",
+                "USER",
+                user.getId().toString(),
+                true);
+    }
+
+    private List<UserRole> managerRoles() {
+        return List.of(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.MANAGER);
     }
 }

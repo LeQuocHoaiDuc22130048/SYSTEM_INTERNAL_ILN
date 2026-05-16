@@ -16,10 +16,11 @@ class DashboardPage extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final wide = MediaQuery.of(context).size.width > 760;
+            final wide = MediaQuery.sizeOf(context).width > 760;
             final contentWidth = constraints.maxWidth > 980
                 ? 980.0
                 : constraints.maxWidth;
@@ -52,7 +53,7 @@ class DashboardPage extends StatelessWidget {
                         itemBuilder: (context, index) {
                           final stat = _dashboardStats[index];
                           return _DashboardStatCard(stat: stat, isDark: isDark)
-                              .animate()
+                              .animate(target: 1)
                               .fadeIn(duration: 260.ms, delay: (index * 35).ms)
                               .slideY(
                                 begin: 0.08,
@@ -126,9 +127,9 @@ class _DashboardHeader extends StatelessWidget {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              color: AppColors.successLight.withOpacity(0.65),
+              color: AppColors.successLight.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.success.withOpacity(0.3)),
+              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,

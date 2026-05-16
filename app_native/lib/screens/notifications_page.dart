@@ -39,10 +39,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final wide = MediaQuery.of(context).size.width > 760;
+    final wide = MediaQuery.sizeOf(context).width > 760;
     final unreadCount = _currentNotifications.where((n) => n.unread).length;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: EdgeInsets.fromLTRB(
@@ -134,7 +135,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.06),
+                            color: Colors.black.withValues(alpha: 0.06),
                             blurRadius: 7,
                             offset: const Offset(0, 2),
                           ),

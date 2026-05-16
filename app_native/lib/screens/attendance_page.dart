@@ -36,8 +36,9 @@ class _AttendancePageState extends State<AttendancePage>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final today = DateFormat('EEEE, dd/MM/yyyy').format(DateTime.now());
-    final wide = MediaQuery.of(context).size.width > 760;
+    final wide = MediaQuery.sizeOf(context).width > 760;
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
@@ -76,7 +77,7 @@ class _AttendancePageState extends State<AttendancePage>
                             ),
                           ],
                         )
-                        .animate()
+                        .animate(target: 1)
                         .fadeIn(duration: 400.ms)
                         .slideY(begin: -0.2, end: 0, duration: 400.ms),
               ),
@@ -88,7 +89,7 @@ class _AttendancePageState extends State<AttendancePage>
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final screenHeight = MediaQuery.of(context).size.height;
+                    final screenHeight = MediaQuery.sizeOf(context).height;
                     final checkInHeight = screenHeight * 0.25;
 
                     return Container(
@@ -103,7 +104,7 @@ class _AttendancePageState extends State<AttendancePage>
                             borderRadius: BorderRadius.circular(16),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withOpacity(0.3),
+                                color: AppColors.primary.withValues(alpha: 0.3),
                                 blurRadius: 20,
                                 offset: const Offset(0, 8),
                               ),
@@ -198,7 +199,7 @@ class _AttendancePageState extends State<AttendancePage>
                             ],
                           ),
                         )
-                        .animate()
+                        .animate(target: 1)
                         .fadeIn(duration: 600.ms, delay: 100.ms)
                         .slideY(
                           begin: 0.2,
@@ -269,7 +270,7 @@ class _AttendancePageState extends State<AttendancePage>
               decoration: BoxDecoration(
                 color: AppColors.infoLight,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.info.withOpacity(0.3)),
+                border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
@@ -292,7 +293,7 @@ class _AttendancePageState extends State<AttendancePage>
                 ],
               ),
             )
-            .animate()
+            .animate(target: 1)
             .fadeIn(duration: 400.ms, delay: 200.ms)
             .slideY(begin: 0.2, end: 0, duration: 400.ms, delay: 200.ms),
         const SizedBox(height: 24),
@@ -378,7 +379,7 @@ class _AttendancePageState extends State<AttendancePage>
                   ],
                 ),
               )
-              .animate()
+              .animate(target: 1)
               .fadeIn(
                 duration: 400.ms,
                 delay: (300 + mockAttendanceRecords.indexOf(record) * 50).ms,

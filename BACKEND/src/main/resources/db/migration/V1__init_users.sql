@@ -3,6 +3,8 @@
 -- ============================================================
 
 -- Enum types
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TYPE user_role AS ENUM ('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE');
 CREATE TYPE user_status AS ENUM ('REGISTERED', 'PENDING_APPROVAL', 'ACTIVE', 'SUSPENDED', 'DELETED');
 

@@ -16,24 +16,28 @@ class WarehousePage extends StatefulWidget {
 
 class _WarehousePageState extends State<WarehousePage> {
   final TextEditingController _searchController = TextEditingController();
-  BoardStatus? _filter;
-  String _searchQuery = '';
+  final ValueNotifier<BoardStatus?> _filter = ValueNotifier(null);
+  final ValueNotifier<String> _searchQuery = ValueNotifier('');
   bool _isGridView = true;
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchQuery.dispose();
+    _filter.dispose();
     super.dispose();
   }
 
   List<Board> get _filteredBoards {
+    final query = _searchQuery.value.toLowerCase();
+    final currentFilter = _filter.value;
     return mockBoards.where((board) {
-      final matchesFilter = _filter == null || board.status == _filter;
+      final matchesFilter = currentFilter == null || board.status == currentFilter;
       final matchesSearch =
-          _searchQuery.isEmpty ||
-          board.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          board.qrCode.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          board.model.toLowerCase().contains(_searchQuery.toLowerCase());
+          query.isEmpty ||
+          board.name.toLowerCase().contains(query) ||
+          board.qrCode.toLowerCase().contains(query) ||
+          board.model.toLowerCase().contains(query);
       return matchesFilter && matchesSearch;
     }).toList();
   }
@@ -43,6 +47,7 @@ class _WarehousePageState extends State<WarehousePage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -92,32 +97,51 @@ class _WarehousePageState extends State<WarehousePage> {
                               ],
                             ),
                           ),
-                          ElevatedButton.icon(
-                            onPressed: () async {
-                              final result = await Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const ScannerPage(),
+                          Row(
+                            children: [
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  _showAddEditBoardDialog();
+                                },
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text(
+                                  'Thêm',
+                                  style: TextStyle(fontSize: 12),
                                 ),
-                              );
-                              if (result != null && mounted) {
-                                setState(() {
-                                  _searchQuery = result as String;
-                                  _searchController.text = _searchQuery;
-                                });
-                              }
-                            },
-                            icon: const Icon(Icons.qr_code_scanner, size: 16),
-                            label: const Text(
-                              'Quét QR',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 10,
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ScannerPage(),
+                                    ),
+                                  );
+                                  if (result != null && mounted) {
+                                    _searchQuery.value = result as String;
+                                    _searchController.text = _searchQuery.value;
+                                  }
+                                },
+                                icon: const Icon(Icons.qr_code_scanner, size: 16),
+                                label: const Text(
+                                  'Quét QR',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -130,7 +154,7 @@ class _WarehousePageState extends State<WarehousePage> {
                           child: Row(
                             children: [
                               _buildLandscapeStatCard(
-                                '${statusStats.totalBoards}',
+                                '${mockBoards.length}',
                                 'Tổng',
                                 LucideIcons.cpu,
                                 AppColors.primary,
@@ -138,7 +162,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               ),
                               const SizedBox(width: 22),
                               _buildLandscapeStatCard(
-                                '${statusStats.availableBoards}',
+                                '${mockBoards.where((b) => b.status == BoardStatus.available).length}',
                                 'Sẵn sàng',
                                 Icons.inventory_2_outlined,
                                 AppColors.success,
@@ -146,7 +170,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               ),
                               const SizedBox(width: 22),
                               _buildLandscapeStatCard(
-                                '${statusStats.checkedOutBoards}',
+                                '${mockBoards.where((b) => b.status == BoardStatus.checkedOut).length}',
                                 'Đang dùng',
                                 LucideIcons.wrench,
                                 AppColors.warning,
@@ -154,7 +178,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               ),
                               const SizedBox(width: 22),
                               _buildLandscapeStatCard(
-                                '${statusStats.maintenanceBoards}',
+                                '${mockBoards.where((b) => b.status == BoardStatus.maintenance).length}',
                                 'Bảo trì',
                                 Icons.warning_amber,
                                 AppColors.error,
@@ -173,28 +197,28 @@ class _WarehousePageState extends State<WarehousePage> {
                           childAspectRatio: 3.0,
                           children: [
                             _buildCompactStatCard(
-                              '${statusStats.totalBoards}',
+                              '${mockBoards.length}',
                               'Tổng',
                               LucideIcons.cpu,
                               AppColors.primary,
                               isDark,
                             ),
                             _buildCompactStatCard(
-                              '${statusStats.availableBoards}',
+                              '${mockBoards.where((b) => b.status == BoardStatus.available).length}',
                               'Sẵn sàng',
                               Icons.inventory_2_outlined,
                               AppColors.success,
                               isDark,
                             ),
                             _buildCompactStatCard(
-                              '${statusStats.checkedOutBoards}',
+                              '${mockBoards.where((b) => b.status == BoardStatus.checkedOut).length}',
                               'Đang dùng',
                               LucideIcons.wrench,
                               AppColors.warning,
                               isDark,
                             ),
                             _buildCompactStatCard(
-                              '${statusStats.maintenanceBoards}',
+                              '${mockBoards.where((b) => b.status == BoardStatus.maintenance).length}',
                               'Bảo trì',
                               Icons.warning_amber,
                               AppColors.error,
@@ -213,9 +237,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               child: TextField(
                                 controller: _searchController,
                                 onChanged: (value) {
-                                  setState(() {
-                                    _searchQuery = value;
-                                  });
+                                  _searchQuery.value = value;
                                 },
                                 style: const TextStyle(fontSize: 12),
                                 decoration: InputDecoration(
@@ -385,83 +407,91 @@ class _WarehousePageState extends State<WarehousePage> {
 
                 // Board List
                 Expanded(
-                  child: _filteredBoards.isEmpty
-                      ? Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Text('🔌', style: TextStyle(fontSize: 48)),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Không tìm thấy bo mạch',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? AppColors.textPrimaryDark
-                                      : AppColors.textPrimaryLight,
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_searchQuery, _filter]),
+                    builder: (context, _) {
+                      final filtered = _filteredBoards;
+                      if (filtered.isEmpty) {
+                        return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text('🔌', style: TextStyle(fontSize: 48)),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Không tìm thấy bo mạch',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Thử thay đổi bộ lọc',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondaryLight,
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Thử thay đổi bộ lọc',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                        )
-                      : _isGridView
-                      ? GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: wide ? 4 : 2,
-                                mainAxisSpacing: 8,
-                                crossAxisSpacing: 8,
-                                childAspectRatio: wide ? 0.75 : 0.7,
-                              ),
-                          itemCount: _filteredBoards.length,
-                          itemBuilder: (context, index) {
-                            return _buildBoardGridCard(_filteredBoards[index])
-                                .animate()
-                                .fadeIn(
-                                  duration: 400.ms,
-                                  delay: (50 * index).ms,
-                                )
-                                .slideY(
-                                  begin: 0.2,
-                                  end: 0,
-                                  duration: 400.ms,
-                                  delay: (50 * index).ms,
-                                );
-                          },
-                        )
-                      : ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredBoards.length,
-                          itemBuilder: (context, index) {
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _buildBoardListCard(_filteredBoards[index])
-                                  .animate()
+                              ],
+                            ),
+                          );
+                      }
+                      
+                      return _isGridView
+                        ? GridView.builder(
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: wide ? 4 : 2,
+                                  mainAxisSpacing: 8,
+                                  crossAxisSpacing: 8,
+                                  childAspectRatio: wide ? 0.75 : 0.7,
+                                ),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              return _buildBoardGridCard(filtered[index])
+                                  .animate(target: 1)
                                   .fadeIn(
                                     duration: 400.ms,
                                     delay: (50 * index).ms,
                                   )
-                                  .slideX(
-                                    begin: -0.2,
+                                  .slideY(
+                                    begin: 0.2,
                                     end: 0,
                                     duration: 400.ms,
                                     delay: (50 * index).ms,
-                                  ),
-                            );
-                          },
-                        ),
+                                  );
+                            },
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: _buildBoardListCard(filtered[index])
+                                    .animate(target: 1)
+                                    .fadeIn(
+                                      duration: 400.ms,
+                                      delay: (50 * index).ms,
+                                    )
+                                    .slideX(
+                                      begin: -0.2,
+                                      end: 0,
+                                      duration: 400.ms,
+                                      delay: (50 * index).ms,
+                                    ),
+                              );
+                            },
+                          );
+                    },
+                  ),
                 ),
               ],
             );
@@ -527,46 +557,49 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   Widget _buildFilterChip(String label, BoardStatus? status, int count) {
-    final isSelected = _filter == status;
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return FilterChip(
-      label: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label),
-          const SizedBox(width: 6),
-          Text(
-            '$count',
-            style: TextStyle(
-              fontSize: 10,
-              color: isSelected
-                  ? Colors.blue[200]
-                  : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
-            ),
+    return ValueListenableBuilder<BoardStatus?>(
+      valueListenable: _filter,
+      builder: (context, currentFilter, _) {
+        final isSelected = currentFilter == status;
+        return FilterChip(
+          label: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label),
+              const SizedBox(width: 6),
+              Text(
+                '$count',
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isSelected
+                      ? Colors.blue[200]
+                      : (isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
-      selected: isSelected,
-      onSelected: (selected) {
-        setState(() {
-          _filter = selected ? status : null;
-        });
+          selected: isSelected,
+          onSelected: (selected) {
+            _filter.value = selected ? status : null;
+          },
+          backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
+          selectedColor: AppColors.primary,
+          labelStyle: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: isSelected
+                ? Colors.white
+                : (isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        );
       },
-      backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
-      selectedColor: AppColors.primary,
-      labelStyle: TextStyle(
-        fontSize: 11,
-        fontWeight: FontWeight.w600,
-        color: isSelected
-            ? Colors.white
-            : (isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
     );
   }
 
@@ -625,7 +658,7 @@ class _WarehousePageState extends State<WarehousePage> {
             ],
           ),
         )
-        .animate()
+        .animate(target: 1)
         .fadeIn(duration: 300.ms, delay: 100.ms)
         .slideY(begin: 0.2, end: 0, duration: 300.ms, delay: 100.ms);
   }
@@ -919,15 +952,182 @@ class _WarehousePageState extends State<WarehousePage> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _BoardDetailSheet(board: board),
+      builder: (context) => _BoardDetailSheet(
+        board: board,
+        onEdit: () {
+          Navigator.pop(context);
+          _showAddEditBoardDialog(board: board);
+        },
+        onDelete: () {
+          Navigator.pop(context);
+          _showDeleteConfirmDialog(board);
+        },
+      ),
+    );
+  }
+
+  void _showDeleteConfirmDialog(Board board) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Xóa bo mạch'),
+        content: Text('Bạn có chắc chắn muốn xóa bo mạch ${board.name}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          TextButton(
+            onPressed: () {
+              setState(() {
+                mockBoards.removeWhere((b) => b.id == board.id);
+              });
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Đã xóa bo mạch ${board.name}')),
+              );
+            },
+            child: const Text('Xóa', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddEditBoardDialog({Board? board}) {
+    final isEditing = board != null;
+    final autoQr = 'BD-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
+    final nameCtrl = TextEditingController(text: board?.name ?? '');
+    final qrCodeCtrl = TextEditingController(text: board?.qrCode ?? autoQr);
+    final modelCtrl = TextEditingController(text: board?.model ?? '');
+    final locationCtrl = TextEditingController(text: board?.location ?? '');
+    final descCtrl = TextEditingController(text: board?.description ?? '');
+    BoardStatus selectedStatus = board?.status ?? BoardStatus.available;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+          
+          return AlertDialog(
+            title: Text(isEditing ? 'Chỉnh sửa bo mạch' : 'Thêm bo mạch'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(
+                    controller: nameCtrl,
+                    decoration: const InputDecoration(labelText: 'Tên bo mạch'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: qrCodeCtrl,
+                    decoration: InputDecoration(
+                      labelText: isEditing ? 'Mã QR' : 'Mã QR (Tạo tự động)',
+                      filled: true,
+                      fillColor: isDark ? Colors.white10 : Colors.grey.shade200,
+                    ),
+                    readOnly: true,
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: modelCtrl,
+                    decoration: const InputDecoration(labelText: 'Model'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: locationCtrl,
+                    decoration: const InputDecoration(labelText: 'Vị trí'),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<BoardStatus>(
+                    value: selectedStatus,
+                    decoration: const InputDecoration(labelText: 'Trạng thái'),
+                    items: BoardStatus.values.map((s) {
+                      String label = 'Sẵn sàng';
+                      if (s == BoardStatus.checkedOut) label = 'Đang dùng';
+                      if (s == BoardStatus.maintenance) label = 'Bảo trì';
+                      return DropdownMenuItem(value: s, child: Text(label));
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) setDialogState(() => selectedStatus = val);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descCtrl,
+                    decoration: const InputDecoration(labelText: 'Mô tả'),
+                    maxLines: 3,
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Hủy'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (nameCtrl.text.isEmpty) return;
+                  
+                  setState(() {
+                    if (isEditing) {
+                      final index = mockBoards.indexWhere((b) => b.id == board.id);
+                      if (index != -1) {
+                        mockBoards[index] = Board(
+                          id: board.id,
+                          name: nameCtrl.text,
+                          qrCode: qrCodeCtrl.text,
+                          model: modelCtrl.text,
+                          location: locationCtrl.text,
+                          status: selectedStatus,
+                          description: descCtrl.text,
+                          checkedOutBy: board.checkedOutBy,
+                          checkedOutAt: board.checkedOutAt,
+                          currentRepairOrder: board.currentRepairOrder,
+                        );
+                      }
+                    } else {
+                      mockBoards.add(Board(
+                        id: 'board_${DateTime.now().millisecondsSinceEpoch}',
+                        name: nameCtrl.text,
+                        qrCode: qrCodeCtrl.text,
+                        model: modelCtrl.text,
+                        location: locationCtrl.text,
+                        status: selectedStatus,
+                        description: descCtrl.text,
+                      ));
+                    }
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(isEditing ? 'Đã cập nhật bo mạch' : 'Đã thêm bo mạch'),
+                    ),
+                  );
+                },
+                child: const Text('Lưu'),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }
 
 class _BoardDetailSheet extends StatefulWidget {
   final Board board;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _BoardDetailSheet({required this.board});
+  const _BoardDetailSheet({
+    required this.board,
+    required this.onEdit,
+    required this.onDelete,
+  });
 
   @override
   State<_BoardDetailSheet> createState() => _BoardDetailSheetState();
@@ -1025,6 +1225,16 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                         ),
                       ],
                     ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 20, color: AppColors.primary),
+                    onPressed: widget.onEdit,
+                    tooltip: 'Chỉnh sửa',
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.delete, size: 20, color: AppColors.error),
+                    onPressed: widget.onDelete,
+                    tooltip: 'Xóa',
                   ),
                 ],
               ),

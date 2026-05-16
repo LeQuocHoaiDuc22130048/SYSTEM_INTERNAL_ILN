@@ -16,8 +16,15 @@ class RepairOrdersPage extends StatefulWidget {
 }
 
 class _RepairOrdersPageState extends State<RepairOrdersPage> {
-  RepairOrderStatus? _filter;
-  String _searchQuery = '';
+  final ValueNotifier<RepairOrderStatus?> _filter = ValueNotifier(null);
+  final ValueNotifier<String> _searchQuery = ValueNotifier('');
+
+  @override
+  void dispose() {
+    _searchQuery.dispose();
+    _filter.dispose();
+    super.dispose();
+  }
 
   void _showCreateOrderSheet(BuildContext context) {
     showModalBottomSheet(
@@ -29,9 +36,10 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   }
 
   List<RepairOrder> get _filteredOrders {
-    final query = _searchQuery.toLowerCase();
+    final query = _searchQuery.value.toLowerCase();
+    final currentFilter = _filter.value;
     return mockRepairOrders.where((order) {
-      final matchesFilter = _filter == null || order.status == _filter;
+      final matchesFilter = currentFilter == null || order.status == currentFilter;
       final matchesSearch =
           query.isEmpty ||
           order.deviceName.toLowerCase().contains(query) ||
@@ -47,6 +55,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, constraints) {
@@ -109,7 +118,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                               Expanded(
                                 child: TextField(
                                   onChanged: (value) =>
-                                      setState(() => _searchQuery = value),
+                                      _searchQuery.value = value,
                                   decoration: InputDecoration(
                                     hintText:
                                         'Tìm theo mã đơn, thiết bị, khách hàng...',
@@ -183,16 +192,21 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                   ),
                 ),
                 Expanded(
-                  child: _filteredOrders.isEmpty
-                      ? _EmptyOrders(isDark: isDark)
-                      : ListView.builder(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_searchQuery, _filter]),
+                    builder: (context, _) {
+                      final filtered = _filteredOrders;
+                      if (filtered.isEmpty) {
+                        return _EmptyOrders(isDark: isDark);
+                      }
+                      return ListView.builder(
                           padding: EdgeInsets.fromLTRB(
                             wide ? 20 : 22,
                             4,
                             wide ? 20 : 22,
                             24,
                           ),
-                          itemCount: _filteredOrders.length,
+                          itemCount: filtered.length,
                           itemBuilder: (context, index) {
                             return Center(
                               child: ConstrainedBox(
@@ -203,10 +217,10 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child:
                                       _OrderCard(
-                                            order: _filteredOrders[index],
+                                            order: filtered[index],
                                             isDark: isDark,
                                           )
-                                          .animate()
+                                          .animate(target: 1)
                                           .fadeIn(
                                             duration: 320.ms,
                                             delay: (index * 45).ms,
@@ -221,7 +235,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                               ),
                             );
                           },
-                        ),
+                        );
+                    },
+                  ),
                 ),
               ],
             );
@@ -232,28 +248,32 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   }
 
   Widget _buildFilterChip(String label, RepairOrderStatus? status) {
-    final isSelected = _filter == status;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final count = status == null
         ? mockRepairOrders.length
         : mockRepairOrders.where((order) => order.status == status).length;
 
-    return FilterChip(
-      label: Text('$label  $count'),
-      selected: isSelected,
-      onSelected: (selected) =>
-          setState(() => _filter = selected ? status : null),
-      backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
-      selectedColor: AppColors.primary,
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: FontWeight.w600,
-        color: isSelected
-            ? Colors.white
-            : (isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight),
-      ),
+    return ValueListenableBuilder<RepairOrderStatus?>(
+      valueListenable: _filter,
+      builder: (context, currentFilter, _) {
+        final isSelected = currentFilter == status;
+        return FilterChip(
+          label: Text('$label  $count'),
+          selected: isSelected,
+          onSelected: (selected) => _filter.value = selected ? status : null,
+          backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
+          selectedColor: AppColors.primary,
+          labelStyle: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: isSelected
+                ? Colors.white
+                : (isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight),
+          ),
+        );
+      },
     );
   }
 }
@@ -279,7 +299,7 @@ class _OrderCard extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(isDark ? 0.16 : 0.06),
+              color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.06),
               blurRadius: 7,
               offset: const Offset(0, 2),
             ),
@@ -720,11 +740,9 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Container(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      decoration: BoxDecoration(
+    return _KeyboardBottomPadding(
+      child: Container(
+        decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -832,6 +850,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
           ),
         ),
       ),
+      ),
     );
   }
 
@@ -893,6 +912,24 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
           },
         ),
       ],
+    );
+  }
+}
+
+class _KeyboardBottomPadding extends StatelessWidget {
+  final Widget child;
+
+  const _KeyboardBottomPadding({required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedPadding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      duration: const Duration(milliseconds: 120),
+      curve: Curves.easeOutCubic,
+      child: child,
     );
   }
 }

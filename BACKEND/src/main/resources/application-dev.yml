@@ -12,7 +12,7 @@ spring:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
-    baseline-version: 1.0
+    baseline-version: 0
 
   jpa:
     hibernate:
@@ -22,11 +22,22 @@ spring:
       hibernate:
         format_sql: true
         dialect: org.hibernate.dialect.PostgreSQLDialect
+        jdbc:
+          time_zone: UTC
 
   data:
     redis:
       host: localhost
       port: 6379
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+      write-durations-as-timestamps: false
+    deserialization:
+      fail-on-ignored-properties: false
+    default-property-inclusion: non_null
+    time-zone: UTC
 
 app:
   init:
@@ -41,6 +52,12 @@ app:
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8080}
 
+  firebase:
+    project-id: ${FIREBASE_PROJECT_ID:}
+    service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+    service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
+    server-key: ${FIREBASE_SERVER_KEY:}
+
 application:
   security:
     jwt:
@@ -48,6 +65,14 @@ application:
       expiration: 900000
       refresh-token:
         expiration: 604800000
+
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    tags-sorter: alpha
+    operations-sorter: method
 
 logging:
   level:

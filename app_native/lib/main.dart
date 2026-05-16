@@ -124,6 +124,7 @@ class _MainScreenState extends State<MainScreen> {
 
         if (isWide) {
           return Scaffold(
+            resizeToAvoidBottomInset: false,
             body: Row(
               children: [
                 _SideNavigation(
@@ -145,6 +146,7 @@ class _MainScreenState extends State<MainScreen> {
         }
 
         return Scaffold(
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(
             toolbarHeight: 56,
             elevation: 0,
@@ -203,7 +205,7 @@ class _MainScreenState extends State<MainScreen> {
                   width: double.infinity,
                   padding: EdgeInsets.fromLTRB(
                     16,
-                    MediaQuery.of(context).padding.top + 20,
+                    MediaQuery.paddingOf(context).top + 20,
                     16,
                     20,
                   ),
@@ -580,7 +582,7 @@ class _CategoryLabel extends StatelessWidget {
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          color: Colors.white.withOpacity(0.3),
+          color: Colors.white.withValues(alpha: 0.3),
           fontSize: 10,
           fontWeight: FontWeight.bold,
           letterSpacing: 1.2,
@@ -610,7 +612,7 @@ class _SideNavItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final activeColor = AppColors.primary;
-    final inactiveColor = Colors.white.withOpacity(0.6);
+    final inactiveColor = Colors.white.withValues(alpha: 0.6);
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -654,7 +656,7 @@ class _SideNavItem extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? Colors.white.withOpacity(0.2)
+                          ? Colors.white.withValues(alpha: 0.2)
                           : const Color(0xFFEF4444),
                       borderRadius: BorderRadius.circular(10),
                     ),

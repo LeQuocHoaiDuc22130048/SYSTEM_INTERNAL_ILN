@@ -178,7 +178,7 @@ class StatCard extends StatelessWidget {
         ],
       ),
     )
-        .animate()
+        .animate(target: 1)
         .fadeIn(duration: 300.ms, delay: 100.ms)
         .slideY(begin: 0.2, end: 0, duration: 300.ms, delay: 100.ms);
   }

@@ -8,9 +8,10 @@ class AccountApprovalPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final wide = MediaQuery.of(context).size.width > 760;
+    final wide = MediaQuery.sizeOf(context).width > 760;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: isDark
           ? AppColors.backgroundDark
           : const Color(0xFFF8FAFC),

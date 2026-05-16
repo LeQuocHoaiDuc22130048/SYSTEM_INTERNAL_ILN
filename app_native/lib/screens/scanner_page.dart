@@ -49,7 +49,7 @@ class _ScannerPageState extends State<ScannerPage> {
           
           // Controls
           Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
+            top: MediaQuery.paddingOf(context).top + 16,
             left: 16,
             right: 16,
             child: Row(
@@ -68,7 +68,7 @@ class _ScannerPageState extends State<ScannerPage> {
                     shadows: [
                       Shadow(
                         blurRadius: 10,
-                        color: Colors.black.withOpacity(0.5),
+                        color: Colors.black.withValues(alpha: 0.5),
                         offset: const Offset(0, 2),
                       ),
                     ],
@@ -84,14 +84,14 @@ class _ScannerPageState extends State<ScannerPage> {
           
           // Instructions
           Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 40,
-            left: 0,
+            bottom: MediaQuery.paddingOf(context).bottom + 40,
+            left: 24,
             right: 0,
             child: Center(
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: const Text(
@@ -109,7 +109,7 @@ class _ScannerPageState extends State<ScannerPage> {
   Widget _buildCircleButton({required IconData icon, required VoidCallback onPressed}) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.5),
+        color: Colors.black.withValues(alpha: 0.5),
         shape: BoxShape.circle,
       ),
       child: IconButton(
@@ -120,7 +120,7 @@ class _ScannerPageState extends State<ScannerPage> {
   }
 
   Widget _buildOverlay(BuildContext context) {
-    final size = MediaQuery.of(context).size;
+    final size = MediaQuery.sizeOf(context);
     final scanArea = size.width * 0.7;
     
     return Stack(
@@ -128,7 +128,7 @@ class _ScannerPageState extends State<ScannerPage> {
         // Semi-transparent background with a hole
         ColorFiltered(
           colorFilter: ColorFilter.mode(
-            Colors.black.withOpacity(0.5),
+            Colors.black.withValues(alpha: 0.5),
             BlendMode.srcOut,
           ),
           child: Stack(
