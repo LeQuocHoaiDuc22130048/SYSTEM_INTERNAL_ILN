@@ -16,6 +16,9 @@ import 'screens/employee_management_page.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'utils/auth_provider.dart';
+import 'utils/network_provider.dart';
+import 'utils/pending_sync_provider.dart';
+import 'widgets/offline_banner.dart';
 
 void main() {
   runApp(
@@ -23,6 +26,15 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => NetworkProvider()),
+        ChangeNotifierProxyProvider<NetworkProvider, PendingSyncProvider>(
+          create: (_) => PendingSyncProvider(),
+          update: (_, network, pendingSync) {
+            final provider = pendingSync ?? PendingSyncProvider();
+            provider.bindNetwork(network);
+            return provider;
+          },
+        ),
       ],
       child: const MyApp(),
     ),
@@ -43,6 +55,9 @@ class MyApp extends StatelessWidget {
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
           home: const LoginPage(),
+          builder: (context, child) {
+            return OfflineBanner(child: child ?? const SizedBox.shrink());
+          },
           routes: {
             '/login': (context) => const LoginPage(),
             '/dashboard': (context) => const MainScreen(),

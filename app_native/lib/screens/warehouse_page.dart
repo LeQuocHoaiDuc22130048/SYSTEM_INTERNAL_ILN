@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
+import '../utils/network_provider.dart';
+import '../utils/pending_sync_provider.dart';
 import '../widgets/status_badge.dart';
 import '../data/mock_data.dart';
 import '../models/board.dart';
@@ -46,6 +48,36 @@ class _WarehousePageState extends State<WarehousePage> {
 
   String _qrCodeLabel(Board board) {
     return board.qrCode.isEmpty ? 'QR chờ backend tạo' : board.qrCode;
+  }
+
+  Future<void> _handleEmployeeQrScan(String qrCode) async {
+    final isOnline = await context.read<NetworkProvider>().checkNow();
+    if (!mounted) return;
+
+    if (!isOnline) {
+      context.read<PendingSyncProvider>().addAction(
+            type: PendingSyncType.qrScan,
+            title: 'Quét QR bo mạch',
+            description: 'Mã QR: $qrCode',
+          );
+      _showSnackBar(
+        'Đã lưu tạm mã QR. Admin sẽ thấy thay đổi khi thiết bị có mạng lại.',
+        AppColors.warning,
+      );
+      return;
+    }
+
+    _showSnackBar('Đã quét và cập nhật admin: $qrCode', AppColors.success);
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -92,9 +124,7 @@ class _WarehousePageState extends State<WarehousePage> {
                       ),
                     );
                     if (result != null && mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Đã quét: $result')),
-                      );
+                      await _handleEmployeeQrScan(result as String);
                     }
                   },
                   icon: const Icon(Icons.camera_alt),
@@ -1291,7 +1321,20 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
       _isLoading = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 1200));
+    final isOnline = await context.read<NetworkProvider>().checkNow();
+    if (!isOnline && mounted) {
+      final isReturn = widget.board.status == BoardStatus.checkedOut;
+      context.read<PendingSyncProvider>().addAction(
+            type: isReturn
+                ? PendingSyncType.boardReturn
+                : PendingSyncType.boardCheckout,
+            title: isReturn ? 'Trả bo mạch' : 'Lấy bo mạch',
+            description: '${widget.board.name} - ${widget.board.qrCode}',
+          );
+    }
+
+    await Future.delayed(Duration(milliseconds: isOnline ? 1200 : 250));
+    if (!mounted) return;
 
     setState(() {
       _isLoading = false;

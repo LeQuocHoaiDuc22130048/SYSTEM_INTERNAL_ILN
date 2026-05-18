@@ -5,6 +5,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../models/user.dart';
 import '../utils/auth_provider.dart';
+import '../utils/network_provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -48,6 +49,17 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    final hasInternet = await Provider.of<NetworkProvider>(
+      context,
+      listen: false,
+    ).checkNow();
+    if (!hasInternet) {
+      setState(() {
+        _error = 'Thiết bị đang mất kết nối internet. Vui lòng kiểm tra mạng.';
+      });
+      return;
+    }
+
     setState(() {
       _loading = true;
     });
@@ -82,6 +94,17 @@ class _LoginPageState extends State<LoginPage> {
     if (_passwordController.text.length < 6) {
       setState(() {
         _error = 'Mật khẩu phải ít nhất 6 ký tự.';
+      });
+      return;
+    }
+
+    final hasInternet = await Provider.of<NetworkProvider>(
+      context,
+      listen: false,
+    ).checkNow();
+    if (!hasInternet) {
+      setState(() {
+        _error = 'Thiết bị đang mất kết nối internet. Vui lòng kiểm tra mạng.';
       });
       return;
     }

@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
+import '../utils/network_provider.dart';
+import '../utils/pending_sync_provider.dart';
 import '../widgets/status_badge.dart';
 import '../data/mock_data.dart';
 import 'face_attendance_page.dart';
@@ -164,15 +167,7 @@ class _AttendancePageState extends State<AttendancePage>
                                   Column(
                                     children: [
                                       ElevatedButton.icon(
-                                        onPressed: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) =>
-                                                  const FaceAttendancePage(),
-                                            ),
-                                          );
-                                        },
+                                        onPressed: _handleFaceScan,
                                         icon: const Icon(
                                           LucideIcons.scanFace,
                                           size: 18,
@@ -254,6 +249,52 @@ class _AttendancePageState extends State<AttendancePage>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Future<void> _handleFaceScan() async {
+    final confirmed = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const FaceAttendancePage(),
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final checkInTime = DateFormat('HH:mm').format(DateTime.now());
+    setState(() {
+      _hasCheckedIn = true;
+      _checkInTime = checkInTime;
+    });
+
+    final network = context.read<NetworkProvider>();
+    final isOnline = await network.checkNow();
+    if (!mounted) return;
+
+    if (!isOnline) {
+      context.read<PendingSyncProvider>().addAction(
+            type: PendingSyncType.faceAttendance,
+            title: 'Chấm công khuôn mặt',
+            description: 'Check-in lúc $checkInTime',
+          );
+      _showSnackBar(
+        'Đã ghi nhận tạm. Admin sẽ thấy thay đổi khi thiết bị có mạng lại.',
+        AppColors.warning,
+      );
+      return;
+    }
+
+    _showSnackBar('Check-in thành công, đã cập nhật cho admin.', AppColors.success);
+  }
+
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

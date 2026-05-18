@@ -262,7 +262,7 @@ class _FaceAttendancePageState extends State<FaceAttendancePage> {
                     children: [
                       Expanded(
                         child: TextButton(
-                          onPressed: () => Navigator.pop(context),
+                          onPressed: () => Navigator.pop(context, false),
                           style: TextButton.styleFrom(
                             foregroundColor: Colors.white.withValues(alpha: 0.6),
                             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -274,7 +274,7 @@ class _FaceAttendancePageState extends State<FaceAttendancePage> {
                       if (_isSuccess)
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => Navigator.pop(context),
+                            onPressed: () => Navigator.pop(context, true),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.success,
                               foregroundColor: Colors.white,
@@ -301,7 +301,7 @@ class _FaceAttendancePageState extends State<FaceAttendancePage> {
             left: 10,
             child: IconButton(
               icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(context, false),
               style: IconButton.styleFrom(
                 backgroundColor: Colors.white.withValues(alpha: 0.1),
               ),
