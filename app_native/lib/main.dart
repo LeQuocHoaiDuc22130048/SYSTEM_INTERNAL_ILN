@@ -11,13 +11,19 @@ import 'screens/messages_page.dart';
 import 'screens/notifications_page.dart';
 import 'screens/repair_orders_page.dart';
 import 'screens/warehouse_page.dart';
+import 'screens/profile_page.dart';
+import 'screens/employee_management_page.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
+import 'utils/auth_provider.dart';
 
 void main() {
   runApp(
-    ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
+      ],
       child: const MyApp(),
     ),
   );
@@ -74,44 +80,103 @@ class _MainScreenState extends State<MainScreen> {
   int _previousIndex = 0;
   bool _isSidebarExpanded = true;
 
-  final List<Widget> _pages = [
-    const DashboardPage(),
-    const RepairOrdersPage(),
-    const WarehousePage(),
-    const AttendancePage(),
-    const MessagesPage(),
-    const NotificationsPage(),
-    const EmployeesPage(),
-    const AccountApprovalPage(),
-  ];
+  late final List<Widget?> _pages;
 
-  final List<NavigationItem> _navItems = [
-    NavigationItem(
-      icon: Icons.dashboard_outlined,
-      label: 'Dashboard',
-      activeIcon: Icons.dashboard,
-    ),
-    NavigationItem(
-      icon: Icons.build_outlined,
-      label: 'Đơn',
-      activeIcon: Icons.build,
-    ),
-    NavigationItem(
-      icon: Icons.inventory_2_outlined,
-      label: 'Kho',
-      activeIcon: Icons.inventory_2,
-    ),
-    NavigationItem(
-      icon: Icons.access_time_outlined,
-      label: 'Chấm công',
-      activeIcon: Icons.access_time,
-    ),
-    NavigationItem(
-      icon: Icons.chat_bubble_outline,
-      label: 'Tin nhắn',
-      activeIcon: Icons.chat_bubble,
-    ),
-  ];
+  List<NavigationItem> get _navItems {
+    final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
+    return [
+      NavigationItem(
+        icon: Icons.dashboard_outlined,
+        label: 'Dashboard',
+        activeIcon: Icons.dashboard,
+        tabIndex: 0,
+      ),
+      NavigationItem(
+        icon: Icons.build_outlined,
+        label: 'Đơn',
+        activeIcon: Icons.build,
+        tabIndex: 1,
+      ),
+      NavigationItem(
+        icon: Icons.inventory_2_outlined,
+        label: 'Kho',
+        activeIcon: Icons.inventory_2,
+        tabIndex: 2,
+      ),
+      if (!isEmployee)
+        NavigationItem(
+          icon: Icons.access_time_outlined,
+          label: 'Chấm công',
+          activeIcon: Icons.access_time,
+          tabIndex: 3,
+        ),
+      NavigationItem(
+        icon: Icons.chat_bubble_outline,
+        label: 'Tin nhắn',
+        activeIcon: Icons.chat_bubble,
+        tabIndex: 4,
+      ),
+      if (!isEmployee)
+        NavigationItem(
+          icon: Icons.people_outline,
+          label: 'Quản lý NV',
+          activeIcon: Icons.people,
+          tabIndex: 6,
+        ),
+      NavigationItem(
+        icon: Icons.person_outline,
+        label: 'Cá nhân',
+        activeIcon: Icons.person,
+        tabIndex: 8,
+      ),
+    ];
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = List<Widget?>.filled(9, null);
+    _pages[_currentIndex] = _buildPage(_currentIndex);
+  }
+
+  Widget _buildPage(int index) {
+    switch (index) {
+      case 0:
+        return const DashboardPage();
+      case 1:
+        return const RepairOrdersPage();
+      case 2:
+        return const WarehousePage();
+      case 3:
+        return const AttendancePage();
+      case 4:
+        return const MessagesPage();
+      case 5:
+        return const NotificationsPage();
+      case 6:
+        return const EmployeeManagementPage();
+      case 7:
+        return const SizedBox.shrink(); // AccountApproval is inside EmployeeManagementPage now
+      case 8:
+        return const ProfilePage();
+      default:
+        return const DashboardPage();
+    }
+  }
+
+  void _setCurrentIndex(int index) {
+    setState(() {
+      _pages[index] ??= _buildPage(index);
+      _currentIndex = index;
+    });
+  }
+
+  List<Widget> get _visiblePages {
+    return List<Widget>.generate(
+      _pages.length,
+      (index) => _pages[index] ?? const SizedBox.shrink(),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -131,14 +196,17 @@ class _MainScreenState extends State<MainScreen> {
                   currentIndex: _currentIndex,
                   isDark: isDark,
                   isExpanded: _isSidebarExpanded,
-                  onIndexChanged: (index) =>
-                      setState(() => _currentIndex = index),
+                  onIndexChanged: _setCurrentIndex,
                   onToggleExpand: () =>
                       setState(() => _isSidebarExpanded = !_isSidebarExpanded),
                   themeProvider: themeProvider,
+                  isEmployee: Provider.of<AuthProvider>(context).isEmployee,
                 ),
                 Expanded(
-                  child: IndexedStack(index: _currentIndex, children: _pages),
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: _visiblePages,
+                  ),
                 ),
               ],
             ),
@@ -154,19 +222,15 @@ class _MainScreenState extends State<MainScreen> {
             backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
             surfaceTintColor: Colors.transparent,
             centerTitle: true,
-            leading: Builder(
-              builder: (context) {
-                return IconButton(
-                  icon: const Icon(Icons.menu, size: 22),
-                  onPressed: () => Scaffold.of(context).openDrawer(),
-                  tooltip: 'Menu',
-                );
-              },
+            leading: IconButton(
+              icon: const Icon(Icons.logout, size: 22),
+              onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+              tooltip: 'Đăng xuất',
             ),
             title: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                SizedBox(
                   width: 50,
                   height: 50,
                   child: Image.asset("assets/images/app_logo.png"),
@@ -174,16 +238,21 @@ class _MainScreenState extends State<MainScreen> {
               ],
             ),
             actions: [
+              IconButton(
+                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, size: 22),
+                onPressed: themeProvider.toggleTheme,
+                tooltip: 'Giao diện',
+              ),
               _BadgeIconButton(
                 icon: Icons.notifications_outlined,
                 badge: '3',
                 tooltip: 'Thông báo',
                 onPressed: () {
                   if (_currentIndex == 5) {
-                    setState(() => _currentIndex = _previousIndex);
+                    _setCurrentIndex(_previousIndex);
                   } else {
                     _previousIndex = _currentIndex;
-                    setState(() => _currentIndex = 5);
+                    _setCurrentIndex(5);
                   }
                 },
               ),
@@ -197,104 +266,7 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-          drawer: Drawer(
-            child: ListView(
-              padding: EdgeInsets.zero,
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: EdgeInsets.fromLTRB(
-                    16,
-                    MediaQuery.paddingOf(context).top + 20,
-                    16,
-                    20,
-                  ),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).primaryColor,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        "assets/images/app_logo.png",
-                        width: 100,
-                        height: 100,
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        'Inverter like new',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                _DrawerDestination(
-                  icon: Icons.dashboard_outlined,
-                  label: 'Dashboard',
-                  selected: _currentIndex == 0,
-                  onTap: () => _selectFromDrawer(context, 0),
-                ),
-                _DrawerDestination(
-                  icon: Icons.build_outlined,
-                  label: 'Đơn sửa chữa',
-                  selected: _currentIndex == 1,
-                  onTap: () => _selectFromDrawer(context, 1),
-                ),
-                _DrawerDestination(
-                  icon: Icons.inventory_2_outlined,
-                  label: 'Kho bo mạch',
-                  selected: _currentIndex == 2,
-                  onTap: () => _selectFromDrawer(context, 2),
-                ),
-                _DrawerDestination(
-                  icon: Icons.access_time_outlined,
-                  label: 'Chấm công',
-                  selected: _currentIndex == 3,
-                  onTap: () => _selectFromDrawer(context, 3),
-                ),
-                _DrawerDestination(
-                  icon: Icons.chat_bubble_outline,
-                  label: 'Tin nhắn',
-                  selected: _currentIndex == 4,
-                  onTap: () => _selectFromDrawer(context, 4),
-                ),
-                _DrawerDestination(
-                  icon: Icons.person_add_outlined,
-                  label: 'Duyệt tài khoản',
-                  selected: _currentIndex == 7,
-                  onTap: () => _selectFromDrawer(context, 7),
-                ),
-                const Divider(),
-                ListTile(
-                  leading: Icon(isDark ? Icons.light_mode : Icons.dark_mode),
-                  title: Text(isDark ? 'Chế độ sáng' : 'Chế độ tối'),
-                  onTap: themeProvider.toggleTheme,
-                ),
-                ListTile(
-                  leading: const Icon(Icons.settings_outlined),
-                  title: const Text('Cài đặt'),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.logout),
-                  title: const Text('Đăng xuất'),
-                  onTap: () {
-                    Navigator.pushReplacementNamed(context, '/login');
-                  },
-                ),
-              ],
-            ),
-          ),
-          body: IndexedStack(index: _currentIndex, children: _pages),
+          body: IndexedStack(index: _currentIndex, children: _visiblePages),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -311,7 +283,7 @@ class _MainScreenState extends State<MainScreen> {
                 child: Row(
                   children: List.generate(_navItems.length, (index) {
                     final item = _navItems[index];
-                    final isSelected = _currentIndex == index;
+                    final isSelected = _currentIndex == item.tabIndex;
                     final color = isSelected
                         ? Theme.of(context).primaryColor
                         : (isDark
@@ -320,7 +292,7 @@ class _MainScreenState extends State<MainScreen> {
 
                     return Expanded(
                       child: InkWell(
-                        onTap: () => setState(() => _currentIndex = index),
+                        onTap: () => _setCurrentIndex(item.tabIndex),
                         child: Stack(
                           alignment: Alignment.center,
                           clipBehavior: Clip.none,
@@ -348,7 +320,7 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                               ],
                             ),
-                            if (index == 4)
+                            if (item.tabIndex == 4)
                               Positioned(
                                 top: 10,
                                 right: 22,
@@ -369,7 +341,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _selectFromDrawer(BuildContext context, int index) {
-    setState(() => _currentIndex = index);
+    _setCurrentIndex(index);
     Navigator.pop(context);
   }
 }
@@ -381,6 +353,7 @@ class _SideNavigation extends StatelessWidget {
   final ValueChanged<int> onIndexChanged;
   final VoidCallback onToggleExpand;
   final ThemeProvider themeProvider;
+  final bool isEmployee;
 
   const _SideNavigation({
     required this.currentIndex,
@@ -389,6 +362,7 @@ class _SideNavigation extends StatelessWidget {
     required this.onIndexChanged,
     required this.onToggleExpand,
     required this.themeProvider,
+    required this.isEmployee,
   });
 
   @override
@@ -477,13 +451,14 @@ class _SideNavigation extends StatelessWidget {
                   onTap: () => onIndexChanged(2),
                   isExpanded: isExpanded,
                 ),
-                _SideNavItem(
-                  icon: LucideIcons.clock,
-                  label: 'Chấm công',
-                  isSelected: currentIndex == 3,
-                  onTap: () => onIndexChanged(3),
-                  isExpanded: isExpanded,
-                ),
+                if (!isEmployee)
+                  _SideNavItem(
+                    icon: LucideIcons.clock,
+                    label: 'Chấm công',
+                    isSelected: currentIndex == 3,
+                    onTap: () => onIndexChanged(3),
+                    isExpanded: isExpanded,
+                  ),
                 _SideNavItem(
                   icon: LucideIcons.messageSquare,
                   label: 'Tin nhắn',
@@ -501,30 +476,27 @@ class _SideNavigation extends StatelessWidget {
                   badge: '3',
                 ),
                 const SizedBox(height: 16),
-                if (isExpanded) _CategoryLabel('QUẢN LÝ'),
-                _SideNavItem(
-                  icon: LucideIcons.users,
-                  label: 'Nhân viên',
-                  isSelected: currentIndex == 6,
-                  onTap: () => onIndexChanged(6),
-                  isExpanded: isExpanded,
-                ),
-                _SideNavItem(
-                  icon: LucideIcons.userPlus,
-                  label: 'Duyệt tài khoản',
-                  isSelected: currentIndex == 7,
-                  onTap: () => onIndexChanged(7),
-                  isExpanded: isExpanded,
-                  badge: '2',
-                ),
-
-                const SizedBox(height: 16),
+                if (isExpanded && !isEmployee) _CategoryLabel('QUẢN LÝ'),
+                if (!isEmployee)
+                  _SideNavItem(
+                    icon: LucideIcons.users,
+                    label: 'Quản lý nhân viên',
+                    isSelected: currentIndex == 6,
+                    onTap: () => onIndexChanged(6),
+                    isExpanded: isExpanded,
+                  ),                const SizedBox(height: 16),
                 const Divider(color: Colors.white10),
                 const SizedBox(height: 16),
 
                 // Footer items moved inside scrollable list
-                _StatusSelector(isExpanded: isExpanded),
                 const SizedBox(height: 12),
+                _SideNavItem(
+                  icon: LucideIcons.user,
+                  label: 'Cá nhân',
+                  isSelected: currentIndex == 8,
+                  onTap: () => onIndexChanged(8),
+                  isExpanded: isExpanded,
+                ),
                 _SideNavItem(
                   icon: isDark ? LucideIcons.sun : LucideIcons.moon,
                   label: isDark ? 'Chế độ sáng' : 'Chế độ tối',
@@ -678,41 +650,7 @@ class _SideNavItem extends StatelessWidget {
   }
 }
 
-class _StatusSelector extends StatelessWidget {
-  final bool isExpanded;
-  const _StatusSelector({required this.isExpanded});
 
-  @override
-  Widget build(BuildContext context) {
-    if (!isExpanded)
-      return const Icon(LucideIcons.circle, color: Colors.amber, size: 12);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          const Icon(LucideIcons.circle, color: Colors.amber, size: 12),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: Text(
-              'Demo: Super Admin',
-              style: TextStyle(color: Colors.white70, fontSize: 12),
-            ),
-          ),
-          Icon(
-            LucideIcons.chevronDown,
-            size: 14,
-            color: Colors.white.withValues(alpha: 0.3),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _UserProfile extends StatelessWidget {
   final bool isExpanded;
@@ -864,10 +802,12 @@ class NavigationItem {
   final IconData icon;
   final IconData activeIcon;
   final String label;
+  final int tabIndex;
 
   NavigationItem({
     required this.icon,
     required this.activeIcon,
     required this.label,
+    required this.tabIndex,
   });
 }

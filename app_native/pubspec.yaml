@@ -41,6 +41,7 @@ dependencies:
   # Utils
   intl: ^0.19.0
   google_fonts: ^8.1.0
+  image_picker: ^1.2.2
 
 dev_dependencies:
   flutter_test:
@@ -56,9 +57,9 @@ flutter:
 flutter_launcher_icons:
   android: "launcher_icon"
   ios: true
-  image_path: "assets/images/app_logo.png"
+  image_path: "assets/images/icon.png"
   adaptive_icon_background: "#FFFFFF"
-  adaptive_icon_foreground: "assets/images/app_logo.png"
+  adaptive_icon_foreground: "assets/images/icon.png"
 
 
 

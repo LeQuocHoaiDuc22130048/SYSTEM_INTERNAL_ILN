@@ -13,6 +13,7 @@ class RepairOrder {
   final DateTime? updatedAt;
   final String? description;
   final String? notes;
+  final String? imagePath;
 
   RepairOrder({
     required this.id,
@@ -27,6 +28,7 @@ class RepairOrder {
     this.updatedAt,
     this.description,
     this.notes,
+    this.imagePath,
   });
 
   String get statusLabel {

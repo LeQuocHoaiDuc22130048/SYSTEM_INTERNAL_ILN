@@ -23,7 +23,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Messaging", description = "Nhan tin noi bo realtime")
+@Tag(name = "Messaging", description = "Nhắn tin nội bộ realtime")
 @RestController
 @RequestMapping("/api/v1/conversations")
 @RequiredArgsConstructor

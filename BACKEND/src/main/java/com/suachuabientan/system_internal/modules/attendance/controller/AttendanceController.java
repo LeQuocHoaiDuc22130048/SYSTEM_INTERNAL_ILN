@@ -26,7 +26,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Attendance", description = "Cham cong noi bo")
+@Tag(name = "Attendance", description = "Chấm công nội bộ")
 @RestController
 @RequestMapping("/api/v1/attendance")
 @RequiredArgsConstructor

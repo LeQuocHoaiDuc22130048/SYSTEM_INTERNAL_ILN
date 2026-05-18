@@ -1,11 +1,13 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../data/mock_data.dart';
 import '../models/repair_order.dart';
 import '../theme/app_colors.dart';
+import '../utils/auth_provider.dart';
 import '../widgets/status_badge.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -14,6 +16,7 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -35,50 +38,104 @@ class DashboardPage extends StatelessWidget {
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: contentWidth),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _DashboardHeader(isDark: isDark, wide: wide),
-                      const SizedBox(height: 24),
-                      GridView.builder(
-                        itemCount: _dashboardStats.length,
-                        shrinkWrap: true,
-                        physics: const NeverScrollableScrollPhysics(),
-                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                          crossAxisCount: wide ? 4 : 2,
-                          mainAxisSpacing: wide ? 20 : 10,
-                          crossAxisSpacing: wide ? 12 : 10,
-                          mainAxisExtent: wide ? 112 : 98,
+                  child: isEmployee
+                      ? _buildEmployeeDashboard(isDark, wide)
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _DashboardHeader(isDark: isDark, wide: wide),
+                            const SizedBox(height: 24),
+                            GridView.builder(
+                              itemCount: _dashboardStats.length,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: wide ? 4 : 2,
+                                mainAxisSpacing: wide ? 20 : 10,
+                                crossAxisSpacing: wide ? 12 : 10,
+                                mainAxisExtent: wide ? 112 : 98,
+                              ),
+                              itemBuilder: (context, index) {
+                                final stat = _dashboardStats[index];
+                                return _DashboardStatCard(stat: stat, isDark: isDark)
+                                    .animate(target: 1)
+                                    .fadeIn(duration: 260.ms, delay: (index * 35).ms)
+                                    .slideY(
+                                      begin: 0.08,
+                                      end: 0,
+                                      duration: 260.ms,
+                                      delay: (index * 35).ms,
+                                    );
+                              },
+                            ),
+                            const SizedBox(height: 20),
+                            _WeeklyOrdersChart(isDark: isDark),
+                            const SizedBox(height: 20),
+                            _StatusRatioCard(isDark: isDark, wide: wide),
+                            const SizedBox(height: 20),
+                            _TodayAttendanceCard(isDark: isDark),
+                            const SizedBox(height: 20),
+                            _RecentOrdersCard(isDark: isDark),
+                          ],
                         ),
-                        itemBuilder: (context, index) {
-                          final stat = _dashboardStats[index];
-                          return _DashboardStatCard(stat: stat, isDark: isDark)
-                              .animate(target: 1)
-                              .fadeIn(duration: 260.ms, delay: (index * 35).ms)
-                              .slideY(
-                                begin: 0.08,
-                                end: 0,
-                                duration: 260.ms,
-                                delay: (index * 35).ms,
-                              );
-                        },
-                      ),
-                      const SizedBox(height: 20),
-                      _WeeklyOrdersChart(isDark: isDark),
-                      const SizedBox(height: 20),
-                      _StatusRatioCard(isDark: isDark, wide: wide),
-                      const SizedBox(height: 20),
-                      _TodayAttendanceCard(isDark: isDark),
-                      const SizedBox(height: 20),
-                      _RecentOrdersCard(isDark: isDark),
-                    ],
-                  ),
                 ),
               ),
             );
           },
         ),
       ),
+    );
+  }
+
+  Widget _buildEmployeeDashboard(bool isDark, bool wide) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _DashboardHeader(isDark: isDark, wide: wide),
+        const SizedBox(height: 24),
+        GridView.builder(
+          itemCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: wide ? 4 : 2,
+            mainAxisSpacing: wide ? 20 : 10,
+            crossAxisSpacing: wide ? 12 : 10,
+            mainAxisExtent: wide ? 112 : 98,
+          ),
+          itemBuilder: (context, index) {
+            final stats = [
+              const _DashboardStat(
+                label: 'Đơn của tôi',
+                value: '3',
+                icon: LucideIcons.wrench,
+                color: AppColors.primary,
+                background: AppColors.infoLight,
+                helper: '2 đang sửa',
+              ),
+              const _DashboardStat(
+                label: 'Tin nhắn chưa đọc',
+                value: '4',
+                icon: LucideIcons.messageSquare,
+                color: AppColors.warning,
+                background: AppColors.warningLight,
+              ),
+            ];
+            final stat = stats[index];
+            return _DashboardStatCard(stat: stat, isDark: isDark)
+                .animate(target: 1)
+                .fadeIn(duration: 260.ms, delay: (index * 35).ms)
+                .slideY(
+                  begin: 0.08,
+                  end: 0,
+                  duration: 260.ms,
+                  delay: (index * 35).ms,
+                );
+          },
+        ),
+        const SizedBox(height: 20),
+        _RecentOrdersCard(isDark: isDark),
+      ],
     );
   }
 }

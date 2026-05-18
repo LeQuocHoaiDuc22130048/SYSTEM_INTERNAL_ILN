@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
+import '../models/user.dart';
+import '../utils/auth_provider.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -19,6 +22,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLogin = true;
   String _error = '';
   bool _loading = false;
+  UserRole _selectedRole = UserRole.manager;
 
   @override
   void dispose() {
@@ -93,6 +97,8 @@ class _LoginPageState extends State<LoginPage> {
     });
 
     if (!mounted) return;
+
+    Provider.of<AuthProvider>(context, listen: false).setRole(_selectedRole);
 
     // Navigate to app
     Navigator.of(context).pushReplacementNamed('/dashboard');
@@ -353,6 +359,11 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 24),
               ],
 
+              if (_isLogin) ...[
+                _buildRoleSelector(),
+                const SizedBox(height: 24),
+              ],
+
               _buildSubmitButton(),
               const SizedBox(height: 24),
               _buildToggleModeButton(),
@@ -436,6 +447,53 @@ class _LoginPageState extends State<LoginPage> {
               vertical: 16,
             ),
           ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildRoleSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Đăng nhập với quyền (Mock)',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.blue[100],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Theme(
+                data: ThemeData(unselectedWidgetColor: Colors.blue[200]?.withValues(alpha: 0.5)),
+                child: RadioListTile<UserRole>(
+                  title: const Text('Quản lý', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  value: UserRole.manager,
+                  groupValue: _selectedRole,
+                  onChanged: (val) => setState(() => _selectedRole = val!),
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: AppColors.primary,
+                ),
+              ),
+            ),
+            Expanded(
+              child: Theme(
+                data: ThemeData(unselectedWidgetColor: Colors.blue[200]?.withValues(alpha: 0.5)),
+                child: RadioListTile<UserRole>(
+                  title: const Text('Nhân viên', style: TextStyle(color: Colors.white, fontSize: 13)),
+                  value: UserRole.employee,
+                  groupValue: _selectedRole,
+                  onChanged: (val) => setState(() => _selectedRole = val!),
+                  contentPadding: EdgeInsets.zero,
+                  activeColor: AppColors.primary,
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );

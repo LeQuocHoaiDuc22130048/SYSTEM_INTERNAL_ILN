@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -31,6 +32,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
           background: n.background,
           unread: false,
           highlight: n.highlight,
+          imagePath: n.imagePath,
         );
       }).toList();
     });
@@ -187,6 +189,7 @@ class _NotificationItem {
   final Color background;
   final bool unread;
   final bool highlight;
+  final String? imagePath;
 
   const _NotificationItem({
     required this.title,
@@ -197,6 +200,7 @@ class _NotificationItem {
     required this.background,
     this.unread = false,
     this.highlight = false,
+    this.imagePath,
   });
 }
 
@@ -210,6 +214,7 @@ const _notifications = [
     background: AppColors.infoLight,
     unread: true,
     highlight: true,
+    imagePath: 'assets/images/app_logo.png',
   ),
   _NotificationItem(
     title: 'Tài khoản chờ duyệt',
@@ -343,6 +348,25 @@ class _NotificationTile extends StatelessWidget {
               ],
             ),
           ),
+          if (item.imagePath != null) ...[
+            const SizedBox(width: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: item.imagePath!.startsWith('assets/')
+                  ? Image.asset(
+                      item.imagePath!,
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    )
+                  : Image.file(
+                      File(item.imagePath!),
+                      width: 50,
+                      height: 50,
+                      fit: BoxFit.cover,
+                    ),
+            ),
+          ],
           if (item.unread) ...[
             const SizedBox(width: 10),
             const Padding(

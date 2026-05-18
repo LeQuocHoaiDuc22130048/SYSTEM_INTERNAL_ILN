@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.UUID;
 
-@Tag(name = "Notification", description = "Thong bao in-app, push va realtime")
+@Tag(name = "Notification", description = "Thông báo in-app, push và realtime")
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
+import '../utils/auth_provider.dart';
 import '../widgets/status_badge.dart';
 import '../data/mock_data.dart';
 import '../models/board.dart';
@@ -42,9 +44,72 @@ class _WarehousePageState extends State<WarehousePage> {
     }).toList();
   }
 
+  String _qrCodeLabel(Board board) {
+    return board.qrCode.isEmpty ? 'QR chờ backend tạo' : board.qrCode;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
+
+    if (isEmployee) {
+      return Scaffold(
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.qr_code_scanner,
+                  size: 80,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'Quét mã QR Bo mạch',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Sử dụng camera để quét mã QR trên bo mạch',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    final result = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ScannerPage(),
+                      ),
+                    );
+                    if (result != null && mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Đã quét: $result')),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.camera_alt),
+                  label: const Text('Mở Máy Quét'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -362,42 +427,50 @@ class _WarehousePageState extends State<WarehousePage> {
                       const SizedBox(height: 8),
 
                       // Filters
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _buildFilterChip('Tất cả', null, mockBoards.length),
-                            const SizedBox(width: 6),
-                            _buildFilterChip(
-                              'Sẵn sàng',
-                              BoardStatus.available,
-                              mockBoards
-                                  .where(
-                                    (b) => b.status == BoardStatus.available,
-                                  )
-                                  .length,
-                            ),
-                            const SizedBox(width: 6),
-                            _buildFilterChip(
-                              'Đang dùng',
-                              BoardStatus.checkedOut,
-                              mockBoards
-                                  .where(
-                                    (b) => b.status == BoardStatus.checkedOut,
-                                  )
-                                  .length,
-                            ),
-                            const SizedBox(width: 6),
-                            _buildFilterChip(
-                              'Bảo trì',
-                              BoardStatus.maintenance,
-                              mockBoards
-                                  .where(
-                                    (b) => b.status == BoardStatus.maintenance,
-                                  )
-                                  .length,
-                            ),
-                          ],
+                      SizedBox(
+                        height: 32,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            children: [
+                              _buildFilterChip(
+                                'Tất cả',
+                                null,
+                                mockBoards.length,
+                              ),
+                              const SizedBox(width: 6),
+                              _buildFilterChip(
+                                'Sẵn sàng',
+                                BoardStatus.available,
+                                mockBoards
+                                    .where(
+                                      (b) => b.status == BoardStatus.available,
+                                    )
+                                    .length,
+                              ),
+                              const SizedBox(width: 6),
+                              _buildFilterChip(
+                                'Đang dùng',
+                                BoardStatus.checkedOut,
+                                mockBoards
+                                    .where(
+                                      (b) => b.status == BoardStatus.checkedOut,
+                                    )
+                                    .length,
+                              ),
+                              const SizedBox(width: 6),
+                              _buildFilterChip(
+                                'Bảo trì',
+                                BoardStatus.maintenance,
+                                mockBoards
+                                    .where(
+                                      (b) =>
+                                          b.status == BoardStatus.maintenance,
+                                    )
+                                    .length,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -563,41 +636,49 @@ class _WarehousePageState extends State<WarehousePage> {
       valueListenable: _filter,
       builder: (context, currentFilter, _) {
         final isSelected = currentFilter == status;
-        return FilterChip(
-          label: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(label),
-              const SizedBox(width: 6),
-              Text(
-                '$count',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: isSelected
-                      ? Colors.blue[200]
-                      : (isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight),
+        return SizedBox(
+          height: 32,
+          child: FilterChip(
+            label: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(label),
+                const SizedBox(width: 6),
+                Text(
+                  '$count',
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: isSelected
+                        ? Colors.blue[200]
+                        : (isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+            selected: isSelected,
+            onSelected: (selected) {
+              _filter.value = selected ? status : null;
+            },
+            backgroundColor: isDark
+                ? AppColors.surfaceDark
+                : const Color(0xFFF1F5F9),
+            selectedColor: AppColors.primary,
+            labelStyle: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              color: isSelected
+                  ? Colors.white
+                  : (isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight),
+            ),
+            labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+            padding: EdgeInsets.zero,
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-          selected: isSelected,
-          onSelected: (selected) {
-            _filter.value = selected ? status : null;
-          },
-          backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
-          selectedColor: AppColors.primary,
-          labelStyle: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.w600,
-            color: isSelected
-                ? Colors.white
-                : (isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         );
       },
     );
@@ -768,7 +849,7 @@ class _WarehousePageState extends State<WarehousePage> {
                     ),
                     const SizedBox(height: 1),
                     Text(
-                      board.qrCode,
+                      _qrCodeLabel(board),
                       style: TextStyle(
                         fontSize: 9,
                         fontFamily: 'monospace',
@@ -905,7 +986,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   Row(
                     children: [
                       Text(
-                        board.qrCode,
+                        _qrCodeLabel(board),
                         style: TextStyle(
                           fontSize: 12,
                           fontFamily: 'monospace',
@@ -996,9 +1077,8 @@ class _WarehousePageState extends State<WarehousePage> {
 
   void _showAddEditBoardDialog({Board? board}) {
     final isEditing = board != null;
-    final autoQr = 'BD-${DateTime.now().millisecondsSinceEpoch.toString().substring(8)}';
     final nameCtrl = TextEditingController(text: board?.name ?? '');
-    final qrCodeCtrl = TextEditingController(text: board?.qrCode ?? autoQr);
+    final qrCodeCtrl = TextEditingController(text: board?.qrCode ?? '');
     final modelCtrl = TextEditingController(text: board?.model ?? '');
     final locationCtrl = TextEditingController(text: board?.location ?? '');
     final descCtrl = TextEditingController(text: board?.description ?? '');
@@ -1009,108 +1089,177 @@ class _WarehousePageState extends State<WarehousePage> {
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
           final isDark = Theme.of(context).brightness == Brightness.dark;
-          
-          return AlertDialog(
-            title: Text(isEditing ? 'Chỉnh sửa bo mạch' : 'Thêm bo mạch'),
-            content: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameCtrl,
-                    decoration: const InputDecoration(labelText: 'Tên bo mạch'),
+          final screenSize = MediaQuery.sizeOf(context);
+          final isCompact = screenSize.width < 600;
+
+          return Dialog(
+            insetPadding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 14 : 20,
+              vertical: 20,
+            ),
+            alignment: Alignment.center,
+            child: FractionallySizedBox(
+              widthFactor: isCompact ? 1 : 0.75,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: screenSize.height * (isCompact ? 0.9 : 0.75),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 12),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        isEditing ? 'Chỉnh sửa bo mạch' : 'Thêm bo mạch',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const SizedBox(height: 18),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              TextField(
+                                controller: nameCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Tên bo mạch',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              if (isEditing) ...[
+                                TextField(
+                                  controller: qrCodeCtrl,
+                                  decoration: InputDecoration(
+                                    labelText: 'Mã QR',
+                                    filled: true,
+                                    fillColor: isDark
+                                        ? Colors.white10
+                                        : Colors.grey.shade200,
+                                  ),
+                                  readOnly: true,
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                              TextField(
+                                controller: modelCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Model',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: locationCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Vị trí',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<BoardStatus>(
+                                initialValue: selectedStatus,
+                                decoration: const InputDecoration(
+                                  labelText: 'Trạng thái',
+                                ),
+                                items: BoardStatus.values.map((s) {
+                                  String label = 'Sẵn sàng';
+                                  if (s == BoardStatus.checkedOut) {
+                                    label = 'Đang dùng';
+                                  }
+                                  if (s == BoardStatus.maintenance) {
+                                    label = 'Bảo trì';
+                                  }
+                                  return DropdownMenuItem(
+                                    value: s,
+                                    child: Text(label),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setDialogState(
+                                      () => selectedStatus = val,
+                                    );
+                                  }
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: descCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Mô tả',
+                                ),
+                                maxLines: 3,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Hủy'),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            onPressed: () {
+                              if (nameCtrl.text.isEmpty) return;
+
+                              setState(() {
+                                if (isEditing) {
+                                  final index = mockBoards.indexWhere(
+                                    (b) => b.id == board.id,
+                                  );
+                                  if (index != -1) {
+                                    mockBoards[index] = Board(
+                                      id: board.id,
+                                      name: nameCtrl.text,
+                                      qrCode: board.qrCode,
+                                      model: modelCtrl.text,
+                                      location: locationCtrl.text,
+                                      status: selectedStatus,
+                                      description: descCtrl.text,
+                                      checkedOutBy: board.checkedOutBy,
+                                      checkedOutAt: board.checkedOutAt,
+                                      currentRepairOrder:
+                                          board.currentRepairOrder,
+                                    );
+                                  }
+                                } else {
+                                  mockBoards.add(
+                                    Board(
+                                      id: 'board_${DateTime.now().millisecondsSinceEpoch}',
+                                      name: nameCtrl.text,
+                                      qrCode: '',
+                                      model: modelCtrl.text,
+                                      location: locationCtrl.text,
+                                      status: selectedStatus,
+                                      description: descCtrl.text,
+                                    ),
+                                  );
+                                }
+                              });
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    isEditing
+                                        ? 'Đã cập nhật bo mạch'
+                                        : 'Đã thêm bo mạch',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: const Text('Lưu'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: qrCodeCtrl,
-                    decoration: InputDecoration(
-                      labelText: isEditing ? 'Mã QR' : 'Mã QR (Tạo tự động)',
-                      filled: true,
-                      fillColor: isDark ? Colors.white10 : Colors.grey.shade200,
-                    ),
-                    readOnly: true,
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: modelCtrl,
-                    decoration: const InputDecoration(labelText: 'Model'),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: locationCtrl,
-                    decoration: const InputDecoration(labelText: 'Vị trí'),
-                  ),
-                  const SizedBox(height: 12),
-                  DropdownButtonFormField<BoardStatus>(
-                    value: selectedStatus,
-                    decoration: const InputDecoration(labelText: 'Trạng thái'),
-                    items: BoardStatus.values.map((s) {
-                      String label = 'Sẵn sàng';
-                      if (s == BoardStatus.checkedOut) label = 'Đang dùng';
-                      if (s == BoardStatus.maintenance) label = 'Bảo trì';
-                      return DropdownMenuItem(value: s, child: Text(label));
-                    }).toList(),
-                    onChanged: (val) {
-                      if (val != null) setDialogState(() => selectedStatus = val);
-                    },
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: descCtrl,
-                    decoration: const InputDecoration(labelText: 'Mô tả'),
-                    maxLines: 3,
-                  ),
-                ],
+                ),
               ),
             ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Hủy'),
-              ),
-              ElevatedButton(
-                onPressed: () {
-                  if (nameCtrl.text.isEmpty) return;
-                  
-                  setState(() {
-                    if (isEditing) {
-                      final index = mockBoards.indexWhere((b) => b.id == board.id);
-                      if (index != -1) {
-                        mockBoards[index] = Board(
-                          id: board.id,
-                          name: nameCtrl.text,
-                          qrCode: qrCodeCtrl.text,
-                          model: modelCtrl.text,
-                          location: locationCtrl.text,
-                          status: selectedStatus,
-                          description: descCtrl.text,
-                          checkedOutBy: board.checkedOutBy,
-                          checkedOutAt: board.checkedOutAt,
-                          currentRepairOrder: board.currentRepairOrder,
-                        );
-                      }
-                    } else {
-                      mockBoards.add(Board(
-                        id: 'board_${DateTime.now().millisecondsSinceEpoch}',
-                        name: nameCtrl.text,
-                        qrCode: qrCodeCtrl.text,
-                        model: modelCtrl.text,
-                        location: locationCtrl.text,
-                        status: selectedStatus,
-                        description: descCtrl.text,
-                      ));
-                    }
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(isEditing ? 'Đã cập nhật bo mạch' : 'Đã thêm bo mạch'),
-                    ),
-                  );
-                },
-                child: const Text('Lưu'),
-              ),
-            ],
           );
         },
       ),
@@ -1214,7 +1363,8 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                           ),
                         ),
                         Text(
-                          '${widget.board.qrCode} · ${widget.board.model}',
+                          '${widget.board.qrCode.isEmpty ? 'QR chờ backend tạo' : widget.board.qrCode} '
+                          '· ${widget.board.model}',
                           style: TextStyle(
                             fontSize: 12,
                             fontFamily: 'monospace',

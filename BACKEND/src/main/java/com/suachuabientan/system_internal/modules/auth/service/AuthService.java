@@ -77,7 +77,6 @@ public class AuthService {
                 .build();
 
 
-
         UserEntity saved = userRepository.save(user);
         notifyAccountPending(saved);
         log.info("Tài khoản mới đăng ký: username={}", saved.getUsername());
@@ -180,6 +179,7 @@ public class AuthService {
     }
 
     // ── Approve / Reject ──────────────────────────────────────────────────
+
     /**
      * Duyệt hoặc từ chối tài khoản nhân viên.
      * Chỉ ADMIN và MANAGER mới có quyền — kiểm tra tại Controller qua @PreAuthorize.
@@ -189,7 +189,7 @@ public class AuthService {
         UserEntity target = userRepository.findByIdAndIsDeletedFalse(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng " + targetUserId));
 
-        if(!target.isPending()) throw new BusinessException("Tài khoản không ở trạng thái chờ duyệt");
+        if (!target.isPending()) throw new BusinessException("Tài khoản không ở trạng thái chờ duyệt");
 
         boolean approved = request.action() == ApprovalAction.APPROVE;
         if (approved) {
@@ -230,63 +230,10 @@ public class AuthService {
     }
 
 
-    /**
-     * Tìm kiếm nhân viên — phân trang, có keyword.
-     */
-    @Transactional(readOnly = true)
-    public Page<UserResponse> searchUsers(String keyword, Pageable pageable) {
-        String kw = (keyword == null || keyword.trim().isEmpty() ? null : keyword.trim());
-        return userRepository.searchUsers(kw, pageable)
-                .map(userMapper::toResponse);
-    }
-
-    /**
-     * Danh sách nhân viên
-     */
-    @Transactional(readOnly = true)
-    public Page<UserResponse> getUsers(Pageable pageable) {
-        List<UserStatus> statuses = List.of(UserStatus.ACTIVE, UserStatus.SUSPENDED);
-        return userRepository.findByStatusInAndIsDeletedFalse(statuses, pageable)
-                .map(userMapper::toResponse);
-    }
-
-    @Transactional(readOnly = true)
-    public UserResponse getUserById(UUID userId) {
-        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + userId));
-        return userMapper.toResponse(user);
-    }
-
-    // ── Suspend / Delete ──────────────────────────────────────────────────
-
-    @Transactional
-    public UserResponse suspendUser(UUID targetUserId, UUID performedByUserId) {
-        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetUserId));
-
-        user.suspend();
-        log.info("Khoá tài khoản: userId={}, by={}", targetUserId, performedByUserId);
-        return userMapper.toResponse(userRepository.save(user));
-    }
-
-    @Transactional
-    public UserResponse unsuspendUser(UUID targetUserId, UUID performedByUserId) {
-        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetUserId));
-
-        if (user.getStatus() != UserStatus.SUSPENDED) {
-            throw new BusinessException("Chỉ có thể mở khóa tài khoản đang bị khóa");
-        }
-
-        user.activate();
-        log.info("Mở khóa tài khoản: userId={}, by={}", targetUserId, performedByUserId);
-        return userMapper.toResponse(userRepository.save(user));
-    }
-
     @Transactional
     public void deleteUser(UUID targetUserId, UUID performedByUserId) {
         UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên: " + targetUserId));
+                .orElseThrow(() -> new ResourceNotFoundException(STR."Không tìm thấy nhân viên: \{targetUserId}"));
 
         // Soft delete — không xóa thật (DB rules)
         user.softDelete(performedByUserId);
