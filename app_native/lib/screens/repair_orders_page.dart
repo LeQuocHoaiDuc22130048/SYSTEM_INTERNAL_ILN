@@ -4,10 +4,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 
-import '../data/mock_data.dart';
 import '../models/repair_order.dart';
 import '../theme/app_colors.dart';
+import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
 
 class RepairOrdersPage extends StatefulWidget {
@@ -20,6 +21,14 @@ class RepairOrdersPage extends StatefulWidget {
 class _RepairOrdersPageState extends State<RepairOrdersPage> {
   final ValueNotifier<RepairOrderStatus?> _filter = ValueNotifier(null);
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BackendDataProvider>().loadRepairOrders();
+    });
+  }
 
   @override
   void dispose() {
@@ -40,7 +49,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   List<RepairOrder> get _filteredOrders {
     final query = _searchQuery.value.toLowerCase();
     final currentFilter = _filter.value;
-    return mockRepairOrders.where((order) {
+    final orders = context.read<BackendDataProvider>().repairOrders;
+    return orders.where((order) {
       final matchesFilter = currentFilter == null || order.status == currentFilter;
       final matchesSearch =
           query.isEmpty ||
@@ -55,6 +65,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backend = context.watch<BackendDataProvider>();
+    final orders = backend.repairOrders;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -96,7 +108,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                     ),
                                     const SizedBox(height: 4),
                                     Text(
-                                      '${mockRepairOrders.length} đơn tổng cộng',
+                                      '${orders.length} đơn tổng cộng',
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: isDark
@@ -194,7 +206,17 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                   ),
                 ),
                 Expanded(
-                  child: AnimatedBuilder(
+                  child: backend.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : backend.error != null
+                      ? _ErrorState(
+                          message: backend.error!,
+                          onRetry: () => context
+                              .read<BackendDataProvider>()
+                              .loadRepairOrders(),
+                          isDark: isDark,
+                        )
+                      : AnimatedBuilder(
                     animation: Listenable.merge([_searchQuery, _filter]),
                     builder: (context, _) {
                       final filtered = _filteredOrders;
@@ -251,9 +273,10 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
 
   Widget _buildFilterChip(String label, RepairOrderStatus? status) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final orders = context.watch<BackendDataProvider>().repairOrders;
     final count = status == null
-        ? mockRepairOrders.length
-        : mockRepairOrders.where((order) => order.status == status).length;
+        ? orders.length
+        : orders.where((order) => order.status == status).length;
 
     return ValueListenableBuilder<RepairOrderStatus?>(
       valueListenable: _filter,
@@ -722,6 +745,49 @@ class _EmptyOrders extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  final bool isDark;
+
+  const _ErrorState({
+    required this.message,
+    required this.onRetry,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 42, color: AppColors.error),
+            const SizedBox(height: 12),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Thử lại'),
+            ),
+          ],
+        ),
       ),
     );
   }

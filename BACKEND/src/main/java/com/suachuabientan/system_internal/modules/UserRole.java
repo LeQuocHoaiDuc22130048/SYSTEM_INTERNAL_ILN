@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.common.enums;
+package com.suachuabientan.system_internal.modules;
 
 import lombok.AccessLevel;
 import lombok.Getter;

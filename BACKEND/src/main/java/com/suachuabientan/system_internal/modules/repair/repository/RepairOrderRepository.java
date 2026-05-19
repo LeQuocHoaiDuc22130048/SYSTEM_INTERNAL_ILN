@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.modules.repository;
+package com.suachuabientan.system_internal.modules.repair.repository;
 
 import com.suachuabientan.system_internal.modules.repair.entity.RepairOrder;
 import com.suachuabientan.system_internal.modules.repair.enums.RepairStatus;

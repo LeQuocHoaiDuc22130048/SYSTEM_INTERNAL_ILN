@@ -4,10 +4,10 @@ import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
+import '../utils/backend_data_provider.dart';
 import '../utils/network_provider.dart';
 import '../utils/pending_sync_provider.dart';
 import '../widgets/status_badge.dart';
-import '../data/mock_data.dart';
 import '../models/board.dart';
 import 'scanner_page.dart';
 
@@ -25,6 +25,14 @@ class _WarehousePageState extends State<WarehousePage> {
   bool _isGridView = true;
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BackendDataProvider>().loadBoards();
+    });
+  }
+
+  @override
   void dispose() {
     _searchController.dispose();
     _searchQuery.dispose();
@@ -35,7 +43,8 @@ class _WarehousePageState extends State<WarehousePage> {
   List<Board> get _filteredBoards {
     final query = _searchQuery.value.toLowerCase();
     final currentFilter = _filter.value;
-    return mockBoards.where((board) {
+    final boards = context.read<BackendDataProvider>().boards;
+    return boards.where((board) {
       final matchesFilter = currentFilter == null || board.status == currentFilter;
       final matchesSearch =
           query.isEmpty ||
@@ -84,6 +93,8 @@ class _WarehousePageState extends State<WarehousePage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
+    final backend = context.watch<BackendDataProvider>();
+    final boards = backend.boards;
 
     if (isEmployee) {
       return Scaffold(
@@ -181,7 +192,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${mockBoards.length} bo mạch trong kho',
+                                  '${boards.length} bo mạch trong kho',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: isDark
@@ -249,7 +260,7 @@ class _WarehousePageState extends State<WarehousePage> {
                           child: Row(
                             children: [
                               _buildLandscapeStatCard(
-                                '${mockBoards.length}',
+                                '${boards.length}',
                                 'Tổng',
                                 LucideIcons.cpu,
                                 AppColors.primary,
@@ -257,7 +268,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               ),
                               const SizedBox(width: 22),
                               _buildLandscapeStatCard(
-                                '${mockBoards.where((b) => b.status == BoardStatus.available).length}',
+                                '${boards.where((b) => b.status == BoardStatus.available).length}',
                                 'Sẵn sàng',
                                 Icons.inventory_2_outlined,
                                 AppColors.success,
@@ -265,7 +276,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               ),
                               const SizedBox(width: 22),
                               _buildLandscapeStatCard(
-                                '${mockBoards.where((b) => b.status == BoardStatus.checkedOut).length}',
+                                '${boards.where((b) => b.status == BoardStatus.checkedOut).length}',
                                 'Đang dùng',
                                 LucideIcons.wrench,
                                 AppColors.warning,
@@ -273,7 +284,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               ),
                               const SizedBox(width: 22),
                               _buildLandscapeStatCard(
-                                '${mockBoards.where((b) => b.status == BoardStatus.maintenance).length}',
+                                '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
                                 'Bảo trì',
                                 Icons.warning_amber,
                                 AppColors.error,
@@ -292,28 +303,28 @@ class _WarehousePageState extends State<WarehousePage> {
                           childAspectRatio: 3.0,
                           children: [
                             _buildCompactStatCard(
-                              '${mockBoards.length}',
+                              '${boards.length}',
                               'Tổng',
                               LucideIcons.cpu,
                               AppColors.primary,
                               isDark,
                             ),
                             _buildCompactStatCard(
-                              '${mockBoards.where((b) => b.status == BoardStatus.available).length}',
+                              '${boards.where((b) => b.status == BoardStatus.available).length}',
                               'Sẵn sàng',
                               Icons.inventory_2_outlined,
                               AppColors.success,
                               isDark,
                             ),
                             _buildCompactStatCard(
-                              '${mockBoards.where((b) => b.status == BoardStatus.checkedOut).length}',
+                              '${boards.where((b) => b.status == BoardStatus.checkedOut).length}',
                               'Đang dùng',
                               LucideIcons.wrench,
                               AppColors.warning,
                               isDark,
                             ),
                             _buildCompactStatCard(
-                              '${mockBoards.where((b) => b.status == BoardStatus.maintenance).length}',
+                              '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
                               'Bảo trì',
                               Icons.warning_amber,
                               AppColors.error,
@@ -466,13 +477,13 @@ class _WarehousePageState extends State<WarehousePage> {
                               _buildFilterChip(
                                 'Tất cả',
                                 null,
-                                mockBoards.length,
+                                boards.length,
                               ),
                               const SizedBox(width: 6),
                               _buildFilterChip(
                                 'Sẵn sàng',
                                 BoardStatus.available,
-                                mockBoards
+                                boards
                                     .where(
                                       (b) => b.status == BoardStatus.available,
                                     )
@@ -482,7 +493,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               _buildFilterChip(
                                 'Đang dùng',
                                 BoardStatus.checkedOut,
-                                mockBoards
+                                boards
                                     .where(
                                       (b) => b.status == BoardStatus.checkedOut,
                                     )
@@ -492,7 +503,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               _buildFilterChip(
                                 'Bảo trì',
                                 BoardStatus.maintenance,
-                                mockBoards
+                                boards
                                     .where(
                                       (b) =>
                                           b.status == BoardStatus.maintenance,
@@ -1089,10 +1100,9 @@ class _WarehousePageState extends State<WarehousePage> {
             child: const Text('Hủy'),
           ),
           TextButton(
-            onPressed: () {
-              setState(() {
-                mockBoards.removeWhere((b) => b.id == board.id);
-              });
+            onPressed: () async {
+              await context.read<BackendDataProvider>().deleteBoard(board);
+              if (!mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Đã xóa bo mạch ${board.name}')),
@@ -1233,43 +1243,28 @@ class _WarehousePageState extends State<WarehousePage> {
                           ),
                           const SizedBox(width: 8),
                           ElevatedButton(
-                            onPressed: () {
+                            onPressed: () async {
                               if (nameCtrl.text.isEmpty) return;
 
-                              setState(() {
-                                if (isEditing) {
-                                  final index = mockBoards.indexWhere(
-                                    (b) => b.id == board.id,
-                                  );
-                                  if (index != -1) {
-                                    mockBoards[index] = Board(
-                                      id: board.id,
-                                      name: nameCtrl.text,
-                                      qrCode: board.qrCode,
-                                      model: modelCtrl.text,
-                                      location: locationCtrl.text,
-                                      status: selectedStatus,
-                                      description: descCtrl.text,
-                                      checkedOutBy: board.checkedOutBy,
-                                      checkedOutAt: board.checkedOutAt,
-                                      currentRepairOrder:
-                                          board.currentRepairOrder,
-                                    );
-                                  }
-                                } else {
-                                  mockBoards.add(
-                                    Board(
-                                      id: 'board_${DateTime.now().millisecondsSinceEpoch}',
-                                      name: nameCtrl.text,
-                                      qrCode: '',
-                                      model: modelCtrl.text,
-                                      location: locationCtrl.text,
-                                      status: selectedStatus,
-                                      description: descCtrl.text,
-                                    ),
-                                  );
-                                }
-                              });
+                              final backend = context.read<BackendDataProvider>();
+                              final body = {
+                                'name': nameCtrl.text,
+                                'category': modelCtrl.text,
+                                'location': locationCtrl.text,
+                                'description': descCtrl.text,
+                                if (isEditing)
+                                  'status': _boardStatusName(selectedStatus),
+                              };
+                              if (isEditing) {
+                                await backend.api.patch(
+                                  '/api/v1/boards/${board.id}',
+                                  body: body,
+                                );
+                              } else {
+                                await backend.api.post('/api/v1/boards', body: body);
+                              }
+                              await backend.loadBoards();
+                              if (!mounted) return;
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -1294,6 +1289,17 @@ class _WarehousePageState extends State<WarehousePage> {
         },
       ),
     );
+  }
+
+  String _boardStatusName(BoardStatus status) {
+    switch (status) {
+      case BoardStatus.available:
+        return 'AVAILABLE';
+      case BoardStatus.checkedOut:
+        return 'CHECKED_OUT';
+      case BoardStatus.maintenance:
+        return 'MAINTENANCE';
+    }
   }
 }
 

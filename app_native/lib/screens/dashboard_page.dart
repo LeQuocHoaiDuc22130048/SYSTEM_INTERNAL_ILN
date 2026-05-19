@@ -4,10 +4,11 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../data/mock_data.dart';
+import '../models/board.dart';
 import '../models/repair_order.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
+import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -39,33 +40,45 @@ class DashboardPage extends StatelessWidget {
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: contentWidth),
                   child: isEmployee
-                      ? _buildEmployeeDashboard(isDark, wide)
+                      ? _buildEmployeeDashboard(context, isDark, wide)
                       : Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _DashboardHeader(isDark: isDark, wide: wide),
                             const SizedBox(height: 24),
-                            GridView.builder(
-                              itemCount: _dashboardStats.length,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: wide ? 4 : 2,
-                                mainAxisSpacing: wide ? 20 : 10,
-                                crossAxisSpacing: wide ? 12 : 10,
-                                mainAxisExtent: wide ? 112 : 98,
-                              ),
-                              itemBuilder: (context, index) {
-                                final stat = _dashboardStats[index];
-                                return _DashboardStatCard(stat: stat, isDark: isDark)
-                                    .animate(target: 1)
-                                    .fadeIn(duration: 260.ms, delay: (index * 35).ms)
-                                    .slideY(
-                                      begin: 0.08,
-                                      end: 0,
-                                      duration: 260.ms,
-                                      delay: (index * 35).ms,
-                                    );
+                            Builder(
+                              builder: (context) {
+                                final stats = _buildDashboardStats(context);
+                                return GridView.builder(
+                                  itemCount: stats.length,
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: wide ? 4 : 2,
+                                    mainAxisSpacing: wide ? 20 : 10,
+                                    crossAxisSpacing: wide ? 12 : 10,
+                                    mainAxisExtent: wide ? 112 : 98,
+                                  ),
+                                  itemBuilder: (context, index) {
+                                    final stat = stats[index];
+                                    return _DashboardStatCard(
+                                      stat: stat,
+                                      isDark: isDark,
+                                    )
+                                        .animate(target: 1)
+                                        .fadeIn(
+                                          duration: 260.ms,
+                                          delay: (index * 35).ms,
+                                        )
+                                        .slideY(
+                                          begin: 0.08,
+                                          end: 0,
+                                          duration: 260.ms,
+                                          delay: (index * 35).ms,
+                                        );
+                                  },
+                                );
                               },
                             ),
                             const SizedBox(height: 20),
@@ -87,7 +100,14 @@ class DashboardPage extends StatelessWidget {
     );
   }
 
-  Widget _buildEmployeeDashboard(bool isDark, bool wide) {
+  Widget _buildEmployeeDashboard(BuildContext context, bool isDark, bool wide) {
+    final backend = Provider.of<BackendDataProvider>(context);
+    final currentUser = Provider.of<AuthProvider>(context).currentUser;
+    final myOrders = currentUser == null
+        ? backend.repairOrders
+        : backend.repairOrders
+            .where((order) => order.assignedToName == currentUser.name)
+            .toList();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -105,17 +125,18 @@ class DashboardPage extends StatelessWidget {
           ),
           itemBuilder: (context, index) {
             final stats = [
-              const _DashboardStat(
+              _DashboardStat(
                 label: 'Đơn của tôi',
-                value: '3',
+                value: '${myOrders.length}',
                 icon: LucideIcons.wrench,
                 color: AppColors.primary,
                 background: AppColors.infoLight,
-                helper: '2 đang sửa',
+                helper:
+                    '${myOrders.where((o) => o.status == RepairOrderStatus.inProgress).length} đang sửa',
               ),
-              const _DashboardStat(
+              _DashboardStat(
                 label: 'Tin nhắn chưa đọc',
-                value: '4',
+                value: '0',
                 icon: LucideIcons.messageSquare,
                 color: AppColors.warning,
                 background: AppColors.warningLight,
@@ -243,69 +264,78 @@ class _DashboardStat {
   });
 }
 
-const _dashboardStats = [
-  _DashboardStat(
-    label: 'Tổng đơn hôm nay',
-    value: '24',
-    icon: LucideIcons.wrench,
-    color: AppColors.primary,
-    background: AppColors.infoLight,
-    trend: '↑ 12% so hôm qua',
-  ),
-  _DashboardStat(
-    label: 'Đang xử lý',
-    value: '8',
-    icon: LucideIcons.activity,
-    color: AppColors.warning,
-    background: AppColors.warningLight,
-    helper: 'Cần theo dõi',
-  ),
-  _DashboardStat(
-    label: 'Hoàn thành hôm nay',
-    value: '12',
-    icon: LucideIcons.circleCheck,
-    color: AppColors.success,
-    background: AppColors.successLight,
-    trend: '↑ 8% so hôm qua',
-  ),
-  _DashboardStat(
-    label: 'Bo mạch sẵn sàng',
-    value: '6/10',
-    icon: LucideIcons.microchip,
-    color: AppColors.purple,
-    background: AppColors.purpleLight,
-    helper: '3 đang dùng',
-  ),
-  _DashboardStat(
-    label: 'Nhân viên có mặt',
-    value: '6/6',
-    icon: LucideIcons.usersRound,
-    color: AppColors.primary,
-    background: AppColors.infoLight,
-    helper: '1 đến muộn',
-  ),
-  _DashboardStat(
-    label: 'Đơn chờ phân công',
-    value: '4',
-    icon: LucideIcons.circle,
-    color: AppColors.warning,
-    background: AppColors.warningLight,
-  ),
-  _DashboardStat(
-    label: 'Bo mạch bảo trì',
-    value: '1',
-    icon: LucideIcons.triangleAlert,
-    color: AppColors.error,
-    background: AppColors.errorLight,
-  ),
-  _DashboardStat(
-    label: 'Tài khoản chờ duyệt',
-    value: '2',
-    icon: LucideIcons.userRoundPlus,
-    color: AppColors.purple,
-    background: AppColors.purpleLight,
-  ),
-];
+List<_DashboardStat> _buildDashboardStats(BuildContext context) {
+  final backend = context.watch<BackendDataProvider>();
+  final orders = backend.repairOrders;
+  final boards = backend.boards;
+  final employees = backend.employees;
+  final attendance = backend.attendanceRecords;
+
+  return [
+    _DashboardStat(
+      label: 'Tổng đơn',
+      value: '${orders.length}',
+      icon: LucideIcons.wrench,
+      color: AppColors.primary,
+      background: AppColors.infoLight,
+    ),
+    _DashboardStat(
+      label: 'Đang xử lý',
+      value:
+          '${orders.where((o) => o.status == RepairOrderStatus.inProgress).length}',
+      icon: LucideIcons.activity,
+      color: AppColors.warning,
+      background: AppColors.warningLight,
+      helper: 'Cần theo dõi',
+    ),
+    _DashboardStat(
+      label: 'Hoàn thành',
+      value:
+          '${orders.where((o) => o.status == RepairOrderStatus.completed).length}',
+      icon: LucideIcons.circleCheck,
+      color: AppColors.success,
+      background: AppColors.successLight,
+    ),
+    _DashboardStat(
+      label: 'Bo mạch sẵn sàng',
+      value: '${boards.where((b) => b.status == BoardStatus.available).length}/${boards.length}',
+      icon: LucideIcons.microchip,
+      color: AppColors.purple,
+      background: AppColors.purpleLight,
+      helper:
+          '${boards.where((b) => b.status == BoardStatus.checkedOut).length} đang dùng',
+    ),
+    _DashboardStat(
+      label: 'Nhân viên có mặt',
+      value: '${attendance.length}/${employees.length}',
+      icon: LucideIcons.usersRound,
+      color: AppColors.primary,
+      background: AppColors.infoLight,
+    ),
+    _DashboardStat(
+      label: 'Đơn chờ phân công',
+      value: '${orders.where((o) => o.assignedToId == null).length}',
+      icon: LucideIcons.circle,
+      color: AppColors.warning,
+      background: AppColors.warningLight,
+    ),
+    _DashboardStat(
+      label: 'Bo mạch bảo trì',
+      value:
+          '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
+      icon: LucideIcons.triangleAlert,
+      color: AppColors.error,
+      background: AppColors.errorLight,
+    ),
+    _DashboardStat(
+      label: 'Tài khoản chờ duyệt',
+      value: '${backend.pendingUsers.length}',
+      icon: LucideIcons.userRoundPlus,
+      color: AppColors.purple,
+      background: AppColors.purpleLight,
+    ),
+  ];
+}
 
 class _DashboardStatCard extends StatelessWidget {
   final _DashboardStat stat;
@@ -401,6 +431,8 @@ class _WeeklyOrdersChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final orders = context.watch<BackendDataProvider>().repairOrders;
+    final weeklyOrderStats = _buildWeeklyOrderStats(orders);
     return _Panel(
       isDark: isDark,
       padding: const EdgeInsets.fromLTRB(14, 16, 14, 12),
@@ -526,6 +558,46 @@ class _WeeklyOrdersChart extends StatelessWidget {
       borderRadius: const BorderRadius.vertical(top: Radius.circular(3)),
     );
   }
+
+  List<_WeeklyOrderStat> _buildWeeklyOrderStats(List<RepairOrder> orders) {
+    final now = DateTime.now();
+    return List.generate(7, (index) {
+      final day = DateTime(now.year, now.month, now.day)
+          .subtract(Duration(days: 6 - index));
+      final dayOrders = orders.where((order) {
+        final created = order.createdAt;
+        return created.year == day.year &&
+            created.month == day.month &&
+            created.day == day.day;
+      }).toList();
+      return _WeeklyOrderStat(
+        day: '${day.day}/${day.month}',
+        pending: dayOrders
+            .where((o) => o.status == RepairOrderStatus.pending)
+            .length,
+        inProgress: dayOrders
+            .where((o) => o.status == RepairOrderStatus.inProgress)
+            .length,
+        completed: dayOrders
+            .where((o) => o.status == RepairOrderStatus.completed)
+            .length,
+      );
+    });
+  }
+}
+
+class _WeeklyOrderStat {
+  final String day;
+  final int pending;
+  final int inProgress;
+  final int completed;
+
+  const _WeeklyOrderStat({
+    required this.day,
+    required this.pending,
+    required this.inProgress,
+    required this.completed,
+  });
 }
 
 class _StatusRatioCard extends StatelessWidget {
@@ -536,6 +608,9 @@ class _StatusRatioCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final stats = _StatusStats.fromOrders(
+      context.watch<BackendDataProvider>().repairOrders,
+    );
     return _Panel(
       isDark: isDark,
       padding: const EdgeInsets.all(16),
@@ -556,19 +631,19 @@ class _StatusRatioCard extends StatelessWidget {
                       centerSpaceRadius: wide ? 66 : 48,
                       startDegreeOffset: -80,
                       sections: [
-                        _pie(statusStats.pending, AppColors.chartPending, wide),
+                        _pie(stats.pending, AppColors.chartPending, wide),
                         _pie(
-                          statusStats.inProgress,
+                          stats.inProgress,
                           AppColors.chartInProgress,
                           wide,
                         ),
                         _pie(
-                          statusStats.completed,
+                          stats.completed,
                           AppColors.chartCompleted,
                           wide,
                         ),
                         _pie(
-                          statusStats.delivered,
+                          stats.delivered,
                           AppColors.chartDelivered,
                           wide,
                         ),
@@ -585,25 +660,29 @@ class _StatusRatioCard extends StatelessWidget {
                       children: [
                         _StatusSummaryRow(
                           label: 'Chờ xử lý',
-                          value: statusStats.pending,
+                          value: stats.pending,
+                          total: stats.total,
                           color: AppColors.chartPending,
                           isDark: isDark,
                         ),
                         _StatusSummaryRow(
                           label: 'Đang sửa',
-                          value: statusStats.inProgress,
+                          value: stats.inProgress,
+                          total: stats.total,
                           color: AppColors.chartInProgress,
                           isDark: isDark,
                         ),
                         _StatusSummaryRow(
                           label: 'Hoàn thành',
-                          value: statusStats.completed,
+                          value: stats.completed,
+                          total: stats.total,
                           color: AppColors.chartCompleted,
                           isDark: isDark,
                         ),
                         _StatusSummaryRow(
                           label: 'Đã giao',
-                          value: statusStats.delivered,
+                          value: stats.delivered,
+                          total: stats.total,
                           color: AppColors.chartDelivered,
                           isDark: isDark,
                         ),
@@ -645,23 +724,20 @@ class _StatusRatioCard extends StatelessWidget {
 class _StatusSummaryRow extends StatelessWidget {
   final String label;
   final int value;
+  final int total;
   final Color color;
   final bool isDark;
 
   const _StatusSummaryRow({
     required this.label,
     required this.value,
+    required this.total,
     required this.color,
     required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final total =
-        statusStats.pending +
-        statusStats.inProgress +
-        statusStats.completed +
-        statusStats.delivered;
     final percent = total == 0 ? 0 : ((value / total) * 100).round();
 
     return Padding(
@@ -716,6 +792,34 @@ class _StatusSummaryRow extends StatelessWidget {
   }
 }
 
+class _StatusStats {
+  final int pending;
+  final int inProgress;
+  final int completed;
+  final int delivered;
+
+  const _StatusStats({
+    required this.pending,
+    required this.inProgress,
+    required this.completed,
+    required this.delivered,
+  });
+
+  int get total => pending + inProgress + completed + delivered;
+
+  factory _StatusStats.fromOrders(List<RepairOrder> orders) {
+    return _StatusStats(
+      pending: orders.where((o) => o.status == RepairOrderStatus.pending).length,
+      inProgress:
+          orders.where((o) => o.status == RepairOrderStatus.inProgress).length,
+      completed:
+          orders.where((o) => o.status == RepairOrderStatus.completed).length,
+      delivered:
+          orders.where((o) => o.status == RepairOrderStatus.delivered).length,
+    );
+  }
+}
+
 class _TodayAttendanceCard extends StatelessWidget {
   final bool isDark;
 
@@ -723,6 +827,7 @@ class _TodayAttendanceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final records = context.watch<BackendDataProvider>().attendanceRecords;
     return _Panel(
       isDark: isDark,
       padding: const EdgeInsets.all(16),
@@ -731,7 +836,7 @@ class _TodayAttendanceCard extends StatelessWidget {
         children: [
           _SectionTitle('Chấm công hôm nay', isDark: isDark),
           const SizedBox(height: 12),
-          ...mockAttendanceRecords.map(
+          ...records.map(
             (record) => Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Row(
@@ -795,6 +900,7 @@ class _RecentOrdersCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final orders = context.watch<BackendDataProvider>().repairOrders;
     return _Panel(
       isDark: isDark,
       padding: EdgeInsets.zero,
@@ -809,7 +915,7 @@ class _RecentOrdersCard extends StatelessWidget {
               ],
             ),
           ),
-          ...mockRepairOrders
+          ...orders
               .take(4)
               .map((order) => _RecentOrderRow(order: order, isDark: isDark)),
         ],

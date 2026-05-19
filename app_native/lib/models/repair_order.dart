@@ -43,4 +43,55 @@ class RepairOrder {
         return 'Đã giao';
     }
   }
+
+  factory RepairOrder.fromJson(Map<String, dynamic> json) {
+    final assignedTo = json['assignedTo'];
+    final images = json['images'];
+    return RepairOrder(
+      id: json['id']?.toString() ?? '',
+      orderNumber: json['orderCode']?.toString() ?? '',
+      deviceName: json['deviceName']?.toString() ?? '',
+      customerName: json['customerName']?.toString() ?? '',
+      customerPhone: json['customerPhone']?.toString(),
+      status: _statusFromBackend(json['status']?.toString()),
+      assignedToId: assignedTo is Map<String, dynamic>
+          ? assignedTo['id']?.toString()
+          : null,
+      assignedToName: assignedTo is Map<String, dynamic>
+          ? assignedTo['fullName']?.toString()
+          : null,
+      createdAt: _dateFromJson(json['createdAt']) ?? DateTime.now(),
+      updatedAt: _dateFromJson(json['updatedAt']),
+      description: json['description']?.toString(),
+      notes: json['deviceType']?.toString(),
+      imagePath: images is List && images.isNotEmpty && images.first is Map
+          ? (images.first as Map)['imageUrl']?.toString()
+          : null,
+    );
+  }
+
+  static RepairOrderStatus _statusFromBackend(String? status) {
+    switch (status) {
+      case 'RECEIVED':
+      case 'PENDING':
+        return RepairOrderStatus.pending;
+      case 'ASSIGNED':
+      case 'IN_PROGRESS':
+      case 'CHECKING':
+      case 'REPAIRING':
+        return RepairOrderStatus.inProgress;
+      case 'COMPLETED':
+      case 'DONE':
+        return RepairOrderStatus.completed;
+      case 'DELIVERED':
+        return RepairOrderStatus.delivered;
+      default:
+        return RepairOrderStatus.pending;
+    }
+  }
+
+  static DateTime? _dateFromJson(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
+  }
 }

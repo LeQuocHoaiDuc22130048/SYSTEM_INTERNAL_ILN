@@ -2,10 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import 'screens/account_approval_page.dart';
 import 'screens/attendance_page.dart';
 import 'screens/dashboard_page.dart';
-import 'screens/employees_page.dart';
 import 'screens/login_page.dart';
 import 'screens/messages_page.dart';
 import 'screens/notifications_page.dart';
@@ -16,6 +14,7 @@ import 'screens/employee_management_page.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
 import 'utils/auth_provider.dart';
+import 'utils/backend_data_provider.dart';
 import 'utils/network_provider.dart';
 import 'utils/pending_sync_provider.dart';
 import 'widgets/offline_banner.dart';
@@ -26,6 +25,13 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, BackendDataProvider>(
+          create: (context) => BackendDataProvider(
+            api: context.read<AuthProvider>().api,
+          ),
+          update: (_, auth, previous) =>
+              previous ?? BackendDataProvider(api: auth.api),
+        ),
         ChangeNotifierProvider(create: (_) => NetworkProvider()),
         ChangeNotifierProxyProvider<NetworkProvider, PendingSyncProvider>(
           create: (_) => PendingSyncProvider(),
@@ -239,7 +245,15 @@ class _MainScreenState extends State<MainScreen> {
             centerTitle: true,
             leading: IconButton(
               icon: const Icon(Icons.logout, size: 22),
-              onPressed: () => Navigator.pushReplacementNamed(context, '/login'),
+              onPressed: () async {
+                await Provider.of<AuthProvider>(
+                  context,
+                  listen: false,
+                ).logout();
+                if (context.mounted) {
+                  Navigator.pushReplacementNamed(context, '/login');
+                }
+              },
               tooltip: 'Đăng xuất',
             ),
             title: Row(
@@ -523,8 +537,15 @@ class _SideNavigation extends StatelessWidget {
                   icon: LucideIcons.logOut,
                   label: 'Đăng xuất',
                   isSelected: false,
-                  onTap: () =>
-                      Navigator.pushReplacementNamed(context, '/login'),
+                  onTap: () async {
+                    await Provider.of<AuthProvider>(
+                      context,
+                      listen: false,
+                    ).logout();
+                    if (context.mounted) {
+                      Navigator.pushReplacementNamed(context, '/login');
+                    }
+                  },
                   isExpanded: isExpanded,
                 ),
                 const SizedBox(height: 12),
@@ -673,13 +694,20 @@ class _UserProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = Provider.of<AuthProvider>(context).currentUser;
+    final name = currentUser?.name ?? 'Người dùng';
+    final role = currentUser == null
+        ? ''
+        : '${currentUser.roleLabel} - ${currentUser.employeeId.isEmpty ? currentUser.username : currentUser.employeeId}';
+    final initials = _initials(name);
+
     if (!isExpanded) {
-      return const CircleAvatar(
+      return CircleAvatar(
         radius: 18,
         backgroundColor: AppColors.primary,
         child: Text(
-          'NM',
-          style: TextStyle(
+          initials,
+          style: const TextStyle(
             color: Colors.white,
             fontSize: 12,
             fontWeight: FontWeight.bold,
@@ -690,12 +718,12 @@ class _UserProfile extends StatelessWidget {
 
     return Row(
       children: [
-        const CircleAvatar(
+        CircleAvatar(
           radius: 18,
-          backgroundColor: Color(0xFFD946EF),
+          backgroundColor: const Color(0xFFD946EF),
           child: Text(
-            'NM',
-            style: TextStyle(
+            initials,
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.bold,
@@ -703,27 +731,39 @@ class _UserProfile extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        const Expanded(
+        Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Nguyễn Văn Minh',
-                style: TextStyle(
+                name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
                 ),
               ),
               Text(
-                'Super Admin - NV-2024-001',
-                style: TextStyle(color: Colors.white54, fontSize: 10),
+                role,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: Colors.white54, fontSize: 10),
               ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  String _initials(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    if (words.isEmpty || words.first.isEmpty) return 'ND';
+    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
+    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
+        .toUpperCase();
   }
 }
 

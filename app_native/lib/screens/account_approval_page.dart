@@ -1,14 +1,54 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
+import '../models/user.dart';
 import '../theme/app_colors.dart';
+import '../utils/backend_data_provider.dart';
 
-class AccountApprovalPage extends StatelessWidget {
+class AccountApprovalPage extends StatefulWidget {
   const AccountApprovalPage({super.key});
+
+  @override
+  State<AccountApprovalPage> createState() => _AccountApprovalPageState();
+}
+
+class _AccountApprovalPageState extends State<AccountApprovalPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BackendDataProvider>().loadPendingUsers();
+    });
+  }
+
+  Future<void> _processUser(User user, String action) async {
+    try {
+      final backend = context.read<BackendDataProvider>();
+      if (action == 'APPROVE') {
+        await backend.approveUser(user);
+      } else {
+        await backend.rejectUser(user);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(action == 'APPROVE' ? 'Đã duyệt tài khoản.' : 'Đã từ chối tài khoản.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.toString())),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final wide = MediaQuery.sizeOf(context).width > 760;
+    final backend = context.watch<BackendDataProvider>();
+    final pendingUsers = backend.pendingUsers;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -47,7 +87,7 @@ class AccountApprovalPage extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '2 tài khoản chờ phê duyệt',
+                            '${pendingUsers.length} tài khoản chờ phê duyệt',
                             style: TextStyle(
                               fontSize: 14,
                               color: isDark
@@ -67,7 +107,7 @@ class AccountApprovalPage extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: const Text(
-                          '2 chờ duyệt',
+                          'Chờ duyệt',
                           style: TextStyle(
                             color: Color(0xFF92400E),
                             fontSize: 12,
@@ -78,31 +118,24 @@ class AccountApprovalPage extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 32),
-                  _buildApprovalCard(
-                    context,
-                    name: 'Võ Minh Khoa',
-                    username: '@vmkhoa',
-                    initials: 'VK',
-                    department: 'Kỹ thuật',
-                    phone: '0978 901 234',
-                    time: '10:30 - 15/01/2024',
-                    note:
-                        'Nhân viên mới, được giới thiệu bởi anh Nguyễn Văn Minh',
-                    isDark: isDark,
-                  ),
-                  const SizedBox(height: 20),
-                  _buildApprovalCard(
-                    context,
-                    name: 'Bùi Thị Hoa',
-                    username: '@bthoa',
-                    initials: 'BH',
-                    department: 'Kỹ thuật',
-                    phone: '0989 012 345',
-                    time: '10:30 - 15/01/2024',
-                    note:
-                        'Nhân viên mới, được giới thiệu bởi anh Nguyễn Văn Minh',
-                    isDark: isDark,
-                  ),
+                  if (backend.isLoading)
+                    const Center(child: CircularProgressIndicator())
+                  else if (backend.error != null)
+                    _buildErrorState(isDark, backend.error!)
+                  else if (pendingUsers.isEmpty)
+                    _buildEmptyState(isDark)
+                  else
+                    ...pendingUsers.map(
+                      (user) => Padding(
+                        padding: const EdgeInsets.only(bottom: 20),
+                        child: _buildApprovalCard(
+                          context,
+                          user: user,
+                          initials: _initials(user.name),
+                          isDark: isDark,
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
@@ -114,13 +147,8 @@ class AccountApprovalPage extends StatelessWidget {
 
   Widget _buildApprovalCard(
     BuildContext context, {
-    required String name,
-    required String username,
+    required User user,
     required String initials,
-    required String department,
-    required String phone,
-    required String time,
-    required String note,
     required bool isDark,
   }) {
     return Container(
@@ -164,7 +192,7 @@ class AccountApprovalPage extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          name,
+                          user.name,
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
@@ -195,7 +223,7 @@ class AccountApprovalPage extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      username,
+                      '@${user.username}',
                       style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF64748B),
@@ -209,13 +237,13 @@ class AccountApprovalPage extends StatelessWidget {
           const SizedBox(height: 20),
           Row(
             children: [
-              _buildInfoItem(LucideIcons.briefcase, department, isDark),
+              _buildInfoItem(LucideIcons.briefcase, user.department ?? '-', isDark),
               const SizedBox(width: 24),
-              _buildInfoItem(LucideIcons.phone, phone, isDark),
+              _buildInfoItem(LucideIcons.phone, user.phone ?? '-', isDark),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoItem(LucideIcons.clock, 'Đăng ký: $time', isDark),
+          _buildInfoItem(LucideIcons.clock, 'Mã NV: ${user.employeeId.isEmpty ? 'Chưa có' : user.employeeId}', isDark),
           const SizedBox(height: 20),
           Container(
             width: double.infinity,
@@ -239,7 +267,7 @@ class AccountApprovalPage extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  note,
+                  'Tài khoản đang chờ quản lý duyệt để có thể đăng nhập hệ thống.',
                   style: TextStyle(
                     fontSize: 14,
                     color: isDark
@@ -255,7 +283,7 @@ class AccountApprovalPage extends StatelessWidget {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _processUser(user, 'REJECT'),
                   icon: const Icon(LucideIcons.circleX, size: 18),
                   label: const Text('Từ chối'),
                   style: OutlinedButton.styleFrom(
@@ -271,7 +299,7 @@ class AccountApprovalPage extends StatelessWidget {
               const SizedBox(width: 16),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _processUser(user, 'APPROVE'),
                   icon: const Icon(LucideIcons.circleCheck, size: 18),
                   label: const Text('Duyệt'),
                   style: ElevatedButton.styleFrom(
@@ -308,5 +336,51 @@ class AccountApprovalPage extends StatelessWidget {
         ),
       ],
     );
+  }
+
+  Widget _buildErrorState(bool isDark, String error) {
+    return Center(
+      child: Column(
+        children: [
+          const Icon(Icons.cloud_off, size: 42, color: AppColors.error),
+          const SizedBox(height: 12),
+          Text(
+            error,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
+            ),
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            onPressed: () => context.read<BackendDataProvider>().loadPendingUsers(),
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Thử lại'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Text(
+        'Không có tài khoản chờ duyệt',
+        style: TextStyle(
+          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+
+  String _initials(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    if (words.isEmpty || words.first.isEmpty) return 'ND';
+    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
+    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
+        .toUpperCase();
   }
 }

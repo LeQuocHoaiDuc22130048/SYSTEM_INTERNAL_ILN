@@ -6,8 +6,8 @@ import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../utils/network_provider.dart';
 import '../utils/pending_sync_provider.dart';
+import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
-import '../data/mock_data.dart';
 import 'face_attendance_page.dart';
 
 class AttendancePage extends StatefulWidget {
@@ -27,6 +27,9 @@ class _AttendancePageState extends State<AttendancePage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BackendDataProvider>().loadAttendance();
+    });
   }
 
   @override
@@ -301,6 +304,7 @@ class _AttendancePageState extends State<AttendancePage>
 
   Widget _buildTodayTab() {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final records = context.watch<BackendDataProvider>().attendanceRecords;
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -351,7 +355,8 @@ class _AttendancePageState extends State<AttendancePage>
           ),
         ),
         const SizedBox(height: 12),
-        ...mockAttendanceRecords.map((record) {
+        ...records.map((record) {
+          final index = records.indexOf(record);
           return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
@@ -423,13 +428,13 @@ class _AttendancePageState extends State<AttendancePage>
               .animate(target: 1)
               .fadeIn(
                 duration: 400.ms,
-                delay: (300 + mockAttendanceRecords.indexOf(record) * 50).ms,
+                delay: (300 + index * 50).ms,
               )
               .slideX(
                 begin: -0.2,
                 end: 0,
                 duration: 400.ms,
-                delay: (300 + mockAttendanceRecords.indexOf(record) * 50).ms,
+                delay: (300 + index * 50).ms,
               );
         }),
       ],

@@ -1,7 +1,7 @@
 package com.suachuabientan.system_internal.modules.notification.service;
 
-import com.suachuabientan.system_internal.common.enums.UserRole;
-import com.suachuabientan.system_internal.common.enums.UserStatus;
+import com.suachuabientan.system_internal.modules.UserRole;
+import com.suachuabientan.system_internal.modules.UserStatus;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;

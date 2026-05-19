@@ -3,8 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
-import '../models/user.dart';
+import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
+import '../utils/backend_data_provider.dart';
 import '../utils/network_provider.dart';
 
 class LoginPage extends StatefulWidget {
@@ -23,7 +24,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLogin = true;
   String _error = '';
   bool _loading = false;
-  UserRole _selectedRole = UserRole.manager;
 
   @override
   void dispose() {
@@ -35,6 +35,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _handleRegister() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     setState(() {
       _error = '';
     });
@@ -49,6 +50,16 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
+    final strongPassword = RegExp(
+      r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$',
+    ).hasMatch(_passwordController.text);
+    if (!strongPassword) {
+      setState(() {
+        _error = 'Mật khẩu cần tối thiểu 8 ký tự, có chữ hoa, chữ thường và số.';
+      });
+      return;
+    }
+
     final hasInternet = await Provider.of<NetworkProvider>(
       context,
       listen: false,
@@ -64,22 +75,46 @@ class _LoginPageState extends State<LoginPage> {
       _loading = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 1400));
+    try {
+      await auth.register(
+        username: _usernameController.text.trim(),
+        password: _passwordController.text,
+        fullName: _fullNameController.text.trim(),
+        phone: _phoneController.text.trim(),
+        department: 'Nhân viên',
+      );
 
-    setState(() {
-      _loading = false;
-      _isLogin = true;
-      _error = '';
-    });
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _isLogin = true;
+        _error = '';
+      });
 
-    if (!mounted) return;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đăng ký thành công! Vui lòng đăng nhập.')),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Đăng ký thành công! Vui lòng chờ duyệt trước khi đăng nhập.',
+          ),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Không thể đăng ký. Vui lòng thử lại.';
+      });
+    }
   }
 
   Future<void> _handleLogin() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
     setState(() {
       _error = '';
     });
@@ -91,13 +126,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
 
-    if (_passwordController.text.length < 6) {
-      setState(() {
-        _error = 'Mật khẩu phải ít nhất 6 ký tự.';
-      });
-      return;
-    }
-
     final hasInternet = await Provider.of<NetworkProvider>(
       context,
       listen: false,
@@ -113,18 +141,252 @@ class _LoginPageState extends State<LoginPage> {
       _loading = true;
     });
 
-    await Future.delayed(const Duration(milliseconds: 1400));
+    try {
+      await auth.login(
+        username: _usernameController.text.trim(),
+        password: _passwordController.text,
+      );
 
-    setState(() {
-      _loading = false;
-    });
+      if (!mounted) return;
+      setState(() => _loading = false);
+      context.read<BackendDataProvider>().loadAll();
+      Navigator.of(context).pushReplacementNamed('/dashboard');
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = error.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = 'Không thể đăng nhập. Vui lòng thử lại.';
+      });
+    }
+  }
 
-    if (!mounted) return;
+  Future<String?> _resetPassword({
+    required String username,
+    required String phone,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    try {
+      await Provider.of<AuthProvider>(context, listen: false).forgotPassword(
+        username: username,
+        phone: phone,
+        newPassword: newPassword,
+        confirmPassword: confirmPassword,
+      );
+      return null;
+    } on ApiException catch (error) {
+      return error.message;
+    } catch (_) {
+      return 'Không thể đặt lại mật khẩu. Vui lòng thử lại.';
+    }
+  }
 
-    Provider.of<AuthProvider>(context, listen: false).setRole(_selectedRole);
+  Future<void> _showForgotPasswordDialog() async {
+    final pageContext = context;
+    final usernameController = TextEditingController(
+      text: _usernameController.text,
+    );
+    final phoneController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool showNewPassword = false;
+    bool showConfirmPassword = false;
+    bool loading = false;
+    String error = '';
 
-    // Navigate to app
-    Navigator.of(context).pushReplacementNamed('/dashboard');
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !loading,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (_, setDialogState) {
+            Future<void> submit() async {
+              final dialogNavigator = Navigator.of(dialogContext);
+              final messenger = ScaffoldMessenger.of(pageContext);
+
+              setDialogState(() => error = '');
+
+              if (usernameController.text.trim().isEmpty ||
+                  phoneController.text.trim().isEmpty ||
+                  newPasswordController.text.isEmpty ||
+                  confirmPasswordController.text.isEmpty) {
+                setDialogState(() {
+                  error = 'Vui lòng điền đầy đủ thông tin.';
+                });
+                return;
+              }
+
+              if (newPasswordController.text != confirmPasswordController.text) {
+                setDialogState(() {
+                  error = 'Mật khẩu xác nhận không khớp.';
+                });
+                return;
+              }
+
+              if (newPasswordController.text.length < 8) {
+                setDialogState(() {
+                  error = 'Mật khẩu mới phải có ít nhất 8 ký tự.';
+                });
+                return;
+              }
+
+              final strongPassword = RegExp(
+                r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$',
+              ).hasMatch(newPasswordController.text);
+              if (!strongPassword) {
+                setDialogState(() {
+                  error = 'Mật khẩu mới cần có chữ hoa, chữ thường và số.';
+                });
+                return;
+              }
+
+              final hasInternet = await Provider.of<NetworkProvider>(
+                dialogContext,
+                listen: false,
+              ).checkNow();
+              if (!hasInternet) {
+                setDialogState(() {
+                  error = 'Thiết bị đang mất kết nối internet. Vui lòng kiểm tra mạng.';
+                });
+                return;
+              }
+
+              setDialogState(() => loading = true);
+              final resetError = await _resetPassword(
+                username: usernameController.text.trim(),
+                phone: phoneController.text.trim(),
+                newPassword: newPasswordController.text,
+                confirmPassword: confirmPasswordController.text,
+              );
+              setDialogState(() => loading = false);
+
+              if (!mounted) return;
+              if (resetError != null) {
+                setDialogState(() => error = resetError);
+                return;
+              }
+
+              dialogNavigator.pop();
+              messenger.showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Đặt lại mật khẩu thành công. Vui lòng đăng nhập.',
+                  ),
+                ),
+              );
+            }
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF111827),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: Colors.white.withValues(alpha: 0.15)),
+              ),
+              title: const Text(
+                'Quên mật khẩu',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildInputField(
+                      label: 'Tên đăng nhập',
+                      hint: 'Nhập username...',
+                      controller: usernameController,
+                      icon: LucideIcons.user,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInputField(
+                      label: 'Số điện thoại đã đăng ký',
+                      hint: 'Nhập số điện thoại...',
+                      controller: phoneController,
+                      icon: LucideIcons.phone,
+                      keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInputField(
+                      label: 'Mật khẩu mới',
+                      hint: 'Nhập mật khẩu mới...',
+                      controller: newPasswordController,
+                      icon: LucideIcons.lock,
+                      isPassword: true,
+                      obscurePassword: !showNewPassword,
+                      onTogglePassword: () => setDialogState(
+                        () => showNewPassword = !showNewPassword,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildInputField(
+                      label: 'Xác nhận mật khẩu',
+                      hint: 'Nhập lại mật khẩu mới...',
+                      controller: confirmPasswordController,
+                      icon: LucideIcons.lockKeyhole,
+                      isPassword: true,
+                      obscurePassword: !showConfirmPassword,
+                      onTogglePassword: () => setDialogState(
+                        () => showConfirmPassword = !showConfirmPassword,
+                      ),
+                    ),
+                    if (error.isNotEmpty) ...[
+                      const SizedBox(height: 16),
+                      Text(
+                        error,
+                        style: const TextStyle(
+                          color: Color(0xFFFCA5A5),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: loading
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Hủy'),
+                ),
+                ElevatedButton(
+                  onPressed: loading ? null : submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: loading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        )
+                      : const Text('Đặt lại mật khẩu'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    usernameController.dispose();
+    phoneController.dispose();
+    newPasswordController.dispose();
+    confirmPasswordController.dispose();
   }
 
   @override
@@ -346,6 +608,10 @@ class _LoginPageState extends State<LoginPage> {
                 icon: LucideIcons.lock,
                 isPassword: true,
               ),
+              if (_isLogin) ...[
+                const SizedBox(height: 8),
+                _buildForgotPasswordButton(),
+              ],
               const SizedBox(height: 24),
 
               // Error Message
@@ -382,11 +648,6 @@ class _LoginPageState extends State<LoginPage> {
                 const SizedBox(height: 24),
               ],
 
-              if (_isLogin) ...[
-                _buildRoleSelector(),
-                const SizedBox(height: 24),
-              ],
-
               _buildSubmitButton(),
               const SizedBox(height: 24),
               _buildToggleModeButton(),
@@ -404,6 +665,8 @@ class _LoginPageState extends State<LoginPage> {
     required TextEditingController controller,
     required IconData icon,
     bool isPassword = false,
+    bool? obscurePassword,
+    VoidCallback? onTogglePassword,
     TextInputType? keyboardType,
   }) {
     return Column(
@@ -420,7 +683,7 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 8),
         TextField(
           controller: controller,
-          obscureText: isPassword && !_showPassword,
+          obscureText: isPassword && (obscurePassword ?? !_showPassword),
           keyboardType: keyboardType,
           style: const TextStyle(color: Colors.white, fontSize: 15),
           decoration: InputDecoration(
@@ -433,12 +696,14 @@ class _LoginPageState extends State<LoginPage> {
             suffixIcon: isPassword
                 ? IconButton(
                     icon: Icon(
-                      _showPassword ? LucideIcons.eyeOff : LucideIcons.eye,
+                      (obscurePassword ?? !_showPassword)
+                          ? LucideIcons.eye
+                          : LucideIcons.eyeOff,
                       size: 18,
                       color: Colors.blue[200]?.withValues(alpha: 0.5),
                     ),
-                    onPressed: () =>
-                        setState(() => _showPassword = !_showPassword),
+                    onPressed: onTogglePassword ??
+                        () => setState(() => _showPassword = !_showPassword),
                   )
                 : null,
             hintStyle: TextStyle(
@@ -475,50 +740,22 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildRoleSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Đăng nhập với quyền (Mock)',
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.blue[100],
+  Widget _buildForgotPasswordButton() {
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        onPressed: _loading ? null : _showForgotPasswordDialog,
+        icon: const Icon(LucideIcons.keyRound, size: 16),
+        label: const Text('Quên mật khẩu?'),
+        style: TextButton.styleFrom(
+          foregroundColor: Colors.blue[100],
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          textStyle: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
           ),
         ),
-        const SizedBox(height: 8),
-        Row(
-          children: [
-            Expanded(
-              child: Theme(
-                data: ThemeData(unselectedWidgetColor: Colors.blue[200]?.withValues(alpha: 0.5)),
-                child: RadioListTile<UserRole>(
-                  title: const Text('Quản lý', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  value: UserRole.manager,
-                  groupValue: _selectedRole,
-                  onChanged: (val) => setState(() => _selectedRole = val!),
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: AppColors.primary,
-                ),
-              ),
-            ),
-            Expanded(
-              child: Theme(
-                data: ThemeData(unselectedWidgetColor: Colors.blue[200]?.withValues(alpha: 0.5)),
-                child: RadioListTile<UserRole>(
-                  title: const Text('Nhân viên', style: TextStyle(color: Colors.white, fontSize: 13)),
-                  value: UserRole.employee,
-                  groupValue: _selectedRole,
-                  onChanged: (val) => setState(() => _selectedRole = val!),
-                  contentPadding: EdgeInsets.zero,
-                  activeColor: AppColors.primary,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
+      ),
     );
   }
 

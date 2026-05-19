@@ -1,8 +1,8 @@
 package com.suachuabientan.system_internal.modules.auth.service;
 
-import com.suachuabientan.system_internal.common.enums.ApprovalAction;
-import com.suachuabientan.system_internal.common.enums.UserRole;
-import com.suachuabientan.system_internal.common.enums.UserStatus;
+import com.suachuabientan.system_internal.modules.ApprovalAction;
+import com.suachuabientan.system_internal.modules.UserRole;
+import com.suachuabientan.system_internal.modules.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
@@ -11,6 +11,7 @@ import com.suachuabientan.system_internal.modules.auth.entity.RefreshToken;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.entity.UserRegistrationRequestEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
@@ -151,6 +152,25 @@ public class AuthService {
         saveRefreshToken(user.getId(), newRefreshToken, storedToken.getDeviceInfo());
 
         return buildLoginResponse(newAccessToken, newRefreshToken, user);
+    }
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new BusinessException("Mat khau xac nhan khong khop", 400);
+        }
+
+        UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(request.username())
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
+
+        if (user.getPhone() == null || !user.getPhone().equals(request.phone())) {
+            throw new BusinessException("So dien thoai xac minh khong dung", 400);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        refreshTokenRepository.revokeAllByUserId(user.getId());
+        log.info("Forgot password: reset password and revoked sessions for userId={}", user.getId());
     }
 
 

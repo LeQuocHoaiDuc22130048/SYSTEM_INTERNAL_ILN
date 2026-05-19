@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
-import '../data/mock_data.dart';
 import '../models/user.dart';
+import '../utils/backend_data_provider.dart';
 
 class EmployeesPage extends StatefulWidget {
   const EmployeesPage({super.key});
@@ -14,6 +15,13 @@ class EmployeesPage extends StatefulWidget {
 class _EmployeesPageState extends State<EmployeesPage> {
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
   final ValueNotifier<UserRole?> _roleFilter = ValueNotifier(null);
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<BackendDataProvider>().loadEmployees();
+    });
+  }
 
   @override
   void dispose() {
@@ -22,19 +30,11 @@ class _EmployeesPageState extends State<EmployeesPage> {
     super.dispose();
   }
 
-  void _showAddEmployeeSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const _AddEmployeeSheet(),
-    );
-  }
-
   List<User> get _filteredEmployees {
     final query = _searchQuery.value.toLowerCase();
     final currentRole = _roleFilter.value;
-    return mockUsers.where((user) {
+    final employees = context.read<BackendDataProvider>().employees;
+    return employees.where((user) {
       final matchesSearch =
           query.isEmpty ||
           user.name.toLowerCase().contains(query) ||
@@ -49,6 +49,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final wide = MediaQuery.sizeOf(context).width > 760;
+    final backend = context.watch<BackendDataProvider>();
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -85,7 +86,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  '${mockUsers.length} nhân viên',
+                                  '${backend.employees.length} nhân viên',
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: isDark
@@ -97,11 +98,9 @@ class _EmployeesPageState extends State<EmployeesPage> {
                             ),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () {
-                              _showAddEmployeeSheet(context);
-                            },
-                            icon: const Icon(Icons.add, size: 18),
-                            label: const Text('Thêm'),
+                            onPressed: () => context.read<BackendDataProvider>().loadEmployees(),
+                            icon: const Icon(Icons.refresh, size: 18),
+                            label: const Text('Tải lại'),
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 16,
@@ -173,7 +172,11 @@ class _EmployeesPageState extends State<EmployeesPage> {
 
             // Employee List
             Expanded(
-              child: AnimatedBuilder(
+              child: backend.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : backend.error != null
+                  ? _buildErrorState(isDark, backend.error!)
+                  : AnimatedBuilder(
                 animation: Listenable.merge([_searchQuery, _roleFilter]),
                 builder: (context, _) {
                   final filtered = _filteredEmployees;
@@ -222,6 +225,36 @@ class _EmployeesPageState extends State<EmployeesPage> {
                     );
                 },
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState(bool isDark, String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off, size: 42, color: AppColors.error),
+            const SizedBox(height: 12),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 16),
+            OutlinedButton.icon(
+              onPressed: () => context.read<BackendDataProvider>().loadEmployees(),
+              icon: const Icon(Icons.refresh, size: 18),
+              label: const Text('Thử lại'),
             ),
           ],
         ),
@@ -537,7 +570,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
               ),
               const SizedBox(height: 24),
 
-              // Stats (mock data)
+              // Stats
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(

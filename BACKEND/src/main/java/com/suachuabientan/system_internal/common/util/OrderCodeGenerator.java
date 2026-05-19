@@ -1,6 +1,6 @@
 package com.suachuabientan.system_internal.common.util;
 
-import com.suachuabientan.system_internal.modules.repository.RepairOrderRepository;
+import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 

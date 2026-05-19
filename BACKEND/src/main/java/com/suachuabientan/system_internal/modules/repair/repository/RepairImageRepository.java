@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.modules.repository;
+package com.suachuabientan.system_internal.modules.repair.repository;
 
 import com.suachuabientan.system_internal.modules.repair.entity.RepairImage;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -3,6 +3,7 @@ package com.suachuabientan.system_internal.modules.auth.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
@@ -55,6 +56,14 @@ public class AuthController {
     public ResponseEntity<ApiResponse<LoginResponse>> refresh(
             @Valid @RequestBody RefreshTokenRequest request) {
         return ResponseEntity.ok(ApiResponse.success(authService.refreshToken(request)));
+    }
+
+    @Operation(summary = "Dat lai mat khau khi quen mat khau")
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Dat lai mat khau thanh cong"));
     }
 
     @Operation(summary = "Đăng xuất thiết bị hiện tại — revoke refresh token")

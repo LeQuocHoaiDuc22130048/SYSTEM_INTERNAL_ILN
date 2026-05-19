@@ -1,6 +1,6 @@
 package com.suachuabientan.system_internal.modules.repair.service;
 
-import com.suachuabientan.system_internal.common.enums.UserRole;
+import com.suachuabientan.system_internal.modules.UserRole;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.common.util.OrderCodeGenerator;
@@ -16,9 +16,9 @@ import com.suachuabientan.system_internal.modules.repair.entity.RepairImage;
 import com.suachuabientan.system_internal.modules.repair.entity.RepairOrder;
 import com.suachuabientan.system_internal.modules.repair.entity.RepairTimeline;
 import com.suachuabientan.system_internal.modules.repair.enums.RepairStatus;
-import com.suachuabientan.system_internal.modules.repository.RepairImageRepository;
-import com.suachuabientan.system_internal.modules.repository.RepairOrderRepository;
-import com.suachuabientan.system_internal.modules.repository.RepairTimelineRepository;
+import com.suachuabientan.system_internal.modules.repair.repository.RepairImageRepository;
+import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
+import com.suachuabientan.system_internal.modules.repair.repository.RepairTimelineRepository;
 import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
 import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;

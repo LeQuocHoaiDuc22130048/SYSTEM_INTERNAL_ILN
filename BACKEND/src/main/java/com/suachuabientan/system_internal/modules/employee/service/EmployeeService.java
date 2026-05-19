@@ -1,7 +1,7 @@
 package com.suachuabientan.system_internal.modules.employee.service;
 
-import com.suachuabientan.system_internal.common.enums.UserRole;
-import com.suachuabientan.system_internal.common.enums.UserStatus;
+import com.suachuabientan.system_internal.modules.UserRole;
+import com.suachuabientan.system_internal.modules.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.modules.attendance.entity.AttendanceRecord;
@@ -12,7 +12,7 @@ import com.suachuabientan.system_internal.modules.auth.repository.UserRepository
 import com.suachuabientan.system_internal.modules.employee.dto.request.UpdateEmployeeRequest;
 import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeDetailResponse;
 import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeScheduleResponse;
-import com.suachuabientan.system_internal.modules.repository.RepairOrderRepository;
+import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;

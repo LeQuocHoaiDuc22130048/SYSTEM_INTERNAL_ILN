@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../models/user.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 
@@ -11,11 +12,14 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
-    
-    final name = isEmployee ? 'Nguyễn Văn Nhân Viên' : 'Nguyễn Văn Quản Lý';
-    final role = isEmployee ? 'Nhân viên - NV-2024-002' : 'Quản lý - QL-2024-001';
-    final avatarColor = isEmployee ? Colors.blue : const Color(0xFFD946EF);
+    final auth = Provider.of<AuthProvider>(context);
+    final user = auth.currentUser;
+    final name = user?.name ?? 'Người dùng';
+    final role = user == null
+        ? ''
+        : '${user.roleLabel} - ${user.employeeId.isEmpty ? user.username : user.employeeId}';
+    final avatarColor = auth.isEmployee ? Colors.blue : const Color(0xFFD946EF);
+    final initials = _initials(name);
 
     return Scaffold(
       backgroundColor: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
@@ -29,9 +33,9 @@ class ProfilePage extends StatelessWidget {
               CircleAvatar(
                 radius: 50,
                 backgroundColor: avatarColor,
-                child: const Text(
-                  'NV',
-                  style: TextStyle(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -56,7 +60,7 @@ class ProfilePage extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              _buildInfoSection(isDark),
+              _buildInfoSection(isDark, user),
               const SizedBox(height: 24),
               _buildSettingsSection(isDark, context),
             ],
@@ -66,7 +70,7 @@ class ProfilePage extends StatelessWidget {
     );
   }
 
-  Widget _buildInfoSection(bool isDark) {
+  Widget _buildInfoSection(bool isDark, User? user) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -78,23 +82,23 @@ class ProfilePage extends StatelessWidget {
       child: Column(
         children: [
           _buildInfoTile(
-            icon: LucideIcons.mail,
-            title: 'Email',
-            value: 'nguyenvan@example.com',
+            icon: LucideIcons.user,
+            title: 'Tên đăng nhập',
+            value: user?.username ?? '-',
             isDark: isDark,
           ),
           Divider(height: 1, color: isDark ? AppColors.borderDark : AppColors.borderLight),
           _buildInfoTile(
             icon: LucideIcons.phone,
             title: 'Số điện thoại',
-            value: '0987654321',
+            value: user?.phone ?? '-',
             isDark: isDark,
           ),
           Divider(height: 1, color: isDark ? AppColors.borderDark : AppColors.borderLight),
           _buildInfoTile(
-            icon: LucideIcons.mapPin,
-            title: 'Địa chỉ',
-            value: '123 Đường ABC, Quận X, TP Y',
+            icon: LucideIcons.building2,
+            title: 'Bộ phận',
+            value: user?.department ?? '-',
             isDark: isDark,
           ),
         ],
@@ -175,5 +179,13 @@ class ProfilePage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _initials(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    if (words.isEmpty || words.first.isEmpty) return 'ND';
+    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
+    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
+        .toUpperCase();
   }
 }
