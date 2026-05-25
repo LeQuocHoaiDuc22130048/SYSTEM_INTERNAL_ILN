@@ -12,7 +12,8 @@ import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
 
 class RepairOrdersPage extends StatefulWidget {
-  const RepairOrdersPage({super.key});
+  final String? targetOrderId;
+  const RepairOrdersPage({super.key, this.targetOrderId});
 
   @override
   State<RepairOrdersPage> createState() => _RepairOrdersPageState();
@@ -25,9 +26,33 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<BackendDataProvider>().loadRepairOrders();
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await context.read<BackendDataProvider>().loadRepairOrders();
+      if (widget.targetOrderId != null) {
+        _showOrderById(widget.targetOrderId!);
+      }
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant RepairOrdersPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.targetOrderId != null && widget.targetOrderId != oldWidget.targetOrderId) {
+      _showOrderById(widget.targetOrderId!);
+    }
+  }
+
+  void _showOrderById(String id) {
+    final orders = context.read<BackendDataProvider>().repairOrders;
+    final matchIndex = orders.indexWhere((o) => o.id == id);
+    if (matchIndex != -1) {
+      showModalBottomSheet(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (context) => _OrderDetailSheet(order: orders[matchIndex]),
+      );
+    }
   }
 
   @override

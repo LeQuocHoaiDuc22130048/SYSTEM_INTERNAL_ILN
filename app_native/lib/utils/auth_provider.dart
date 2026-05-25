@@ -6,11 +6,10 @@ class AuthProvider extends ChangeNotifier {
   final ApiClient api = ApiClient();
 
   User? _currentUser;
-  String? _refreshToken;
   bool _isLoading = false;
 
   User? get currentUser => _currentUser;
-  String? get refreshToken => _refreshToken;
+  String? get refreshToken => api.refreshToken;
   bool get isAuthenticated => api.accessToken != null;
   bool get isLoading => _isLoading;
   UserRole get role => _currentUser?.role ?? UserRole.employee;
@@ -36,7 +35,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       api.accessToken = data['accessToken']?.toString();
-      _refreshToken = data['refreshToken']?.toString();
+      api.refreshToken = data['refreshToken']?.toString();
 
       final userInfo = data['userInfo'];
       if (api.accessToken == null || userInfo is! Map<String, dynamic>) {
@@ -108,7 +107,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> logout() async {
     _log('Logout started');
-    final token = _refreshToken;
+    final token = api.refreshToken;
     if (token != null) {
       try {
         await api.post('/api/v1/auth/logout', body: {'refreshToken': token});
@@ -118,7 +117,7 @@ class AuthProvider extends ChangeNotifier {
     }
 
     api.accessToken = null;
-    _refreshToken = null;
+    api.refreshToken = null;
     _currentUser = null;
     _log('Logout completed locally');
     notifyListeners();

@@ -224,10 +224,9 @@ public class MessagingService {
         Instant readAt = Instant.now();
         conversationMemberRepository.updateLastReadAt(conversationId, userId, readAt);
 
-        List<UUID> unreadMessageIds = messageRepository.findUnreadMessageIds(
-                conversationId,
-                userId,
-                member.getLastReadAt());
+        List<UUID> unreadMessageIds = member.getLastReadAt() == null
+                ? messageRepository.findUnreadMessageIds(conversationId, userId)
+                : messageRepository.findUnreadMessageIdsAfter(conversationId, userId, member.getLastReadAt());
         if (unreadMessageIds.isEmpty()) {
             return;
         }
@@ -299,9 +298,9 @@ public class MessagingService {
                         .map(member -> toMemberInfo(member, usersById.get(member.getUserId())))
                         .toList(),
                 lastMessage != null ? toMessageInfo(lastMessage) : null,
-                viewerMember != null
-                        ? messageRepository.countUnread(conversation.getId(), viewerId, viewerMember.getLastReadAt())
-                        : 0,
+                viewerMember == null ? 0 : (viewerMember.getLastReadAt() == null
+                        ? messageRepository.countUnread(conversation.getId(), viewerId)
+                        : messageRepository.countUnreadAfter(conversation.getId(), viewerId, viewerMember.getLastReadAt())),
                 conversation.getCreatedAt()
         );
     }

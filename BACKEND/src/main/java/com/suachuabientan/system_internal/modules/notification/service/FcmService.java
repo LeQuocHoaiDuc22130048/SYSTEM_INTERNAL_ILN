@@ -1,152 +1,134 @@
 package com.suachuabientan.system_internal.modules.notification.service;
 
-import com.google.auth.oauth2.GoogleCredentials;
-import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
-import lombok.RequiredArgsConstructor;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.messaging.*;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestTemplate;
 
-import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
-import java.util.Base64;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class FcmService {
-    private static final String FCM_LEGACY_ENDPOINT = "https://fcm.googleapis.com/fcm/send";
-    private static final String FCM_V1_SCOPE = "https://www.googleapis.com/auth/firebase.messaging";
-
-    private final RestTemplate restTemplate;
-
-    @Value("${app.firebase.project-id:}")
-    private String projectId;
-
-    @Value("${app.firebase.service-account-json:}")
-    private String serviceAccountJson;
-
-    @Value("${app.firebase.service-account-base64:}")
-    private String serviceAccountBase64;
-
-    @Value("${app.firebase.server-key:}")
-    private String serverKey;
-
-    public void send(
-            String deviceToken,
-            String title,
-            String body,
-            NotificationType type,
-            String refType,
-            String refId) {
-        if (!StringUtils.hasText(deviceToken)) {
+    /**
+     * Gửi push notification đến một thiết bị.
+     *
+     * @param deviceToken  FCM registration token của thiết bị (từ Flutter)
+     * @param title        Tiêu đề notification
+     * @param body         Nội dung notification
+     * @param data         Data payload — Flutter dùng để navigate đúng màn hình
+     */
+    public void sendToDevice(String deviceToken, String title, String body,
+                             Map<String, String> data) {
+        if (deviceToken == null || deviceToken.isBlank()) {
+            log.debug("Bỏ qua push — deviceToken trống");
             return;
         }
 
-        if (StringUtils.hasText(projectId) && hasServiceAccount()) {
-            sendHttpV1(deviceToken, title, body, type, refType, refId);
-            return;
-        }
-
-        sendLegacy(deviceToken, title, body, type, refType, refId);
-    }
-
-    private void sendHttpV1(
-            String deviceToken,
-            String title,
-            String body,
-            NotificationType type,
-            String refType,
-            String refId) {
-        try {
-            GoogleCredentials credentials = GoogleCredentials
-                    .fromStream(new ByteArrayInputStream(serviceAccountBytes()))
-                    .createScoped(List.of(FCM_V1_SCOPE));
-            credentials.refreshIfExpired();
-
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.setBearerAuth(credentials.getAccessToken().getTokenValue());
-
-            Map<String, Object> message = new HashMap<>();
-            message.put("token", deviceToken);
-            message.put("notification", Map.of("title", title, "body", body));
-            message.put("data", buildData(type, refType, refId));
-            message.put("android", Map.of("priority", "HIGH"));
-            message.put("apns", Map.of("headers", Map.of("apns-priority", "10")));
-
-            restTemplate.exchange(
-                    "https://fcm.googleapis.com/v1/projects/" + projectId + "/messages:send",
-                    HttpMethod.POST,
-                    new HttpEntity<>(Map.of("message", message), headers),
-                    String.class);
-        } catch (Exception ex) {
-            log.warn("Cannot send FCM HTTP v1 notification: {}", ex.getMessage());
-        }
-    }
-
-    private void sendLegacy(
-            String deviceToken,
-            String title,
-            String body,
-            NotificationType type,
-            String refType,
-            String refId) {
-        if (!StringUtils.hasText(serverKey)) {
-            log.debug("Skip FCM because Firebase credentials are empty");
+        if (!isFirebaseReady()) {
+            log.warn("Firebase chưa được cấu hình — bỏ qua push notification: title={}", title);
             return;
         }
 
         try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-            headers.set("Authorization", "key=" + serverKey);
+            Message.Builder messageBuilder = Message.builder()
+                    .setToken(deviceToken)
+                    .setNotification(Notification.builder()
+                            .setTitle(title)
+                            .setBody(body)
+                            .build())
+                    // Android config
+                    .setAndroidConfig(AndroidConfig.builder()
+                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .setNotification(AndroidNotification.builder()
+                                    .setSound("default")
+                                    .setClickAction("FLUTTER_NOTIFICATION_CLICK")
+                                    .build())
+                            .build())
+                    // iOS config
+                    .setApnsConfig(ApnsConfig.builder()
+                            .setAps(Aps.builder()
+                                    .setSound("default")
+                                    .setBadge(1)
+                                    .build())
+                            .build());
 
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("to", deviceToken);
-            payload.put("priority", "high");
-            payload.put("notification", Map.of("title", title, "body", body));
-            payload.put("data", buildData(type, refType, refId));
+            // Thêm data payload nếu có
+            if (data != null && !data.isEmpty()) {
+                messageBuilder.putAllData(data);
+            }
 
-            restTemplate.exchange(
-                    FCM_LEGACY_ENDPOINT,
-                    HttpMethod.POST,
-                    new HttpEntity<>(payload, headers),
-                    String.class);
-        } catch (Exception ex) {
-            log.warn("Cannot send FCM legacy notification: {}", ex.getMessage());
+            String messageId = FirebaseMessaging.getInstance()
+                    .send(messageBuilder.build());
+
+            log.debug("Push notification gửi thành công: messageId={}, title={}", messageId, title);
+
+        } catch (FirebaseMessagingException e) {
+            handleFcmException(e, deviceToken);
+        } catch (Exception e) {
+            // Không throw — push thất bại không được ảnh hưởng nghiệp vụ
+            log.error("Lỗi gửi push notification: {}", e.getMessage());
         }
     }
 
-    private Map<String, String> buildData(NotificationType type, String refType, String refId) {
-        Map<String, String> data = new HashMap<>();
-        data.put("type", type.name());
-        if (StringUtils.hasText(refType)) {
-            data.put("refType", refType);
+    /**
+     * Gửi notification đến nhiều thiết bị cùng lúc (tối đa 500).
+     */
+    public void sendToMultipleDevices(java.util.List<String> deviceTokens,
+                                      String title, String body,
+                                      Map<String, String> data) {
+        if (deviceTokens == null || deviceTokens.isEmpty()) return;
+        if (!isFirebaseReady()) return;
+
+        try {
+            MulticastMessage.Builder builder = MulticastMessage.builder()
+                    .addAllTokens(deviceTokens)
+                    .setNotification(Notification.builder()
+                            .setTitle(title)
+                            .setBody(body)
+                            .build())
+                    .setAndroidConfig(AndroidConfig.builder()
+                            .setPriority(AndroidConfig.Priority.HIGH)
+                            .build());
+
+            if (data != null && !data.isEmpty()) {
+                builder.putAllData(data);
+            }
+
+            BatchResponse response = FirebaseMessaging.getInstance()
+                    .sendEachForMulticast(builder.build());
+
+            log.info("Multicast push: success={}, failure={}",
+                    response.getSuccessCount(), response.getFailureCount());
+
+        } catch (FirebaseMessagingException e) {
+            log.error("Lỗi gửi multicast push: code={}, message={}",
+                    e.getMessagingErrorCode(), e.getMessage());
         }
-        if (StringUtils.hasText(refId)) {
-            data.put("refId", refId);
-        }
-        return data;
     }
 
-    private boolean hasServiceAccount() {
-        return StringUtils.hasText(serviceAccountJson) || StringUtils.hasText(serviceAccountBase64);
+    // ── Helpers ───────────────────────────────────────────────
+
+    private boolean isFirebaseReady() {
+        return !FirebaseApp.getApps().isEmpty();
     }
 
-    private byte[] serviceAccountBytes() {
-        if (StringUtils.hasText(serviceAccountBase64)) {
-            return Base64.getDecoder().decode(serviceAccountBase64);
+    /**
+     * Xử lý lỗi FCM — log chi tiết, không throw.
+     * Token không hợp lệ → cần xoá khỏi DB (gọi callback nếu cần).
+     */
+    private void handleFcmException(FirebaseMessagingException e, String deviceToken) {
+        MessagingErrorCode code = e.getMessagingErrorCode();
+
+        if (code == MessagingErrorCode.UNREGISTERED
+                || code == MessagingErrorCode.INVALID_ARGUMENT) {
+            // Token không còn hợp lệ — Flutter đã gỡ app hoặc đổi thiết bị
+            log.warn("FCM token không hợp lệ, cần xoá: token={}...{}",
+                    deviceToken.substring(0, Math.min(10, deviceToken.length())),
+                    deviceToken.substring(Math.max(0, deviceToken.length() - 5)));
+            // TODO: publish event để AuthService xoá device_token của user
+        } else {
+            log.error("FCM error: code={}, message={}", code, e.getMessage());
         }
-        return serviceAccountJson.getBytes(StandardCharsets.UTF_8);
     }
 }

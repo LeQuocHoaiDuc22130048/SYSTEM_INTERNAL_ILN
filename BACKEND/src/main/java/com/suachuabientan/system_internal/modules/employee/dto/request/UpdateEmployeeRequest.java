@@ -15,6 +15,8 @@ public record UpdateEmployeeRequest(
 
         String address,
 
-        String avatarUrl
+        String avatarUrl,
+
+        String role
 ) {
 }

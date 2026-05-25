@@ -1,7 +1,7 @@
 package com.suachuabientan.system_internal.modules.notification.service;
 
-import com.suachuabientan.system_internal.modules.UserRole;
-import com.suachuabientan.system_internal.modules.UserStatus;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
@@ -20,6 +20,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -94,7 +95,16 @@ public class NotificationService {
         publishInApp(response);
 
         if (pushEnabled && StringUtils.hasText(recipient.getDeviceToken())) {
-            fcmService.send(recipient.getDeviceToken(), title, body, type, refType, refId);
+            fcmService.sendToDevice(
+                    recipient.getDeviceToken(),
+                    title,
+                    body,
+                    Map.of(
+                            "notificationId", saved.getId().toString(),
+                            "type", type.name(),
+                            "refType", refType == null ? "" : refType,
+                            "refId", refId == null ? "" : refId
+                    ));
         }
 
         return response;

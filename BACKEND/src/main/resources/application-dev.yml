@@ -31,7 +31,7 @@ spring:
       host: localhost
       port: 6379
 
-  jackson:
+  Jackson:
     serialization:
       write-dates-as-timestamps: false
       write-durations-as-timestamps: false
@@ -43,26 +43,24 @@ spring:
 app:
   init:
     super-admin:
-      username: ${SUPER_ADMIN_USERNAME:}
-      password: ${SUPER_ADMIN_PASSWORD:}
+      username: ${SUPER_ADMIN_USERNAME:super_admin}
+      password: ${SUPER_ADMIN_PASSWORD:Admin@123456}
       full-name: "Super Admin"
     admin:
-      username: ${ADMIN_USERNAME:}
-      password: ${ADMIN_PASSWORD:}
+      username: ${ADMIN_USERNAME:admin}
+      password: ${ADMIN_PASSWORD:Admin@123456}
       full-name: "Admin"
   cors:
     allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8080,http://localhost:8081}
 
   firebase:
+    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
     project-id: ${FIREBASE_PROJECT_ID:}
-    service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
-    service-account-base64: ${FIREBASE_SERVICE_ACCOUNT_BASE64:}
-    server-key: ${FIREBASE_SERVER_KEY:}
 
 application:
   security:
     jwt:
-      secret-key: ${JWT_SECRET}
+      secret-key: ${JWT_SECRET:${JWT_SECRET_KEY:}{8MbuZg{9oi$gE.p%Y*?{H>75lLha[WBtl(Po6@/#K}}
       expiration: 900000
       refresh-token:
         expiration: 604800000

@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.modules;
+package com.suachuabientan.system_internal.common.enums;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

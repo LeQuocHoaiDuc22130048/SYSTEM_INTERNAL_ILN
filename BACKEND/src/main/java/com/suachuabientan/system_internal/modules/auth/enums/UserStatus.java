@@ -1,4 +1,4 @@
-package com.suachuabientan.system_internal.modules;
+package com.suachuabientan.system_internal.modules.auth.enums;
 
 public enum UserStatus {
     REGISTERED,

@@ -59,98 +59,13 @@ class _WarehousePageState extends State<WarehousePage> {
     return board.qrCode.isEmpty ? 'QR chờ backend tạo' : board.qrCode;
   }
 
-  Future<void> _handleEmployeeQrScan(String qrCode) async {
-    final isOnline = await context.read<NetworkProvider>().checkNow();
-    if (!mounted) return;
 
-    if (!isOnline) {
-      context.read<PendingSyncProvider>().addAction(
-            type: PendingSyncType.qrScan,
-            title: 'Quét QR bo mạch',
-            description: 'Mã QR: $qrCode',
-          );
-      _showSnackBar(
-        'Đã lưu tạm mã QR. Admin sẽ thấy thay đổi khi thiết bị có mạng lại.',
-        AppColors.warning,
-      );
-      return;
-    }
-
-    _showSnackBar('Đã quét và cập nhật admin: $qrCode', AppColors.success);
-  }
-
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
     final backend = context.watch<BackendDataProvider>();
     final boards = backend.boards;
-
-    if (isEmployee) {
-      return Scaffold(
-        body: SafeArea(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.qr_code_scanner,
-                  size: 80,
-                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Quét mã QR Bo mạch',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Sử dụng camera để quét mã QR trên bo mạch',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                  ),
-                ),
-                const SizedBox(height: 32),
-                ElevatedButton.icon(
-                  onPressed: () async {
-                    final result = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ScannerPage(),
-                      ),
-                    );
-                    if (result != null && mounted) {
-                      await _handleEmployeeQrScan(result as String);
-                    }
-                  },
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Mở Máy Quét'),
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
-                    textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-    }
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -1357,6 +1272,7 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isEmployee = Provider.of<AuthProvider>(context, listen: false).isEmployee;
 
     return Container(
       decoration: BoxDecoration(
@@ -1430,11 +1346,12 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                     onPressed: widget.onEdit,
                     tooltip: 'Chỉnh sửa',
                   ),
-                  IconButton(
-                    icon: const Icon(Icons.delete, size: 20, color: AppColors.error),
-                    onPressed: widget.onDelete,
-                    tooltip: 'Xóa',
-                  ),
+                  if (!isEmployee)
+                    IconButton(
+                      icon: const Icon(Icons.delete, size: 20, color: AppColors.error),
+                      onPressed: widget.onDelete,
+                      tooltip: 'Xóa',
+                    ),
                 ],
               ),
               const SizedBox(height: 24),

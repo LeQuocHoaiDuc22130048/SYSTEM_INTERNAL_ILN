@@ -22,9 +22,19 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             WHERE m.conversationId = :conversationId
               AND m.senderId <> :userId
               AND m.isDeleted = false
-              AND (:lastReadAt IS NULL OR m.sentAt > :lastReadAt)
             """)
     long countUnread(
+            @Param("conversationId") UUID conversationId,
+            @Param("userId") UUID userId);
+
+    @Query("""
+            SELECT COUNT(m) FROM Message m
+            WHERE m.conversationId = :conversationId
+              AND m.senderId <> :userId
+              AND m.isDeleted = false
+              AND m.sentAt > :lastReadAt
+            """)
+    long countUnreadAfter(
             @Param("conversationId") UUID conversationId,
             @Param("userId") UUID userId,
             @Param("lastReadAt") Instant lastReadAt);
@@ -34,9 +44,19 @@ public interface MessageRepository extends JpaRepository<Message, UUID> {
             WHERE m.conversationId = :conversationId
               AND m.senderId <> :userId
               AND m.isDeleted = false
-              AND (:lastReadAt IS NULL OR m.sentAt > :lastReadAt)
             """)
     List<UUID> findUnreadMessageIds(
+            @Param("conversationId") UUID conversationId,
+            @Param("userId") UUID userId);
+
+    @Query("""
+            SELECT m.id FROM Message m
+            WHERE m.conversationId = :conversationId
+              AND m.senderId <> :userId
+              AND m.isDeleted = false
+              AND m.sentAt > :lastReadAt
+            """)
+    List<UUID> findUnreadMessageIdsAfter(
             @Param("conversationId") UUID conversationId,
             @Param("userId") UUID userId,
             @Param("lastReadAt") Instant lastReadAt);

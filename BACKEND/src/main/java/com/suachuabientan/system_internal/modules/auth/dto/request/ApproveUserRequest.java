@@ -1,6 +1,6 @@
 package com.suachuabientan.system_internal.modules.auth.dto.request;
 
-import com.suachuabientan.system_internal.modules.ApprovalAction;
+import com.suachuabientan.system_internal.modules.auth.enums.ApprovalAction;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 

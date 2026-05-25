@@ -17,6 +17,11 @@ spring:
       host: ${PROD_REDIS_HOST}
       password: ${PROD_REDIS_PASSWORD}
 
+app:
+  firebase:
+    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
+    project-id: ${FIREBASE_PROJECT_ID:}
+
 logging:
   level:
     root: WARN

@@ -34,7 +34,7 @@ public class WarehouseController {
 
     @Operation(summary = "Tạo bo mạch mới")
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
     public ResponseEntity<ApiResponse<BoardItemResponse>> create(
             @Valid @RequestBody CreateBoardItemRequest request,
             @AuthenticationPrincipal UserDetails userDetails
@@ -62,7 +62,7 @@ public class WarehouseController {
 
     @Operation(summary = "Cập nhật thông tin bo mạch")
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
     public ResponseEntity<ApiResponse<BoardItemResponse>> update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateBoardItemRequest request,

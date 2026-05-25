@@ -203,13 +203,14 @@ class _EmployeesPageState extends State<EmployeesPage> {
                   }
                   return GridView.builder(
                       padding: const EdgeInsets.all(16),
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 0.85,
-                          ),
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: MediaQuery.sizeOf(context).width > 760
+                            ? 3
+                            : 2,
+                        mainAxisSpacing: 12,
+                        crossAxisSpacing: 12,
+                        mainAxisExtent: 245,
+                      ),
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
                         return _buildEmployeeCard(filtered[index])
@@ -311,10 +312,11 @@ class _EmployeesPageState extends State<EmployeesPage> {
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 64,
-              height: 64,
+              width: 56,
+              height: 56,
               decoration: BoxDecoration(
                 color: avatarColor,
                 shape: BoxShape.circle,
@@ -323,14 +325,14 @@ class _EmployeesPageState extends State<EmployeesPage> {
                 child: Text(
                   user.avatar ?? user.name[0],
                   style: const TextStyle(
-                    fontSize: 24,
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
               user.name,
               style: TextStyle(
@@ -364,9 +366,9 @@ class _EmployeesPageState extends State<EmployeesPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 6),
             Text(
-              user.employeeId,
+              user.employeeId.isEmpty ? user.username : user.employeeId,
               style: TextStyle(
                 fontSize: 12,
                 fontFamily: 'monospace',
@@ -376,7 +378,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
               ),
             ),
             if (user.department != null) ...[
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -404,7 +406,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                 ],
               ),
             ],
-            const Spacer(),
+            const SizedBox(height: 8),
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 6),
@@ -620,7 +622,13 @@ class _EmployeeDetailSheet extends StatelessWidget {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // Edit employee
+                        Navigator.pop(context);
+                        showModalBottomSheet(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => _EditEmployeeSheet(user: user),
+                        );
                       },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -959,6 +967,361 @@ class _KeyboardBottomPadding extends StatelessWidget {
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOutCubic,
       child: child,
+    );
+  }
+}
+
+class _EditEmployeeSheet extends StatefulWidget {
+  final User user;
+
+  const _EditEmployeeSheet({required this.user});
+
+  @override
+  State<_EditEmployeeSheet> createState() => _EditEmployeeSheetState();
+}
+
+class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameCtrl;
+  late final TextEditingController _phoneCtrl;
+  late final TextEditingController _departmentCtrl;
+  late UserRole _selectedRole;
+  bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameCtrl = TextEditingController(text: widget.user.name);
+    _phoneCtrl = TextEditingController(text: widget.user.phone ?? '');
+    _departmentCtrl = TextEditingController(text: widget.user.department ?? '');
+    _selectedRole = widget.user.role;
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _phoneCtrl.dispose();
+    _departmentCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return _KeyboardBottomPadding(
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Chỉnh sửa nhân viên',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildTextField(
+                    context,
+                    label: 'Họ và tên',
+                    hint: 'Nhập họ và tên đầy đủ',
+                    icon: Icons.person_outline,
+                    controller: _nameCtrl,
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'Vui lòng nhập họ và tên';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    label: 'Số điện thoại',
+                    hint: '0901 234 567',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                    controller: _phoneCtrl,
+                    validator: (value) {
+                      if (value != null && value.isNotEmpty) {
+                        final cleaned = value.replaceAll(RegExp(r'\D'), '');
+                        final regExp = RegExp(r'^[0-9]{10,11}$');
+                        if (!regExp.hasMatch(cleaned)) {
+                          return 'Số điện thoại phải có 10–11 chữ số';
+                        }
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    label: 'Phòng ban',
+                    hint: 'Kỹ thuật, Kế toán...',
+                    icon: Icons.business_center_outlined,
+                    controller: _departmentCtrl,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildRoleDropdown(context),
+                  const SizedBox(height: 32),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: _isLoading ? null : () => Navigator.pop(context),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: const Text('Hủy'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _isLoading
+                              ? null
+                              : () async {
+                                  if (_formKey.currentState!.validate()) {
+                                    setState(() => _isLoading = true);
+                                    final navigator = Navigator.of(context);
+                                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                    try {
+                                      final cleanedPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+                                      String roleKey;
+                                      switch (_selectedRole) {
+                                        case UserRole.superAdmin:
+                                          roleKey = 'SUPER_ADMIN';
+                                          break;
+                                        case UserRole.admin:
+                                          roleKey = 'ADMIN';
+                                          break;
+                                        case UserRole.manager:
+                                          roleKey = 'MANAGER';
+                                          break;
+                                        case UserRole.employee:
+                                          roleKey = 'EMPLOYEE';
+                                          break;
+                                      }
+                                      await context.read<BackendDataProvider>().updateEmployee(
+                                        widget.user.id,
+                                        {
+                                          'fullName': _nameCtrl.text.trim(),
+                                          'phone': cleanedPhone.isEmpty ? null : cleanedPhone,
+                                          'department': _departmentCtrl.text.trim().isEmpty ? null : _departmentCtrl.text.trim(),
+                                          'role': roleKey,
+                                        },
+                                      );
+                                      if (mounted) {
+                                        navigator.pop();
+                                        scaffoldMessenger.showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Cập nhật nhân viên thành công!'),
+                                            backgroundColor: AppColors.success,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        scaffoldMessenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text(e.toString()),
+                                            backgroundColor: AppColors.error,
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      }
+                                    } finally {
+                                      if (mounted) {
+                                        setState(() => _isLoading = false);
+                                      }
+                                    }
+                                  }
+                                },
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  height: 20,
+                                  width: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor:
+                                        AlwaysStoppedAnimation<Color>(Colors.white),
+                                  ),
+                                )
+                              : const Text('Lưu thay đổi'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRoleDropdown(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Vai trò / Quyền hạn',
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isDark
+                ? AppColors.textPrimaryDark
+                : AppColors.textPrimaryLight,
+          ),
+        ),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<UserRole>(
+          value: _selectedRole,
+          style: TextStyle(
+            fontSize: 14,
+            color: isDark
+                ? AppColors.textPrimaryDark
+                : AppColors.textPrimaryLight,
+          ),
+          decoration: InputDecoration(
+            prefixIcon: const Icon(Icons.admin_panel_settings_outlined, size: 20),
+            filled: true,
+            fillColor: isDark ? AppColors.surfaceDark : const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 12,
+            ),
+          ),
+          dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
+          items: const [
+            DropdownMenuItem(
+              value: UserRole.employee,
+              child: Text('Nhân viên'),
+            ),
+            DropdownMenuItem(
+              value: UserRole.manager,
+              child: Text('Quản lý'),
+            ),
+            DropdownMenuItem(
+              value: UserRole.admin,
+              child: Text('Admin'),
+            ),
+            DropdownMenuItem(
+              value: UserRole.superAdmin,
+              child: Text('Super Admin'),
+            ),
+          ],
+          onChanged: (val) {
+            if (val != null) {
+              setState(() {
+                _selectedRole = val;
+              });
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField(
+    BuildContext context, {
+    required String label,
+    required String hint,
+    required IconData icon,
+    required TextEditingController controller,
+    TextInputType? keyboardType,
+    String? Function(String?)? validator,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isDark
+                ? AppColors.textPrimaryDark
+                : AppColors.textPrimaryLight,
+          ),
+        ),
+        const SizedBox(height: 8),
+        TextFormField(
+          controller: controller,
+          keyboardType: keyboardType,
+          style: const TextStyle(fontSize: 14),
+          decoration: InputDecoration(
+            hintText: hint,
+            prefixIcon: Icon(icon, size: 20),
+            filled: true,
+            fillColor: isDark ? AppColors.surfaceDark : const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+          ),
+          validator: validator,
+        ),
+      ],
     );
   }
 }

@@ -4,7 +4,8 @@ import 'employees_page.dart';
 import 'account_approval_page.dart';
 
 class EmployeeManagementPage extends StatelessWidget {
-  const EmployeeManagementPage({super.key});
+  final int initialTabIndex;
+  const EmployeeManagementPage({super.key, this.initialTabIndex = 0});
 
   @override
   Widget build(BuildContext context) {
@@ -12,6 +13,7 @@ class EmployeeManagementPage extends StatelessWidget {
 
     return DefaultTabController(
       length: 2,
+      initialIndex: initialTabIndex,
       child: Scaffold(
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(48),

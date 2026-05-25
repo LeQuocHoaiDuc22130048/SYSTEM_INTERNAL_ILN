@@ -1,8 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import 'screens/attendance_page.dart';
+import 'models/app_notification.dart';
 import 'screens/dashboard_page.dart';
 import 'screens/login_page.dart';
 import 'screens/messages_page.dart';
@@ -16,21 +18,46 @@ import 'theme/app_theme.dart';
 import 'utils/auth_provider.dart';
 import 'utils/backend_data_provider.dart';
 import 'utils/network_provider.dart';
+import 'utils/notification_provider.dart';
 import 'utils/pending_sync_provider.dart';
+import 'utils/chat_provider.dart';
 import 'widgets/offline_banner.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProxyProvider<AuthProvider, BackendDataProvider>(
-          create: (context) => BackendDataProvider(
-            api: context.read<AuthProvider>().api,
-          ),
+          create: (context) =>
+              BackendDataProvider(api: context.read<AuthProvider>().api),
           update: (_, auth, previous) =>
               previous ?? BackendDataProvider(api: auth.api),
+        ),
+        ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
+          create: (context) =>
+              NotificationProvider(api: context.read<AuthProvider>().api),
+          update: (_, auth, previous) {
+            final provider = previous ?? NotificationProvider(api: auth.api);
+            provider.bindAuth(auth);
+            return provider;
+          },
+        ),
+        ChangeNotifierProxyProvider2<AuthProvider, NotificationProvider, ChatProvider>(
+          create: (context) => ChatProvider(
+            api: context.read<AuthProvider>().api,
+            notificationProvider: context.read<NotificationProvider>(),
+          ),
+          update: (_, auth, notifications, previous) {
+            final provider = previous ?? ChatProvider(
+              api: auth.api,
+              notificationProvider: notifications,
+            );
+            provider.updateAuthAndNotification(auth, notifications);
+            return provider;
+          },
         ),
         ChangeNotifierProvider(create: (_) => NetworkProvider()),
         ChangeNotifierProxyProvider<NetworkProvider, PendingSyncProvider>(
@@ -100,8 +127,11 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
   int _previousIndex = 0;
   bool _isSidebarExpanded = true;
+  String? _targetRepairOrderId;
+  int _targetEmployeeManagementTabIndex = 0;
 
   late final List<Widget?> _pages;
+  StreamSubscription<AppNotification>? _notificationSub;
 
   List<NavigationItem> get _navItems {
     final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
@@ -158,6 +188,47 @@ class _MainScreenState extends State<MainScreen> {
     super.initState();
     _pages = List<Widget?>.filled(9, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
+
+    // Setup notification click listeners
+    final notificationProvider = context.read<NotificationProvider>();
+    if (notificationProvider.pendingNotificationClick != null) {
+      final pending = notificationProvider.pendingNotificationClick!;
+      notificationProvider.pendingNotificationClick = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _handleNotificationClick(pending);
+      });
+    }
+
+    _notificationSub = notificationProvider.notificationClickStream.listen((notification) {
+      _handleNotificationClick(notification);
+    });
+  }
+
+  void _handleNotificationClick(AppNotification item) {
+    final type = item.type;
+    final refType = item.refType;
+    final refId = item.refId;
+
+    if (type == 'NEW_MESSAGE' || refType == 'CONVERSATION') {
+      _setCurrentIndex(4, refId: refId);
+      if (refId != null && refId.isNotEmpty) {
+        context.read<ChatProvider>().selectConversationById(refId);
+      }
+    } else if (type.startsWith('ORDER_') || type.startsWith('NEW_REPAIR_') || refType == 'REPAIR_ORDER') {
+      if (refId != null && refId.isNotEmpty) {
+        _setCurrentIndex(1, refId: refId);
+      } else {
+        _setCurrentIndex(1);
+      }
+    } else if (type.startsWith('ACCOUNT_') || refType == 'USER') {
+      _setCurrentIndex(6, tabIndex: 1);
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationSub?.cancel();
+    super.dispose();
   }
 
   Widget _buildPage(int index) {
@@ -165,7 +236,7 @@ class _MainScreenState extends State<MainScreen> {
       case 0:
         return const DashboardPage();
       case 1:
-        return const RepairOrdersPage();
+        return RepairOrdersPage(targetOrderId: _targetRepairOrderId);
       case 2:
         return const WarehousePage();
       case 3:
@@ -173,9 +244,16 @@ class _MainScreenState extends State<MainScreen> {
       case 4:
         return const MessagesPage();
       case 5:
-        return const NotificationsPage();
+        return NotificationsPage(
+          onNavigateToTab: (tabIndex, {String? refId, int? subTab}) {
+            _setCurrentIndex(tabIndex, refId: refId, tabIndex: subTab);
+            if (tabIndex == 4 && refId != null) {
+              context.read<ChatProvider>().selectConversationById(refId);
+            }
+          },
+        );
       case 6:
-        return const EmployeeManagementPage();
+        return EmployeeManagementPage(initialTabIndex: _targetEmployeeManagementTabIndex);
       case 7:
         return const SizedBox.shrink(); // AccountApproval is inside EmployeeManagementPage now
       case 8:
@@ -185,8 +263,15 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  void _setCurrentIndex(int index) {
+  void _setCurrentIndex(int index, {String? refId, int? tabIndex}) {
     setState(() {
+      if (index == 1) {
+        _targetRepairOrderId = refId;
+        _pages[1] = RepairOrdersPage(targetOrderId: refId);
+      } else if (index == 6) {
+        _targetEmployeeManagementTabIndex = tabIndex ?? 0;
+        _pages[6] = EmployeeManagementPage(initialTabIndex: tabIndex ?? 0);
+      }
       _pages[index] ??= _buildPage(index);
       _currentIndex = index;
     });
@@ -203,6 +288,12 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDark;
+    final unreadNotifications = context
+        .watch<NotificationProvider>()
+        .unreadCount;
+    final notificationBadge = unreadNotifications > 99
+        ? '99+'
+        : unreadNotifications.toString();
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -222,6 +313,7 @@ class _MainScreenState extends State<MainScreen> {
                       setState(() => _isSidebarExpanded = !_isSidebarExpanded),
                   themeProvider: themeProvider,
                   isEmployee: Provider.of<AuthProvider>(context).isEmployee,
+                  notificationBadge: notificationBadge,
                 ),
                 Expanded(
                   child: IndexedStack(
@@ -268,13 +360,16 @@ class _MainScreenState extends State<MainScreen> {
             ),
             actions: [
               IconButton(
-                icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, size: 22),
+                icon: Icon(
+                  isDark ? Icons.light_mode : Icons.dark_mode,
+                  size: 22,
+                ),
                 onPressed: themeProvider.toggleTheme,
                 tooltip: 'Giao diện',
               ),
               _BadgeIconButton(
                 icon: Icons.notifications_outlined,
-                badge: '3',
+                badge: notificationBadge,
                 tooltip: 'Thông báo',
                 onPressed: () {
                   if (_currentIndex == 5) {
@@ -349,11 +444,16 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                               ],
                             ),
-                            if (item.tabIndex == 4)
+                            if (item.tabIndex == 4 && context.watch<ChatProvider>().totalUnreadCount > 0)
                               Positioned(
                                 top: 10,
                                 right: 22,
-                                child: _BadgePill(text: '4', size: 14),
+                                child: _BadgePill(
+                                  text: context.watch<ChatProvider>().totalUnreadCount > 99
+                                      ? '99+'
+                                      : context.watch<ChatProvider>().totalUnreadCount.toString(),
+                                  size: 14,
+                                ),
                               ),
                           ],
                         ),
@@ -383,6 +483,7 @@ class _SideNavigation extends StatelessWidget {
   final VoidCallback onToggleExpand;
   final ThemeProvider themeProvider;
   final bool isEmployee;
+  final String notificationBadge;
 
   const _SideNavigation({
     required this.currentIndex,
@@ -392,6 +493,7 @@ class _SideNavigation extends StatelessWidget {
     required this.onToggleExpand,
     required this.themeProvider,
     required this.isEmployee,
+    required this.notificationBadge,
   });
 
   @override
@@ -399,6 +501,9 @@ class _SideNavigation extends StatelessWidget {
     final bgColor = isDark
         ? const Color(0xFF111C2E)
         : const Color(0xFF111C2E); // Dark blue like in image
+
+    final unreadChats = context.watch<ChatProvider>().totalUnreadCount;
+    final chatBadge = unreadChats > 0 ? (unreadChats > 99 ? '99+' : unreadChats.toString()) : null;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -494,7 +599,7 @@ class _SideNavigation extends StatelessWidget {
                   isSelected: currentIndex == 4,
                   onTap: () => onIndexChanged(4),
                   isExpanded: isExpanded,
-                  badge: '4',
+                  badge: chatBadge,
                 ),
                 _SideNavItem(
                   icon: LucideIcons.bell,
@@ -502,7 +607,7 @@ class _SideNavigation extends StatelessWidget {
                   isSelected: currentIndex == 5,
                   onTap: () => onIndexChanged(5),
                   isExpanded: isExpanded,
-                  badge: '3',
+                  badge: notificationBadge,
                 ),
                 const SizedBox(height: 16),
                 if (isExpanded && !isEmployee) _CategoryLabel('QUẢN LÝ'),
@@ -513,7 +618,8 @@ class _SideNavigation extends StatelessWidget {
                     isSelected: currentIndex == 6,
                     onTap: () => onIndexChanged(6),
                     isExpanded: isExpanded,
-                  ),                const SizedBox(height: 16),
+                  ),
+                const SizedBox(height: 16),
                 const Divider(color: Colors.white10),
                 const SizedBox(height: 16),
 
@@ -621,6 +727,7 @@ class _SideNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final activeColor = AppColors.primary;
     final inactiveColor = Colors.white.withValues(alpha: 0.6);
+    final visibleBadge = badge != null && badge != '0';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
@@ -656,7 +763,7 @@ class _SideNavItem extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (badge != null)
+                if (visibleBadge)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 6,
@@ -685,8 +792,6 @@ class _SideNavItem extends StatelessWidget {
     );
   }
 }
-
-
 
 class _UserProfile extends StatelessWidget {
   final bool isExpanded;
@@ -806,6 +911,7 @@ class _BadgeIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final showBadge = badge != '0';
     return Stack(
       clipBehavior: Clip.none,
       children: [
@@ -814,11 +920,12 @@ class _BadgeIconButton extends StatelessWidget {
           onPressed: onPressed,
           tooltip: tooltip,
         ),
-        Positioned(
-          right: 10,
-          top: 10,
-          child: _BadgePill(text: badge, size: 16),
-        ),
+        if (showBadge)
+          Positioned(
+            right: 10,
+            top: 10,
+            child: _BadgePill(text: badge, size: 16),
+          ),
       ],
     );
   }

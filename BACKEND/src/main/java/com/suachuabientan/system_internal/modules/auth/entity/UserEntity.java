@@ -1,7 +1,7 @@
 package com.suachuabientan.system_internal.modules.auth.entity;
 
-import com.suachuabientan.system_internal.modules.UserRole;
-import com.suachuabientan.system_internal.modules.UserStatus;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.common.model.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;

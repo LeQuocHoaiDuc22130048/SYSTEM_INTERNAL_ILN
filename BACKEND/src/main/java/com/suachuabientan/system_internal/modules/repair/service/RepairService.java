@@ -1,6 +1,6 @@
 package com.suachuabientan.system_internal.modules.repair.service;
 
-import com.suachuabientan.system_internal.modules.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.common.util.OrderCodeGenerator;

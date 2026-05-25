@@ -1,8 +1,8 @@
 package com.suachuabientan.system_internal.modules.auth.service;
 
-import com.suachuabientan.system_internal.modules.ApprovalAction;
-import com.suachuabientan.system_internal.modules.UserRole;
-import com.suachuabientan.system_internal.modules.UserStatus;
+import com.suachuabientan.system_internal.modules.auth.enums.ApprovalAction;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;

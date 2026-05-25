@@ -26,18 +26,24 @@ class ApiClient {
 
   static List<String> get _baseUrlCandidates {
     if (_configuredBaseUrl.isNotEmpty) return [_configuredBaseUrl];
-    if (kIsWeb) return ['http://localhost:8888'];
+    if (kIsWeb) return ['http://192.168.1.152:8888'];
     if (defaultTargetPlatform == TargetPlatform.android) {
       return [
+        'http://192.168.1.152:8888',
         'http://127.0.0.1:8888',
         'http://10.0.2.2:8888',
         'http://10.0.3.2:8888',
       ];
     }
-    return ['http://localhost:8888'];
+    return ['http://192.168.1.152:8888'];
   }
 
   String? accessToken;
+  String? refreshToken;
+  bool _isRefreshing = false;
+  String? _lastSuccessfulBaseUrl;
+
+  String get activeBaseUrl => _lastSuccessfulBaseUrl ?? baseUrl;
 
   Uri uri(String path, [Map<String, dynamic>? queryParameters]) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
@@ -126,6 +132,7 @@ class ApiClient {
       try {
         response = await request(requestUri).timeout(_timeout);
         stopwatch.stop();
+        _lastSuccessfulBaseUrl = candidateBaseUrl;
         break;
       } catch (error) {
         stopwatch.stop();
@@ -145,17 +152,44 @@ class ApiClient {
       );
     }
 
-    final decoded = _decode(response.body);
+    http.Response finalResponse = response;
+    final decoded = _decode(finalResponse.body);
     final message = _messageFrom(decoded);
     _log(
-      '$method $requestUri -> ${response.statusCode} in '
+      '$method $requestUri -> ${finalResponse.statusCode} in '
       '${stopwatch.elapsedMilliseconds}ms',
     );
 
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      _log('$method $requestUri error: ${message ?? response.body}');
+    if (finalResponse.statusCode < 200 || finalResponse.statusCode >= 300) {
+      if ((finalResponse.statusCode == 401 || finalResponse.statusCode == 403) &&
+          path != '/api/v1/auth/refresh' &&
+          refreshToken != null) {
+        final success = await _tryRefreshToken();
+        if (success) {
+          try {
+            _log('Retrying $method $requestUri after token refresh');
+            finalResponse = await request(requestUri).timeout(_timeout);
+            final decodedRetry = _decode(finalResponse.body);
+            final messageRetry = _messageFrom(decodedRetry);
+            _log(
+              'Retry $method $requestUri -> ${finalResponse.statusCode} in '
+              '${stopwatch.elapsedMilliseconds}ms',
+            );
+            if (finalResponse.statusCode >= 200 && finalResponse.statusCode < 300) {
+              if (decodedRetry is Map<String, dynamic> && decodedRetry.containsKey('data')) {
+                return decodedRetry['data'];
+              }
+              return decodedRetry;
+            }
+          } catch (e) {
+            _log('Retry failed: $e');
+          }
+        }
+      }
+
+      _log('$method $requestUri error: ${message ?? finalResponse.body}');
       throw ApiException(
-        response.statusCode,
+        finalResponse.statusCode,
         message ?? 'Yêu cầu không thành công. Vui lòng thử lại.',
       );
     }
@@ -165,6 +199,43 @@ class ApiClient {
     }
 
     return decoded;
+  }
+
+  Future<bool> _tryRefreshToken() async {
+    if (_isRefreshing) return false;
+    _isRefreshing = true;
+    _log('Attempting to refresh token...');
+    try {
+      final refreshUri = Uri.parse('$activeBaseUrl/api/v1/auth/refresh');
+      final response = await http.post(
+        refreshUri,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'refreshToken': refreshToken,
+        }),
+      ).timeout(_timeout);
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {
+          final data = decoded['data'];
+          if (data is Map<String, dynamic>) {
+            accessToken = data['accessToken']?.toString();
+            refreshToken = data['refreshToken']?.toString();
+            _log('Token refresh successful!');
+            return true;
+          }
+        }
+      }
+      _log('Token refresh failed: status=${response.statusCode}');
+    } catch (e) {
+      _log('Token refresh error: $e');
+    } finally {
+      _isRefreshing = false;
+    }
+    return false;
   }
 
   Uri uriFor(

@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
+import '../utils/api_client.dart';
 import '../utils/network_provider.dart';
 import '../utils/pending_sync_provider.dart';
 import '../utils/backend_data_provider.dart';
@@ -288,7 +289,28 @@ class _AttendancePageState extends State<AttendancePage>
       return;
     }
 
-    _showSnackBar('Check-in thành công, đã cập nhật cho admin.', AppColors.success);
+    try {
+      final backend = context.read<BackendDataProvider>();
+      final data = await backend.api.post(
+        '/api/v1/attendance/check',
+        body: {
+          'deviceId': 'flutter-mobile',
+          'note': 'Cham cong bang khuon mat tu ung dung',
+        },
+      );
+      await backend.loadAttendance();
+      if (!mounted) return;
+
+      final type = data is Map<String, dynamic> ? data['type']?.toString() : null;
+      final label = type == 'OUT' ? 'Check-out' : 'Check-in';
+      _showSnackBar('$label thành công, đã cập nhật backend.', AppColors.success);
+    } on ApiException catch (error) {
+      if (!mounted) return;
+      _showSnackBar(error.message, AppColors.error);
+    } catch (_) {
+      if (!mounted) return;
+      _showSnackBar('Không thể cập nhật chấm công lên backend.', AppColors.error);
+    }
   }
 
   void _showSnackBar(String message, Color color) {

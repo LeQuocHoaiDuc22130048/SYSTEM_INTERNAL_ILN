@@ -104,6 +104,11 @@ class BackendDataProvider extends ChangeNotifier {
     await loadPendingUsers();
   }
 
+  Future<void> updateEmployee(String id, Map<String, dynamic> data) async {
+    await api.patch('/api/v1/employees/$id', body: data);
+    await loadEmployees();
+  }
+
   Future<void> deleteBoard(Board board) async {
     await api.delete('/api/v1/boards/${board.id}');
     await loadBoards();

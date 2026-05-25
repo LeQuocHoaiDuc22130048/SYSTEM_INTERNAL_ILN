@@ -1,7 +1,7 @@
 package com.suachuabientan.system_internal.config;
 
-import com.suachuabientan.system_internal.modules.UserRole;
-import com.suachuabientan.system_internal.modules.UserStatus;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -84,8 +84,24 @@ public class DataInitializer implements ApplicationRunner {
     }
 
     private void initSuperAdmin() {
+        // Dọn dẹp tài khoản lỗi có username trống
+        userRepository.findByUsernameAndIsDeletedFalse("").ifPresent(user -> {
+            userRepository.delete(user);
+            log.info("✓ Đã dọn dẹp tài khoản SUPER_ADMIN lỗi (username trống)");
+        });
+
+        if (!StringUtils.hasText(superAdminUsername)) {
+            log.warn("⚠ SUPER_ADMIN username không được cấu hình — bỏ qua tạo SUPER_ADMIN.");
+            return;
+        }
+
         if (userRepository.existsByUsernameAndIsDeletedFalse(superAdminUsername)) {
             log.info("✓ SUPER_ADMIN '{}' đã tồn tại — bỏ qua.", superAdminUsername);
+            return;
+        }
+
+        if (!StringUtils.hasText(superAdminPassword)) {
+            log.warn("⚠ SUPER_ADMIN password không được cấu hình — bỏ qua tạo SUPER_ADMIN.");
             return;
         }
 

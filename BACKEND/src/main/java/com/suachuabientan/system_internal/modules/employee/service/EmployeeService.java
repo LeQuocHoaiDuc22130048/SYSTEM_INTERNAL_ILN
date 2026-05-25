@@ -1,7 +1,7 @@
 package com.suachuabientan.system_internal.modules.employee.service;
 
-import com.suachuabientan.system_internal.modules.UserRole;
-import com.suachuabientan.system_internal.modules.UserStatus;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.modules.attendance.entity.AttendanceRecord;
@@ -69,6 +69,14 @@ public class EmployeeService {
         if (StringUtils.hasText(request.phone())) user.setPhone(request.phone());
         if (StringUtils.hasText(request.address())) user.setAddress(request.address());
         if (StringUtils.hasText(request.avatarUrl())) user.setAvatarUrl(request.avatarUrl());
+        if (StringUtils.hasText(request.role()) && isManager) {
+            try {
+                UserRole newRole = UserRole.valueOf(request.role().toUpperCase());
+                user.setRole(newRole);
+            } catch (IllegalArgumentException e) {
+                throw new BusinessException("Vai trò không hợp lệ: " + request.role(), 400);
+            }
+        }
 
         log.info("Cập nhật nhân viên: targetId={}, by={}", targetId, requesterId);
         return toDetailResponse(userRepository.save(user));
