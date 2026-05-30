@@ -124,7 +124,7 @@ class _Header extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Thong bao',
+                'Thông báo',
                 style: TextStyle(
                   fontSize: 24,
                   height: 1.2,
@@ -137,8 +137,8 @@ class _Header extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 unreadCount > 0
-                    ? '$unreadCount thong bao chua doc'
-                    : 'Khong co thong bao moi',
+                    ? '$unreadCount thông báo chưa đọc'
+                    : 'Không có thông báo mới',
                 style: TextStyle(
                   fontSize: 13,
                   color: isDark
@@ -153,7 +153,7 @@ class _Header extends StatelessWidget {
           TextButton.icon(
             onPressed: onMarkAllAsRead,
             icon: const Icon(LucideIcons.checkCheck, size: 14),
-            label: const Text('Doc tat ca'),
+            label: const Text('Đọc tất cả'),
           ),
       ],
     );
@@ -401,7 +401,7 @@ class _ErrorState extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: onRetry,
               icon: const Icon(LucideIcons.refreshCw, size: 15),
-              label: const Text('Thu lai'),
+              label: const Text('Thử lại'),
             ),
           ],
         ),
@@ -431,7 +431,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             const Text(
-              'Ban khong co thong bao nao',
+              'Bạn không có thông báo nào',
               style: TextStyle(fontSize: 14),
             ),
           ],

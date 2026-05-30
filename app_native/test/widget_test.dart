@@ -1,8 +1,13 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 import 'package:system_internal_likenew/main.dart';
 import 'package:system_internal_likenew/utils/auth_provider.dart';
+import 'package:system_internal_likenew/utils/api_client.dart';
 import 'package:system_internal_likenew/utils/backend_data_provider.dart';
 import 'package:system_internal_likenew/utils/notification_provider.dart';
 import 'package:system_internal_likenew/utils/chat_provider.dart';
@@ -15,40 +20,31 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
+    final auth = AuthProvider(
+      apiClient: ApiClient(
+        client: MockClient(
+          (_) async => http.Response(jsonEncode({'data': []}), 200),
+        ),
+      ),
+    );
+    auth.api.accessToken = 'widget-test-token';
 
     await tester.pumpWidget(
       MultiProvider(
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
-          ChangeNotifierProvider(create: (_) => AuthProvider()),
-          ChangeNotifierProxyProvider<AuthProvider, BackendDataProvider>(
-            create: (context) =>
-                BackendDataProvider(api: context.read<AuthProvider>().api),
-            update: (_, auth, previous) =>
-                previous ?? BackendDataProvider(api: auth.api),
+          ChangeNotifierProvider.value(value: auth),
+          ChangeNotifierProvider(
+            create: (_) => BackendDataProvider(api: auth.api),
           ),
-          ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
-            create: (context) =>
-                NotificationProvider(api: context.read<AuthProvider>().api),
-            update: (_, auth, previous) {
-              final provider = previous ?? NotificationProvider(api: auth.api);
-              provider.bindAuth(auth);
-              return provider;
-            },
+          ChangeNotifierProvider(
+            create: (_) => NotificationProvider(api: auth.api),
           ),
-          ChangeNotifierProxyProvider2<AuthProvider, NotificationProvider, ChatProvider>(
+          ChangeNotifierProvider(
             create: (context) => ChatProvider(
-              api: context.read<AuthProvider>().api,
+              api: auth.api,
               notificationProvider: context.read<NotificationProvider>(),
             ),
-            update: (_, auth, notifications, previous) {
-              final provider = previous ?? ChatProvider(
-                api: auth.api,
-                notificationProvider: notifications,
-              );
-              provider.updateAuthAndNotification(auth, notifications);
-              return provider;
-            },
           ),
           ChangeNotifierProvider(create: (_) => NetworkProvider()),
           ChangeNotifierProxyProvider<NetworkProvider, PendingSyncProvider>(
@@ -66,7 +62,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Xin chào, Minh 👋'), findsOneWidget);
-    expect(find.text('Tổng đơn hôm nay'), findsOneWidget);
-    expect(find.text('Thống kê đơn theo tuần'), findsOneWidget);
+    expect(find.text('Đơn của tôi'), findsOneWidget);
+    expect(find.text('Đơn gần đây'), findsOneWidget);
   });
 }

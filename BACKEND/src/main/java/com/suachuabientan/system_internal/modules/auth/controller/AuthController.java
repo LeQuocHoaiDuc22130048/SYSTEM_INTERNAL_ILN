@@ -7,6 +7,7 @@ import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswor
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.RequestPasswordResetOtpRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.service.AuthService;
@@ -58,7 +59,15 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(authService.refreshToken(request)));
     }
 
-    @Operation(summary = "Dat lai mat khau khi quen mat khau")
+    @Operation(summary = "Gui ma OTP dat lai mat khau qua thong bao day cua thiet bi")
+    @PostMapping("/forgot-password/otp")
+    public ResponseEntity<ApiResponse<Void>> requestForgotPasswordOtp(
+            @Valid @RequestBody RequestPasswordResetOtpRequest request) {
+        authService.requestPasswordResetOtp(request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Da gui ma OTP"));
+    }
+
+    @Operation(summary = "Dat lai mat khau sau khi xac minh OTP")
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {

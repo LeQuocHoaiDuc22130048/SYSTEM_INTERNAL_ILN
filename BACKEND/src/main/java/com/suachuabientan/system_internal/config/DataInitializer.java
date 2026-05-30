@@ -86,7 +86,8 @@ public class DataInitializer implements ApplicationRunner {
     private void initSuperAdmin() {
         // Dọn dẹp tài khoản lỗi có username trống
         userRepository.findByUsernameAndIsDeletedFalse("").ifPresent(user -> {
-            userRepository.delete(user);
+            user.softDelete(null);
+            userRepository.save(user);
             log.info("✓ Đã dọn dẹp tài khoản SUPER_ADMIN lỗi (username trống)");
         });
 

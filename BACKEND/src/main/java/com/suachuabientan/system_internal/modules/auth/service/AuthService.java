@@ -8,6 +8,7 @@ import com.suachuabientan.system_internal.common.exception.ResourceNotFoundExcep
 import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
 import com.suachuabientan.system_internal.common.util.JwtUtil;
 import com.suachuabientan.system_internal.modules.auth.entity.RefreshToken;
+import com.suachuabientan.system_internal.modules.auth.entity.PasswordResetOtp;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.entity.UserRegistrationRequestEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
@@ -15,10 +16,12 @@ import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswor
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.RequestPasswordResetOtpRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.RefreshTokenRepository;
+import com.suachuabientan.system_internal.modules.auth.repository.PasswordResetOtpRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRegistrationRequestRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
@@ -34,13 +37,16 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.security.SecureRandom;
 import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
+    private static final SecureRandom OTP_RANDOM = new SecureRandom();
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -51,6 +57,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRegistrationRequestRepository userRegistrationRequestRepository;
     private final NotificationService notificationService;
+    private final PasswordResetOtpRepository passwordResetOtpRepository;
 
     /**
      * Đăng ký tài khoản mới — trạng thái PENDING_APPROVAL, chưa được login (SEC-03).
@@ -155,22 +162,71 @@ public class AuthService {
     }
 
     @Transactional
+    public void requestPasswordResetOtp(RequestPasswordResetOtpRequest request) {
+        UserEntity user = findPasswordResetUser(request.username(), request.phone());
+        passwordResetOtpRepository.invalidateActiveForUser(user.getId());
+
+        String otpCode = String.format("%06d", OTP_RANDOM.nextInt(1_000_000));
+        passwordResetOtpRepository.save(PasswordResetOtp.builder()
+                .userId(user.getId())
+                .codeHash(passwordEncoder.encode(otpCode))
+                .expiresAt(Instant.now().plus(5, ChronoUnit.MINUTES))
+                .attempts(0)
+                .used(false)
+                .createdAt(Instant.now())
+                .build());
+
+        notificationService.sendToUser(
+                user.getId(),
+                NotificationType.PASSWORD_RESET_OTP,
+                "Ma xac minh dat lai mat khau",
+                "Ma OTP cua ban la " + otpCode + ". Ma co hieu luc trong 5 phut.",
+                "PASSWORD_RESET",
+                user.getId().toString(),
+                true);
+        log.info("Password reset OTP issued for userId={}", user.getId());
+    }
+
+    @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
         if (!request.newPassword().equals(request.confirmPassword())) {
             throw new BusinessException("Mat khau xac nhan khong khop", 400);
         }
 
-        UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(request.username())
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
+        UserEntity user = findPasswordResetUser(request.username(), request.phone());
+        PasswordResetOtp otp = passwordResetOtpRepository
+                .findFirstByUserIdAndUsedFalseOrderByCreatedAtDesc(user.getId())
+                .orElseThrow(() -> new BusinessException("Vui long yeu cau ma OTP moi", 400));
 
-        if (user.getPhone() == null || !user.getPhone().equals(request.phone())) {
-            throw new BusinessException("So dien thoai xac minh khong dung", 400);
+        if (!otp.isUsable()) {
+            throw new BusinessException("Ma OTP khong con hieu luc. Vui long yeu cau ma moi", 400);
         }
 
+        if (!passwordEncoder.matches(request.otp(), otp.getCodeHash())) {
+            otp.setAttempts(otp.getAttempts() + 1);
+            if (otp.getAttempts() >= 5) {
+                otp.setUsed(true);
+            }
+            passwordResetOtpRepository.save(otp);
+            throw new BusinessException("Ma OTP khong dung", 400);
+        }
+
+        otp.setUsed(true);
+        passwordResetOtpRepository.save(otp);
         user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
         userRepository.save(user);
         refreshTokenRepository.revokeAllByUserId(user.getId());
         log.info("Forgot password: reset password and revoked sessions for userId={}", user.getId());
+    }
+
+    private UserEntity findPasswordResetUser(String username, String phone) {
+        UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(username)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
+
+        if (user.getPhone() == null || !user.getPhone().equals(phone)) {
+            throw new BusinessException("So dien thoai xac minh khong dung", 400);
+        }
+        return user;
     }
 
 
@@ -184,6 +240,7 @@ public class AuthService {
                 ifPresent(t -> {
                     t.revoke();
                     refreshTokenRepository.save(t);
+                    notificationService.clearDeviceToken(t.getUserId());
                     log.info("Logout: revoke tokenid={}", t.getId());
                 });
     }
@@ -195,6 +252,7 @@ public class AuthService {
     @Transactional
     public void logoutAllDevices(UUID userId) {
         refreshTokenRepository.revokeAllByUserId(userId);
+        notificationService.clearDeviceToken(userId);
         log.info("Logout all devices: userId={}", userId);
     }
 
@@ -307,8 +365,8 @@ public class AuthService {
         notificationService.sendToRoles(
                 managerRoles(),
                 NotificationType.ACCOUNT_PENDING,
-                "Tai khoan moi cho duyet",
-                STR."\{user.getFullName()} vua dang ky tai khoan va dang cho duyet.",
+                "Tài khoản mới cho duyệt",
+                STR."\{user.getFullName()} vừa đăng ký tài khoản và đang chờ duyệt.",
                 "USER",
                 user.getId().toString(),
                 false);
@@ -318,10 +376,10 @@ public class AuthService {
         notificationService.sendToUser(
                 user.getId(),
                 approved ? NotificationType.ACCOUNT_APPROVED : NotificationType.ACCOUNT_REJECTED,
-                approved ? "Tai khoan da duoc duyet" : "Tai khoan bi tu choi",
+                approved ? "Tài khoản đã được duyệt" : "Tài khoản bị từ chối",
                 approved
-                        ? "Tai khoan cua ban da duoc duyet. Ban co the dang nhap he thong."
-                        : STR."Tai khoan cua ban bi tu choi. Ly do: \{user.getRejectionReason()}",
+                       ? "Tài khoản của bạn đã được duyệt. Bạn có thể đăng nhập hệ thống."
+                        : STR."Tài khoản của bạn bị từ chối. Lý do: \{user.getRejectionReason()}",
                 "USER",
                 user.getId().toString(),
                 true);

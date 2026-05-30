@@ -9,6 +9,9 @@ import lombok.*;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.suachuabientan.system_internal.modules.repair.enums.RepairMediaType;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 
 @Entity
 @Table(name = "repair_images")
@@ -23,6 +26,11 @@ public class RepairImage extends BaseEntity {
 
     @Column(name = "image_url", nullable = false, length = 500)
     private String imageUrl;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "media_type", nullable = false, length = 20)
+    @Builder.Default
+    private RepairMediaType mediaType = RepairMediaType.IMAGE;
 
     /** VD: "Ảnh trước sửa", "Ảnh sau sửa", "Ảnh lỗi" */
     @Column(length = 255)

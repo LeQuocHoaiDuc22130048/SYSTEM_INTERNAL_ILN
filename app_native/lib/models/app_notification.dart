@@ -59,10 +59,10 @@ class AppNotification {
     final now = DateTime.now();
     final diff = now.difference(local);
 
-    if (diff.inMinutes < 1) return 'Vua xong';
-    if (diff.inHours < 1) return '${diff.inMinutes} phut truoc';
-    if (diff.inDays < 1) return '${diff.inHours} gio truoc';
-    if (diff.inDays == 1) return 'Hom qua';
+    if (diff.inMinutes < 1) return 'Vừa xong';
+    if (diff.inHours < 1) return '${diff.inMinutes} phút trước';
+    if (diff.inDays < 1) return '${diff.inHours} giờ trước';
+    if (diff.inDays == 1) return 'Hôm qua';
     return DateFormat('dd/MM/yyyy HH:mm').format(local);
   }
 }

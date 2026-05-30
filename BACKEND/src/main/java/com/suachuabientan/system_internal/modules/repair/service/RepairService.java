@@ -1,6 +1,7 @@
 package com.suachuabientan.system_internal.modules.repair.service;
 
 import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.common.util.OrderCodeGenerator;
@@ -16,6 +17,7 @@ import com.suachuabientan.system_internal.modules.repair.entity.RepairImage;
 import com.suachuabientan.system_internal.modules.repair.entity.RepairOrder;
 import com.suachuabientan.system_internal.modules.repair.entity.RepairTimeline;
 import com.suachuabientan.system_internal.modules.repair.enums.RepairStatus;
+import com.suachuabientan.system_internal.modules.repair.enums.RepairMediaType;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairImageRepository;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairTimelineRepository;
@@ -27,6 +29,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
@@ -43,6 +46,7 @@ public class RepairService {
     private final UserRepository userRepository;
     private final OrderCodeGenerator orderCodeGenerator;
     private final NotificationService notificationService;
+    private final RepairMediaStorageService repairMediaStorageService;
 
     // ── Tạo đơn ──────────────────────────────────────────────
 
@@ -102,6 +106,12 @@ public class RepairService {
         UserEntity technician = userRepository.findByIdAndIsDeletedFalse(request.technicianId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         STR."Không tìm thấy kỹ thuật viên: \{request.technicianId()}"));
+        if (technician.getRole() != UserRole.EMPLOYEE) {
+            throw new BusinessException("Chỉ nhân viên mới được phân công sửa chữa");
+        }
+        if (technician.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException("Nhân viên được phân công phải đang hoạt động");
+        }
 
         UUID previousAssignee = order.getAssignedTo();
         order.setAssignedTo(request.technicianId());
@@ -200,6 +210,7 @@ public class RepairService {
         RepairImage image = RepairImage.builder()
                 .orderId(orderId)
                 .imageUrl(imageUrl)
+                .mediaType(RepairMediaType.IMAGE)
                 .caption(caption)
                 .uploadedBy(uploadedBy)
                 .uploadedAt(Instant.now())
@@ -210,7 +221,30 @@ public class RepairService {
                 caption != null ? caption : "Đính kèm ảnh mới", uploadedBy);
 
         return new RepairOrderResponse.ImageInfo(
-                saved.getId(), saved.getImageUrl(), saved.getCaption(), saved.getUploadedAt());
+                saved.getId(), saved.getImageUrl(), saved.getMediaType().name(), saved.getCaption(), saved.getUploadedAt());
+    }
+
+    @Transactional
+    public RepairOrderResponse.ImageInfo addMedia(
+            UUID orderId, MultipartFile file, RepairMediaType mediaType, String caption, UUID uploadedBy) {
+        findOrderById(orderId);
+        RepairMediaStorageService.StoredMedia storedMedia = repairMediaStorageService.store(file, mediaType);
+
+        RepairImage media = RepairImage.builder()
+                .orderId(orderId)
+                .imageUrl(storedMedia.publicUrl())
+                .mediaType(mediaType)
+                .caption(caption)
+                .uploadedBy(uploadedBy)
+                .uploadedAt(Instant.now())
+                .build();
+
+        RepairImage saved = repairImageRepository.save(media);
+        String action = mediaType == RepairMediaType.VIDEO ? "Upload video" : "Upload anh";
+        addTimeline(orderId, action, caption != null ? caption : storedMedia.originalFileName(), uploadedBy);
+
+        return new RepairOrderResponse.ImageInfo(
+                saved.getId(), saved.getImageUrl(), saved.getMediaType().name(), saved.getCaption(), saved.getUploadedAt());
     }
 
     // ── Huỷ đơn ──────────────────────────────────────────────
@@ -270,7 +304,7 @@ public class RepairService {
                 .findByOrderIdAndIsDeletedFalseOrderByUploadedAtAsc(order.getId())
                 .stream()
                 .map(img -> new RepairOrderResponse.ImageInfo(
-                        img.getId(), img.getImageUrl(), img.getCaption(), img.getUploadedAt()))
+                        img.getId(), img.getImageUrl(), img.getMediaType().name(), img.getCaption(), img.getUploadedAt()))
                 .toList();
 
         return new RepairOrderResponse(
@@ -318,8 +352,8 @@ public class RepairService {
         notificationService.sendToRoles(
                 managerRoles(),
                 NotificationType.NEW_REPAIR_ORDER,
-                "Don sua chua moi",
-                STR."Don \{order.getOrderCode()} cua khach \{order.getCustomerName()} dang cho phan cong.",
+                "Đơn sửa chữa mới",
+                STR."Đơn \{order.getOrderCode()} của khách \{order.getCustomerName()} đang chờ phân công.",
                 "REPAIR_ORDER",
                 order.getId().toString(),
                 true);
@@ -329,8 +363,8 @@ public class RepairService {
         notificationService.sendToUser(
                 technician.getId(),
                 NotificationType.ORDER_ASSIGNED,
-                "Ban duoc phan cong don moi",
-                STR."Don \{order.getOrderCode()} - \{order.getDeviceName()} da duoc phan cong cho ban.",
+                "Bạn được phân công đơn mới",
+                STR."Đơn \{order.getOrderCode()} - \{order.getDeviceName()} đã được phân công cho bạn.",
                 "REPAIR_ORDER",
                 order.getId().toString(),
                 true);
@@ -341,8 +375,8 @@ public class RepairService {
             notificationService.sendToUser(
                     order.getReceivedBy(),
                     NotificationType.ORDER_COMPLETED,
-                    "Don sua chua da hoan thanh",
-                    STR."Don \{order.getOrderCode()} da sua xong va san sang giao khach.",
+                    "Đơn sửa chữa đã hoàn thành",
+                    STR."Đơn \{order.getOrderCode()} đã sửa xong và sẵn sàng giao khách.",
                     "REPAIR_ORDER",
                     order.getId().toString(),
                     true);
@@ -353,8 +387,8 @@ public class RepairService {
             notificationService.sendToUser(
                     order.getAssignedTo(),
                     NotificationType.ORDER_STATUS_CHANGED,
-                    "Trang thai don da thay doi",
-                    STR."Don \{order.getOrderCode()} chuyen tu \{oldStatus.name()} sang \{order.getStatus().name()}.",
+                    "Trạng thái đơn đã thay đổi",
+                    STR."Đơn \{order.getOrderCode()} chuyển từ \{oldStatus.name()} sang \{order.getStatus().name()}.",
                     "REPAIR_ORDER",
                     order.getId().toString(),
                     false);
@@ -366,7 +400,7 @@ public class RepairService {
                 order.getAssignedTo(),
                 NotificationType.ORDER_PRIORITY_CHANGED,
                 "Uu tien don da thay doi",
-                STR."Don \{order.getOrderCode()} duoc cap nhat muc uu tien \{priority}.",
+                STR."Đơn \{order.getOrderCode()} được cập nhật mức ưu tiên \{priority}.",
                 "REPAIR_ORDER",
                 order.getId().toString(),
                 false);

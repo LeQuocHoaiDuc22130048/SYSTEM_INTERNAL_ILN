@@ -20,6 +20,7 @@ public record MessageResponse(
         }
         return switch (messageType) {
             case "IMAGE" -> "Da gui mot hinh anh";
+            case "VIDEO" -> "Da gui mot video";
             case "FILE" -> "Da gui mot tep dinh kem";
             default -> "Tin nhan moi";
         };

@@ -17,8 +17,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -65,6 +67,23 @@ public class MessagingController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(201).body(ApiResponse.created(
                 messagingService.sendMessage(conversationId, request, userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Gui anh, video hoac tep dinh kem vao cuoc tro chuyen")
+    @PostMapping(value = "/{conversationId}/messages/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<MessageResponse>> sendMediaMessage(
+            @PathVariable UUID conversationId,
+            @RequestPart("file") MultipartFile file,
+            @RequestParam(required = false) String content,
+            @RequestParam String messageType,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.status(201).body(ApiResponse.created(
+                messagingService.sendMediaMessage(
+                        conversationId,
+                        file,
+                        content,
+                        messageType,
+                        userDetails.getUserId())));
     }
 
     @Operation(summary = "Them thanh vien vao nhom")

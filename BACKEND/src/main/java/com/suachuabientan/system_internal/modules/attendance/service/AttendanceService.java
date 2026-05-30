@@ -4,6 +4,7 @@ import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.CheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.CreateScheduleRequest;
+import com.suachuabientan.system_internal.modules.attendance.dto.request.FaceCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.ManualCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.DailyAttendanceResponse;
@@ -45,10 +46,42 @@ public class AttendanceService {
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final WorkScheduleRepository workScheduleRepository;
     private final UserRepository userRepository;
+    private final FaceRecognitionService faceRecognitionService;
 
     @Transactional
     public AttendanceResponse check(UUID employeeId, CheckinRequest request) {
         UserEntity employee = findUser(employeeId);
+        return recordAttendance(employee, request.deviceId(), request.note(), null);
+    }
+
+    @Transactional
+    public AttendanceResponse faceCheck(UUID employeeId, FaceCheckinRequest request) {
+        UserEntity employee = findUser(employeeId);
+        if (!Boolean.TRUE.equals(employee.getFaceEnrolled()) || employee.getFaceEncoding() == null) {
+            throw new BusinessException("Nhân viên chưa đăng ký khuôn mặt", 400);
+        }
+
+        FaceRecognitionService.FaceVerificationResult verification = faceRecognitionService.verify(
+                employee.getFaceEncoding(),
+                request.faceImageBase64(),
+                request.imageContentType());
+        if (!verification.matched()) {
+            throw new BusinessException("Không xác minh được khuôn mặt", 403);
+        }
+
+        return recordAttendance(
+                employee,
+                request.deviceId(),
+                "Chấm công bằng khuôn mặt từ ứng dụng",
+                verification.confidence());
+    }
+
+    private AttendanceResponse recordAttendance(
+            UserEntity employee,
+            String deviceId,
+            String note,
+            Double confidenceScore) {
+        UUID employeeId = employee.getId();
         LocalDate today = LocalDate.now(BUSINESS_ZONE);
         Instant dayStart = startOfDay(today);
         Instant dayEnd = startOfDay(today.plusDays(1));
@@ -68,8 +101,9 @@ public class AttendanceService {
                 .employeeId(employeeId)
                 .type(nextType)
                 .checkTime(Instant.now())
-                .deviceId(request != null ? request.deviceId() : null)
-                .note(request != null ? request.note() : null)
+                .deviceId(deviceId)
+                .note(note)
+                .confidenceScore(confidenceScore)
                 .isValid(true)
                 .build();
 
@@ -124,7 +158,7 @@ public class AttendanceService {
         LocalDate startDate = from != null ? from : LocalDate.now(BUSINESS_ZONE).minusDays(30);
         LocalDate endDate = to != null ? to : LocalDate.now(BUSINESS_ZONE);
         if (endDate.isBefore(startDate)) {
-            throw new BusinessException("Ngay ket thuc phai sau hoac bang ngay bat dau");
+            throw new BusinessException("Ngày kết thúc phải sau hoặc bằng ngày bắt đầu");
         }
 
         return attendanceRecordRepository
@@ -160,7 +194,7 @@ public class AttendanceService {
     public WorkScheduleResponse createOrUpdateSchedule(CreateScheduleRequest request) {
         UserEntity employee = findUser(request.employeeId());
         if (!request.shiftEnd().isAfter(request.shiftStart())) {
-            throw new BusinessException("Gio ket thuc ca phai sau gio bat dau");
+            throw new BusinessException("Giờ kết thúc ca phải sau giờ bắt đầu");
         }
 
         WorkSchedule schedule = workScheduleRepository

@@ -30,6 +30,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.*;
@@ -47,6 +48,7 @@ public class MessagingService {
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
+    private final MessageMediaStorageService messageMediaStorageService;
 
     @Transactional(readOnly = true)
     public List<ConversationResponse> getMyConversations(UUID userId) {
@@ -66,7 +68,7 @@ public class MessagingService {
             UUID otherUserId = memberIds.stream()
                     .filter(memberId -> !memberId.equals(creatorId))
                     .findFirst()
-                    .orElseThrow(() -> new BusinessException("Cuoc tro chuyen DIRECT can mot thanh vien khac"));
+                    .orElseThrow(() -> new BusinessException("Cuộc trò chuyện DIRECT cần có một thành viên khác"));
             Optional<Conversation> existing = conversationRepository.findDirectConversation(creatorId, otherUserId);
             if (existing.isPresent()) {
                 return toConversationResponse(existing.get(), creatorId);
@@ -129,6 +131,31 @@ public class MessagingService {
     }
 
     @Transactional
+    public MessageResponse sendMediaMessage(
+            UUID conversationId,
+            MultipartFile file,
+            String content,
+            String type,
+            UUID senderId) {
+        ensureMember(conversationId, senderId);
+        MessageType messageType = parseMessageType(type);
+        if (messageType != MessageType.IMAGE
+                && messageType != MessageType.VIDEO
+                && messageType != MessageType.FILE) {
+            throw new BusinessException("Loại tin nhắn upload không hợp lệ: " + type);
+        }
+
+        MessageMediaStorageService.StoredMedia stored = messageMediaStorageService.store(file, messageType);
+        String effectiveContent = StringUtils.hasText(content)
+                ? content.trim()
+                : (messageType == MessageType.FILE ? stored.originalFileName() : null);
+        return sendMessage(
+                conversationId,
+                new SendMessageRequest(effectiveContent, stored.publicUrl(), messageType.name()),
+                senderId);
+    }
+
+    @Transactional
     public MessageResponse sendMessage(SendMessageWSRequest request, UUID senderId) {
         SendMessageRequest restRequest = new SendMessageRequest(
                 request.content(),
@@ -140,7 +167,7 @@ public class MessagingService {
     @Transactional
     public ConversationResponse addMembers(UUID conversationId, List<UUID> memberIds, UUID requesterId) {
         Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cuộc trò chuyện: " + conversationId));
         ensureGroupAdmin(conversation, requesterId);
 
         List<ConversationMember> newMembers = memberIds.stream()
@@ -166,12 +193,12 @@ public class MessagingService {
             UpdateConversationRequest request,
             UUID requesterId) {
         Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cuộc trò chuyện: " + conversationId));
         ensureGroupAdmin(conversation, requesterId);
 
         if (request.name() != null) {
             if (!StringUtils.hasText(request.name())) {
-                throw new BusinessException("Ten nhom khong duoc de trong");
+                throw new BusinessException("Tên nhóm không được để trống");
             }
             conversation.setName(request.name());
         }
@@ -185,10 +212,10 @@ public class MessagingService {
     @Transactional
     public ConversationResponse removeMember(UUID conversationId, UUID memberId, UUID requesterId) {
         Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cuộc trò chuyện: " + conversationId));
         ensureGroupAdmin(conversation, requesterId);
         if (requesterId.equals(memberId)) {
-            throw new BusinessException("Admin nhom dung endpoint roi nhom de tu roi khoi nhom");
+            throw new BusinessException("Admin nhóm dùng endpoint này để rời nhóm");
         }
         ensureMember(conversationId, memberId);
 
@@ -199,20 +226,20 @@ public class MessagingService {
     @Transactional
     public void leaveConversation(UUID conversationId, UUID userId) {
         Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cuộc trò chuyện: " + conversationId));
         ConversationMember member = ensureMember(conversationId, userId);
         if (conversation.getType() != ConversationType.GROUP) {
-            throw new BusinessException("Khong the roi khoi cuoc tro chuyen DIRECT");
+            throw new BusinessException("Không thể rời khỏi cuộc trò chuyện DIRECT");
         }
 
         List<ConversationMember> members = conversationMemberRepository.findByConversationId(conversationId);
         if (members.size() <= 1) {
-            throw new BusinessException("Khong the roi nhom khi chi con mot thanh vien");
+            throw new BusinessException("Không thể rời nhóm khi chỉ còn một thành viên");
         }
         boolean hasOtherAdmin = members.stream()
                 .anyMatch(other -> !other.getUserId().equals(userId) && Boolean.TRUE.equals(other.getIsAdmin()));
         if (Boolean.TRUE.equals(member.getIsAdmin()) && !hasOtherAdmin) {
-            throw new BusinessException("Can chuyen quyen admin cho thanh vien khac truoc khi roi nhom");
+            throw new BusinessException("Cần chuyển quyền admin cho thành viên khác trước khi rời nhóm");
         }
 
         conversationMemberRepository.deleteByConversationIdAndUserId(conversationId, userId);
@@ -267,7 +294,7 @@ public class MessagingService {
                 .forEach(userId -> notificationService.sendToUser(
                         userId,
                         NotificationType.NEW_MESSAGE,
-                        "Tin nhan moi",
+                        "Tin nhắn mới",
                         response.contentPreview(),
                         "CONVERSATION",
                         response.conversationId().toString(),
@@ -327,7 +354,7 @@ public class MessagingService {
     private ConversationResponse.MemberInfo toMemberInfo(ConversationMember member, UserEntity user) {
         return new ConversationResponse.MemberInfo(
                 member.getUserId(),
-                user != null ? user.getFullName() : "Khong xac dinh",
+                user != null ? user.getFullName() : "Không xác định",
                 user != null ? user.getEmployeeCode() : null,
                 user != null ? user.getAvatarUrl() : null,
                 member.getIsAdmin()
@@ -338,7 +365,7 @@ public class MessagingService {
         UserEntity sender = userRepository.findByIdAndIsDeletedFalse(message.getSenderId()).orElse(null);
         return new ConversationResponse.MessageInfo(
                 message.getId(),
-                sender != null ? sender.getFullName() : "Khong xac dinh",
+                sender != null ? sender.getFullName() : "Không xác định",
                 message.getContent(),
                 message.getMessageType().name(),
                 message.getSentAt()
@@ -365,25 +392,25 @@ public class MessagingService {
 
     private ConversationMember ensureMember(UUID conversationId, UUID userId) {
         conversationRepository.findByIdAndIsDeletedFalse(conversationId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy cuộc trò chuyện: " + conversationId));
         return conversationMemberRepository.findByConversationIdAndUserId(conversationId, userId)
-                .orElseThrow(() -> new BusinessException("Ban khong phai thanh vien cua cuoc tro chuyen nay", 403));
+                .orElseThrow(() -> new BusinessException("Bạn không phải là thành viên của cuộc trò chuyện này", 403));
     }
 
     private ConversationMember ensureGroupAdmin(Conversation conversation, UUID requesterId) {
         ConversationMember requester = ensureMember(conversation.getId(), requesterId);
         if (conversation.getType() != ConversationType.GROUP) {
-            throw new BusinessException("Thao tac nay chi ap dung cho cuoc tro chuyen nhom");
+            throw new BusinessException("Thao tác này chỉ áp dụng cho cuộc trò chuyện nhóm");
         }
         if (!Boolean.TRUE.equals(requester.getIsAdmin())) {
-            throw new BusinessException("Chi admin nhom moi co quyen thuc hien thao tac nay", 403);
+            throw new BusinessException("Chỉ admin nhóm mới có quyền thực hiện thao tác này", 403);
         }
         return requester;
     }
 
     private UserEntity findUser(UUID userId) {
         return userRepository.findByIdAndIsDeletedFalse(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
     }
 
     private void markMessageRead(UUID messageId, UUID userId) {
@@ -400,7 +427,7 @@ public class MessagingService {
         try {
             return ConversationType.valueOf(value);
         } catch (Exception ex) {
-            throw new BusinessException("Loai cuoc tro chuyen khong hop le: " + value);
+            throw new BusinessException("Loại cuộc trò chuyện không hợp lệ: " + value);
         }
     }
 
@@ -408,7 +435,7 @@ public class MessagingService {
         try {
             return MessageType.valueOf(value);
         } catch (Exception ex) {
-            throw new BusinessException("Loai tin nhan khong hop le: " + value);
+            throw new BusinessException("Loại tin nhắn không hợp lệ: " + value);
         }
     }
 
@@ -424,26 +451,28 @@ public class MessagingService {
             List<UUID> memberIds,
             UUID creatorId) {
         if (type == ConversationType.DIRECT && memberIds.size() != 2) {
-            throw new BusinessException("Cuoc tro chuyen DIRECT can dung 2 thanh vien");
+            throw new BusinessException("Cuộc trò chuyện DIRECT cần có 2 thành viên");
         }
         if (type == ConversationType.GROUP && memberIds.size() < 3) {
-            throw new BusinessException("Cuoc tro chuyen GROUP can it nhat 3 thanh vien gom nguoi tao");
+            throw new BusinessException("Cuộc trò chuyện GROUP cần ít nhất 3 thành viên gồm người tạo");
         }
         if (type == ConversationType.GROUP && !StringUtils.hasText(name)) {
-            throw new BusinessException("Ten nhom khong duoc de trong");
+            throw new BusinessException("Tên nhóm không được để trống");
         }
         if (!memberIds.contains(creatorId)) {
-            throw new BusinessException("Nguoi tao phai la thanh vien cua cuoc tro chuyen");
+            throw new BusinessException("Người tạo phải là thành viên của cuộc trò chuyện");
         }
     }
 
     private void validateMessageBody(String content, String mediaUrl, MessageType messageType) {
         if (messageType == MessageType.TEXT && !StringUtils.hasText(content)) {
-            throw new BusinessException("Tin nhan TEXT phai co noi dung");
+            throw new BusinessException("Tin nhắn TEXT phải có nội dung");
         }
-        if ((messageType == MessageType.IMAGE || messageType == MessageType.FILE)
+        if ((messageType == MessageType.IMAGE
+                || messageType == MessageType.VIDEO
+                || messageType == MessageType.FILE)
                 && !StringUtils.hasText(mediaUrl)) {
-            throw new BusinessException("Tin nhan media phai co mediaUrl");
+            throw new BusinessException("Tin nhắn media phải có mediaUrl");
         }
     }
 }

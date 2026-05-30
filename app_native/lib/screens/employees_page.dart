@@ -3,7 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../models/user.dart';
+import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
+import 'attendance_screen.dart';
 
 class EmployeesPage extends StatefulWidget {
   const EmployeesPage({super.key});
@@ -98,7 +100,9 @@ class _EmployeesPageState extends State<EmployeesPage> {
                             ),
                           ),
                           ElevatedButton.icon(
-                            onPressed: () => context.read<BackendDataProvider>().loadEmployees(),
+                            onPressed: () => context
+                                .read<BackendDataProvider>()
+                                .loadEmployees(),
                             icon: const Icon(Icons.refresh, size: 18),
                             label: const Text('Tải lại'),
                             style: ElevatedButton.styleFrom(
@@ -177,55 +181,63 @@ class _EmployeesPageState extends State<EmployeesPage> {
                   : backend.error != null
                   ? _buildErrorState(isDark, backend.error!)
                   : AnimatedBuilder(
-                animation: Listenable.merge([_searchQuery, _roleFilter]),
-                builder: (context, _) {
-                  final filtered = _filteredEmployees;
-                  if (filtered.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('👥', style: TextStyle(fontSize: 48)),
-                          const SizedBox(height: 16),
-                          Text(
-                            'Không tìm thấy nhân viên',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight,
+                      animation: Listenable.merge([_searchQuery, _roleFilter]),
+                      builder: (context, _) {
+                        final filtered = _filteredEmployees;
+                        if (filtered.isEmpty) {
+                          return Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Text(
+                                  '👥',
+                                  style: TextStyle(fontSize: 48),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'Không tìm thấy nhân viên',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return GridView.builder(
-                      padding: const EdgeInsets.all(16),
-                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: MediaQuery.sizeOf(context).width > 760
-                            ? 3
-                            : 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        mainAxisExtent: 245,
-                      ),
-                      itemCount: filtered.length,
-                      itemBuilder: (context, index) {
-                        return _buildEmployeeCard(filtered[index])
-                            .animate(target: 1)
-                            .fadeIn(duration: 400.ms, delay: (50 * index).ms)
-                            .slideY(
-                              begin: 0.2,
-                              end: 0,
-                              duration: 400.ms,
-                              delay: (50 * index).ms,
-                            );
+                          );
+                        }
+                        return GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate:
+                              SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount:
+                                    MediaQuery.sizeOf(context).width > 760
+                                    ? 3
+                                    : 2,
+                                mainAxisSpacing: 12,
+                                crossAxisSpacing: 12,
+                                mainAxisExtent: 245,
+                              ),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                            return _buildEmployeeCard(filtered[index])
+                                .animate(target: 1)
+                                .fadeIn(
+                                  duration: 400.ms,
+                                  delay: (50 * index).ms,
+                                )
+                                .slideY(
+                                  begin: 0.2,
+                                  end: 0,
+                                  duration: 400.ms,
+                                  delay: (50 * index).ms,
+                                );
+                          },
+                        );
                       },
-                    );
-                },
-              ),
+                    ),
             ),
           ],
         ),
@@ -253,7 +265,8 @@ class _EmployeesPageState extends State<EmployeesPage> {
             ),
             const SizedBox(height: 16),
             OutlinedButton.icon(
-              onPressed: () => context.read<BackendDataProvider>().loadEmployees(),
+              onPressed: () =>
+                  context.read<BackendDataProvider>().loadEmployees(),
               icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Thử lại'),
             ),
@@ -276,7 +289,9 @@ class _EmployeesPageState extends State<EmployeesPage> {
           onSelected: (selected) {
             _roleFilter.value = selected ? role : null;
           },
-          backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
+          backgroundColor: isDark
+              ? AppColors.surfaceDark
+              : const Color(0xFFF1F5F9),
           selectedColor: AppColors.primary,
           labelStyle: TextStyle(
             fontSize: 12,
@@ -479,6 +494,9 @@ class _EmployeeDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarColor = _getAvatarColor(user.role);
+    final currentRole = context.watch<AuthProvider>().role;
+    final canEnrollFace =
+        currentRole == UserRole.superAdmin || currentRole == UserRole.admin;
 
     return Container(
       decoration: BoxDecoration(
@@ -548,7 +566,12 @@ class _EmployeeDetailSheet extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Info
-              _buildInfoRow(context, Icons.badge_outlined, 'Mã NV', user.employeeId),
+              _buildInfoRow(
+                context,
+                Icons.badge_outlined,
+                'Mã NV',
+                user.employeeId,
+              ),
               _buildInfoRow(context, Icons.email_outlined, 'Email', user.email),
               if (user.phone != null)
                 _buildInfoRow(
@@ -569,6 +592,12 @@ class _EmployeeDetailSheet extends StatelessWidget {
                 Icons.circle,
                 'Trạng thái',
                 user.status == UserStatus.active ? 'Hoạt động' : 'Tạm ngưng',
+              ),
+              _buildInfoRow(
+                context,
+                Icons.face_retouching_natural,
+                'Khuôn mặt',
+                user.faceEnrolled ? 'Đã đăng ký' : 'Chưa đăng ký',
               ),
               const SizedBox(height: 24),
 
@@ -607,6 +636,35 @@ class _EmployeeDetailSheet extends StatelessWidget {
               const SizedBox(height: 24),
 
               // Actions
+              if (canEnrollFace) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: user.status != UserStatus.active
+                        ? null
+                        : () {
+                            Navigator.pop(context);
+                            showModalBottomSheet(
+                              context: context,
+                              isScrollControlled: true,
+                              backgroundColor: Colors.transparent,
+                              builder: (context) =>
+                                  _EnrollFaceSheet(user: user),
+                            );
+                          },
+                    icon: const Icon(Icons.face_retouching_natural),
+                    label: Text(
+                      user.faceEnrolled
+                          ? 'Cập nhật khuôn mặt'
+                          : 'Đăng ký khuôn mặt',
+                    ),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
               Row(
                 children: [
                   Expanded(
@@ -646,10 +704,15 @@ class _EmployeeDetailSheet extends StatelessWidget {
   }
 
   Widget _buildInfoRow(
-      BuildContext context, IconData icon, String label, String value) {
+    BuildContext context,
+    IconData icon,
+    String label,
+    String value,
+  ) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final secondaryColor =
-        isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
@@ -663,10 +726,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
               children: [
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: secondaryColor,
-                  ),
+                  style: TextStyle(fontSize: 12, color: secondaryColor),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -696,7 +756,9 @@ class _EmployeeDetailSheet extends StatelessWidget {
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+            color: isDark
+                ? AppColors.textPrimaryDark
+                : AppColors.textPrimaryLight,
           ),
         ),
         const SizedBox(height: 4),
@@ -733,149 +795,155 @@ class _AddEmployeeSheetState extends State<_AddEmployeeSheet> {
     return _KeyboardBottomPadding(
       child: Container(
         decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Thêm nhân viên mới',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                _buildTextField(
-                  context,
-                  label: 'Họ và tên',
-                  hint: 'Nhập họ và tên đầy đủ',
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  context,
-                  label: 'Email',
-                  hint: 'example@techfix.com',
-                  icon: Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  context,
-                  label: 'Số điện thoại',
-                  hint: '0901 234 567',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  context,
-                  label: 'Phòng ban',
-                  hint: 'Kỹ thuật, Kế toán...',
-                  icon: Icons.business_center_outlined,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Vai trò',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: UserRole.values.map((role) {
-                    final isSelected = _selectedRole == role;
-                    return ChoiceChip(
-                      label: Text(_getRoleLabel(role)),
-                      selected: isSelected,
-                      onSelected: (selected) {
-                        if (selected) {
-                          setState(() => _selectedRole = role);
-                        }
-                      },
-                      selectedColor: AppColors.primary,
-                      labelStyle: TextStyle(
-                        fontSize: 12,
-                        color: isSelected
-                            ? Colors.white
-                            : (isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight),
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(2),
                       ),
-                    );
-                  }).toList(),
-                ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () async {
-                            if (_formKey.currentState!.validate()) {
-                              setState(() => _isLoading = true);
-                              await Future.delayed(
-                                  const Duration(milliseconds: 1500));
-                              if (mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Thêm nhân viên thành công!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text('Tạo tài khoản'),
                   ),
-                ),
-              ],
+                  const SizedBox(height: 24),
+                  Text(
+                    'Thêm nhân viên mới',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  _buildTextField(
+                    context,
+                    label: 'Họ và tên',
+                    hint: 'Nhập họ và tên đầy đủ',
+                    icon: Icons.person_outline,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    label: 'Email',
+                    hint: 'example@techfix.com',
+                    icon: Icons.email_outlined,
+                    keyboardType: TextInputType.emailAddress,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    label: 'Số điện thoại',
+                    hint: '0901 234 567',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    label: 'Phòng ban',
+                    hint: 'Kỹ thuật, Kế toán...',
+                    icon: Icons.business_center_outlined,
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Vai trò',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: UserRole.values.map((role) {
+                      final isSelected = _selectedRole == role;
+                      return ChoiceChip(
+                        label: Text(_getRoleLabel(role)),
+                        selected: isSelected,
+                        onSelected: (selected) {
+                          if (selected) {
+                            setState(() => _selectedRole = role);
+                          }
+                        },
+                        selectedColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          fontSize: 12,
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading
+                          ? null
+                          : () async {
+                              if (_formKey.currentState!.validate()) {
+                                final navigator = Navigator.of(context);
+                                final messenger = ScaffoldMessenger.of(context);
+                                setState(() => _isLoading = true);
+                                await Future.delayed(
+                                  const Duration(milliseconds: 1500),
+                                );
+                                if (mounted) {
+                                  navigator.pop();
+                                  messenger.showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Thêm nhân viên thành công!',
+                                      ),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text('Tạo tài khoản'),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -961,9 +1029,7 @@ class _KeyboardBottomPadding extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedPadding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOutCubic,
       child: child,
@@ -1094,7 +1160,9 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
                     children: [
                       Expanded(
                         child: OutlinedButton(
-                          onPressed: _isLoading ? null : () => Navigator.pop(context),
+                          onPressed: _isLoading
+                              ? null
+                              : () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
@@ -1110,9 +1178,11 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
                                   if (_formKey.currentState!.validate()) {
                                     setState(() => _isLoading = true);
                                     final navigator = Navigator.of(context);
-                                    final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                    final scaffoldMessenger =
+                                        ScaffoldMessenger.of(context);
                                     try {
-                                      final cleanedPhone = _phoneCtrl.text.replaceAll(RegExp(r'\D'), '');
+                                      final cleanedPhone = _phoneCtrl.text
+                                          .replaceAll(RegExp(r'\D'), '');
                                       String roleKey;
                                       switch (_selectedRole) {
                                         case UserRole.superAdmin:
@@ -1128,20 +1198,28 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
                                           roleKey = 'EMPLOYEE';
                                           break;
                                       }
-                                      await context.read<BackendDataProvider>().updateEmployee(
-                                        widget.user.id,
-                                        {
-                                          'fullName': _nameCtrl.text.trim(),
-                                          'phone': cleanedPhone.isEmpty ? null : cleanedPhone,
-                                          'department': _departmentCtrl.text.trim().isEmpty ? null : _departmentCtrl.text.trim(),
-                                          'role': roleKey,
-                                        },
-                                      );
+                                      await context
+                                          .read<BackendDataProvider>()
+                                          .updateEmployee(widget.user.id, {
+                                            'fullName': _nameCtrl.text.trim(),
+                                            'phone': cleanedPhone.isEmpty
+                                                ? null
+                                                : cleanedPhone,
+                                            'department':
+                                                _departmentCtrl.text
+                                                    .trim()
+                                                    .isEmpty
+                                                ? null
+                                                : _departmentCtrl.text.trim(),
+                                            'role': roleKey,
+                                          });
                                       if (mounted) {
                                         navigator.pop();
                                         scaffoldMessenger.showSnackBar(
                                           const SnackBar(
-                                            content: Text('Cập nhật nhân viên thành công!'),
+                                            content: Text(
+                                              'Cập nhật nhân viên thành công!',
+                                            ),
                                             backgroundColor: AppColors.success,
                                             behavior: SnackBarBehavior.floating,
                                           ),
@@ -1173,8 +1251,9 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
                                   width: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    valueColor:
-                                        AlwaysStoppedAnimation<Color>(Colors.white),
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white,
+                                    ),
                                   ),
                                 )
                               : const Text('Lưu thay đổi'),
@@ -1209,7 +1288,7 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<UserRole>(
-          value: _selectedRole,
+          initialValue: _selectedRole,
           style: TextStyle(
             fontSize: 14,
             color: isDark
@@ -1217,7 +1296,10 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
                 : AppColors.textPrimaryLight,
           ),
           decoration: InputDecoration(
-            prefixIcon: const Icon(Icons.admin_panel_settings_outlined, size: 20),
+            prefixIcon: const Icon(
+              Icons.admin_panel_settings_outlined,
+              size: 20,
+            ),
             filled: true,
             fillColor: isDark ? AppColors.surfaceDark : const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
@@ -1243,14 +1325,8 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
               value: UserRole.employee,
               child: Text('Nhân viên'),
             ),
-            DropdownMenuItem(
-              value: UserRole.manager,
-              child: Text('Quản lý'),
-            ),
-            DropdownMenuItem(
-              value: UserRole.admin,
-              child: Text('Admin'),
-            ),
+            DropdownMenuItem(value: UserRole.manager, child: Text('Quản lý')),
+            DropdownMenuItem(value: UserRole.admin, child: Text('Admin')),
             DropdownMenuItem(
               value: UserRole.superAdmin,
               child: Text('Super Admin'),
@@ -1322,6 +1398,180 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
           validator: validator,
         ),
       ],
+    );
+  }
+}
+
+class _EnrollFaceSheet extends StatefulWidget {
+  final User user;
+
+  const _EnrollFaceSheet({required this.user});
+
+  @override
+  State<_EnrollFaceSheet> createState() => _EnrollFaceSheetState();
+}
+
+class _EnrollFaceSheetState extends State<_EnrollFaceSheet> {
+  bool _isSaving = false;
+
+  Future<void> _submit() async {
+    final enrolled = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AttendanceScreen(
+          initialMode: AttendanceMode.enrollment,
+          initialEmployeeId: widget.user.employeeId.isNotEmpty
+              ? widget.user.employeeId
+              : widget.user.id,
+          initialEmployeeName: widget.user.name,
+          initialBackendEmployeeId: widget.user.id,
+          popOnEnrollmentSuccess: true,
+        ),
+      ),
+    );
+    if (enrolled != true || !mounted) return;
+
+    setState(() => _isSaving = true);
+    try {
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đã đăng ký khuôn mặt cho ${widget.user.name}.'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString()),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return _KeyboardBottomPadding(
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE2E8F0),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  widget.user.faceEnrolled
+                      ? 'Cập nhật khuôn mặt'
+                      : 'Đăng ký khuôn mặt',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${widget.user.name} - ${widget.user.employeeId}',
+                  style: TextStyle(
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Thu mẫu bằng camera',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF0F172A)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'ML Kit kiểm tra khuôn mặt hợp lệ trên thiết bị, sau đó '
+                    'TFLite trích xuất embedding và lưu vào database cục bộ. '
+                    'Luồng này hoạt động offline hoàn toàn.',
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: _isSaving
+                            ? null
+                            : () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                        child: const Text('Hủy'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _isSaving ? null : _submit,
+                        icon: _isSaving
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.camera_alt_outlined),
+                        label: Text(_isSaving ? 'Đang lưu' : 'Mở camera'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

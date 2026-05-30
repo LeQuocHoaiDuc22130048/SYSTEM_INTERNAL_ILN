@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
@@ -13,7 +12,15 @@ class ApiException implements Exception {
   String toString() => message;
 }
 
+enum TokenRefreshResult { success, rejected, unavailable }
+
 class ApiClient {
+  final http.Client _client;
+  VoidCallback? onSessionExpired;
+
+  ApiClient({http.Client? client, this.onSessionExpired})
+    : _client = client ?? http.Client();
+
   static const Duration _timeout = Duration(seconds: 6);
 
   static const String _configuredBaseUrl = String.fromEnvironment(
@@ -62,7 +69,7 @@ class ApiClient {
       method: 'GET',
       path: path,
       queryParameters: queryParameters,
-      request: (requestUri) => http.get(requestUri, headers: _headers()),
+      request: (requestUri) => _client.get(requestUri, headers: _headers()),
     );
   }
 
@@ -71,7 +78,31 @@ class ApiClient {
       method: 'POST',
       path: path,
       request: (requestUri) =>
-          http.post(requestUri, headers: _headers(), body: _encode(body)),
+          _client.post(requestUri, headers: _headers(), body: _encode(body)),
+    );
+  }
+
+  Future<dynamic> postMultipart(
+    String path, {
+    required Map<String, String> fields,
+    required String filename,
+    required Uint8List bytes,
+  }) async {
+    return _send(
+      method: 'POST',
+      path: path,
+      request: (requestUri) async {
+        final request = http.MultipartRequest('POST', requestUri)
+          ..headers.addAll({
+            if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+          })
+          ..fields.addAll(fields)
+          ..files.add(
+            http.MultipartFile.fromBytes('file', bytes, filename: filename),
+          );
+        return http.Response.fromStream(await request.send());
+      },
+      timeout: const Duration(seconds: 60),
     );
   }
 
@@ -80,7 +111,7 @@ class ApiClient {
       method: 'PATCH',
       path: path,
       request: (requestUri) =>
-          http.patch(requestUri, headers: _headers(), body: _encode(body)),
+          _client.patch(requestUri, headers: _headers(), body: _encode(body)),
     );
   }
 
@@ -89,7 +120,7 @@ class ApiClient {
       method: 'PUT',
       path: path,
       request: (requestUri) =>
-          http.put(requestUri, headers: _headers(), body: _encode(body)),
+          _client.put(requestUri, headers: _headers(), body: _encode(body)),
     );
   }
 
@@ -97,7 +128,7 @@ class ApiClient {
     return _send(
       method: 'DELETE',
       path: path,
-      request: (requestUri) => http.delete(requestUri, headers: _headers()),
+      request: (requestUri) => _client.delete(requestUri, headers: _headers()),
     );
   }
 
@@ -118,6 +149,7 @@ class ApiClient {
     required String path,
     Map<String, dynamic>? queryParameters,
     required Future<http.Response> Function(Uri uri) request,
+    Duration timeout = _timeout,
   }) async {
     http.Response? response;
     Uri? requestUri;
@@ -130,7 +162,7 @@ class ApiClient {
       _log('$method $requestUri');
 
       try {
-        response = await request(requestUri).timeout(_timeout);
+        response = await request(requestUri).timeout(timeout);
         stopwatch.stop();
         _lastSuccessfulBaseUrl = candidateBaseUrl;
         break;
@@ -161,22 +193,24 @@ class ApiClient {
     );
 
     if (finalResponse.statusCode < 200 || finalResponse.statusCode >= 300) {
-      if ((finalResponse.statusCode == 401 || finalResponse.statusCode == 403) &&
+      if ((finalResponse.statusCode == 401 ||
+              finalResponse.statusCode == 403) &&
           path != '/api/v1/auth/refresh' &&
           refreshToken != null) {
-        final success = await _tryRefreshToken();
-        if (success) {
+        final refreshResult = await _tryRefreshToken();
+        if (refreshResult == TokenRefreshResult.success) {
           try {
             _log('Retrying $method $requestUri after token refresh');
-            finalResponse = await request(requestUri).timeout(_timeout);
+            finalResponse = await request(requestUri).timeout(timeout);
             final decodedRetry = _decode(finalResponse.body);
-            final messageRetry = _messageFrom(decodedRetry);
             _log(
               'Retry $method $requestUri -> ${finalResponse.statusCode} in '
               '${stopwatch.elapsedMilliseconds}ms',
             );
-            if (finalResponse.statusCode >= 200 && finalResponse.statusCode < 300) {
-              if (decodedRetry is Map<String, dynamic> && decodedRetry.containsKey('data')) {
+            if (finalResponse.statusCode >= 200 &&
+                finalResponse.statusCode < 300) {
+              if (decodedRetry is Map<String, dynamic> &&
+                  decodedRetry.containsKey('data')) {
                 return decodedRetry['data'];
               }
               return decodedRetry;
@@ -184,6 +218,8 @@ class ApiClient {
           } catch (e) {
             _log('Retry failed: $e');
           }
+        } else if (refreshResult == TokenRefreshResult.rejected) {
+          onSessionExpired?.call();
         }
       }
 
@@ -201,21 +237,19 @@ class ApiClient {
     return decoded;
   }
 
-  Future<bool> _tryRefreshToken() async {
-    if (_isRefreshing) return false;
+  Future<TokenRefreshResult> _tryRefreshToken() async {
+    if (_isRefreshing) return TokenRefreshResult.unavailable;
     _isRefreshing = true;
     _log('Attempting to refresh token...');
     try {
       final refreshUri = Uri.parse('$activeBaseUrl/api/v1/auth/refresh');
-      final response = await http.post(
-        refreshUri,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'refreshToken': refreshToken,
-        }),
-      ).timeout(_timeout);
+      final response = await _client
+          .post(
+            refreshUri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refreshToken': refreshToken}),
+          )
+          .timeout(_timeout);
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(response.body);
@@ -225,17 +259,20 @@ class ApiClient {
             accessToken = data['accessToken']?.toString();
             refreshToken = data['refreshToken']?.toString();
             _log('Token refresh successful!');
-            return true;
+            return TokenRefreshResult.success;
           }
         }
       }
       _log('Token refresh failed: status=${response.statusCode}');
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        return TokenRefreshResult.rejected;
+      }
     } catch (e) {
       _log('Token refresh error: $e');
     } finally {
       _isRefreshing = false;
     }
-    return false;
+    return TokenRefreshResult.unavailable;
   }
 
   Uri uriFor(
@@ -249,6 +286,14 @@ class ApiClient {
         (key, value) => MapEntry(key, value?.toString()),
       ),
     );
+  }
+
+  String resolveUrl(String path) {
+    if (path.startsWith('http://') || path.startsWith('https://')) {
+      return path;
+    }
+    final normalizedPath = path.startsWith('/') ? path : '/$path';
+    return '$activeBaseUrl$normalizedPath';
   }
 
   void _log(String message) {

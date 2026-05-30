@@ -45,16 +45,22 @@ Future<void> main() async {
             return provider;
           },
         ),
-        ChangeNotifierProxyProvider2<AuthProvider, NotificationProvider, ChatProvider>(
+        ChangeNotifierProxyProvider2<
+          AuthProvider,
+          NotificationProvider,
+          ChatProvider
+        >(
           create: (context) => ChatProvider(
             api: context.read<AuthProvider>().api,
             notificationProvider: context.read<NotificationProvider>(),
           ),
           update: (_, auth, notifications, previous) {
-            final provider = previous ?? ChatProvider(
-              api: auth.api,
-              notificationProvider: notifications,
-            );
+            final provider =
+                previous ??
+                ChatProvider(
+                  api: auth.api,
+                  notificationProvider: notifications,
+                );
             provider.updateAuthAndNotification(auth, notifications);
             return provider;
           },
@@ -132,6 +138,7 @@ class _MainScreenState extends State<MainScreen> {
 
   late final List<Widget?> _pages;
   StreamSubscription<AppNotification>? _notificationSub;
+  bool _navigatingToLogin = false;
 
   List<NavigationItem> get _navItems {
     final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
@@ -199,7 +206,9 @@ class _MainScreenState extends State<MainScreen> {
       });
     }
 
-    _notificationSub = notificationProvider.notificationClickStream.listen((notification) {
+    _notificationSub = notificationProvider.notificationClickStream.listen((
+      notification,
+    ) {
       _handleNotificationClick(notification);
     });
   }
@@ -214,7 +223,9 @@ class _MainScreenState extends State<MainScreen> {
       if (refId != null && refId.isNotEmpty) {
         context.read<ChatProvider>().selectConversationById(refId);
       }
-    } else if (type.startsWith('ORDER_') || type.startsWith('NEW_REPAIR_') || refType == 'REPAIR_ORDER') {
+    } else if (type.startsWith('ORDER_') ||
+        type.startsWith('NEW_REPAIR_') ||
+        refType == 'REPAIR_ORDER') {
       if (refId != null && refId.isNotEmpty) {
         _setCurrentIndex(1, refId: refId);
       } else {
@@ -253,7 +264,9 @@ class _MainScreenState extends State<MainScreen> {
           },
         );
       case 6:
-        return EmployeeManagementPage(initialTabIndex: _targetEmployeeManagementTabIndex);
+        return EmployeeManagementPage(
+          initialTabIndex: _targetEmployeeManagementTabIndex,
+        );
       case 7:
         return const SizedBox.shrink(); // AccountApproval is inside EmployeeManagementPage now
       case 8:
@@ -284,8 +297,50 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
+  void _returnToLogin({String? warning}) {
+    if (_navigatingToLogin || !mounted) return;
+    _navigatingToLogin = true;
+    if (warning != null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(warning)));
+    }
+    Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
+  }
+
+  Future<void> _logout() async {
+    final auth = context.read<AuthProvider>();
+    await context.read<NotificationProvider>().prepareForLogout();
+    await auth.logout();
+    _returnToLogin(warning: auth.logoutWarning);
+  }
+
+  Widget _withProfileNotice(Widget child, AuthProvider auth) {
+    if (auth.profileError == null) return child;
+    return Column(
+      children: [
+        MaterialBanner(
+          content: const Text(
+            'Không thể đồng bộ hồ sơ mới nhất. Thông tin đang hiển thị có thể đã cũ.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: auth.isLoadingProfile ? null : auth.loadMe,
+              child: Text(auth.isLoadingProfile ? 'ĐANG TẢI...' : 'THỬ LẠI'),
+            ),
+          ],
+        ),
+        Expanded(child: child),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+    if (!auth.isAuthenticated && !_navigatingToLogin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _returnToLogin());
+    }
     final themeProvider = Provider.of<ThemeProvider>(context);
     final isDark = themeProvider.isDark;
     final unreadNotifications = context
@@ -314,11 +369,12 @@ class _MainScreenState extends State<MainScreen> {
                   themeProvider: themeProvider,
                   isEmployee: Provider.of<AuthProvider>(context).isEmployee,
                   notificationBadge: notificationBadge,
+                  onLogout: _logout,
                 ),
                 Expanded(
-                  child: IndexedStack(
-                    index: _currentIndex,
-                    children: _visiblePages,
+                  child: _withProfileNotice(
+                    IndexedStack(index: _currentIndex, children: _visiblePages),
+                    auth,
                   ),
                 ),
               ],
@@ -337,15 +393,7 @@ class _MainScreenState extends State<MainScreen> {
             centerTitle: true,
             leading: IconButton(
               icon: const Icon(Icons.logout, size: 22),
-              onPressed: () async {
-                await Provider.of<AuthProvider>(
-                  context,
-                  listen: false,
-                ).logout();
-                if (context.mounted) {
-                  Navigator.pushReplacementNamed(context, '/login');
-                }
-              },
+              onPressed: _logout,
               tooltip: 'Đăng xuất',
             ),
             title: Row(
@@ -390,7 +438,10 @@ class _MainScreenState extends State<MainScreen> {
               ),
             ),
           ),
-          body: IndexedStack(index: _currentIndex, children: _visiblePages),
+          body: _withProfileNotice(
+            IndexedStack(index: _currentIndex, children: _visiblePages),
+            auth,
+          ),
           bottomNavigationBar: Container(
             decoration: BoxDecoration(
               color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -444,14 +495,23 @@ class _MainScreenState extends State<MainScreen> {
                                 ),
                               ],
                             ),
-                            if (item.tabIndex == 4 && context.watch<ChatProvider>().totalUnreadCount > 0)
+                            if (item.tabIndex == 4 &&
+                                context.watch<ChatProvider>().totalUnreadCount >
+                                    0)
                               Positioned(
                                 top: 10,
                                 right: 22,
                                 child: _BadgePill(
-                                  text: context.watch<ChatProvider>().totalUnreadCount > 99
+                                  text:
+                                      context
+                                              .watch<ChatProvider>()
+                                              .totalUnreadCount >
+                                          99
                                       ? '99+'
-                                      : context.watch<ChatProvider>().totalUnreadCount.toString(),
+                                      : context
+                                            .watch<ChatProvider>()
+                                            .totalUnreadCount
+                                            .toString(),
                                   size: 14,
                                 ),
                               ),
@@ -468,11 +528,6 @@ class _MainScreenState extends State<MainScreen> {
       },
     );
   }
-
-  void _selectFromDrawer(BuildContext context, int index) {
-    _setCurrentIndex(index);
-    Navigator.pop(context);
-  }
 }
 
 class _SideNavigation extends StatelessWidget {
@@ -484,6 +539,7 @@ class _SideNavigation extends StatelessWidget {
   final ThemeProvider themeProvider;
   final bool isEmployee;
   final String notificationBadge;
+  final Future<void> Function() onLogout;
 
   const _SideNavigation({
     required this.currentIndex,
@@ -494,6 +550,7 @@ class _SideNavigation extends StatelessWidget {
     required this.themeProvider,
     required this.isEmployee,
     required this.notificationBadge,
+    required this.onLogout,
   });
 
   @override
@@ -503,7 +560,9 @@ class _SideNavigation extends StatelessWidget {
         : const Color(0xFF111C2E); // Dark blue like in image
 
     final unreadChats = context.watch<ChatProvider>().totalUnreadCount;
-    final chatBadge = unreadChats > 0 ? (unreadChats > 99 ? '99+' : unreadChats.toString()) : null;
+    final chatBadge = unreadChats > 0
+        ? (unreadChats > 99 ? '99+' : unreadChats.toString())
+        : null;
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
@@ -643,15 +702,7 @@ class _SideNavigation extends StatelessWidget {
                   icon: LucideIcons.logOut,
                   label: 'Đăng xuất',
                   isSelected: false,
-                  onTap: () async {
-                    await Provider.of<AuthProvider>(
-                      context,
-                      listen: false,
-                    ).logout();
-                    if (context.mounted) {
-                      Navigator.pushReplacementNamed(context, '/login');
-                    }
-                  },
+                  onTap: onLogout,
                   isExpanded: isExpanded,
                 ),
                 const SizedBox(height: 12),
@@ -869,30 +920,6 @@ class _UserProfile extends StatelessWidget {
     if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
     return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
         .toUpperCase();
-  }
-}
-
-class _DrawerDestination extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _DrawerDestination({
-    required this.icon,
-    required this.label,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon),
-      title: Text(label),
-      selected: selected,
-      onTap: onTap,
-    );
   }
 }
 

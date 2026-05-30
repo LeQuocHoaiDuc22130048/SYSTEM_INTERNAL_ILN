@@ -48,6 +48,7 @@ public record RepairOrderResponse(
     public record ImageInfo(
             UUID id,
             String imageUrl,
+            String mediaType,
             String caption,
             Instant uploadedAt
     ) {

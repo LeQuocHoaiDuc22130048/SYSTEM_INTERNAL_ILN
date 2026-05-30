@@ -1,5 +1,23 @@
 enum RepairOrderStatus { pending, inProgress, completed, delivered }
 
+class RepairMedia {
+  final String url;
+  final String type;
+  final String? caption;
+
+  const RepairMedia({required this.url, required this.type, this.caption});
+
+  bool get isVideo => type == 'VIDEO';
+
+  factory RepairMedia.fromJson(Map<String, dynamic> json) {
+    return RepairMedia(
+      url: json['imageUrl']?.toString() ?? '',
+      type: json['mediaType']?.toString() ?? 'IMAGE',
+      caption: json['caption']?.toString(),
+    );
+  }
+}
+
 class RepairOrder {
   final String id;
   final String orderNumber;
@@ -13,7 +31,7 @@ class RepairOrder {
   final DateTime? updatedAt;
   final String? description;
   final String? notes;
-  final String? imagePath;
+  final List<RepairMedia> media;
 
   RepairOrder({
     required this.id,
@@ -28,8 +46,15 @@ class RepairOrder {
     this.updatedAt,
     this.description,
     this.notes,
-    this.imagePath,
+    this.media = const [],
   });
+
+  String? get imagePath {
+    for (final attachment in media) {
+      if (!attachment.isVideo) return attachment.url;
+    }
+    return null;
+  }
 
   String get statusLabel {
     switch (status) {
@@ -64,9 +89,13 @@ class RepairOrder {
       updatedAt: _dateFromJson(json['updatedAt']),
       description: json['description']?.toString(),
       notes: json['deviceType']?.toString(),
-      imagePath: images is List && images.isNotEmpty && images.first is Map
-          ? (images.first as Map)['imageUrl']?.toString()
-          : null,
+      media: images is List
+          ? images
+              .whereType<Map<String, dynamic>>()
+              .map(RepairMedia.fromJson)
+              .where((attachment) => attachment.url.isNotEmpty)
+              .toList()
+          : const [],
     );
   }
 

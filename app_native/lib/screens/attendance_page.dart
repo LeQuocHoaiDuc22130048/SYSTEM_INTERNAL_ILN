@@ -4,12 +4,9 @@ import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
-import '../utils/api_client.dart';
-import '../utils/network_provider.dart';
-import '../utils/pending_sync_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
-import 'face_attendance_page.dart';
+import 'attendance_screen.dart';
 
 class AttendancePage extends StatefulWidget {
   const AttendancePage({super.key});
@@ -216,25 +213,23 @@ class _AttendancePageState extends State<AttendancePage>
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  child: TabBar(
-                    controller: _tabController,
-                    indicator: BoxDecoration(color: AppColors.primary),
-                    indicatorSize: TabBarIndicatorSize.tab,
-                    labelColor: Colors.white,
-                    unselectedLabelColor: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                    labelStyle: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    tabs: const [
-                      Tab(text: 'Hôm nay'),
-                      Tab(text: 'Lịch sử'),
-                      Tab(text: 'Báo cáo'),
-                    ],
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(color: AppColors.primary),
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  labelColor: Colors.white,
+                  unselectedLabelColor: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                  labelStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
                   ),
+                  tabs: const [
+                    Tab(text: 'Hôm nay'),
+                    Tab(text: 'Lịch sử'),
+                    Tab(text: 'Báo cáo'),
+                  ],
                 ),
               ),
             ),
@@ -258,70 +253,18 @@ class _AttendancePageState extends State<AttendancePage>
   }
 
   Future<void> _handleFaceScan() async {
-    final confirmed = await Navigator.push<bool>(
+    final checked = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => const FaceAttendancePage(),
+        builder: (context) =>
+            const AttendanceScreen(popOnVerificationSuccess: true),
       ),
     );
-    if (confirmed != true || !mounted) return;
-
-    final checkInTime = DateFormat('HH:mm').format(DateTime.now());
+    if (checked != true || !mounted) return;
     setState(() {
       _hasCheckedIn = true;
-      _checkInTime = checkInTime;
+      _checkInTime = DateFormat('HH:mm').format(DateTime.now());
     });
-
-    final network = context.read<NetworkProvider>();
-    final isOnline = await network.checkNow();
-    if (!mounted) return;
-
-    if (!isOnline) {
-      context.read<PendingSyncProvider>().addAction(
-            type: PendingSyncType.faceAttendance,
-            title: 'Chấm công khuôn mặt',
-            description: 'Check-in lúc $checkInTime',
-          );
-      _showSnackBar(
-        'Đã ghi nhận tạm. Admin sẽ thấy thay đổi khi thiết bị có mạng lại.',
-        AppColors.warning,
-      );
-      return;
-    }
-
-    try {
-      final backend = context.read<BackendDataProvider>();
-      final data = await backend.api.post(
-        '/api/v1/attendance/check',
-        body: {
-          'deviceId': 'flutter-mobile',
-          'note': 'Cham cong bang khuon mat tu ung dung',
-        },
-      );
-      await backend.loadAttendance();
-      if (!mounted) return;
-
-      final type = data is Map<String, dynamic> ? data['type']?.toString() : null;
-      final label = type == 'OUT' ? 'Check-out' : 'Check-in';
-      _showSnackBar('$label thành công, đã cập nhật backend.', AppColors.success);
-    } on ApiException catch (error) {
-      if (!mounted) return;
-      _showSnackBar(error.message, AppColors.error);
-    } catch (_) {
-      if (!mounted) return;
-      _showSnackBar('Không thể cập nhật chấm công lên backend.', AppColors.error);
-    }
-  }
-
-  void _showSnackBar(String message, Color color) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: color,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      ),
-    );
   }
 
   Widget _buildTodayTab() {
@@ -337,7 +280,9 @@ class _AttendancePageState extends State<AttendancePage>
               decoration: BoxDecoration(
                 color: AppColors.infoLight,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+                border: Border.all(
+                  color: AppColors.info.withValues(alpha: 0.3),
+                ),
               ),
               child: Row(
                 children: [
@@ -448,10 +393,7 @@ class _AttendancePageState extends State<AttendancePage>
                 ),
               )
               .animate(target: 1)
-              .fadeIn(
-                duration: 400.ms,
-                delay: (300 + index * 50).ms,
-              )
+              .fadeIn(duration: 400.ms, delay: (300 + index * 50).ms)
               .slideX(
                 begin: -0.2,
                 end: 0,
@@ -539,30 +481,6 @@ class _AttendancePageState extends State<AttendancePage>
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  void _handleCheckInOut() {
-    setState(() {
-      if (_hasCheckedIn) {
-        // Check-out
-        _hasCheckedIn = false;
-      } else {
-        // Check-in
-        _hasCheckedIn = true;
-        _checkInTime = DateFormat('HH:mm').format(DateTime.now());
-      }
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _hasCheckedIn ? 'Check-in thành công!' : 'Check-out thành công!',
-        ),
-        backgroundColor: AppColors.success,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }

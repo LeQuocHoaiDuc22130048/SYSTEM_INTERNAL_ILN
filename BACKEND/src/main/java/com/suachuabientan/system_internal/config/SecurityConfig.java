@@ -50,7 +50,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/register").permitAll()
                         .requestMatchers("/api/v1/auth/refresh").permitAll()
                         .requestMatchers("/api/v1/auth/forgot-password").permitAll()
+                        .requestMatchers("/api/v1/auth/forgot-password/otp").permitAll()
                         .requestMatchers("/ws/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/message-media/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/repair-media/**").permitAll()
                         // Swagger — chỉ dev
                         .requestMatchers("/swagger-ui/**", "/api-docs/**").permitAll()
                         // Actuator health check

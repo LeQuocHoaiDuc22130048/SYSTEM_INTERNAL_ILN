@@ -10,5 +10,6 @@ public enum NotificationType {
     ACCOUNT_PENDING,
     ACCOUNT_APPROVED,
     ACCOUNT_REJECTED,
+    PASSWORD_RESET_OTP,
     NEW_MESSAGE
 }

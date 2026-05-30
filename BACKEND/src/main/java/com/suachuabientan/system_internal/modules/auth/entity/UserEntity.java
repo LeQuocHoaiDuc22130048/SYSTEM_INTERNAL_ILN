@@ -87,7 +87,7 @@ public class UserEntity extends BaseEntity {
 
     // ── Chấm công khuôn mặt ───────────────────────────────────────────────
 
-    /** JSON vector từ DeepFace/ML Kit — không lưu ảnh gốc */
+    /** JSON embedding do dịch vụ FaceNet/OpenCV tạo ra; không lưu ảnh gốc. */
     @Column(name = "face_encoding", columnDefinition = "TEXT")
     private String faceEncoding;
 

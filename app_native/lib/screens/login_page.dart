@@ -55,7 +55,8 @@ class _LoginPageState extends State<LoginPage> {
     ).hasMatch(_passwordController.text);
     if (!strongPassword) {
       setState(() {
-        _error = 'Mật khẩu cần tối thiểu 8 ký tự, có chữ hoa, chữ thường và số.';
+        _error =
+            'Mật khẩu cần tối thiểu 8 ký tự, có chữ hoa, chữ thường và số.';
       });
       return;
     }
@@ -169,6 +170,7 @@ class _LoginPageState extends State<LoginPage> {
   Future<String?> _resetPassword({
     required String username,
     required String phone,
+    required String otp,
     required String newPassword,
     required String confirmPassword,
   }) async {
@@ -176,6 +178,7 @@ class _LoginPageState extends State<LoginPage> {
       await Provider.of<AuthProvider>(context, listen: false).forgotPassword(
         username: username,
         phone: phone,
+        otp: otp,
         newPassword: newPassword,
         confirmPassword: confirmPassword,
       );
@@ -193,11 +196,13 @@ class _LoginPageState extends State<LoginPage> {
       text: _usernameController.text,
     );
     final phoneController = TextEditingController();
+    final otpController = TextEditingController();
     final newPasswordController = TextEditingController();
     final confirmPasswordController = TextEditingController();
     bool showNewPassword = false;
     bool showConfirmPassword = false;
     bool loading = false;
+    bool otpRequested = false;
     String error = '';
 
     await showDialog<void>(
@@ -209,20 +214,69 @@ class _LoginPageState extends State<LoginPage> {
             Future<void> submit() async {
               final dialogNavigator = Navigator.of(dialogContext);
               final messenger = ScaffoldMessenger.of(pageContext);
+              final auth = Provider.of<AuthProvider>(
+                dialogContext,
+                listen: false,
+              );
 
               setDialogState(() => error = '');
 
               if (usernameController.text.trim().isEmpty ||
-                  phoneController.text.trim().isEmpty ||
-                  newPasswordController.text.isEmpty ||
-                  confirmPasswordController.text.isEmpty) {
+                  phoneController.text.trim().isEmpty) {
                 setDialogState(() {
                   error = 'Vui lòng điền đầy đủ thông tin.';
                 });
                 return;
               }
 
-              if (newPasswordController.text != confirmPasswordController.text) {
+              final hasInternet = await Provider.of<NetworkProvider>(
+                dialogContext,
+                listen: false,
+              ).checkNow();
+              if (!hasInternet) {
+                setDialogState(() {
+                  error =
+                      'Thiết bị đang mất kết nối internet. Vui lòng kiểm tra mạng.';
+                });
+                return;
+              }
+
+              if (!otpRequested) {
+                setDialogState(() => loading = true);
+                try {
+                  await auth.requestPasswordResetOtp(
+                    username: usernameController.text.trim(),
+                    phone: phoneController.text.trim(),
+                  );
+                  setDialogState(() {
+                    loading = false;
+                    otpRequested = true;
+                  });
+                } on ApiException catch (requestError) {
+                  setDialogState(() {
+                    loading = false;
+                    error = requestError.message;
+                  });
+                } catch (_) {
+                  setDialogState(() {
+                    loading = false;
+                    error = 'Không thể gửi mã OTP. Vui lòng thử lại.';
+                  });
+                }
+                return;
+              }
+
+              if (otpController.text.trim().isEmpty ||
+                  newPasswordController.text.isEmpty ||
+                  confirmPasswordController.text.isEmpty) {
+                setDialogState(() {
+                  error = 'Vui lòng nhập mã OTP và mật khẩu mới.';
+                });
+                return;
+              }
+
+              if (newPasswordController.text !=
+                  confirmPasswordController.text) {
                 setDialogState(() {
                   error = 'Mật khẩu xác nhận không khớp.';
                 });
@@ -246,21 +300,11 @@ class _LoginPageState extends State<LoginPage> {
                 return;
               }
 
-              final hasInternet = await Provider.of<NetworkProvider>(
-                dialogContext,
-                listen: false,
-              ).checkNow();
-              if (!hasInternet) {
-                setDialogState(() {
-                  error = 'Thiết bị đang mất kết nối internet. Vui lòng kiểm tra mạng.';
-                });
-                return;
-              }
-
               setDialogState(() => loading = true);
               final resetError = await _resetPassword(
                 username: usernameController.text.trim(),
                 phone: phoneController.text.trim(),
+                otp: otpController.text.trim(),
                 newPassword: newPasswordController.text,
                 confirmPassword: confirmPasswordController.text,
               );
@@ -313,30 +357,40 @@ class _LoginPageState extends State<LoginPage> {
                       icon: LucideIcons.phone,
                       keyboardType: TextInputType.phone,
                     ),
-                    const SizedBox(height: 16),
-                    _buildInputField(
-                      label: 'Mật khẩu mới',
-                      hint: 'Nhập mật khẩu mới...',
-                      controller: newPasswordController,
-                      icon: LucideIcons.lock,
-                      isPassword: true,
-                      obscurePassword: !showNewPassword,
-                      onTogglePassword: () => setDialogState(
-                        () => showNewPassword = !showNewPassword,
+                    if (otpRequested) ...[
+                      const SizedBox(height: 16),
+                      _buildInputField(
+                        label: 'Mã OTP',
+                        hint: 'Nhập mã OTP...',
+                        controller: otpController,
+                        icon: LucideIcons.shieldCheck,
+                        keyboardType: TextInputType.number,
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    _buildInputField(
-                      label: 'Xác nhận mật khẩu',
-                      hint: 'Nhập lại mật khẩu mới...',
-                      controller: confirmPasswordController,
-                      icon: LucideIcons.lockKeyhole,
-                      isPassword: true,
-                      obscurePassword: !showConfirmPassword,
-                      onTogglePassword: () => setDialogState(
-                        () => showConfirmPassword = !showConfirmPassword,
+                      const SizedBox(height: 16),
+                      _buildInputField(
+                        label: 'Mật khẩu mới',
+                        hint: 'Nhập mật khẩu mới...',
+                        controller: newPasswordController,
+                        icon: LucideIcons.lock,
+                        isPassword: true,
+                        obscurePassword: !showNewPassword,
+                        onTogglePassword: () => setDialogState(
+                          () => showNewPassword = !showNewPassword,
+                        ),
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      _buildInputField(
+                        label: 'Xác nhận mật khẩu',
+                        hint: 'Nhập lại mật khẩu mới...',
+                        controller: confirmPasswordController,
+                        icon: LucideIcons.lockKeyhole,
+                        isPassword: true,
+                        obscurePassword: !showConfirmPassword,
+                        onTogglePassword: () => setDialogState(
+                          () => showConfirmPassword = !showConfirmPassword,
+                        ),
+                      ),
+                    ],
                     if (error.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       Text(
@@ -374,7 +428,7 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                           ),
                         )
-                      : const Text('Đặt lại mật khẩu'),
+                      : Text(otpRequested ? 'Đặt lại mật khẩu' : 'Gửi mã OTP'),
                 ),
               ],
             );
@@ -385,6 +439,7 @@ class _LoginPageState extends State<LoginPage> {
 
     usernameController.dispose();
     phoneController.dispose();
+    otpController.dispose();
     newPasswordController.dispose();
     confirmPasswordController.dispose();
   }
@@ -404,7 +459,7 @@ class _LoginPageState extends State<LoginPage> {
                 builder: (context, constraints) {
                   final width = constraints.maxWidth;
                   final availableHeight = constraints.maxHeight;
-                  
+
                   final isDesktop = width >= 1024;
                   final isTablet = width >= 640 && width < 1024;
                   final isMobile = width < 640;
@@ -430,7 +485,9 @@ class _LoginPageState extends State<LoginPage> {
                         child: Center(
                           child: ConstrainedBox(
                             constraints: BoxConstraints(
-                              maxWidth: isDesktop ? 1100 : (isTablet ? 500 : 400),
+                              maxWidth: isDesktop
+                                  ? 1100
+                                  : (isTablet ? 500 : 400),
                             ),
                             child: isDesktop
                                 ? Row(
@@ -448,7 +505,9 @@ class _LoginPageState extends State<LoginPage> {
                                             constraints: const BoxConstraints(
                                               maxWidth: 450,
                                             ),
-                                            child: _buildFormCard(isDesktop: true),
+                                            child: _buildFormCard(
+                                              isDesktop: true,
+                                            ),
                                           ),
                                         ),
                                       ),
@@ -462,9 +521,7 @@ class _LoginPageState extends State<LoginPage> {
                                         isMobile: isMobile,
                                         isShort: isShort,
                                       ),
-                                      SizedBox(
-                                        height: isShort ? 16 : 24,
-                                      ),
+                                      SizedBox(height: isShort ? 16 : 24),
                                       _buildFormCard(isDesktop: false),
                                       const SizedBox(height: 20),
                                     ],
@@ -483,55 +540,55 @@ class _LoginPageState extends State<LoginPage> {
     );
   }
 
-  Widget _buildBrandingSection({required double scale, required bool isMobile, bool isShort = false}) {
+  Widget _buildBrandingSection({
+    required double scale,
+    required bool isMobile,
+    bool isShort = false,
+  }) {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Container(
-          width: 250 * scale,
-          height: 250 * scale,
-          child: Image.asset(
-            'assets/images/app_logo.png',
-            fit: BoxFit.contain,
-          ),
-        ).animate(target: 1).fadeIn(duration: 600.ms).scale(
-              begin: const Offset(0.8, 0.8),
-              duration: 600.ms,
-            ),
+        SizedBox(
+              width: 250 * scale,
+              height: 250 * scale,
+              child: Image.asset(
+                'assets/images/app_logo.png',
+                fit: BoxFit.contain,
+              ),
+            )
+            .animate(target: 1)
+            .fadeIn(duration: 600.ms)
+            .scale(begin: const Offset(0.8, 0.8), duration: 600.ms),
         if (!isShort) ...[
           SizedBox(height: 24 * scale),
           Text(
-            'INVERTER LIKE NEW',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: isMobile ? 28 * scale : 40 * scale,
-              fontWeight: FontWeight.w800,
-              color: Colors.white,
-              letterSpacing: -0.5,
-            ),
-          ).animate(target: 1).fadeIn(duration: 600.ms, delay: 100.ms).slideY(
-                begin: 0.3,
-                end: 0,
-                duration: 600.ms,
-                delay: 100.ms,
-              ),
+                'INVERTER LIKE NEW',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isMobile ? 28 * scale : 40 * scale,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.white,
+                  letterSpacing: -0.5,
+                ),
+              )
+              .animate(target: 1)
+              .fadeIn(duration: 600.ms, delay: 100.ms)
+              .slideY(begin: 0.3, end: 0, duration: 600.ms, delay: 100.ms),
           SizedBox(height: 12 * scale),
           Text(
-            'Internal Management System',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: isMobile ? 12 * scale : 16 * scale,
-              color: Colors.white.withValues(alpha: 0.7),
-              letterSpacing: 0.2,
-              fontWeight: FontWeight.w500,
-            ),
-          ).animate(target: 1).fadeIn(duration: 600.ms, delay: 200.ms).slideY(
-                begin: 0.3,
-                end: 0,
-                duration: 600.ms,
-                delay: 200.ms,
-              ),
+                'Internal Management System',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: isMobile ? 12 * scale : 16 * scale,
+                  color: Colors.white.withValues(alpha: 0.7),
+                  letterSpacing: 0.2,
+                  fontWeight: FontWeight.w500,
+                ),
+              )
+              .animate(target: 1)
+              .fadeIn(duration: 600.ms, delay: 200.ms)
+              .slideY(begin: 0.3, end: 0, duration: 600.ms, delay: 200.ms),
         ],
       ],
     );
@@ -702,7 +759,8 @@ class _LoginPageState extends State<LoginPage> {
                       size: 18,
                       color: Colors.blue[200]?.withValues(alpha: 0.5),
                     ),
-                    onPressed: onTogglePassword ??
+                    onPressed:
+                        onTogglePassword ??
                         () => setState(() => _showPassword = !_showPassword),
                   )
                 : null,
@@ -750,10 +808,7 @@ class _LoginPageState extends State<LoginPage> {
         style: TextButton.styleFrom(
           foregroundColor: Colors.blue[100],
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          textStyle: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
         ),
       ),
     );
@@ -877,7 +932,7 @@ class LoginBackground extends StatelessWidget {
   Widget build(BuildContext context) {
     // Use sizeOf instead of of(context).size to prevent rebuilding on viewInsets changes
     final size = MediaQuery.sizeOf(context);
-    
+
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(

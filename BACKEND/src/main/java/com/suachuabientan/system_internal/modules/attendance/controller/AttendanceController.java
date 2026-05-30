@@ -3,6 +3,7 @@ package com.suachuabientan.system_internal.modules.attendance.controller;
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.CheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.CreateScheduleRequest;
+import com.suachuabientan.system_internal.modules.attendance.dto.request.FaceCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.ManualCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.DailyAttendanceResponse;
@@ -33,9 +34,9 @@ import java.util.UUID;
 public class AttendanceController {
     private final AttendanceService attendanceService;
 
-    @Operation(summary = "Cham cong noi bo cho nguoi dang dang nhap")
+    @Operation(summary = "Cham cong noi bo khong doi chieu khuon mat cho quan ly")
     @PostMapping("/check")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> check(
             @RequestBody(required = false) CheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -43,6 +44,17 @@ public class AttendanceController {
         return ResponseEntity.ok(ApiResponse.success(
                 attendanceService.check(userDetails.getUserId(), safeRequest),
                 "Cham cong thanh cong"));
+    }
+
+    @Operation(summary = "Cham cong sau khi AI doi chieu anh khuon mat")
+    @PostMapping("/face-check")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> faceCheck(
+            @Valid @RequestBody FaceCheckinRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attendanceService.faceCheck(userDetails.getUserId(), request),
+                "Xac minh khuon mat va cham cong thanh cong"));
     }
 
     @Operation(summary = "Tong hop cham cong hom nay cua nguoi dang dang nhap")

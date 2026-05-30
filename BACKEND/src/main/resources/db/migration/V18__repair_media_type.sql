@@ -1,0 +1,2 @@
+ALTER TABLE repair_images
+    ADD COLUMN media_type VARCHAR(20) NOT NULL DEFAULT 'IMAGE';

@@ -71,4 +71,12 @@ public class NotificationController {
         notificationService.updateDeviceToken(userDetails.getUserId(), request.deviceToken());
         return ResponseEntity.ok(ApiResponse.success(null, "Da cap nhat device token"));
     }
+
+    @Operation(summary = "Huy Firebase device token khi dang xuat thiet bi hien tai")
+    @DeleteMapping("/device-token")
+    public ResponseEntity<ApiResponse<Void>> clearDeviceToken(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        notificationService.clearDeviceToken(userDetails.getUserId());
+        return ResponseEntity.ok(ApiResponse.success(null, "Da huy device token"));
+    }
 }

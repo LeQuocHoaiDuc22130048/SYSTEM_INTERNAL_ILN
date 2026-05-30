@@ -47,7 +47,7 @@ public class NotificationService {
     public NotificationResponse markAsRead(UUID notificationId, UUID recipientId) {
         Notification notification = notificationRepository
                 .findByIdAndRecipientIdAndIsDeletedFalse(notificationId, recipientId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay thong bao: " + notificationId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông báo: " + notificationId));
 
         notification.setIsRead(true);
         return toResponse(notificationRepository.save(notification));
@@ -63,8 +63,16 @@ public class NotificationService {
     @Transactional
     public void updateDeviceToken(UUID userId, String deviceToken) {
         UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung: " + userId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
         user.setDeviceToken(deviceToken);
+        userRepository.save(user);
+    }
+
+    @Transactional
+    public void clearDeviceToken(UUID userId) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + userId));
+        user.setDeviceToken(null);
         userRepository.save(user);
     }
 
@@ -78,7 +86,7 @@ public class NotificationService {
             String refId,
             boolean pushEnabled) {
         UserEntity recipient = userRepository.findByIdAndIsDeletedFalse(recipientId)
-                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi nhan: " + recipientId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người nhận: " + recipientId));
 
         Notification notification = Notification.builder()
                 .recipientId(recipientId)

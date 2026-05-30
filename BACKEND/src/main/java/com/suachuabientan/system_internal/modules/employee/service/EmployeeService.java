@@ -12,6 +12,7 @@ import com.suachuabientan.system_internal.modules.auth.repository.UserRepository
 import com.suachuabientan.system_internal.modules.employee.dto.request.UpdateEmployeeRequest;
 import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeDetailResponse;
 import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeScheduleResponse;
+import com.suachuabientan.system_internal.modules.attendance.service.FaceRecognitionService;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,6 +38,7 @@ public class EmployeeService {
     private final UserRepository userRepository;
     private final AttendanceRecordRepository attendanceRepository;
     private final RepairOrderRepository repairOrderRepository;
+    private final FaceRecognitionService faceRecognitionService;
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
 
     @Transactional
@@ -86,18 +88,19 @@ public class EmployeeService {
 
     /**
      * Đăng ký khuôn mặt cho nhân viên — chỉ Admin thực hiện.
-     * Face encoding (JSON vector) đã được xử lý bởi Python service.
+     * Anh crop duoc chuyen cho dich vu FaceNet/OpenCV de tao embedding.
      */
     @Transactional
-    public EmployeeDetailResponse enrollFace(UUID employeeId, String faceEncoding,
+    public EmployeeDetailResponse enrollFace(UUID employeeId, String faceImageBase64,
+                                             String imageContentType,
                                              UUID adminId) {
         UserEntity user = findUserById(employeeId);
 
-        if (!StringUtils.hasText(faceEncoding)) {
-            throw new BusinessException("Face encoding không được để trống");
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new BusinessException("Chỉ có thể đăng ký khuôn mặt cho nhân viên đang hoạt động");
         }
 
-        user.setFaceEncoding(faceEncoding);
+        user.setFaceEncoding(faceRecognitionService.enroll(faceImageBase64, imageContentType));
         user.setFaceEnrolled(true);
         user.setFaceVerifiedBy(adminId);
 

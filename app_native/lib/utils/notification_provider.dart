@@ -35,6 +35,7 @@ class NotificationProvider extends ChangeNotifier {
   String? _lastUploadedToken;
   bool _firebaseInitializing = false;
   bool _deviceTokenSyncing = false;
+  bool _suppressTokenUpload = false;
   String? _lastSyncToken;
 
   AppNotification? pendingNotificationClick;
@@ -52,13 +53,19 @@ class NotificationProvider extends ChangeNotifier {
       _clickStreamController.stream;
 
   void clickNotification(AppNotification notification) {
-    _log('Notification clicked: id=${notification.id}, type=${notification.type}');
+    _log(
+      'Notification clicked: id=${notification.id}, type=${notification.type}',
+    );
     pendingNotificationClick = notification;
     _clickStreamController.add(notification);
     notifyListeners();
   }
 
-  AppNotification _parseNotificationFromPayload(Map<String, dynamic> data, {String? defaultTitle, String? defaultBody}) {
+  AppNotification _parseNotificationFromPayload(
+    Map<String, dynamic> data, {
+    String? defaultTitle,
+    String? defaultBody,
+  }) {
     return AppNotification(
       id: data['notificationId']?.toString() ?? data['id']?.toString() ?? '',
       recipientId: data['recipientId']?.toString() ?? '',
@@ -84,7 +91,10 @@ class NotificationProvider extends ChangeNotifier {
       _foregroundSub ??= FirebaseMessaging.onMessage.listen(
         _handleForegroundMessage,
       );
-      _onMessageOpenedAppSub ??= FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      _onMessageOpenedAppSub ??= FirebaseMessaging.onMessageOpenedApp.listen((
+        RemoteMessage message,
+      ) {
+        if (!apiHasToken) return;
         _log('FCM onMessageOpenedApp triggered');
         final notification = _parseNotificationFromPayload(
           message.data,
@@ -95,7 +105,7 @@ class NotificationProvider extends ChangeNotifier {
       });
 
       FirebaseMessaging.instance.getInitialMessage().then((message) {
-        if (message != null) {
+        if (message != null && apiHasToken) {
           _log('FCM getInitialMessage triggered');
           final notification = _parseNotificationFromPayload(
             message.data,
@@ -191,6 +201,7 @@ class NotificationProvider extends ChangeNotifier {
     if (_auth?.isAuthenticated == true && token != null) {
       if (token == _lastSyncToken) return;
       _lastSyncToken = token;
+      _suppressTokenUpload = false;
 
       initializeFirebase().then((_) => _syncDeviceToken());
       loadUnreadCount();
@@ -211,6 +222,35 @@ class NotificationProvider extends ChangeNotifier {
       error = null;
       notifyListeners();
     }
+  }
+
+  Future<void> prepareForLogout() async {
+    _suppressTokenUpload = true;
+    _disconnectRealtime();
+    _pollTimer?.cancel();
+    _pollTimer = null;
+
+    if (apiHasToken) {
+      try {
+        await api.delete('/api/v1/notifications/device-token');
+      } catch (e) {
+        _log('Device token unregister failed: $e');
+      }
+    }
+
+    if (firebaseReady && !kIsWeb) {
+      try {
+        await FirebaseMessaging.instance.deleteToken();
+      } catch (e) {
+        _log('Firebase token delete failed: $e');
+      }
+    }
+
+    _lastUploadedToken = null;
+    notifications = [];
+    unreadCount = 0;
+    error = null;
+    notifyListeners();
   }
 
   void _connectRealtime() {
@@ -239,6 +279,7 @@ class NotificationProvider extends ChangeNotifier {
     _stompClient?.subscribe(
       destination: '/user/queue/notifications',
       callback: (frame) {
+        if (!apiHasToken || _suppressTokenUpload) return;
         final body = frame.body;
         if (body == null || body.isEmpty) return;
 
@@ -262,6 +303,7 @@ class NotificationProvider extends ChangeNotifier {
     _stompClient?.subscribe(
       destination: '/user/queue/messages',
       callback: (frame) {
+        if (!apiHasToken || _suppressTokenUpload) return;
         final body = frame.body;
         if (body == null || body.isEmpty) return;
 
@@ -283,15 +325,23 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> _syncDeviceToken() async {
-    if (!firebaseReady || !apiHasToken || kIsWeb || _deviceTokenSyncing) return;
+    if (!firebaseReady ||
+        !apiHasToken ||
+        kIsWeb ||
+        _deviceTokenSyncing ||
+        _suppressTokenUpload) {
+      return;
+    }
     _deviceTokenSyncing = true;
     try {
-      final settings = await FirebaseMessaging.instance.requestPermission()
+      final settings = await FirebaseMessaging.instance
+          .requestPermission()
           .timeout(const Duration(seconds: 5));
       if (settings.authorizationStatus == AuthorizationStatus.denied) return;
 
-      final token = await FirebaseMessaging.instance.getToken()
-          .timeout(const Duration(seconds: 5));
+      final token = await FirebaseMessaging.instance.getToken().timeout(
+        const Duration(seconds: 5),
+      );
       if (token != null) await _uploadDeviceToken(token);
     } catch (e) {
       _log('Device token sync failed or timed out: $e');
@@ -301,7 +351,9 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> _uploadDeviceToken(String token) async {
-    if (!apiHasToken || token == _lastUploadedToken) return;
+    if (!apiHasToken || _suppressTokenUpload || token == _lastUploadedToken) {
+      return;
+    }
 
     try {
       await api.put(
@@ -321,21 +373,23 @@ class NotificationProvider extends ChangeNotifier {
       const android = AndroidInitializationSettings('@mipmap/launcher_icon');
       const darwin = DarwinInitializationSettings();
       const settings = InitializationSettings(android: android, iOS: darwin);
-      await _localNotifications.initialize(
-        settings,
-        onDidReceiveNotificationResponse: (response) {
-          final payload = response.payload;
-          if (payload != null && payload.isNotEmpty) {
-            try {
-              final Map<String, dynamic> data = jsonDecode(payload);
-              final notification = _parseNotificationFromPayload(data);
-              clickNotification(notification);
-            } catch (e) {
-              _log('Failed to parse local notification payload: $e');
-            }
-          }
-        },
-      ).timeout(const Duration(seconds: 4));
+      await _localNotifications
+          .initialize(
+            settings,
+            onDidReceiveNotificationResponse: (response) {
+              final payload = response.payload;
+              if (payload != null && payload.isNotEmpty) {
+                try {
+                  final Map<String, dynamic> data = jsonDecode(payload);
+                  final notification = _parseNotificationFromPayload(data);
+                  clickNotification(notification);
+                } catch (e) {
+                  _log('Failed to parse local notification payload: $e');
+                }
+              }
+            },
+          )
+          .timeout(const Duration(seconds: 4));
 
       const channel = AndroidNotificationChannel(
         'system_internal_notifications',
@@ -357,6 +411,8 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
+    if (!apiHasToken) return;
+
     final notification = message.notification;
     if (notification != null && _localNotificationsReady && !kIsWeb) {
       await _localNotifications.show(

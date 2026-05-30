@@ -13,6 +13,7 @@ class User {
   final String? avatar;
   final String? department;
   final String? phone;
+  final bool faceEnrolled;
 
   User({
     required this.id,
@@ -25,6 +26,7 @@ class User {
     this.avatar,
     this.department,
     this.phone,
+    this.faceEnrolled = false,
   });
 
   String get roleLabel {
@@ -76,6 +78,7 @@ class User {
       status: statusFromBackend(json['status']?.toString()),
       avatar: json['avatarUrl']?.toString(),
       department: json['department']?.toString(),
+      faceEnrolled: json['faceEnrolled'] == true,
     );
   }
 
@@ -92,6 +95,7 @@ class User {
       avatar: json['avatarUrl']?.toString(),
       department: json['department']?.toString(),
       phone: json['phone']?.toString(),
+      faceEnrolled: json['faceEnrolled'] == true,
     );
   }
 }

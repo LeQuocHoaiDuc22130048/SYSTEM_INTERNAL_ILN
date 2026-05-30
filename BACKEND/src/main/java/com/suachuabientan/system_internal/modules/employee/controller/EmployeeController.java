@@ -1,6 +1,7 @@
 package com.suachuabientan.system_internal.modules.employee.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
+import com.suachuabientan.system_internal.modules.employee.dto.request.EnrollFaceRequest;
 import com.suachuabientan.system_internal.modules.employee.dto.request.UpdateEmployeeRequest;
 import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeDetailResponse;
 import com.suachuabientan.system_internal.modules.employee.service.EmployeeService;
@@ -101,10 +102,14 @@ public class EmployeeController {
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> enrollFace(
             @PathVariable UUID id,
-            @RequestParam String faceEncoding,
+            @Valid @RequestBody EnrollFaceRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
-                employeeService.enrollFace(id, faceEncoding, userDetails.getUserId()),
+                employeeService.enrollFace(
+                        id,
+                        request.faceImageBase64(),
+                        request.imageContentType(),
+                        userDetails.getUserId()),
                 "Đăng ký khuôn mặt thành công"));
     }
 }

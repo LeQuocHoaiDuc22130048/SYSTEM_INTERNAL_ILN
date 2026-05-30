@@ -44,33 +44,95 @@ class BackendDataProvider extends ChangeNotifier {
   }
 
   Future<void> loadEmployees({bool notify = true}) async {
-    final data = await api.get('/api/v1/employees', queryParameters: {
-      'size': 200,
-    });
+    final data = await api.get(
+      '/api/v1/employees',
+      queryParameters: {'size': 200},
+    );
     employees = _content(data).map(User.fromJson).toList();
     if (notify) notifyListeners();
   }
 
   Future<void> loadPendingUsers({bool notify = true}) async {
-    final data = await api.get('/api/v1/auth/pending', queryParameters: {
-      'size': 200,
-    });
+    final data = await api.get(
+      '/api/v1/auth/pending',
+      queryParameters: {'size': 200},
+    );
     pendingUsers = _content(data).map(User.fromJson).toList();
     if (notify) notifyListeners();
   }
 
   Future<void> loadRepairOrders({bool notify = true}) async {
-    final data = await api.get('/api/v1/repair-orders', queryParameters: {
-      'size': 200,
-    });
+    final data = await api.get(
+      '/api/v1/repair-orders',
+      queryParameters: {'size': 200},
+    );
     repairOrders = _content(data).map(RepairOrder.fromJson).toList();
     if (notify) notifyListeners();
   }
 
+  Future<RepairOrder> createRepairOrder({
+    required String customerName,
+    required String customerPhone,
+    required String deviceName,
+    required String description,
+  }) async {
+    final data = await api.post(
+      '/api/v1/repair-orders',
+      body: {
+        'customerName': customerName,
+        'customerPhone': customerPhone,
+        'deviceName': deviceName,
+        'description': description,
+      },
+    );
+    return RepairOrder.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> uploadRepairMedia(
+    String orderId, {
+    required Uint8List bytes,
+    required String filename,
+    required bool isVideo,
+  }) async {
+    await api.postMultipart(
+      '/api/v1/repair-orders/$orderId/media',
+      fields: {'type': isVideo ? 'VIDEO' : 'IMAGE'},
+      filename: filename,
+      bytes: bytes,
+    );
+  }
+
+  Future<void> assignRepairOrder(
+    String orderId, {
+    required String technicianId,
+    String? note,
+    bool reload = true,
+  }) async {
+    await api.put(
+      '/api/v1/repair-orders/$orderId/assign',
+      body: {'technicianId': technicianId, 'note': note},
+    );
+    if (reload) await loadRepairOrders();
+  }
+
+  Future<void> updateRepairOrderStatus(
+    String orderId, {
+    required String status,
+    String? note,
+    bool reload = true,
+  }) async {
+    await api.patch(
+      '/api/v1/repair-orders/$orderId/status',
+      body: {'status': status, 'note': note},
+    );
+    if (reload) await loadRepairOrders();
+  }
+
   Future<void> loadBoards({bool notify = true}) async {
-    final data = await api.get('/api/v1/boards', queryParameters: {
-      'size': 200,
-    });
+    final data = await api.get(
+      '/api/v1/boards',
+      queryParameters: {'size': 200},
+    );
     boards = _content(data).map(Board.fromJson).toList();
     if (notify) notifyListeners();
   }
@@ -83,29 +145,46 @@ class BackendDataProvider extends ChangeNotifier {
           .map(AttendanceRecord.fromDailyJson)
           .toList();
     } else {
-      attendanceRecords = _content(data).map(AttendanceRecord.fromJson).toList();
+      attendanceRecords = _content(
+        data,
+      ).map(AttendanceRecord.fromJson).toList();
     }
     if (notify) notifyListeners();
   }
 
   Future<void> approveUser(User user) async {
-    await api.put('/api/v1/auth/pending/${user.id}', body: {
-      'action': 'APPROVE',
-      'note': null,
-    });
+    await api.put(
+      '/api/v1/auth/pending/${user.id}',
+      body: {'action': 'APPROVE', 'note': null},
+    );
     await loadPendingUsers();
   }
 
   Future<void> rejectUser(User user) async {
-    await api.put('/api/v1/auth/pending/${user.id}', body: {
-      'action': 'REJECT',
-      'note': 'Từ chối từ ứng dụng',
-    });
+    await api.put(
+      '/api/v1/auth/pending/${user.id}',
+      body: {'action': 'REJECT', 'note': 'Từ chối từ ứng dụng'},
+    );
     await loadPendingUsers();
   }
 
   Future<void> updateEmployee(String id, Map<String, dynamic> data) async {
     await api.patch('/api/v1/employees/$id', body: data);
+    await loadEmployees();
+  }
+
+  Future<void> enrollFace(
+    String id, {
+    required String faceImageBase64,
+    required String imageContentType,
+  }) async {
+    await api.post(
+      '/api/v1/employees/$id/face',
+      body: {
+        'faceImageBase64': faceImageBase64,
+        'imageContentType': imageContentType,
+      },
+    );
     await loadEmployees();
   }
 
@@ -117,7 +196,9 @@ class BackendDataProvider extends ChangeNotifier {
   List<Map<String, dynamic>> _content(dynamic data) {
     if (data is Map<String, dynamic>) {
       final content = data['content'];
-      if (content is List) return content.whereType<Map<String, dynamic>>().toList();
+      if (content is List) {
+        return content.whereType<Map<String, dynamic>>().toList();
+      }
     }
     if (data is List) return data.whereType<Map<String, dynamic>>().toList();
     return const [];

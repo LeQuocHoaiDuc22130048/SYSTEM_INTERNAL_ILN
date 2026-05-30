@@ -22,16 +22,15 @@ class ChatProvider extends ChangeNotifier {
 
   StreamSubscription? _messageStreamSubscription;
 
-  ChatProvider({
-    required this.api,
-    required this.notificationProvider,
-  }) {
+  ChatProvider({required this.api, required this.notificationProvider}) {
     _subscribeToMessages();
   }
 
   void _subscribeToMessages() {
     _messageStreamSubscription?.cancel();
-    _messageStreamSubscription = notificationProvider.messageStream.listen((data) {
+    _messageStreamSubscription = notificationProvider.messageStream.listen((
+      data,
+    ) {
       try {
         final message = ChatMessage.fromJson(data);
 
@@ -46,7 +45,9 @@ class ChatProvider extends ChangeNotifier {
         }
 
         // 2. Update the conversation list's lastMessage and unread count
-        final index = conversations.indexWhere((c) => c.id == message.conversationId);
+        final index = conversations.indexWhere(
+          (c) => c.id == message.conversationId,
+        );
         if (index != -1) {
           final conv = conversations[index];
           final updatedConv = ChatConversation(
@@ -86,7 +87,10 @@ class ChatProvider extends ChangeNotifier {
     return conversations.fold(0, (sum, c) => sum + c.unreadCount);
   }
 
-  void updateAuthAndNotification(AuthProvider auth, NotificationProvider notifications) {
+  void updateAuthAndNotification(
+    AuthProvider auth,
+    NotificationProvider notifications,
+  ) {
     notificationProvider = notifications;
     _subscribeToMessages();
     final token = auth.api.accessToken;
@@ -129,7 +133,9 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final data = await api.get('/api/v1/conversations/$conversationId/messages');
+      final data = await api.get(
+        '/api/v1/conversations/$conversationId/messages',
+      );
       if (data is Map<String, dynamic> && data['content'] is List) {
         final content = data['content'] as List;
         activeMessages = content.map((m) => ChatMessage.fromJson(m)).toList();
@@ -143,7 +149,12 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> sendMessage(String conversationId, String content, {String? mediaUrl, String messageType = 'TEXT'}) async {
+  Future<void> sendMessage(
+    String conversationId,
+    String content, {
+    String? mediaUrl,
+    String messageType = 'TEXT',
+  }) async {
     try {
       final data = await api.post(
         '/api/v1/conversations/$conversationId/messages',
@@ -153,54 +164,83 @@ class ChatProvider extends ChangeNotifier {
           'messageType': messageType,
         },
       );
-      if (data is Map<String, dynamic>) {
-        final sentMessage = ChatMessage.fromJson(data);
-        if (activeConversationId == conversationId) {
-          if (!activeMessages.any((m) => m.id == sentMessage.id)) {
-            activeMessages = [sentMessage, ...activeMessages];
-            notifyListeners();
-          }
-        }
-
-        final index = conversations.indexWhere((c) => c.id == conversationId);
-        if (index != -1) {
-          final conv = conversations[index];
-          final updatedConv = ChatConversation(
-            id: conv.id,
-            type: conv.type,
-            name: conv.name,
-            avatarUrl: conv.avatarUrl,
-            members: conv.members,
-            lastMessage: ConversationMessageInfo(
-              id: sentMessage.id,
-              senderName: sentMessage.sender.fullName,
-              content: sentMessage.content,
-              messageType: sentMessage.messageType,
-              sentAt: sentMessage.sentAt,
-            ),
-            unreadCount: 0,
-            createdAt: conv.createdAt,
-          );
-          conversations.removeAt(index);
-          conversations.insert(0, updatedConv);
-          notifyListeners();
-        }
-      }
+      _consumeSentMessage(conversationId, data);
     } catch (e) {
       debugPrint('[CHAT] Failed to send message: $e');
       rethrow;
     }
   }
 
-  Future<void> createConversation(String type, String name, List<String> memberIds) async {
+  Future<void> sendMediaMessage(
+    String conversationId, {
+    required Uint8List bytes,
+    required String filename,
+    required String messageType,
+    String content = '',
+  }) async {
+    try {
+      final data = await api.postMultipart(
+        '/api/v1/conversations/$conversationId/messages/media',
+        fields: {
+          'messageType': messageType,
+          if (content.trim().isNotEmpty) 'content': content.trim(),
+        },
+        filename: filename,
+        bytes: bytes,
+      );
+      _consumeSentMessage(conversationId, data);
+    } catch (e) {
+      debugPrint('[CHAT] Failed to upload attachment: $e');
+      rethrow;
+    }
+  }
+
+  String mediaUrl(String mediaPath) => api.resolveUrl(mediaPath);
+
+  void _consumeSentMessage(String conversationId, dynamic data) {
+    if (data is! Map<String, dynamic>) return;
+
+    final sentMessage = ChatMessage.fromJson(data);
+    if (activeConversationId == conversationId &&
+        !activeMessages.any((m) => m.id == sentMessage.id)) {
+      activeMessages = [sentMessage, ...activeMessages];
+      notifyListeners();
+    }
+
+    final index = conversations.indexWhere((c) => c.id == conversationId);
+    if (index == -1) return;
+
+    final conv = conversations[index];
+    final updatedConv = ChatConversation(
+      id: conv.id,
+      type: conv.type,
+      name: conv.name,
+      avatarUrl: conv.avatarUrl,
+      members: conv.members,
+      lastMessage: ConversationMessageInfo(
+        id: sentMessage.id,
+        senderName: sentMessage.sender.fullName,
+        content: sentMessage.content,
+        messageType: sentMessage.messageType,
+        sentAt: sentMessage.sentAt,
+      ),
+      unreadCount: 0,
+      createdAt: conv.createdAt,
+    );
+    conversations.removeAt(index);
+    conversations.insert(0, updatedConv);
+    notifyListeners();
+  }
+
+  Future<void> createConversation(
+    String type,
+    String name,
+    List<String> memberIds,
+  ) async {
     try {
       final data = await api.post(
         '/api/v1/conversations',
-        body: {
-          'type': type,
-          'name': name,
-          'memberIds': memberIds,
-        },
+        body: {'type': type, 'name': name, 'memberIds': memberIds},
       );
       if (data is Map<String, dynamic>) {
         final newConv = ChatConversation.fromJson(data);

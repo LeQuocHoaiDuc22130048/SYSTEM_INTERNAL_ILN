@@ -1,5 +1,5 @@
 package com.suachuabientan.system_internal.modules.messaging.enums;
 
 public enum MessageType {
-    TEXT, IMAGE, FILE, SYSTEM
+    TEXT, IMAGE, VIDEO, FILE, SYSTEM
 }

@@ -3,15 +3,25 @@ import '../models/user.dart';
 import 'api_client.dart';
 
 class AuthProvider extends ChangeNotifier {
-  final ApiClient api = ApiClient();
+  final ApiClient api;
+
+  AuthProvider({ApiClient? apiClient}) : api = apiClient ?? ApiClient() {
+    api.onSessionExpired = _expireSession;
+  }
 
   User? _currentUser;
   bool _isLoading = false;
+  bool _isLoadingProfile = false;
+  String? _profileError;
+  String? _logoutWarning;
 
   User? get currentUser => _currentUser;
   String? get refreshToken => api.refreshToken;
   bool get isAuthenticated => api.accessToken != null;
   bool get isLoading => _isLoading;
+  bool get isLoadingProfile => _isLoadingProfile;
+  String? get profileError => _profileError;
+  String? get logoutWarning => _logoutWarning;
   UserRole get role => _currentUser?.role ?? UserRole.employee;
   bool get isEmployee => role == UserRole.employee;
 
@@ -36,6 +46,8 @@ class AuthProvider extends ChangeNotifier {
 
       api.accessToken = data['accessToken']?.toString();
       api.refreshToken = data['refreshToken']?.toString();
+      _profileError = null;
+      _logoutWarning = null;
 
       final userInfo = data['userInfo'];
       if (api.accessToken == null || userInfo is! Map<String, dynamic>) {
@@ -43,7 +55,9 @@ class AuthProvider extends ChangeNotifier {
       }
 
       _currentUser = User.fromLoginJson(userInfo);
-      _log('Login success for username=${_currentUser?.username}, role=${_currentUser?.roleLabel}');
+      _log(
+        'Login success for username=${_currentUser?.username}, role=${_currentUser?.roleLabel}',
+      );
       Future.microtask(loadMe);
     });
   }
@@ -74,6 +88,7 @@ class AuthProvider extends ChangeNotifier {
   Future<void> forgotPassword({
     required String username,
     required String phone,
+    required String otp,
     required String newPassword,
     required String confirmPassword,
   }) async {
@@ -83,6 +98,7 @@ class AuthProvider extends ChangeNotifier {
         body: {
           'username': username,
           'phone': phone,
+          'otp': otp,
           'newPassword': newPassword,
           'confirmPassword': confirmPassword,
         },
@@ -90,7 +106,22 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  Future<void> requestPasswordResetOtp({
+    required String username,
+    required String phone,
+  }) async {
+    await _run(() async {
+      await api.post(
+        '/api/v1/auth/forgot-password/otp',
+        body: {'username': username, 'phone': phone},
+      );
+    });
+  }
+
   Future<void> loadMe() async {
+    _isLoadingProfile = true;
+    _profileError = null;
+    notifyListeners();
     try {
       _log('Loading current user profile');
       final data = await api.get('/api/v1/employees/me');
@@ -99,20 +130,28 @@ class AuthProvider extends ChangeNotifier {
         _log('Profile loaded for username=${_currentUser?.username}');
         notifyListeners();
       }
+    } on ApiException catch (error) {
+      _log('Profile load failed; keeping login user info');
+      _profileError = error.message;
     } catch (_) {
       _log('Profile load failed; keeping login user info');
-      // Login data is enough to keep the session usable.
+      _profileError = 'Không thể tải thông tin hồ sơ. Vui lòng thử lại.';
+    } finally {
+      _isLoadingProfile = false;
+      notifyListeners();
     }
   }
 
   Future<void> logout() async {
     _log('Logout started');
+    _logoutWarning = null;
     final token = api.refreshToken;
     if (token != null) {
       try {
         await api.post('/api/v1/auth/logout', body: {'refreshToken': token});
       } catch (_) {
-        // Local logout still clears credentials if the server is unreachable.
+        _logoutWarning =
+            'Đã đăng xuất trên thiết bị, nhưng máy chủ chưa xác nhận thu hồi phiên do mất kết nối.';
       }
     }
 
@@ -120,6 +159,15 @@ class AuthProvider extends ChangeNotifier {
     api.refreshToken = null;
     _currentUser = null;
     _log('Logout completed locally');
+    notifyListeners();
+  }
+
+  void _expireSession() {
+    api.accessToken = null;
+    api.refreshToken = null;
+    _currentUser = null;
+    _profileError = null;
+    _log('Session expired because refresh token was rejected');
     notifyListeners();
   }
 

@@ -35,6 +35,21 @@ Mọi dữ liệu trao đổi với Client đều phải đi qua tầng Mapper �
 * **Request:** `Flutter -> Controller -> DTO -> Mapper -> Entity -> Repository -> DB`
 * **Response:** `DB -> Repository -> Entity -> Mapper -> DTO -> Controller -> Flutter`
 
+## Dịch vụ nhận diện khuôn mặt
+Ứng dụng Flutter dùng ML Kit để kiểm tra và crop một khuôn mặt, sau đó gửi ảnh JPEG dạng Base64 cho backend. Backend không lưu ảnh gốc; backend gọi dịch vụ Python FaceNet/OpenCV và chỉ lưu embedding JSON.
+
+Thiết lập URL dịch vụ AI bằng biến môi trường `FACE_RECOGNITION_BASE_URL` (mặc định `http://localhost:5000`). Dịch vụ AI cần cung cấp:
+
+```http
+POST /api/v1/faces/encode
+{"imageBase64":"...","imageContentType":"image/jpeg"}
+-> {"encoding":[0.12,-0.08,...]}
+
+POST /api/v1/faces/verify
+{"enrolledEncoding":[0.12,-0.08,...],"imageBase64":"...","imageContentType":"image/jpeg"}
+-> {"matched":true,"confidence":0.98}
+```
+
 ## Quy tắc phát triển (Development Rules)
 * **Tính đóng gói:** Module A không gọi trực tiếp Repository/Entity của Module B. Giao tiếp qua Service Interface
 * **Dữ liệu:** Tuyệt đối không trả Entity trực tiếp về Client. Bắt buộc dùng DTO

@@ -5,9 +5,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/repair_order.dart';
+import '../models/user.dart';
 import '../theme/app_colors.dart';
+import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
 
@@ -37,7 +40,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   @override
   void didUpdateWidget(covariant RepairOrdersPage oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.targetOrderId != null && widget.targetOrderId != oldWidget.targetOrderId) {
+    if (widget.targetOrderId != null &&
+        widget.targetOrderId != oldWidget.targetOrderId) {
       _showOrderById(widget.targetOrderId!);
     }
   }
@@ -76,7 +80,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     final currentFilter = _filter.value;
     final orders = context.read<BackendDataProvider>().repairOrders;
     return orders.where((order) {
-      final matchesFilter = currentFilter == null || order.status == currentFilter;
+      final matchesFilter =
+          currentFilter == null || order.status == currentFilter;
       final matchesSearch =
           query.isEmpty ||
           order.deviceName.toLowerCase().contains(query) ||
@@ -161,7 +166,10 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   decoration: InputDecoration(
                                     hintText:
                                         'Tìm theo mã đơn, thiết bị, khách hàng...',
-                                    prefixIcon: const Icon(Icons.search, size: 20),
+                                    prefixIcon: const Icon(
+                                      Icons.search,
+                                      size: 20,
+                                    ),
                                     filled: true,
                                     fillColor: isDark
                                         ? AppColors.surfaceDark
@@ -176,16 +184,25 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                               const SizedBox(width: 8),
                               Container(
                                 decoration: BoxDecoration(
-                                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                                  color: isDark
+                                      ? AppColors.surfaceDark
+                                      : Colors.white,
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                    color: isDark
+                                        ? AppColors.borderDark
+                                        : AppColors.borderLight,
                                   ),
                                 ),
                                 child: IconButton(
                                   onPressed: () {},
-                                  icon: const Icon(LucideIcons.listFilter, size: 20),
-                                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                  icon: const Icon(
+                                    LucideIcons.listFilter,
+                                    size: 20,
+                                  ),
+                                  color: isDark
+                                      ? AppColors.textPrimaryDark
+                                      : AppColors.textPrimaryLight,
                                 ),
                               ),
                             ],
@@ -242,51 +259,53 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                           isDark: isDark,
                         )
                       : AnimatedBuilder(
-                    animation: Listenable.merge([_searchQuery, _filter]),
-                    builder: (context, _) {
-                      final filtered = _filteredOrders;
-                      if (filtered.isEmpty) {
-                        return _EmptyOrders(isDark: isDark);
-                      }
-                      return ListView.builder(
-                          padding: EdgeInsets.fromLTRB(
-                            wide ? 20 : 22,
-                            4,
-                            wide ? 20 : 22,
-                            24,
-                          ),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) {
-                            return Center(
-                              child: ConstrainedBox(
-                                constraints: const BoxConstraints(
-                                  maxWidth: 980,
-                                ),
-                                child: Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child:
-                                      _OrderCard(
-                                            order: filtered[index],
-                                            isDark: isDark,
-                                          )
-                                          .animate(target: 1)
-                                          .fadeIn(
-                                            duration: 320.ms,
-                                            delay: (index * 45).ms,
-                                          )
-                                          .slideY(
-                                            begin: 0.08,
-                                            end: 0,
-                                            duration: 320.ms,
-                                            delay: (index * 45).ms,
-                                          ),
-                                ),
+                          animation: Listenable.merge([_searchQuery, _filter]),
+                          builder: (context, _) {
+                            final filtered = _filteredOrders;
+                            if (filtered.isEmpty) {
+                              return _EmptyOrders(isDark: isDark);
+                            }
+                            return ListView.builder(
+                              padding: EdgeInsets.fromLTRB(
+                                wide ? 20 : 22,
+                                4,
+                                wide ? 20 : 22,
+                                24,
                               ),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                return Center(
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 980,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.only(
+                                        bottom: 12,
+                                      ),
+                                      child:
+                                          _OrderCard(
+                                                order: filtered[index],
+                                                isDark: isDark,
+                                              )
+                                              .animate(target: 1)
+                                              .fadeIn(
+                                                duration: 320.ms,
+                                                delay: (index * 45).ms,
+                                              )
+                                              .slideY(
+                                                begin: 0.08,
+                                                end: 0,
+                                                duration: 320.ms,
+                                                delay: (index * 45).ms,
+                                              ),
+                                    ),
+                                  ),
+                                );
+                              },
                             );
                           },
-                        );
-                    },
-                  ),
+                        ),
                 ),
               ],
             );
@@ -311,7 +330,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
           label: Text('$label  $count'),
           selected: isSelected,
           onSelected: (selected) => _filter.value = selected ? status : null,
-          backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
+          backgroundColor: isDark
+              ? AppColors.surfaceDark
+              : const Color(0xFFF1F5F9),
           selectedColor: AppColors.primary,
           labelStyle: TextStyle(
             fontSize: 12,
@@ -660,6 +681,49 @@ class _OrderDetailSheet extends StatelessWidget {
                   ),
                 ),
               ],
+              if (order.media.isNotEmpty) ...[
+                const SizedBox(height: 20),
+                Text(
+                  'Đính kèm',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                ...order.media.map((media) {
+                  final url = context
+                      .read<BackendDataProvider>()
+                      .api
+                      .resolveUrl(media.url);
+                  if (media.isVideo) {
+                    return ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(
+                        Icons.play_circle_outline,
+                        color: AppColors.primary,
+                      ),
+                      title: Text(media.caption ?? 'Video đính kèm'),
+                      onTap: () => launchUrl(Uri.parse(url)),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.network(
+                        url,
+                        width: double.infinity,
+                        height: 160,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  );
+                }),
+              ],
               const SizedBox(height: 24),
               Row(
                 children: [
@@ -672,7 +736,17 @@ class _OrderDetailSheet extends StatelessWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () {},
+                      onPressed: () async {
+                        final updated = await showModalBottomSheet<bool>(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => _EditOrderSheet(order: order),
+                        );
+                        if (updated == true && context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      },
                       child: const Text('Chỉnh sửa'),
                     ),
                   ),
@@ -818,6 +892,317 @@ class _ErrorState extends StatelessWidget {
   }
 }
 
+class _EditOrderSheet extends StatefulWidget {
+  final RepairOrder order;
+
+  const _EditOrderSheet({required this.order});
+
+  @override
+  State<_EditOrderSheet> createState() => _EditOrderSheetState();
+}
+
+class _EditOrderSheetState extends State<_EditOrderSheet> {
+  final _noteController = TextEditingController();
+  String? _technicianId;
+  String? _nextStatus;
+  bool _saving = false;
+
+  bool get _canAssign => context.read<AuthProvider>().role != UserRole.employee;
+
+  @override
+  void initState() {
+    super.initState();
+    _technicianId = widget.order.assignedToId;
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  List<MapEntry<String, String>> _availableStatuses() {
+    switch (widget.order.status) {
+      case RepairOrderStatus.pending:
+        return const [MapEntry('IN_PROGRESS', 'Đang sửa')];
+      case RepairOrderStatus.inProgress:
+        return const [MapEntry('COMPLETED', 'Hoàn thành')];
+      case RepairOrderStatus.completed:
+        return const [MapEntry('DELIVERED', 'Đã giao')];
+      case RepairOrderStatus.delivered:
+        return const [];
+    }
+  }
+
+  Future<void> _save() async {
+    final assignmentChanged =
+        _canAssign && _technicianId != widget.order.assignedToId;
+    if (assignmentChanged && _technicianId == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn người sửa.')));
+      return;
+    }
+    if (!assignmentChanged && _nextStatus == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Chưa có thay đổi để lưu.')));
+      return;
+    }
+
+    setState(() => _saving = true);
+    final backend = context.read<BackendDataProvider>();
+    final note = _noteController.text.trim();
+    try {
+      if (assignmentChanged) {
+        await backend.assignRepairOrder(
+          widget.order.id,
+          technicianId: _technicianId!,
+          note: note.isEmpty ? null : note,
+          reload: _nextStatus == null,
+        );
+      }
+      if (_nextStatus != null) {
+        await backend.updateRepairOrderStatus(
+          widget.order.id,
+          status: _nextStatus!,
+          note: note.isEmpty ? null : note,
+        );
+      }
+      if (!mounted) return;
+      Navigator.pop(context, true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cập nhật đơn sửa chữa thành công!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString()),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final backend = context.watch<BackendDataProvider>();
+    User? assignedTechnician;
+    for (final employee in backend.employees) {
+      if (employee.id == widget.order.assignedToId) {
+        assignedTechnician = employee;
+        break;
+      }
+    }
+    final technicians = backend.employees
+        .where(
+          (user) =>
+              user.role == UserRole.employee &&
+              user.status == UserStatus.active,
+        )
+        .toList();
+    final statuses = _availableStatuses();
+
+    return _KeyboardBottomPadding(
+      child: Container(
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chỉnh sửa ${widget.order.orderNumber}',
+                  style: const TextStyle(
+                    fontSize: 19,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Nhân viên đang sửa chữa',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                _AssignedTechnicianCard(
+                  name:
+                      assignedTechnician?.name ??
+                      widget.order.assignedToName ??
+                      'Chưa phân công',
+                  employeeId: assignedTechnician?.employeeId,
+                  department: assignedTechnician?.department,
+                  phone: assignedTechnician?.phone,
+                  isAssigned: widget.order.assignedToId != null,
+                  isDark: isDark,
+                ),
+                const SizedBox(height: 18),
+                if (_canAssign) ...[
+                  const Text(
+                    'Phân công người sửa',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    initialValue: _technicianId,
+                    items: technicians
+                        .map(
+                          (technician) => DropdownMenuItem(
+                            value: technician.id,
+                            child: Text(technician.name),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) => setState(() => _technicianId = value),
+                    decoration: const InputDecoration(
+                      hintText: 'Chọn nhân viên',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                const Text(
+                  'Cập nhật trạng thái',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _nextStatus,
+                  items: statuses
+                      .map(
+                        (status) => DropdownMenuItem(
+                          value: status.key,
+                          child: Text(status.value),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: statuses.isEmpty
+                      ? null
+                      : (value) => setState(() => _nextStatus = value),
+                  decoration: InputDecoration(
+                    hintText: statuses.isEmpty
+                        ? 'Đơn đã hoàn tất'
+                        : 'Giữ nguyên trạng thái',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: _noteController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(
+                    labelText: 'Ghi chú',
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 22),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: _saving ? null : _save,
+                    child: _saving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Lưu thay đổi'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AssignedTechnicianCard extends StatelessWidget {
+  final String name;
+  final String? employeeId;
+  final String? department;
+  final String? phone;
+  final bool isAssigned;
+  final bool isDark;
+
+  const _AssignedTechnicianCard({
+    required this.name,
+    required this.employeeId,
+    required this.department,
+    required this.phone,
+    required this.isAssigned,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final details = <String>[
+      if (employeeId != null && employeeId!.isNotEmpty) employeeId!,
+      if (department != null && department!.isNotEmpty) department!,
+      if (phone != null && phone!.isNotEmpty) phone!,
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.backgroundDark : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            backgroundColor: isAssigned
+                ? AppColors.infoLight
+                : const Color(0xFFF1F5F9),
+            child: Icon(
+              isAssigned
+                  ? Icons.engineering_outlined
+                  : Icons.person_off_outlined,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
+                if (details.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    details.join(' - '),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isDark
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _CreateOrderSheet extends StatefulWidget {
   const _CreateOrderSheet();
 
@@ -827,206 +1212,327 @@ class _CreateOrderSheet extends StatefulWidget {
 
 class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   final _formKey = GlobalKey<FormState>();
+  final _customerNameController = TextEditingController();
+  final _customerPhoneController = TextEditingController();
+  final _deviceNameController = TextEditingController();
+  final _descriptionController = TextEditingController();
   bool _isLoading = false;
-  File? _selectedImage;
+  String? _technicianId;
+  XFile? _selectedMedia;
+  bool _selectedIsVideo = false;
   final ImagePicker _picker = ImagePicker();
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);
     if (pickedFile != null) {
       setState(() {
-        _selectedImage = File(pickedFile.path);
+        _selectedMedia = pickedFile;
+        _selectedIsVideo = false;
       });
     }
+  }
+
+  Future<void> _pickVideo() async {
+    final pickedFile = await _picker.pickVideo(source: ImageSource.gallery);
+    if (pickedFile != null) {
+      setState(() {
+        _selectedMedia = pickedFile;
+        _selectedIsVideo = true;
+      });
+    }
+  }
+
+  Future<void> _createOrder() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
+    final backend = context.read<BackendDataProvider>();
+
+    try {
+      final order = await backend.createRepairOrder(
+        customerName: _customerNameController.text.trim(),
+        customerPhone: _customerPhoneController.text.replaceAll(
+          RegExp(r'\D'),
+          '',
+        ),
+        deviceName: _deviceNameController.text.trim(),
+        description: _descriptionController.text.trim(),
+      );
+      if (_selectedMedia != null) {
+        await backend.uploadRepairMedia(
+          order.id,
+          bytes: await _selectedMedia!.readAsBytes(),
+          filename: _selectedMedia!.name,
+          isVideo: _selectedIsVideo,
+        );
+      }
+      if (_technicianId != null) {
+        await backend.assignRepairOrder(
+          order.id,
+          technicianId: _technicianId!,
+          reload: false,
+        );
+      }
+      await backend.loadRepairOrders();
+      if (!mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tạo đơn sửa chữa thành công!'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(error.toString()),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _customerNameController.dispose();
+    _customerPhoneController.dispose();
+    _deviceNameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final canAssign = context.watch<AuthProvider>().role != UserRole.employee;
+    final technicians = context
+        .watch<BackendDataProvider>()
+        .employees
+        .where(
+          (user) =>
+              user.role == UserRole.employee &&
+              user.status == UserStatus.active,
+        )
+        .toList();
 
     return _KeyboardBottomPadding(
       child: Container(
         decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE2E8F0),
-                      borderRadius: BorderRadius.circular(2),
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  'Tạo đơn sửa chữa mới',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
+                  const SizedBox(height: 24),
+                  Text(
+                    'Tạo đơn sửa chữa mới',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                _buildTextField(
-                  context,
-                  label: 'Tên khách hàng',
-                  hint: 'Nhập tên khách hàng',
-                  icon: Icons.person_outline,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  context,
-                  label: 'Số điện thoại',
-                  hint: '0901 234 567',
-                  icon: Icons.phone_outlined,
-                  keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  context,
-                  label: 'Tên thiết bị',
-                  hint: 'iPhone 15 Pro Max, MacBook Pro...',
-                  icon: Icons.smartphone_outlined,
-                ),
-                const SizedBox(height: 16),
-                _buildTextField(
-                  context,
-                  label: 'Tình trạng lỗi',
-                  hint: 'Mô tả chi tiết lỗi thiết bị',
-                  icon: Icons.error_outline,
-                  maxLines: 3,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Đính kèm hình ảnh',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  const SizedBox(height: 24),
+                  _buildTextField(
+                    context,
+                    controller: _customerNameController,
+                    label: 'Tên khách hàng',
+                    hint: 'Nhập tên khách hàng',
+                    icon: Icons.person_outline,
                   ),
-                ),
-                const SizedBox(height: 8),
-                if (_selectedImage != null)
-                  Stack(
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(12),
-                        child: Image.file(
-                          _selectedImage!,
-                          width: double.infinity,
-                          height: 150,
-                          fit: BoxFit.cover,
-                        ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    controller: _customerPhoneController,
+                    label: 'Số điện thoại',
+                    hint: '0901 234 567',
+                    icon: Icons.phone_outlined,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    controller: _deviceNameController,
+                    label: 'Tên thiết bị',
+                    hint: 'iPhone 15 Pro Max, MacBook Pro...',
+                    icon: Icons.smartphone_outlined,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    context,
+                    controller: _descriptionController,
+                    label: 'Tình trạng lỗi',
+                    hint: 'Mô tả chi tiết lỗi thiết bị',
+                    icon: Icons.error_outline,
+                    maxLines: 3,
+                  ),
+                  if (canAssign) ...[
+                    const SizedBox(height: 16),
+                    Text(
+                      'Phân công người sửa',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : AppColors.textPrimaryLight,
                       ),
-                      Positioned(
-                        top: 8,
-                        right: 8,
-                        child: GestureDetector(
-                          onTap: () => setState(() => _selectedImage = null),
-                          child: Container(
-                            padding: const EdgeInsets.all(4),
-                            decoration: const BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      initialValue: _technicianId,
+                      items: technicians
+                          .map(
+                            (technician) => DropdownMenuItem(
+                              value: technician.id,
+                              child: Text(technician.name),
                             ),
-                            child: const Icon(Icons.close, color: Colors.white, size: 20),
+                          )
+                          .toList(),
+                      onChanged: (value) =>
+                          setState(() => _technicianId = value),
+                      decoration: const InputDecoration(
+                        hintText: 'Chọn nhân viên (không bắt buộc)',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+                  Text(
+                    'Đính kèm hình ảnh hoặc video',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_selectedMedia != null)
+                    Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: _selectedIsVideo
+                              ? Container(
+                                  width: double.infinity,
+                                  height: 120,
+                                  color: AppColors.infoLight,
+                                  child: const Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.play_circle_outline, size: 42),
+                                      SizedBox(height: 6),
+                                      Text('Video đã chọn'),
+                                    ],
+                                  ),
+                                )
+                              : Image.file(
+                                  File(_selectedMedia!.path),
+                                  width: double.infinity,
+                                  height: 150,
+                                  fit: BoxFit.cover,
+                                ),
+                        ),
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: GestureDetector(
+                            onTap: () => setState(() => _selectedMedia = null),
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ],
-                  )
-                else
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
+                      ],
+                    )
+                  else
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        OutlinedButton.icon(
                           onPressed: () => _pickImage(ImageSource.camera),
                           icon: const Icon(Icons.camera_alt),
                           label: const Text('Chụp ảnh'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight),
-                          ),
                         ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
+                        OutlinedButton.icon(
                           onPressed: () => _pickImage(ImageSource.gallery),
                           icon: const Icon(Icons.photo_library),
-                          label: const Text('Thư viện'),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            side: BorderSide(color: isDark ? AppColors.borderDark : AppColors.borderLight),
-                          ),
+                          label: const Text('Chọn ảnh'),
                         ),
-                      ),
-                    ],
-                  ),
-                const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _isLoading
-                        ? null
-                        : () async {
-                            if (_formKey.currentState!.validate()) {
-                              setState(() => _isLoading = true);
-                              await Future.delayed(
-                                  const Duration(milliseconds: 1500));
-                              if (mounted) {
-                                Navigator.pop(context);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('Tạo đơn sửa chữa thành công!'),
-                                    backgroundColor: AppColors.success,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                    style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16),
+                        OutlinedButton.icon(
+                          onPressed: _pickVideo,
+                          icon: const Icon(Icons.videocam_outlined),
+                          label: const Text('Chọn video'),
+                        ),
+                      ],
                     ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor:
-                                  AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : const Text('Tạo đơn hàng'),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _createOrder,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text('Tạo đơn hàng'),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
 
   Widget _buildTextField(
     BuildContext context, {
+    required TextEditingController controller,
     required String label,
     required String hint,
     required IconData icon,
@@ -1050,6 +1556,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
         ),
         const SizedBox(height: 8),
         TextFormField(
+          controller: controller,
           keyboardType: keyboardType,
           maxLines: maxLines,
           style: const TextStyle(fontSize: 14),
@@ -1095,9 +1602,7 @@ class _KeyboardBottomPadding extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedPadding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(context).bottom,
-      ),
+      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOutCubic,
       child: child,

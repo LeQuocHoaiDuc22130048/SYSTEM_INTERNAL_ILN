@@ -14,6 +14,10 @@ public record ForgotPasswordRequest(
         @Pattern(regexp = "^[0-9]{10,11}$", message = "So dien thoai phai co 10-11 chu so")
         String phone,
 
+        @NotBlank(message = "Ma OTP khong duoc de trong")
+        @Pattern(regexp = "^[0-9]{6}$", message = "Ma OTP phai co 6 chu so")
+        String otp,
+
         @NotBlank(message = "Mat khau moi khong duoc de trong")
         @Pattern(
                 regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).{8,}$",
