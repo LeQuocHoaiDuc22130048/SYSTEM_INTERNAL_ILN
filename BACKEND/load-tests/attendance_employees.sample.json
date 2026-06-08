@@ -1,0 +1,11 @@
+{
+  "employees": [
+    {
+      "employeeId": "00000000-0000-0000-0000-000000000001",
+      "employeeCode": "NV001",
+      "faceImageBase64": "REPLACE_WITH_BASE64_JPEG",
+      "expectedScore": 0.9,
+      "type": "IN"
+    }
+  ]
+}

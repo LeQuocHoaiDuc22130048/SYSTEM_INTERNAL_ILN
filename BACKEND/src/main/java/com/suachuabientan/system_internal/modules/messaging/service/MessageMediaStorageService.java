@@ -41,19 +41,19 @@ public class MessageMediaStorageService {
 
     public StoredMedia store(MultipartFile file, MessageType messageType) {
         if (file == null || file.isEmpty()) {
-            throw new BusinessException("Tep tai len khong duoc de trong");
+            throw new BusinessException("Tệp tải lên không được để trống");
         }
         if (file.getSize() > maxFileSize
                 || (messageType == MessageType.IMAGE && file.getSize() > MAX_IMAGE_BYTES)) {
             throw new BusinessException(messageType == MessageType.IMAGE
-                    ? "Anh khong duoc vuot qua 10 MB"
-                    : "Tep khong duoc vuot qua 50 MB");
+                    ? "Ảnh không được vượt quá 10 MB"
+                    : "Tệp không được vượt quá 50 MB");
         }
 
         String originalName = StringUtils.cleanPath(
                 StringUtils.hasText(file.getOriginalFilename()) ? file.getOriginalFilename() : "attachment");
         if (originalName.contains("..")) {
-            throw new BusinessException("Ten tep khong hop le");
+            throw new BusinessException("Tên tệp không hợp lệ");
         }
         String extension = extensionOf(originalName);
         validateMediaType(messageType, file.getContentType(), extension);
@@ -71,14 +71,14 @@ public class MessageMediaStorageService {
                     .stream(file.getInputStream(), file.getSize(), -1)
                     .build());
         } catch (Exception exception) {
-            throw new BusinessException("Khong the luu tep dinh kem");
+            throw new BusinessException("Không thể lưu tệp đính kèm");
         }
         return new StoredMedia("/api/v1/message-media/" + storedName, originalName);
     }
 
     public DownloadedMedia load(String storedName) {
         if (!StringUtils.hasText(storedName) || storedName.contains("..") || storedName.contains("/") || storedName.contains("\\")) {
-            throw new BusinessException("Duong dan tep khong hop le");
+            throw new BusinessException("Đường dẫn tệp không hợp lệ");
         }
         try {
             StatObjectResponse metadata = minioClient.statObject(StatObjectArgs.builder()
@@ -93,11 +93,11 @@ public class MessageMediaStorageService {
         } catch (ErrorResponseException exception) {
             String code = exception.errorResponse().code();
             if ("NoSuchKey".equals(code) || "NoSuchObject".equals(code) || "NoSuchBucket".equals(code)) {
-                throw new BusinessException("Khong tim thay tep dinh kem", 404);
+                throw new BusinessException("Không tìm thấy tệp đính kèm", 404);
             }
-            throw new BusinessException("Khong the tai tep dinh kem", 502);
+            throw new BusinessException("Không thể tải tệp đính kèm", 502);
         } catch (Exception exception) {
-            throw new BusinessException("Khong the tai tep dinh kem", 502);
+            throw new BusinessException("Không thể tải tệp đính kèm", 502);
         }
     }
 
@@ -117,12 +117,12 @@ public class MessageMediaStorageService {
         if (type == MessageType.IMAGE
                 && !normalizedContentType.startsWith("image/")
                 && !IMAGE_EXTENSIONS.contains(extension)) {
-            throw new BusinessException("Tep duoc chon khong phai hinh anh");
+            throw new BusinessException("Tệp được chọn không phải hình ảnh");
         }
         if (type == MessageType.VIDEO
                 && !normalizedContentType.startsWith("video/")
                 && !VIDEO_EXTENSIONS.contains(extension)) {
-            throw new BusinessException("Tep duoc chon khong phai video");
+            throw new BusinessException("Tệp được chọn không phải video");
         }
     }
 

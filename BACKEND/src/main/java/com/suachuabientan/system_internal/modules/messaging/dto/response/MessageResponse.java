@@ -12,17 +12,21 @@ public record MessageResponse(
         String mediaUrl,
         String messageType,
         Instant sentAt,
-        List<UUID> readByUserIds  // Seen indicator
+        Instant editedAt,
+        Instant deletedForEveryoneAt,
+        List<UUID> readByUserIds,
+        List<UUID> mentionUserIds,
+        List<ReactionInfo> reactions
 ) {
     public String contentPreview() {
         if (content != null && !content.isBlank()) {
             return content.length() <= 120 ? content : content.substring(0, 117) + "...";
         }
         return switch (messageType) {
-            case "IMAGE" -> "Da gui mot hinh anh";
-            case "VIDEO" -> "Da gui mot video";
-            case "FILE" -> "Da gui mot tep dinh kem";
-            default -> "Tin nhan moi";
+            case "IMAGE" -> "Đã gửi một hình ảnh";
+            case "VIDEO" -> "Đã gửi một video";
+            case "FILE" -> "Đã gửi một tệp đính kèm";
+            default -> "Tin nhắn mới";
         };
     }
 
@@ -30,6 +34,13 @@ public record MessageResponse(
             UUID id,
             String fullName,
             String avatarUrl
+    ) {
+    }
+
+    public record ReactionInfo(
+            String emoji,
+            long count,
+            List<UUID> userIds
     ) {
     }
 }

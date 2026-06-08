@@ -10,8 +10,12 @@ public record ConversationResponse(
         String name,
         String avatarUrl,
         List<MemberInfo> members,
-        MessageInfo lastMessage,   // Tin nhắn cuối để preview
-        long unreadCount,          // Số tin chưa đọc
+        MessageInfo lastMessage,
+        MessageInfo pinnedMessage,
+        Boolean pinned,
+        Instant pinnedAt,
+        Boolean notificationsMuted,
+        long unreadCount,
         Instant createdAt
 ) {
     public record MemberInfo(
@@ -19,7 +23,9 @@ public record ConversationResponse(
             String fullName,
             String employeeCode,
             String avatarUrl,
-            Boolean isAdmin
+            Boolean isAdmin,
+            String role,
+            Boolean canChat
     ) {
     }
 

@@ -17,12 +17,43 @@ spring:
       host: ${PROD_REDIS_HOST}
       password: ${PROD_REDIS_PASSWORD}
 
+server:
+  ssl:
+    enabled: ${SERVER_SSL_ENABLED:true}
+    key-store: ${SERVER_SSL_KEY_STORE}
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+    key-store-type: ${SERVER_SSL_KEY_STORE_TYPE:PKCS12}
+    key-alias: ${SERVER_SSL_KEY_ALIAS:}
+
 app:
+  init:
+    super-admin:
+      username: ${SUPER_ADMIN_USERNAME}
+      password: ${SUPER_ADMIN_PASSWORD}
+      full-name: ${SUPER_ADMIN_FULL_NAME}
+    admin:
+      username: ${ADMIN_USERNAME:}
+      password: ${ADMIN_PASSWORD:}
+      full-name: ${ADMIN_FULL_NAME:}
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:${CORS_ALLOWED_ORIGINS}}
+  security:
+    require-https: ${APP_REQUIRE_HTTPS:true}
+    http-redirect:
+      enabled: ${APP_HTTP_REDIRECT_ENABLED:true}
   firebase:
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
     project-id: ${FIREBASE_PROJECT_ID:}
 
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY}
+      expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:86400000}
+      refresh-token:
+        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}
+
 logging:
   level:
     root: WARN
-    com.yourproject: INFO
+    com.suachuabientan.system_internal: INFO

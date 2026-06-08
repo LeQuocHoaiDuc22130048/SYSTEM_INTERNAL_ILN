@@ -21,10 +21,14 @@ class ApiClient {
   ApiClient({http.Client? client, this.onSessionExpired})
     : _client = client ?? http.Client();
 
-  static const Duration _timeout = Duration(seconds: 6);
+  static const Duration _timeout = Duration(seconds: 12);
 
   static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
+  );
+  static const bool _allowInsecureApi = bool.fromEnvironment(
+    'ALLOW_INSECURE_API',
+    defaultValue: false,
   );
 
   static String get baseUrl {
@@ -32,17 +36,24 @@ class ApiClient {
   }
 
   static List<String> get _baseUrlCandidates {
-    if (_configuredBaseUrl.isNotEmpty) return [_configuredBaseUrl];
-    if (kIsWeb) return ['http://192.168.1.152:8888'];
-    if (defaultTargetPlatform == TargetPlatform.android) {
-      return [
-        'http://192.168.1.152:8888',
-        'http://127.0.0.1:8888',
-        'http://10.0.2.2:8888',
-        'http://10.0.3.2:8888',
-      ];
+    if (_configuredBaseUrl.isEmpty) {
+      throw StateError(
+        'API_BASE_URL is required. For local development run Flutter with '
+        '--dart-define=API_BASE_URL=http://<backend-host>:8080 '
+        '--dart-define=ALLOW_INSECURE_API=true. '
+        'Production must use HTTPS because biometric face data must never be '
+        'sent over HTTP.',
+      );
     }
-    return ['http://192.168.1.152:8888'];
+    final candidates = _configuredBaseUrl
+        .split(',')
+        .map((url) => url.trim())
+        .where((url) => url.isNotEmpty)
+        .toList(growable: false);
+    for (final candidate in candidates) {
+      _assertHttpsBaseUrl(candidate);
+    }
+    return candidates;
   }
 
   String? accessToken;
@@ -54,11 +65,13 @@ class ApiClient {
 
   Uri uri(String path, [Map<String, dynamic>? queryParameters]) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$baseUrl$normalizedPath').replace(
+    final uri = Uri.parse('$baseUrl$normalizedPath').replace(
       queryParameters: queryParameters?.map(
         (key, value) => MapEntry(key, value?.toString()),
       ),
     );
+    _assertHttpsUri(uri);
+    return uri;
   }
 
   Future<dynamic> get(
@@ -124,11 +137,12 @@ class ApiClient {
     );
   }
 
-  Future<dynamic> delete(String path) async {
+  Future<dynamic> delete(String path, {Object? body}) async {
     return _send(
       method: 'DELETE',
       path: path,
-      request: (requestUri) => _client.delete(requestUri, headers: _headers()),
+      request: (requestUri) =>
+          _client.delete(requestUri, headers: _headers(), body: _encode(body)),
     );
   }
 
@@ -180,7 +194,8 @@ class ApiClient {
       _log('$method $path -> all base URLs failed: $lastConnectionError');
       throw ApiException(
         0,
-        'Không thể kết nối máy chủ. Vui lòng kiểm tra backend hoặc mạng.',
+        'Khong the ket noi may chu. Hay kiem tra tablet va may backend '
+        'dang cung mang WiFi, mo duoc /health, va cong 8080 khong bi firewall chan.',
       );
     }
 
@@ -243,6 +258,7 @@ class ApiClient {
     _log('Attempting to refresh token...');
     try {
       final refreshUri = Uri.parse('$activeBaseUrl/api/v1/auth/refresh');
+      _assertHttpsUri(refreshUri);
       final response = await _client
           .post(
             refreshUri,
@@ -281,19 +297,36 @@ class ApiClient {
     Map<String, dynamic>? queryParameters,
   ]) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
-    return Uri.parse('$baseUrl$normalizedPath').replace(
+    final uri = Uri.parse('$baseUrl$normalizedPath').replace(
       queryParameters: queryParameters?.map(
         (key, value) => MapEntry(key, value?.toString()),
       ),
     );
+    _assertHttpsUri(uri);
+    return uri;
   }
 
   String resolveUrl(String path) {
     if (path.startsWith('http://') || path.startsWith('https://')) {
+      _assertHttpsUri(Uri.parse(path));
       return path;
     }
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     return '$activeBaseUrl$normalizedPath';
+  }
+
+  static void _assertHttpsBaseUrl(String value) {
+    _assertHttpsUri(Uri.parse(value));
+  }
+
+  static void _assertHttpsUri(Uri uri) {
+    final scheme = uri.scheme.toLowerCase();
+    if (scheme != 'https' && !(_allowInsecureApi && scheme == 'http')) {
+      throw StateError(
+        'Blocked insecure API URL: $uri. HTTPS/TLS is required for biometric data. '
+        'For local development only, run with --dart-define=ALLOW_INSECURE_API=true.',
+      );
+    }
   }
 
   void _log(String message) {

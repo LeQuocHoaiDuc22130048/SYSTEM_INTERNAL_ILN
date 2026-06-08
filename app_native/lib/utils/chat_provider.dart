@@ -50,12 +50,7 @@ class ChatProvider extends ChangeNotifier {
         );
         if (index != -1) {
           final conv = conversations[index];
-          final updatedConv = ChatConversation(
-            id: conv.id,
-            type: conv.type,
-            name: conv.name,
-            avatarUrl: conv.avatarUrl,
-            members: conv.members,
+          final updatedConv = conv.copyWith(
             lastMessage: ConversationMessageInfo(
               id: message.id,
               senderName: message.sender.fullName,
@@ -66,10 +61,10 @@ class ChatProvider extends ChangeNotifier {
             unreadCount: message.conversationId == activeConversationId
                 ? 0
                 : conv.unreadCount + 1,
-            createdAt: conv.createdAt,
           );
           conversations.removeAt(index);
           conversations.insert(0, updatedConv);
+          _sortConversations();
           notifyListeners();
         } else {
           // If we received a message for a conversation we don't have yet, reload conversations
@@ -116,6 +111,7 @@ class ChatProvider extends ChangeNotifier {
       final data = await api.get('/api/v1/conversations');
       if (data is List) {
         conversations = data.map((c) => ChatConversation.fromJson(c)).toList();
+        _sortConversations();
       }
     } catch (e) {
       conversationsError = e.toString();
@@ -154,6 +150,7 @@ class ChatProvider extends ChangeNotifier {
     String content, {
     String? mediaUrl,
     String messageType = 'TEXT',
+    List<String> mentionUserIds = const [],
   }) async {
     try {
       final data = await api.post(
@@ -162,6 +159,7 @@ class ChatProvider extends ChangeNotifier {
           'content': content,
           'mediaUrl': mediaUrl,
           'messageType': messageType,
+          if (mentionUserIds.isNotEmpty) 'mentionUserIds': mentionUserIds,
         },
       );
       _consumeSentMessage(conversationId, data);
@@ -197,6 +195,177 @@ class ChatProvider extends ChangeNotifier {
 
   String mediaUrl(String mediaPath) => api.resolveUrl(mediaPath);
 
+  Future<void> editMessage(
+    String conversationId,
+    String messageId,
+    String content, {
+    List<String> mentionUserIds = const [],
+  }) async {
+    final data = await api.patch(
+      '/api/v1/conversations/$conversationId/messages/$messageId',
+      body: {
+        'content': content,
+        if (mentionUserIds.isNotEmpty) 'mentionUserIds': mentionUserIds,
+      },
+    );
+    _replaceMessage(data);
+  }
+
+  Future<void> deleteMessage(
+    String conversationId,
+    String messageId, {
+    required bool forEveryone,
+  }) async {
+    final data = await api.delete(
+      '/api/v1/conversations/$conversationId/messages/$messageId',
+      body: {'scope': forEveryone ? 'EVERYONE' : 'ME'},
+    );
+    if (forEveryone) {
+      _replaceMessage(data);
+    } else {
+      activeMessages = activeMessages.where((m) => m.id != messageId).toList();
+      notifyListeners();
+    }
+  }
+
+  Future<void> reactToMessage(
+    String conversationId,
+    String messageId,
+    String emoji,
+  ) async {
+    final data = await api.put(
+      '/api/v1/conversations/$conversationId/messages/$messageId/reactions',
+      body: {'emoji': emoji},
+    );
+    _replaceMessage(data);
+  }
+
+  Future<void> removeReaction(
+    String conversationId,
+    String messageId,
+    String emoji,
+  ) async {
+    final data = await api.delete(
+      '/api/v1/conversations/$conversationId/messages/$messageId/reactions',
+      body: {'emoji': emoji},
+    );
+    _replaceMessage(data);
+  }
+
+  Future<void> sendTyping(String conversationId, bool typing) async {
+    try {
+      await api.post(
+        '/api/v1/conversations/$conversationId/typing',
+        body: {'typing': typing},
+      );
+    } catch (e) {
+      debugPrint('[CHAT] Failed to send typing state: $e');
+    }
+  }
+
+  Future<void> pinConversation(String conversationId, bool pinned) async {
+    final data = pinned
+        ? await api.put('/api/v1/conversations/$conversationId/pin')
+        : await api.delete('/api/v1/conversations/$conversationId/pin');
+    _replaceConversation(data);
+  }
+
+  Future<void> pinMessage(String conversationId, String messageId) async {
+    final data = await api.put(
+      '/api/v1/conversations/$conversationId/pinned-message/$messageId',
+    );
+    _replaceConversation(data);
+  }
+
+  Future<void> unpinMessage(String conversationId) async {
+    final data = await api.delete(
+      '/api/v1/conversations/$conversationId/pinned-message',
+    );
+    _replaceConversation(data);
+  }
+
+  Future<void> sendRichMediaUrl(
+    String conversationId, {
+    required String mediaUrl,
+    required String messageType,
+    String content = '',
+  }) {
+    return sendMessage(
+      conversationId,
+      content,
+      mediaUrl: mediaUrl,
+      messageType: messageType,
+    );
+  }
+
+  Future<List<ChatMessage>> searchMessages(
+    String conversationId,
+    String query,
+  ) async {
+    final data = await api.get(
+      '/api/v1/conversations/$conversationId/messages/search',
+      queryParameters: {'query': query, 'size': 30},
+    );
+    return _messagesFromPage(data);
+  }
+
+  Future<List<ChatMessage>> loadGallery(
+    String conversationId,
+    String type,
+  ) async {
+    final data = await api.get(
+      '/api/v1/conversations/$conversationId/gallery',
+      queryParameters: {'type': type, 'size': 60},
+    );
+    return _messagesFromPage(data);
+  }
+
+  Future<void> setNotificationsMuted(
+    String conversationId,
+    bool muted,
+  ) async {
+    final data = muted
+        ? await api.put('/api/v1/conversations/$conversationId/mute')
+        : await api.delete('/api/v1/conversations/$conversationId/mute');
+    _replaceConversation(data);
+  }
+
+  void _replaceConversation(dynamic data) {
+    if (data is! Map<String, dynamic>) return;
+    final updated = ChatConversation.fromJson(data);
+    final index = conversations.indexWhere((c) => c.id == updated.id);
+    if (index == -1) {
+      conversations.insert(0, updated);
+    } else {
+      conversations[index] = updated;
+    }
+    _sortConversations();
+    notifyListeners();
+  }
+
+  void _replaceMessage(dynamic data) {
+    if (data is! Map<String, dynamic>) return;
+    final updated = ChatMessage.fromJson(data);
+    final index = activeMessages.indexWhere((m) => m.id == updated.id);
+    if (index != -1) {
+      activeMessages[index] = updated;
+      notifyListeners();
+    }
+  }
+
+  List<ChatMessage> _messagesFromPage(dynamic data) {
+    if (data is Map<String, dynamic> && data['content'] is List) {
+      return (data['content'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(ChatMessage.fromJson)
+          .toList();
+    }
+    if (data is List) {
+      return data.whereType<Map<String, dynamic>>().map(ChatMessage.fromJson).toList();
+    }
+    return const [];
+  }
+
   void _consumeSentMessage(String conversationId, dynamic data) {
     if (data is! Map<String, dynamic>) return;
 
@@ -211,12 +380,7 @@ class ChatProvider extends ChangeNotifier {
     if (index == -1) return;
 
     final conv = conversations[index];
-    final updatedConv = ChatConversation(
-      id: conv.id,
-      type: conv.type,
-      name: conv.name,
-      avatarUrl: conv.avatarUrl,
-      members: conv.members,
+    final updatedConv = conv.copyWith(
       lastMessage: ConversationMessageInfo(
         id: sentMessage.id,
         senderName: sentMessage.sender.fullName,
@@ -225,10 +389,10 @@ class ChatProvider extends ChangeNotifier {
         sentAt: sentMessage.sentAt,
       ),
       unreadCount: 0,
-      createdAt: conv.createdAt,
     );
     conversations.removeAt(index);
     conversations.insert(0, updatedConv);
+    _sortConversations();
     notifyListeners();
   }
 
@@ -271,6 +435,10 @@ class ChatProvider extends ChangeNotifier {
             avatarUrl: conv.avatarUrl,
             members: conv.members,
             lastMessage: conv.lastMessage,
+            pinnedMessage: conv.pinnedMessage,
+            isPinned: conv.isPinned,
+            pinnedAt: conv.pinnedAt,
+            notificationsMuted: conv.notificationsMuted,
             unreadCount: 0,
             createdAt: conv.createdAt,
           );
@@ -320,6 +488,15 @@ class ChatProvider extends ChangeNotifier {
     activeConversationId = null;
     activeMessages = [];
     notifyListeners();
+  }
+
+  void _sortConversations() {
+    conversations.sort((a, b) {
+      if (a.isPinned != b.isPinned) return a.isPinned ? -1 : 1;
+      final aTime = a.lastMessage?.sentAt ?? a.createdAt;
+      final bTime = b.lastMessage?.sentAt ?? b.createdAt;
+      return bTime.compareTo(aTime);
+    });
   }
 
   @override

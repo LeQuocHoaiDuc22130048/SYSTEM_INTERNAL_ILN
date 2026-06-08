@@ -20,7 +20,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
                                 INNER JOIN conversation_members cm ON c.id = cm.conversation_id
                                 WHERE cm.user_id = :userId
                                   AND c.is_deleted = false
-                                ORDER BY c.updated_at DESC
+                                ORDER BY cm.pinned_at DESC NULLS LAST, c.updated_at DESC
             """, nativeQuery = true)
     List<Conversation> findByMember(@Param("userId") UUID userId);
 

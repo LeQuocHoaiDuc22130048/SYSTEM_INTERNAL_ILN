@@ -148,7 +148,7 @@ class NotificationProvider extends ChangeNotifier {
     } on ApiException catch (e) {
       error = e.message;
     } catch (_) {
-      error = 'Khong the tai thong bao.';
+      error = 'Không thể tải thông báo.';
     } finally {
       isLoading = false;
       if (notify) notifyListeners();

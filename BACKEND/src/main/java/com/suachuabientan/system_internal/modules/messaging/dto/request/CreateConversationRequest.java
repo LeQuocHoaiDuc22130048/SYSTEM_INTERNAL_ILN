@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record CreateConversationRequest(
-        @NotBlank(message = "Loai cuoc tro chuyen khong duoc de trong")
+        @NotBlank(message = "Loại cuộc trò chuyện không được để trống")
         String type,
 
         @Size(max = 100, message = "Tên nhóm tối đa 100 ký tự")

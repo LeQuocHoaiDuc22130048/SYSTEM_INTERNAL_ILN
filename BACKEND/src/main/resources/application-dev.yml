@@ -1,78 +1,61 @@
 server:
-  address: 0.0.0.0
-  port: 8888
+  ssl:
+    enabled: ${SERVER_SSL_ENABLED:false}
 
 spring:
   datasource:
-    url: jdbc:postgresql://localhost:5432/system_internal_db
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/system_internal_db}
     username: ${DB_USERNAME:admin}
     password: ${DB_PASSWORD:admin}
     driver-class-name: org.postgresql.Driver
-
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-    baseline-on-migrate: true
-    baseline-version: 0
-
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        jdbc:
-          time_zone: UTC
-
+    show-sql: false
   data:
     redis:
-      host: localhost
-      port: 6379
-
-  jackson:
-    serialization:
-      write-dates-as-timestamps: false
-      write-durations-as-timestamps: false
-    deserialization:
-      fail-on-ignored-properties: false
-    default-property-inclusion: non_null
-    time-zone: UTC
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
 
 app:
+  face-recognition:
+    base-url: ${FACE_RECOGNITION_BASE_URL:http://127.0.0.1:5000}
+    health-path: ${FACE_RECOGNITION_HEALTH_PATH:/health}
+    skip-duplicate-check: ${FACE_RECOGNITION_SKIP_DUPLICATE_CHECK:true}
   init:
     super-admin:
-      username: ${SUPER_ADMIN_USERNAME:super_admin}
+      username: ${SUPER_ADMIN_USERNAME:superadmin}
       password: ${SUPER_ADMIN_PASSWORD:Admin@123456}
-      full-name: "Super Admin"
+      full-name: ${SUPER_ADMIN_FULL_NAME:Super Admin}
     admin:
       username: ${ADMIN_USERNAME:admin}
       password: ${ADMIN_PASSWORD:Admin@123456}
-      full-name: "Admin"
+      full-name: ${ADMIN_FULL_NAME:Admin}
   cors:
-    allowed-origins: ${CORS_ORIGINS:http://localhost:3000,http://localhost:8080,http://localhost:8081}
-
-  firebase:
-    service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
-    project-id: ${FIREBASE_PROJECT_ID:}
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:*}
+  security:
+    require-https: ${APP_REQUIRE_HTTPS:false}
+    http-redirect:
+      enabled: ${APP_HTTP_REDIRECT_ENABLED:false}
+  attendance:
+    face:
+      match-threshold: ${ATTENDANCE_FACE_MATCH_THRESHOLD:${ATTENDANCE_ARCFACE_MATCH_THRESHOLD:0.57}}
+      ambiguous-margin: ${ATTENDANCE_FACE_AMBIGUOUS_MARGIN:0.03}
+      calibration:
+        far: ${ATTENDANCE_FACE_CALIBRATION_FAR:${ATTENDANCE_ARCFACE_CALIBRATION_FAR:0.0}}
+        frr: ${ATTENDANCE_FACE_CALIBRATION_FRR:${ATTENDANCE_ARCFACE_CALIBRATION_FRR:0.02}}
+        dataset-version: ${ATTENDANCE_FACE_CALIBRATION_DATASET_VERSION:${ATTENDANCE_ARCFACE_CALIBRATION_DATASET_VERSION:dev-local-placeholder}}
+        calibrated-at: ${ATTENDANCE_FACE_CALIBRATED_AT:${ATTENDANCE_ARCFACE_CALIBRATED_AT:2026-05-30T00:00:00Z}}
+        report-path: ${ATTENDANCE_FACE_CALIBRATION_REPORT_PATH:${ATTENDANCE_ARCFACE_CALIBRATION_REPORT_PATH:dev-local-placeholder}}
+    ai-smoke-test:
+      enabled: ${ATTENDANCE_AI_SMOKE_TEST_ENABLED:false}
+      fail-fast: ${ATTENDANCE_AI_SMOKE_TEST_FAIL_FAST:false}
 
 application:
   security:
     jwt:
-      secret-key: ${JWT_SECRET:${JWT_SECRET_KEY:}{8MbuZg{9oi$gE.p%Y*?{H>75lLha[WBtl(Po6@/#K}}
-      expiration: 900000
+      secret-key: ${JWT_SECRET_KEY:dev-only-jwt-secret-key-change-me-32bytes-minimum}
+      expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:86400000}
       refresh-token:
-        expiration: 604800000
-
-springdoc:
-  api-docs:
-    path: /api-docs
-  swagger-ui:
-    path: /swagger-ui.html
-    tags-sorter: alpha
-    operations-sorter: method
-
-logging:
-  level:
-    com.yourproject: DEBUG
+        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}

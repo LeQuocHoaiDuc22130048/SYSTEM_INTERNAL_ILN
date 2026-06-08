@@ -26,7 +26,7 @@ import java.util.UUID;
 public class NotificationController {
     private final NotificationService notificationService;
 
-    @Operation(summary = "Danh sach thong bao cua nguoi dang dang nhap")
+    @Operation(summary = "Danh sách thông báo của người đang đăng nhập")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<NotificationResponse>>> getMyNotifications(
             @PageableDefault(size = 20) Pageable pageable,
@@ -35,7 +35,7 @@ public class NotificationController {
                 notificationService.getMyNotifications(userDetails.getUserId(), pageable)));
     }
 
-    @Operation(summary = "Dem so thong bao chua doc")
+    @Operation(summary = "Đếm số thông báo chưa đọc")
     @GetMapping("/unread-count")
     public ResponseEntity<ApiResponse<Map<String, Long>>> countUnread(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -43,40 +43,40 @@ public class NotificationController {
                 Map.of("unreadCount", notificationService.countUnread(userDetails.getUserId()))));
     }
 
-    @Operation(summary = "Danh dau mot thong bao da doc")
+    @Operation(summary = "Đánh dấu một thông báo đã đọc")
     @PutMapping("/{id}/read")
     public ResponseEntity<ApiResponse<NotificationResponse>> markAsRead(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
                 notificationService.markAsRead(id, userDetails.getUserId()),
-                "Da danh dau thong bao la da doc"));
+                "Đã đánh dấu thông báo là đã đọc"));
     }
 
-    @Operation(summary = "Danh dau tat ca thong bao da doc")
+    @Operation(summary = "Đánh dấu tất cả thông báo đã đọc")
     @PutMapping("/read-all")
     public ResponseEntity<ApiResponse<Map<String, Long>>> markAllAsRead(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         long updated = notificationService.markAllAsRead(userDetails.getUserId());
         return ResponseEntity.ok(ApiResponse.success(
                 Map.of("updatedCount", updated),
-                "Da danh dau tat ca thong bao la da doc"));
+                "Đã đánh dấu tất cả thông báo là đã đọc"));
     }
 
-    @Operation(summary = "Cap nhat Firebase device token cua nguoi dang dang nhap")
+    @Operation(summary = "Cập nhật Firebase device token của người đang đăng nhập")
     @PutMapping("/device-token")
     public ResponseEntity<ApiResponse<Void>> updateDeviceToken(
             @Valid @RequestBody UpdateDeviceTokenRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         notificationService.updateDeviceToken(userDetails.getUserId(), request.deviceToken());
-        return ResponseEntity.ok(ApiResponse.success(null, "Da cap nhat device token"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã cập nhật device token"));
     }
 
-    @Operation(summary = "Huy Firebase device token khi dang xuat thiet bi hien tai")
+    @Operation(summary = "Hủy Firebase device token khi đăng xuất thiết bị hiện tại")
     @DeleteMapping("/device-token")
     public ResponseEntity<ApiResponse<Void>> clearDeviceToken(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         notificationService.clearDeviceToken(userDetails.getUserId());
-        return ResponseEntity.ok(ApiResponse.success(null, "Da huy device token"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã hủy device token"));
     }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:camera/camera.dart';
@@ -11,6 +12,52 @@ class DetectedFace {
   final img.Image frame;
 
   const DetectedFace({required this.face, required this.frame});
+}
+
+class FaceQualityMetrics {
+  const FaceQualityMetrics({
+    required this.yaw,
+    required this.roll,
+    required this.brightness,
+    required this.blurVariance,
+    required this.faceWidth,
+    required this.faceHeight,
+  });
+
+  final double yaw;
+  final double roll;
+  final double brightness;
+  final double blurVariance;
+  final double faceWidth;
+  final double faceHeight;
+}
+
+class FaceDetectionQualityResult {
+  const FaceDetectionQualityResult._({
+    this.detectedFace,
+    this.metrics,
+    this.message,
+  });
+
+  final DetectedFace? detectedFace;
+  final FaceQualityMetrics? metrics;
+  final String? message;
+
+  bool get isAccepted => detectedFace != null;
+
+  factory FaceDetectionQualityResult.accepted(
+    DetectedFace detectedFace,
+    FaceQualityMetrics metrics,
+  ) {
+    return FaceDetectionQualityResult._(
+      detectedFace: detectedFace,
+      metrics: metrics,
+    );
+  }
+
+  factory FaceDetectionQualityResult.rejected(String message) {
+    return FaceDetectionQualityResult._(message: message);
+  }
 }
 
 class FaceDetectorService {
@@ -26,6 +73,13 @@ class FaceDetectorService {
       );
 
   final FaceDetector _detector;
+
+  static const _maxYawDegrees = 12.0;
+  static const _maxRollDegrees = 12.0;
+  static const _minFacePixels = 96.0;
+  static const _minBrightness = 55.0;
+  static const _maxBrightness = 230.0;
+  static const _minBlurVariance = 35.0;
 
   Future<DetectedFace?> detectPrimaryFace(
     CameraImage image,
@@ -47,23 +101,75 @@ class FaceDetectorService {
     return DetectedFace(face: face, frame: uprightFrame);
   }
 
-  Future<DetectedFace?> detectPrimaryFaceFromFile(String imagePath) async {
+  Future<DetectedFace?> detectPrimaryFaceFromFile(
+    String imagePath, {
+    bool requireOpenEyes = true,
+    bool requireBothEyesLandmarks = true,
+    double maxYawDegrees = _maxYawDegrees,
+    double maxRollDegrees = _maxRollDegrees,
+  }) async {
+    final result = await detectPrimaryFaceFromFileWithQuality(
+      imagePath,
+      requireOpenEyes: requireOpenEyes,
+      requireBothEyesLandmarks: requireBothEyesLandmarks,
+      maxYawDegrees: maxYawDegrees,
+      maxRollDegrees: maxRollDegrees,
+    );
+    return result.detectedFace;
+  }
+
+  Future<FaceDetectionQualityResult> detectPrimaryFaceFromFileWithQuality(
+    String imagePath, {
+    bool requireOpenEyes = true,
+    bool requireBothEyesLandmarks = true,
+    double maxYawDegrees = _maxYawDegrees,
+    double maxRollDegrees = _maxRollDegrees,
+  }) async {
     final faces = await _detector.processImage(
       InputImage.fromFilePath(imagePath),
     );
-    if (faces.length != 1) return null;
+    if (faces.isEmpty) {
+      return FaceDetectionQualityResult.rejected(
+        'Không thấy khuôn mặt. Đưa mặt vào giữa khung hình.',
+      );
+    }
+    if (faces.length > 1) {
+      return FaceDetectionQualityResult.rejected(
+        'Chỉ được có 1 khuôn mặt trong khung hình.',
+      );
+    }
 
     final face = faces.single;
-    if (!_isGoodFrontalFace(face)) return null;
 
     final bytes = await File(imagePath).readAsBytes();
     final decoded = img.decodeImage(bytes);
-    if (decoded == null) return null;
+    if (decoded == null) {
+      return FaceDetectionQualityResult.rejected(
+        'Không đọc được ảnh camera. Vui lòng thử lại.',
+      );
+    }
+    final frame = img.bakeOrientation(decoded);
+    final quality = _qualityMetrics(frame, face);
+    final qualityMessage = _qualityFailureMessage(
+      frame,
+      face,
+      metrics: quality,
+      requireOpenEyes: requireOpenEyes,
+      requireBothEyesLandmarks: requireBothEyesLandmarks,
+      maxYawDegrees: maxYawDegrees,
+      maxRollDegrees: maxRollDegrees,
+    );
+    if (qualityMessage != null) {
+      return FaceDetectionQualityResult.rejected(qualityMessage);
+    }
 
-    return DetectedFace(face: face, frame: img.bakeOrientation(decoded));
+    return FaceDetectionQualityResult.accepted(
+      DetectedFace(face: face, frame: frame),
+      quality,
+    );
   }
 
-  bool _isGoodFrontalFace(Face face) {
+  bool _isGoodFrontalFace(Face face, {bool requireOpenEyes = true}) {
     final yaw = (face.headEulerAngleY ?? 0).abs();
     final roll = (face.headEulerAngleZ ?? 0).abs();
     final leftEye = face.leftEyeOpenProbability ?? 1;
@@ -72,14 +178,143 @@ class FaceDetectorService {
         face.landmarks[FaceLandmarkType.leftEye] != null &&
         face.landmarks[FaceLandmarkType.rightEye] != null;
 
-    return yaw <= 12 &&
-        roll <= 12 &&
-        leftEye >= 0.45 &&
-        rightEye >= 0.45 &&
+    return yaw <= _maxYawDegrees &&
+        roll <= _maxRollDegrees &&
+        (!requireOpenEyes || (leftEye >= 0.45 && rightEye >= 0.45)) &&
         hasEyes &&
-        face.boundingBox.width > 72 &&
-        face.boundingBox.height > 72;
+        face.boundingBox.width >= _minFacePixels &&
+        face.boundingBox.height >= _minFacePixels;
   }
+
+  String? _qualityFailureMessage(
+    img.Image frame,
+    Face face, {
+    required FaceQualityMetrics metrics,
+    required bool requireOpenEyes,
+    required bool requireBothEyesLandmarks,
+    required double maxYawDegrees,
+    required double maxRollDegrees,
+  }) {
+    if (metrics.yaw.abs() > maxYawDegrees ||
+        metrics.roll.abs() > maxRollDegrees) {
+      if (maxYawDegrees > _maxYawDegrees) {
+        return 'Quay nhẹ hơn và giữ mặt nằm trong khung hình.';
+      }
+      return 'Nhìn thẳng vào camera, không nghiêng hoặc quay mặt.';
+    }
+
+    if (metrics.faceWidth < _minFacePixels ||
+        metrics.faceHeight < _minFacePixels) {
+      return 'Khuôn mặt quá nhỏ. Đưa mặt lại gần camera hơn.';
+    }
+
+    final hasEyes =
+        face.landmarks[FaceLandmarkType.leftEye] != null &&
+        face.landmarks[FaceLandmarkType.rightEye] != null;
+    if (requireBothEyesLandmarks && !hasEyes) {
+      return 'Camera chưa thấy rõ hai mắt. Điều chỉnh lại khuôn mặt.';
+    }
+
+    if (requireOpenEyes) {
+      final leftEye = face.leftEyeOpenProbability ?? 1;
+      final rightEye = face.rightEyeOpenProbability ?? 1;
+      if (leftEye < 0.45 || rightEye < 0.45) {
+        return 'Vui lòng mở mắt và nhìn thẳng vào camera.';
+      }
+    }
+
+    final crop = _safeFaceCrop(frame, face.boundingBox);
+    if (crop == null) {
+      return 'Khuôn mặt nằm ngoài khung hình. Căn lại khuôn mặt.';
+    }
+
+    if (metrics.brightness < _minBrightness) {
+      return 'Ánh sáng quá tối. Vui lòng chụp ở nơi sáng hơn.';
+    }
+    if (metrics.brightness > _maxBrightness) {
+      return 'Ảnh bị quá sáng. Giảm ánh sáng trực tiếp vào mặt.';
+    }
+
+    if (metrics.blurVariance < _minBlurVariance) {
+      return 'Ảnh bị mờ. Giữ điện thoại ổn định và chụp lại.';
+    }
+
+    return null;
+  }
+
+  FaceQualityMetrics _qualityMetrics(img.Image frame, Face face) {
+    final crop = _safeFaceCrop(frame, face.boundingBox);
+    return FaceQualityMetrics(
+      yaw: face.headEulerAngleY ?? 0,
+      roll: face.headEulerAngleZ ?? 0,
+      brightness: crop == null ? 0 : _averageBrightness(crop),
+      blurVariance: crop == null ? 0 : _laplacianVariance(crop),
+      faceWidth: face.boundingBox.width,
+      faceHeight: face.boundingBox.height,
+    );
+  }
+
+  img.Image? _safeFaceCrop(img.Image frame, Rect boundingBox) {
+    final x = boundingBox.left.floor().clamp(0, frame.width - 1);
+    final y = boundingBox.top.floor().clamp(0, frame.height - 1);
+    final right = boundingBox.right.ceil().clamp(0, frame.width);
+    final bottom = boundingBox.bottom.ceil().clamp(0, frame.height);
+    final width = right - x;
+    final height = bottom - y;
+    if (width < 8 || height < 8) return null;
+    return img.copyCrop(frame, x: x, y: y, width: width, height: height);
+  }
+
+  double _averageBrightness(img.Image image) {
+    var total = 0.0;
+    var count = 0;
+    final step = math.max(1, math.min(image.width, image.height) ~/ 64);
+    for (var y = 0; y < image.height; y += step) {
+      for (var x = 0; x < image.width; x += step) {
+        final pixel = image.getPixel(x, y);
+        total += 0.299 * pixel.r + 0.587 * pixel.g + 0.114 * pixel.b;
+        count++;
+      }
+    }
+    return count == 0 ? 0 : total / count;
+  }
+
+  double _laplacianVariance(img.Image image) {
+    final gray = img.grayscale(
+      image.width > 160 || image.height > 160
+          ? img.copyResize(
+              image,
+              width: 160,
+              height: (image.height * 160 / image.width).round(),
+              interpolation: img.Interpolation.linear,
+            )
+          : image,
+    );
+    final values = <double>[];
+    for (var y = 1; y < gray.height - 1; y += 2) {
+      for (var x = 1; x < gray.width - 1; x += 2) {
+        final center = gray.getPixel(x, y).r.toDouble();
+        final laplacian =
+            gray.getPixel(x - 1, y).r +
+            gray.getPixel(x + 1, y).r +
+            gray.getPixel(x, y - 1).r +
+            gray.getPixel(x, y + 1).r -
+            4 * center;
+        values.add(_toDouble(laplacian));
+      }
+    }
+    if (values.isEmpty) return 0;
+    final mean = values.reduce((a, b) => a + b) / values.length;
+    final variance =
+        values.fold<double>(
+          0,
+          (sum, value) => sum + math.pow(value - mean, 2),
+        ) /
+        values.length;
+    return variance;
+  }
+
+  double _toDouble(num value) => value.toDouble();
 
   InputImage? _toInputImage(CameraImage image, CameraDescription camera) {
     final rotation = _inputImageRotation(camera.sensorOrientation);

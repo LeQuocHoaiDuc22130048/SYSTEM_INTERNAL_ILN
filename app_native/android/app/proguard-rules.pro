@@ -1,0 +1,15 @@
+-keep class io.flutter.plugins.camera.** { *; }
+-keep class io.flutter.plugins.camerax.** { *; }
+-keep class androidx.camera.** { *; }
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_face.** { *; }
+-keep class com.google.android.gms.internal.mlkit_vision_common.** { *; }
+-keep class dev.steenbakker.mobile_scanner.** { *; }
+-keep class com.google.zxing.** { *; }
+
+-dontwarn androidx.camera.**
+-dontwarn com.google.mlkit.**
+-dontwarn com.google.android.gms.internal.mlkit_vision_face.**
+-dontwarn com.google.android.gms.internal.mlkit_vision_common.**
+-dontwarn dev.steenbakker.mobile_scanner.**
+-dontwarn com.google.zxing.**

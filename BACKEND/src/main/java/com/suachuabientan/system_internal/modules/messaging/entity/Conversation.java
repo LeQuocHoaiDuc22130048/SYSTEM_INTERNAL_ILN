@@ -5,6 +5,9 @@ import com.suachuabientan.system_internal.modules.messaging.enums.ConversationTy
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.Instant;
+import java.util.UUID;
+
 @Entity
 @Table(name = "conversations")
 @Getter @Setter
@@ -23,5 +26,13 @@ public class Conversation extends BaseEntity {
     @Column(name = "avatar_url", length = 500)
     private String avatarUrl;
 
+    @Column(name = "pinned_message_id")
+    private UUID pinnedMessageId;
+
+    @Column(name = "pinned_message_at")
+    private Instant pinnedMessageAt;
+
+    @Column(name = "pinned_message_by")
+    private UUID pinnedMessageBy;
 
 }

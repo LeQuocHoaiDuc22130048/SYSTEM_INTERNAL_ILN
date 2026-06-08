@@ -43,3 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Local Flutter dart-define files. Keep real keys out of git.
+env*.json
+!env.example.json

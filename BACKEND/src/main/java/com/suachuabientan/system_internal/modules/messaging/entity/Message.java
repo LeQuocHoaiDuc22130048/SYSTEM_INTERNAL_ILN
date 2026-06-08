@@ -34,4 +34,13 @@ public class Message extends BaseEntity {
 
     @Column(name = "sent_at", nullable = false)
     private Instant sentAt;
+
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
+    @Column(name = "deleted_for_everyone_at")
+    private Instant deletedForEveryoneAt;
+
+    @Column(name = "deleted_by_user_id")
+    private UUID deletedByUserId;
 }

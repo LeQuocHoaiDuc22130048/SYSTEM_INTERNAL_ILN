@@ -7,6 +7,7 @@ import com.suachuabientan.system_internal.modules.attendance.repository.Attendan
 import com.suachuabientan.system_internal.modules.attendance.repository.WorkScheduleRepository;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,10 @@ class AttendanceServiceTest {
     private UserRepository userRepository;
     @Mock
     private FaceRecognitionService faceRecognitionService;
+    @Mock
+    private NotificationService notificationService;
+    @Mock
+    private FaceRecognitionMonitoringService faceRecognitionMonitoringService;
 
     private AttendanceService attendanceService;
     private UUID employeeId;
@@ -45,7 +50,9 @@ class AttendanceServiceTest {
                 attendanceRecordRepository,
                 workScheduleRepository,
                 userRepository,
-                faceRecognitionService);
+                faceRecognitionService,
+                notificationService,
+                faceRecognitionMonitoringService);
         employeeId = UUID.randomUUID();
         employee = new UserEntity();
         employee.setId(employeeId);

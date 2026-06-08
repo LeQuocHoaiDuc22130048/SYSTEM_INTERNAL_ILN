@@ -15,7 +15,7 @@ import java.time.Instant;
 public class TokenCleanupJob {
     private final RefreshTokenRepository refreshTokenRepository;
 
-    @Scheduled(cron = "0 0 2 * * * *") // 2:00 AM mỗi ngày
+    @Scheduled(cron = "0 0 2 * * *") // 2:00 AM mỗi ngày
     @Transactional
     public void cleanExpiredTokens() {
         log.info("TokenCleanupJob: Bắt đầu xóa refresh token hết hạn...");

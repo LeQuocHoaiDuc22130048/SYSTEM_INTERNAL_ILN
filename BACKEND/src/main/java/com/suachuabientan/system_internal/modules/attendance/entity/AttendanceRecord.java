@@ -26,6 +26,10 @@ public class AttendanceRecord extends BaseEntity {
     @Column(name = "check_time", nullable = false)
     private Instant checkTime;
 
+    /** Thoi gian do thiet bi mobile ghi nhan khi offline; chi dung de audit/dedup. */
+    @Column(name = "mobile_check_time")
+    private Instant mobileCheckTime;
+
     /** Đường dẫn ảnh chấm công lưu trên MinIO */
     @Column(name = "face_image_path", length = 500)
     private String faceImagePath;
@@ -37,6 +41,10 @@ public class AttendanceRecord extends BaseEntity {
     /** ID tablet chấm công */
     @Column(name = "device_id", length = 100)
     private String deviceId;
+
+    /** ID log cục bộ từ mobile để sync idempotent, tránh ghi trùng khi retry */
+    @Column(name = "device_log_id", length = 120)
+    private String deviceLogId;
 
     /** FALSE nếu admin huỷ bản ghi */
     @Column(name = "is_valid", nullable = false)

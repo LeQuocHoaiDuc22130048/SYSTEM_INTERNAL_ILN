@@ -2,13 +2,17 @@ package com.suachuabientan.system_internal.modules.attendance.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.CheckinRequest;
+import com.suachuabientan.system_internal.modules.attendance.dto.request.AttendanceSyncRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.CreateScheduleRequest;
+import com.suachuabientan.system_internal.modules.attendance.dto.request.FaceRecognitionLogBatchRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.FaceCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.ManualCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceResponse;
+import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceSyncResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.DailyAttendanceResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.WorkScheduleResponse;
 import com.suachuabientan.system_internal.modules.attendance.service.AttendanceService;
+import com.suachuabientan.system_internal.modules.attendance.service.FaceRecognitionMonitoringService;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,6 +37,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class AttendanceController {
     private final AttendanceService attendanceService;
+    private final FaceRecognitionMonitoringService faceRecognitionMonitoringService;
 
     @Operation(summary = "Cham cong noi bo khong doi chieu khuon mat cho quan ly")
     @PostMapping("/check")
@@ -55,6 +60,17 @@ public class AttendanceController {
         return ResponseEntity.ok(ApiResponse.success(
                 attendanceService.faceCheck(userDetails.getUserId(), request),
                 "Xac minh khuon mat va cham cong thanh cong"));
+    }
+
+    @Operation(summary = "Tablet kiosk nhan dien nhan vien bang khuon mat va cham cong")
+    @PostMapping("/face-identify")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> faceIdentify(
+            @Valid @RequestBody FaceCheckinRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attendanceService.faceIdentify(userDetails.getUserId(), request),
+                "Nhan dien khuon mat va cham cong thanh cong"));
     }
 
     @Operation(summary = "Tong hop cham cong hom nay cua nguoi dang dang nhap")
@@ -83,6 +99,28 @@ public class AttendanceController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(201).body(ApiResponse.created(
                 attendanceService.manualCheck(request, userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Dong bo batch log cham cong offline tu mobile")
+    @PostMapping("/sync")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<AttendanceSyncResponse>> syncOfflineLogs(
+            @Valid @RequestBody AttendanceSyncRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attendanceService.syncOfflineLogs(request, userDetails.getUserId()),
+                "Dong bo cham cong offline hoan tat"));
+    }
+
+    @Operation(summary = "Dong bo log ket qua nhan dien khuon mat de monitor false reject rate")
+    @PostMapping("/recognition-logs/batch")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<Integer>> syncRecognitionLogs(
+            @Valid @RequestBody FaceRecognitionLogBatchRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                faceRecognitionMonitoringService.saveMobileLogs(request, userDetails.getUserId()),
+                "Dong bo log nhan dien hoan tat"));
     }
 
     @Operation(summary = "Xem cham cong theo ngay cua mot nhan vien")

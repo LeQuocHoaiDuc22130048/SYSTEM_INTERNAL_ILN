@@ -20,3 +20,8 @@ services:
       - /mnt/storage/minio_data:/data
     command: server /data --address ":9000" --console-address ":9001"
     restart: always
+
+  face-ai:
+    volumes:
+      - /mnt/storage/face_ai_models:/models
+    restart: always

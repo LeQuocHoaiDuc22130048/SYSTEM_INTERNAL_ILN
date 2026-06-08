@@ -1,5 +1,6 @@
 package com.suachuabientan.system_internal.modules.messaging.entity;
 
+import com.suachuabientan.system_internal.modules.messaging.enums.ConversationMemberRole;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -31,6 +32,29 @@ public class ConversationMember {
     private Instant lastReadAt;
 
     // Admin của nhóm có quyền thêm/bớt thành viên
+    @Builder.Default
     @Column(name = "is_admin", nullable = false)
     private Boolean isAdmin = false;
+
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private ConversationMemberRole role = ConversationMemberRole.MEMBER;
+
+    @Builder.Default
+    @Column(name = "can_chat", nullable = false)
+    private Boolean canChat = true;
+
+    @Column(name = "muted_until")
+    private Instant mutedUntil;
+
+    @Column(name = "banned_at")
+    private Instant bannedAt;
+
+    @Column(name = "pinned_at")
+    private Instant pinnedAt;
+
+    @Builder.Default
+    @Column(name = "notifications_muted", nullable = false)
+    private Boolean notificationsMuted = false;
 }

@@ -4,6 +4,9 @@ import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.employee.dto.request.EnrollFaceRequest;
 import com.suachuabientan.system_internal.modules.employee.dto.request.UpdateEmployeeRequest;
 import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeDetailResponse;
+import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeEmbeddingDeltaResponse;
+import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeEmbeddingMetadataResponse;
+import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeFaceEmbeddingResponse;
 import com.suachuabientan.system_internal.modules.employee.service.EmployeeService;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +21,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+import java.time.Instant;
 import java.util.UUID;
 
 @Tag(name = "Employees", description = "Quản lý nhân viên")
@@ -58,6 +63,28 @@ public class EmployeeController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
                 employeeService.getById(userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Danh sach embedding khuon mat de mobile sync offline")
+    @GetMapping("/embeddings")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<List<EmployeeFaceEmbeddingResponse>>> getFaceEmbeddings() {
+        return ResponseEntity.ok(ApiResponse.success(employeeService.getFaceEmbeddings()));
+    }
+
+    @Operation(summary = "Metadata version/checksum embedding khuon mat")
+    @GetMapping("/embeddings/meta")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<EmployeeEmbeddingMetadataResponse>> getFaceEmbeddingMetadata() {
+        return ResponseEntity.ok(ApiResponse.success(employeeService.getFaceEmbeddingMetadata()));
+    }
+
+    @Operation(summary = "Delta embedding khuon mat thay doi tu moc since")
+    @GetMapping("/embeddings/changes")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<EmployeeEmbeddingDeltaResponse>> getFaceEmbeddingChanges(
+            @RequestParam(required = false) Instant since) {
+        return ResponseEntity.ok(ApiResponse.success(employeeService.getFaceEmbeddingChanges(since)));
     }
 
     // ── Cập nhật thông tin ────────────────────────────────────
@@ -107,9 +134,19 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.success(
                 employeeService.enrollFace(
                         id,
-                        request.faceImageBase64(),
-                        request.imageContentType(),
+                        request,
                         userDetails.getUserId()),
                 "Đăng ký khuôn mặt thành công"));
+    }
+
+    @Operation(summary = "Xoa khuon mat da dang ky cua nhan vien")
+    @DeleteMapping("/{id}/face")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<EmployeeDetailResponse>> deleteFace(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                employeeService.deleteFace(id, userDetails.getUserId()),
+                "Da xoa khuon mat da dang ky"));
     }
 }

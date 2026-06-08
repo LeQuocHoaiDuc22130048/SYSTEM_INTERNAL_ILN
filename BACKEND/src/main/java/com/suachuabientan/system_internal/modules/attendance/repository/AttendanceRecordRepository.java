@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface AttendanceRecordRepository extends JpaRepository<AttendanceRecord, UUID> {
@@ -72,4 +73,24 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
               AND a.isValid = true
             """)
     boolean existsByEmployeeAndTypeToday(@Param("employeeId") UUID employeeId, @Param("type") AttendanceType type, @Param("dayStart") Instant dayStart, @Param("dayEnd") Instant dayEnd);
+
+    Optional<AttendanceRecord> findByDeviceLogIdAndIsDeletedFalse(String deviceLogId);
+
+    boolean existsByEmployeeIdAndCheckTimeAndTypeAndIsDeletedFalse(UUID employeeId, Instant checkTime, AttendanceType type);
+
+    @Query(value = """
+            SELECT * FROM attendance_records a
+            WHERE a.employee_id = :employeeId
+              AND a.type = :type
+              AND a.is_deleted = false
+              AND a.is_valid = true
+              AND COALESCE(a.mobile_check_time, a.check_time) >= :from
+              AND COALESCE(a.mobile_check_time, a.check_time) <= :to
+            ORDER BY a.check_time ASC
+            """, nativeQuery = true)
+    List<AttendanceRecord> findDedupCandidates(
+            @Param("employeeId") UUID employeeId,
+            @Param("type") String type,
+            @Param("from") Instant from,
+            @Param("to") Instant to);
 }

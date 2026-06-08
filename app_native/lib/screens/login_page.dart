@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -105,11 +106,14 @@ class _LoginPageState extends State<LoginPage> {
         _loading = false;
         _error = error.message;
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint('[AUTH] Register unexpected error: $error');
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Không thể đăng ký. Vui lòng thử lại.';
+        _error = kDebugMode
+            ? error.toString()
+            : 'Không thể đăng ký. Vui lòng thử lại.';
       });
     }
   }
@@ -158,11 +162,14 @@ class _LoginPageState extends State<LoginPage> {
         _loading = false;
         _error = error.message;
       });
-    } catch (_) {
+    } catch (error) {
+      debugPrint('[AUTH] Login unexpected error: $error');
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Không thể đăng nhập. Vui lòng thử lại.';
+        _error = kDebugMode
+            ? error.toString()
+            : 'Không thể đăng nhập. Vui lòng thử lại.';
       });
     }
   }

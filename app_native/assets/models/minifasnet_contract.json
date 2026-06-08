@@ -1,0 +1,8 @@
+{
+  "modelName": "minifasnet",
+  "outputLength": 3,
+  "classOrder": ["spoof", "real", "spoof"],
+  "realClassIndex": 1,
+  "threshold": 0.8,
+  "notes": "2.7_80x80_MiniFASNetV2.tflite uses 3-class output; inference script treats label == 1 as Real Face. Run liveness on the original frame face crop, not the embedding-model aligned image."
+}

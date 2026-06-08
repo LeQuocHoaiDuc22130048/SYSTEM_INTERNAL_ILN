@@ -4,8 +4,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 public record UpdateDeviceTokenRequest(
-        @NotBlank(message = "Device token khong duoc de trong")
-        @Size(max = 500, message = "Device token toi da 500 ky tu")
+        @NotBlank(message = "Device token không được để trống")
+        @Size(max = 500, message = "Device token tối đa 500 ký tự")
         String deviceToken
 ) {
 }

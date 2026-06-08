@@ -118,6 +118,58 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  Future<void> updateProfile({
+    required String fullName,
+    String? phone,
+    String? department,
+    String? avatarUrl,
+  }) async {
+    final userId = _currentUser?.id;
+    if (userId == null || userId.isEmpty) {
+      throw ApiException(401, 'Phiên đăng nhập không hợp lệ.');
+    }
+
+    await _run(() async {
+      final data = await api.patch(
+        '/api/v1/employees/$userId',
+        body: {
+          'fullName': fullName,
+          'phone': _emptyToNull(phone),
+          'department': _emptyToNull(department),
+          'avatarUrl': _emptyToNull(avatarUrl),
+        },
+      );
+
+      if (data is Map<String, dynamic>) {
+        _currentUser = User.fromJson(data);
+      }
+      await loadMe();
+    });
+  }
+
+  Future<void> changePassword({
+    required String currentPassword,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    await _run(() async {
+      await api.post(
+        '/api/v1/auth/change-password',
+        body: {
+          'currentPassword': currentPassword,
+          'newPassword': newPassword,
+          'confirmPassword': confirmPassword,
+        },
+      );
+
+      api.accessToken = null;
+      api.refreshToken = null;
+      _currentUser = null;
+      _profileError = null;
+      _logoutWarning = 'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.';
+    });
+  }
+
   Future<void> loadMe() async {
     _isLoadingProfile = true;
     _profileError = null;
@@ -186,5 +238,10 @@ class AuthProvider extends ChangeNotifier {
     if (kDebugMode) {
       debugPrint('[AUTH] $message');
     }
+  }
+
+  String? _emptyToNull(String? value) {
+    final trimmed = value?.trim();
+    return trimmed == null || trimmed.isEmpty ? null : trimmed;
   }
 }

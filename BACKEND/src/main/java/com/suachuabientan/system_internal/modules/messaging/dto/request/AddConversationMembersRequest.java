@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.UUID;
 
 public record AddConversationMembersRequest(
-        @NotEmpty(message = "Danh sach thanh vien khong duoc de trong")
+        @NotEmpty(message = "Danh sách thành viên không được để trống")
         List<UUID> memberIds
 ) {
 }

@@ -15,6 +15,7 @@ public record AttendanceResponse(
         String avatarUrl,
         String type,            // IN | OUT
         Instant checkTime,
+        Instant mobileCheckTime,
         Double confidenceScore,
         String faceImagePath,
         Boolean isValid,

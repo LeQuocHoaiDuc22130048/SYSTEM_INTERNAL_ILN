@@ -12,6 +12,7 @@ import com.suachuabientan.system_internal.modules.auth.entity.PasswordResetOtp;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.entity.UserRegistrationRequestEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.ChangePasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
@@ -217,6 +218,30 @@ public class AuthService {
         userRepository.save(user);
         refreshTokenRepository.revokeAllByUserId(user.getId());
         log.info("Forgot password: reset password and revoked sessions for userId={}", user.getId());
+    }
+
+    @Transactional
+    public void changePassword(UUID userId, ChangePasswordRequest request) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new BusinessException("Mat khau xac nhan khong khop", 400);
+        }
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay nguoi dung"));
+
+        if (!passwordEncoder.matches(request.currentPassword(), user.getPasswordHash())) {
+            throw new BusinessException("Mat khau hien tai khong dung", 400);
+        }
+
+        if (passwordEncoder.matches(request.newPassword(), user.getPasswordHash())) {
+            throw new BusinessException("Mat khau moi phai khac mat khau hien tai", 400);
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        refreshTokenRepository.revokeAllByUserId(user.getId());
+        notificationService.clearDeviceToken(user.getId());
+        log.info("Changed password and revoked sessions for userId={}", user.getId());
     }
 
     private UserEntity findPasswordResetUser(String username, String phone) {

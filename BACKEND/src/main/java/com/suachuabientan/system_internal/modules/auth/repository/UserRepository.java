@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Collection;
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,10 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     List<UserEntity> findByRoleInAndStatusAndIsDeletedFalse(
             Collection<UserRole> role, UserStatus status);
+
+    List<UserEntity> findByStatusAndFaceEnrolledTrueAndFaceEncodingIsNotNullAndIsDeletedFalse(UserStatus status);
+
+    List<UserEntity> findByUpdatedAtAfter(Instant updatedAt);
 
     Optional<UserEntity> findByIdAndIsDeletedFalse(UUID id);
 

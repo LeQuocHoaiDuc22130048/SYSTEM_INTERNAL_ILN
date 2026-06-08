@@ -1,0 +1,74 @@
+{"level":"INFO","message":"Face AI dev fallback started","url":"http://127.0.0.1:5000"}
+{"level":"INFO","message":"\"GET /health HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":2736,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/verify","contentLength":20444,"keys":["enrolledEncoding","imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/verify HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6550,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6650,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":7038,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":7242,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":7066,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6178,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":7402,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6182,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":7262,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6862,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":7426,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":7514,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6618,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6942,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5746,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6662,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6650,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6730,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6706,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5958,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6794,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6138,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6614,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6694,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6974,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5806,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5950,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5206,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5306,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5618,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6450,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6218,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":5762,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}
+{"level":"INFO","message":"Face AI request received","path":"/api/v1/faces/encode","contentLength":6074,"keys":["imageBase64","imageContentType"],"imageContentType":"image/jpeg"}
+{"level":"INFO","message":"\"POST /api/v1/faces/encode HTTP/1.1\" 200 -"}

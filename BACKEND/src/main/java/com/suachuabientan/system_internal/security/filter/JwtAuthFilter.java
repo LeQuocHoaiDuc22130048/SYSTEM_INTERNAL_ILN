@@ -1,6 +1,5 @@
 package com.suachuabientan.system_internal.security.filter;
 
-
 import com.suachuabientan.system_internal.common.util.JwtUtil;
 import com.suachuabientan.system_internal.security.service.UserDetailsServiceImpl;
 import jakarta.servlet.FilterChain;
@@ -19,7 +18,6 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -34,11 +32,6 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             @NonNull HttpServletRequest request,
             @NonNull HttpServletResponse response,
             @NonNull FilterChain filterChain) throws ServletException, IOException {
-
-        // Thêm Correlation ID để trace log
-        String correlationId = UUID.randomUUID().toString().substring(0, 8);
-        org.slf4j.MDC.put("correlationId", correlationId);
-        response.setHeader("X-Correlation-Id", correlationId);
 
         try {
             String token = extractToken(request);
@@ -59,10 +52,8 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
             }
         } catch (Exception ex) {
-            // Không throw — để Security config xử lý unauthorized
+            // Keep request handling stateless; Spring Security will handle unauthorized access.
             log.debug("JWT auth failed for request {}: {}", request.getRequestURI(), ex.getMessage());
-        } finally {
-            org.slf4j.MDC.clear();
         }
 
         filterChain.doFilter(request, response);

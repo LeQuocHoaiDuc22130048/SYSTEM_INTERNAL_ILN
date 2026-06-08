@@ -6,11 +6,11 @@ import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record SendMessageWSRequest(
-        @NotNull(message = "conversationId khong duoc de trong")
+        @NotNull(message = "conversationId không được để trống")
         UUID conversationId,
         String content,
         String mediaUrl,
-        @NotBlank(message = "Loai tin nhan khong duoc de trong")
+        @NotBlank(message = "Loại tin nhắn không được để trống")
         String messageType
 ) {
 }

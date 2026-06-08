@@ -7,14 +7,71 @@ spring:
     multipart:
       max-file-size: 50MB
       max-request-size: 50MB
+  lifecycle:
+    timeout-per-shutdown-phase: ${SPRING_SHUTDOWN_TIMEOUT:60s}
+
+server:
+  address: ${SERVER_ADDRESS:0.0.0.0}
+  shutdown: graceful
+  forward-headers-strategy: framework
+  ssl:
+    enabled: ${SERVER_SSL_ENABLED:true}
+    protocol: TLS
+    enabled-protocols: TLSv1.2,TLSv1.3
+    key-store: ${SERVER_SSL_KEY_STORE:}
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:}
+    key-store-type: ${SERVER_SSL_KEY_STORE_TYPE:PKCS12}
+    key-alias: ${SERVER_SSL_KEY_ALIAS:}
 
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     default-property-inclusion: non_null
 
 app:
+  security:
+    require-https: ${APP_REQUIRE_HTTPS:true}
+    http-redirect:
+      enabled: ${APP_HTTP_REDIRECT_ENABLED:true}
+      port: ${APP_HTTP_REDIRECT_PORT:8080}
   face-recognition:
-    base-url: ${FACE_RECOGNITION_BASE_URL:http://localhost:5000}
+    base-url: ${FACE_RECOGNITION_BASE_URL:http://127.0.0.1:5000}
+    health-path: ${FACE_RECOGNITION_HEALTH_PATH:/health}
+  health:
+    disk:
+      min-free-bytes: ${HEALTH_DISK_MIN_FREE_BYTES:1073741824}
+      min-free-ratio: ${HEALTH_DISK_MIN_FREE_RATIO:0.10}
+  attendance:
+    face:
+      match-threshold: ${ATTENDANCE_FACE_MATCH_THRESHOLD}
+      ambiguous-margin: ${ATTENDANCE_FACE_AMBIGUOUS_MARGIN:0.03}
+      frr-alert-threshold: ${ATTENDANCE_FACE_FRR_ALERT_THRESHOLD:0.05}
+      frr-monitor-cron: ${ATTENDANCE_FACE_FRR_MONITOR_CRON:0 5 0 * * *}
+      calibration:
+        far: ${ATTENDANCE_FACE_CALIBRATION_FAR}
+        frr: ${ATTENDANCE_FACE_CALIBRATION_FRR}
+        dataset-version: ${ATTENDANCE_FACE_CALIBRATION_DATASET_VERSION}
+        calibrated-at: ${ATTENDANCE_FACE_CALIBRATED_AT}
+        report-path: ${ATTENDANCE_FACE_CALIBRATION_REPORT_PATH}
+    biometric-image-audit:
+      enabled: ${ATTENDANCE_BIOMETRIC_IMAGE_AUDIT_ENABLED:false}
+      retention-days: ${ATTENDANCE_BIOMETRIC_IMAGE_AUDIT_RETENTION_DAYS:30}
+      encryption: AES-256-GCM
+    backup:
+      enabled: ${ATTENDANCE_BACKUP_ENABLED:true}
+      directory: ${ATTENDANCE_BACKUP_DIRECTORY:./backups/attendance}
+      retention-days: ${ATTENDANCE_BACKUP_RETENTION_DAYS:30}
+      cron: ${ATTENDANCE_BACKUP_CRON:0 30 2 * * *}
+    ai-smoke-test:
+      enabled: ${ATTENDANCE_AI_SMOKE_TEST_ENABLED:true}
+      fail-fast: ${ATTENDANCE_AI_SMOKE_TEST_FAIL_FAST:true}
+      known-good-image: ${ATTENDANCE_AI_SMOKE_KNOWN_GOOD:}
+      expected-embedding: ${ATTENDANCE_AI_SMOKE_EXPECTED_EMBEDDING:}
+      live-image: ${ATTENDANCE_AI_SMOKE_LIVE_IMAGE:}
+      spoof-image: ${ATTENDANCE_AI_SMOKE_SPOOF_IMAGE:}
+      blurry-image: ${ATTENDANCE_AI_SMOKE_BLURRY_IMAGE:}
+      dark-image: ${ATTENDANCE_AI_SMOKE_DARK_IMAGE:}
+      embedding-dimension: ${ATTENDANCE_AI_SMOKE_EMBEDDING_DIMENSION:512}
+      min-expected-embedding-cosine: ${ATTENDANCE_AI_SMOKE_MIN_EMBEDDING_COSINE:0.995}
   messaging:
     max-file-size: ${MESSAGE_MAX_FILE_SIZE:52428800}
     minio:

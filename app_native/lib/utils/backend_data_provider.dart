@@ -177,14 +177,21 @@ class BackendDataProvider extends ChangeNotifier {
     String id, {
     required String faceImageBase64,
     required String imageContentType,
+    List<Map<String, String>>? samples,
   }) async {
     await api.post(
       '/api/v1/employees/$id/face',
       body: {
         'faceImageBase64': faceImageBase64,
         'imageContentType': imageContentType,
+        if (samples != null && samples.isNotEmpty) 'samples': samples,
       },
     );
+    await loadEmployees();
+  }
+
+  Future<void> deleteFace(String id) async {
+    await api.delete('/api/v1/employees/$id/face');
     await loadEmployees();
   }
 

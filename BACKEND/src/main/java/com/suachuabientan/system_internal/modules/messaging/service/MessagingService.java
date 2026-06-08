@@ -5,20 +5,29 @@ import com.suachuabientan.system_internal.common.exception.ResourceNotFoundExcep
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import com.suachuabientan.system_internal.modules.messaging.dto.request.CreateConversationRequest;
+import com.suachuabientan.system_internal.modules.messaging.dto.request.UpdateMemberRoleRequest;
 import com.suachuabientan.system_internal.modules.messaging.dto.request.SendMessageRequest;
 import com.suachuabientan.system_internal.modules.messaging.dto.request.SendMessageWSRequest;
+import com.suachuabientan.system_internal.modules.messaging.dto.request.UpdateMessageRequest;
 import com.suachuabientan.system_internal.modules.messaging.dto.request.UpdateConversationRequest;
 import com.suachuabientan.system_internal.modules.messaging.dto.response.ConversationResponse;
 import com.suachuabientan.system_internal.modules.messaging.dto.response.MessageResponse;
 import com.suachuabientan.system_internal.modules.messaging.entity.Conversation;
 import com.suachuabientan.system_internal.modules.messaging.entity.ConversationMember;
 import com.suachuabientan.system_internal.modules.messaging.entity.Message;
+import com.suachuabientan.system_internal.modules.messaging.entity.MessageDeletion;
+import com.suachuabientan.system_internal.modules.messaging.entity.MessageMention;
+import com.suachuabientan.system_internal.modules.messaging.entity.MessageReaction;
 import com.suachuabientan.system_internal.modules.messaging.entity.MessageRead;
+import com.suachuabientan.system_internal.modules.messaging.enums.ConversationMemberRole;
 import com.suachuabientan.system_internal.modules.messaging.enums.ConversationType;
 import com.suachuabientan.system_internal.modules.messaging.enums.MessageType;
 import com.suachuabientan.system_internal.modules.messaging.repository.ConversationMemberRepository;
 import com.suachuabientan.system_internal.modules.messaging.repository.ConversationRepository;
+import com.suachuabientan.system_internal.modules.messaging.repository.MessageDeletionRepository;
+import com.suachuabientan.system_internal.modules.messaging.repository.MessageMentionRepository;
 import com.suachuabientan.system_internal.modules.messaging.repository.MessageReadRepository;
+import com.suachuabientan.system_internal.modules.messaging.repository.MessageReactionRepository;
 import com.suachuabientan.system_internal.modules.messaging.repository.MessageRepository;
 import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
 import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
@@ -45,6 +54,9 @@ public class MessagingService {
     private final ConversationMemberRepository conversationMemberRepository;
     private final MessageRepository messageRepository;
     private final MessageReadRepository messageReadRepository;
+    private final MessageDeletionRepository messageDeletionRepository;
+    private final MessageReactionRepository messageReactionRepository;
+    private final MessageMentionRepository messageMentionRepository;
     private final UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
@@ -89,6 +101,11 @@ public class MessagingService {
                         .joinAt(Instant.now())
                         .lastReadAt(null)
                         .isAdmin(memberId.equals(creatorId))
+                        .role(memberId.equals(creatorId)
+                                ? ConversationMemberRole.ADMIN
+                                : ConversationMemberRole.MEMBER)
+                        .canChat(true)
+                        .notificationsMuted(false)
                         .build())
                 .toList();
         conversationMemberRepository.saveAll(members);
@@ -100,13 +117,53 @@ public class MessagingService {
     public Page<MessageResponse> getMessages(UUID conversationId, UUID userId, Pageable pageable) {
         ensureMember(conversationId, userId);
         return messageRepository
-                .findByConversationIdAndIsDeletedFalseOrderBySentAtDesc(conversationId, pageable)
+                .findVisibleByConversation(conversationId, userId, pageable)
+                .map(this::toMessageResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MessageResponse> searchMessages(UUID conversationId, UUID userId, String query, Pageable pageable) {
+        ensureMember(conversationId, userId);
+        if (!StringUtils.hasText(query)) {
+            throw new BusinessException("Tu khoa tim kiem khong duoc de trong", 400);
+        }
+        return messageRepository
+                .searchVisibleByConversation(conversationId, userId, query.trim(), pageable)
+                .map(this::toMessageResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MessageResponse> getGallery(UUID conversationId, UUID userId, String type, Pageable pageable) {
+        ensureMember(conversationId, userId);
+        String normalized = type == null ? "MEDIA" : type.trim().toUpperCase(Locale.ROOT);
+        if ("LINKS".equals(normalized)) {
+            return messageRepository.findVisibleLinks(conversationId, userId, pageable)
+                    .map(this::toMessageResponse);
+        }
+
+        List<MessageType> messageTypes = switch (normalized) {
+            case "FILES", "DOCS" -> List.of(MessageType.FILE);
+            case "ALL" -> List.of(
+                    MessageType.IMAGE,
+                    MessageType.VIDEO,
+                    MessageType.GIF,
+                    MessageType.STICKER,
+                    MessageType.FILE);
+            case "MEDIA" -> List.of(
+                    MessageType.IMAGE,
+                    MessageType.VIDEO,
+                    MessageType.GIF,
+                    MessageType.STICKER);
+            default -> throw new BusinessException("Loai thu vien khong hop le: " + type, 400);
+        };
+        return messageRepository.findVisibleByMessageTypes(conversationId, userId, messageTypes, pageable)
                 .map(this::toMessageResponse);
     }
 
     @Transactional
     public MessageResponse sendMessage(UUID conversationId, SendMessageRequest request, UUID senderId) {
-        ensureMember(conversationId, senderId);
+        ConversationMember sender = ensureMember(conversationId, senderId);
+        ensureCanChat(sender);
         MessageType messageType = parseMessageType(request.messageType());
         validateMessageBody(request.content(), request.mediaUrl(), messageType);
 
@@ -120,6 +177,7 @@ public class MessagingService {
                 .build();
 
         Message saved = messageRepository.save(message);
+        saveMentions(saved.getId(), conversationId, request.mentionUserIds());
         markMessageRead(saved.getId(), senderId);
         conversationRepository.findByIdAndIsDeletedFalse(conversationId)
                 .ifPresent(conversationRepository::save);
@@ -151,7 +209,7 @@ public class MessagingService {
                 : (messageType == MessageType.FILE ? stored.originalFileName() : null);
         return sendMessage(
                 conversationId,
-                new SendMessageRequest(effectiveContent, stored.publicUrl(), messageType.name()),
+                new SendMessageRequest(effectiveContent, stored.publicUrl(), messageType.name(), null),
                 senderId);
     }
 
@@ -160,8 +218,200 @@ public class MessagingService {
         SendMessageRequest restRequest = new SendMessageRequest(
                 request.content(),
                 request.mediaUrl(),
-                request.messageType());
+                request.messageType(),
+                null);
         return sendMessage(request.conversationId(), restRequest, senderId);
+    }
+
+    @Transactional
+    public MessageResponse updateMessage(
+            UUID conversationId,
+            UUID messageId,
+            UpdateMessageRequest request,
+            UUID requesterId) {
+        ensureMember(conversationId, requesterId);
+        Message message = findMessage(conversationId, messageId);
+        if (!message.getSenderId().equals(requesterId)) {
+            throw new BusinessException("Chi nguoi gui moi duoc sua tin nhan", 403);
+        }
+        if (message.getDeletedForEveryoneAt() != null) {
+            throw new BusinessException("Tin nhan da bi thu hoi nen khong the sua", 400);
+        }
+        if (message.getMessageType() != MessageType.TEXT) {
+            throw new BusinessException("Chi ho tro sua tin nhan van ban", 400);
+        }
+        if (!StringUtils.hasText(request.content())) {
+            throw new BusinessException("Noi dung tin nhan khong duoc de trong", 400);
+        }
+
+        message.setContent(request.content().trim());
+        message.setEditedAt(Instant.now());
+        Message saved = messageRepository.save(message);
+        saveMentions(saved.getId(), conversationId, request.mentionUserIds());
+        MessageResponse response = toMessageResponse(saved);
+        publishConversationEvent(conversationId, "MESSAGE_UPDATED", response);
+        return response;
+    }
+
+    @Transactional
+    public MessageResponse deleteMessage(
+            UUID conversationId,
+            UUID messageId,
+            String scope,
+            UUID requesterId) {
+        ConversationMember requester = ensureMember(conversationId, requesterId);
+        Message message = findMessage(conversationId, messageId);
+        String normalizedScope = scope == null ? "ME" : scope.trim().toUpperCase(Locale.ROOT);
+        if ("ME".equals(normalizedScope)) {
+            if (!messageDeletionRepository.existsByMessageIdAndUserId(messageId, requesterId)) {
+                messageDeletionRepository.save(MessageDeletion.builder()
+                        .messageId(messageId)
+                        .userId(requesterId)
+                        .deletedAt(Instant.now())
+                        .build());
+            }
+            return toMessageResponse(message);
+        }
+        if (!"EVERYONE".equals(normalizedScope)) {
+            throw new BusinessException("Pham vi xoa tin nhan khong hop le", 400);
+        }
+        if (!message.getSenderId().equals(requesterId) && !canModerate(requester)) {
+            throw new BusinessException("Chi nguoi gui hoac quan tri vien moi duoc thu hoi tin nhan", 403);
+        }
+
+        message.setDeletedForEveryoneAt(Instant.now());
+        message.setDeletedByUserId(requesterId);
+        Message saved = messageRepository.save(message);
+        MessageResponse response = toMessageResponse(saved);
+        publishConversationEvent(conversationId, "MESSAGE_DELETED", response);
+        return response;
+    }
+
+    @Transactional
+    public MessageResponse addReaction(UUID conversationId, UUID messageId, String emoji, UUID userId) {
+        ensureMember(conversationId, userId);
+        Message message = findMessage(conversationId, messageId);
+        String normalizedEmoji = normalizeEmoji(emoji);
+        if (!messageReactionRepository.existsById(new com.suachuabientan.system_internal.modules.messaging.entity.MessageReactionId(
+                messageId,
+                userId,
+                normalizedEmoji))) {
+            messageReactionRepository.save(MessageReaction.builder()
+                    .messageId(messageId)
+                    .userId(userId)
+                    .emoji(normalizedEmoji)
+                    .reactedAt(Instant.now())
+                    .build());
+        }
+        MessageResponse response = toMessageResponse(message);
+        publishConversationEvent(conversationId, "MESSAGE_REACTION_UPDATED", response);
+        return response;
+    }
+
+    @Transactional
+    public MessageResponse removeReaction(UUID conversationId, UUID messageId, String emoji, UUID userId) {
+        ensureMember(conversationId, userId);
+        Message message = findMessage(conversationId, messageId);
+        messageReactionRepository.deleteByMessageIdAndUserIdAndEmoji(messageId, userId, normalizeEmoji(emoji));
+        MessageResponse response = toMessageResponse(message);
+        publishConversationEvent(conversationId, "MESSAGE_REACTION_UPDATED", response);
+        return response;
+    }
+
+    @Transactional
+    public ConversationResponse updateMemberRole(
+            UUID conversationId,
+            UUID memberId,
+            UpdateMemberRoleRequest request,
+            UUID requesterId) {
+        Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+        ConversationMember requester = ensureGroupAdmin(conversation, requesterId);
+        ConversationMember target = ensureMember(conversationId, memberId);
+        if (requester.getUserId().equals(memberId) && request.role() != null && !"ADMIN".equalsIgnoreCase(request.role())) {
+            throw new BusinessException("Khong the tu ha quyen admin cua chinh minh", 400);
+        }
+
+        ConversationMemberRole role = parseMemberRole(request.role());
+        target.setRole(role);
+        target.setIsAdmin(role == ConversationMemberRole.ADMIN);
+        if (request.canChat() != null) {
+            target.setCanChat(request.canChat());
+            target.setBannedAt(Boolean.FALSE.equals(request.canChat()) ? Instant.now() : null);
+        }
+        conversationMemberRepository.save(target);
+        return toConversationResponse(conversation, requester.getUserId());
+    }
+
+    @Transactional
+    public ConversationResponse setConversationPinned(UUID conversationId, UUID userId, boolean pinned) {
+        Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+        ConversationMember member = ensureMember(conversationId, userId);
+        member.setPinnedAt(pinned ? Instant.now() : null);
+        conversationMemberRepository.save(member);
+        return toConversationResponse(conversation, userId);
+    }
+
+    @Transactional
+    public ConversationResponse setNotificationsMuted(UUID conversationId, UUID userId, boolean muted) {
+        Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+        ConversationMember member = ensureMember(conversationId, userId);
+        member.setNotificationsMuted(muted);
+        conversationMemberRepository.save(member);
+        return toConversationResponse(conversation, userId);
+    }
+
+    @Transactional
+    public ConversationResponse pinMessage(UUID conversationId, UUID messageId, UUID requesterId) {
+        Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+        ConversationMember requester = ensureMember(conversationId, requesterId);
+        if (conversation.getType() == ConversationType.GROUP && !canModerate(requester)) {
+            throw new BusinessException("Chi admin hoac moderator moi duoc ghim tin nhan nhom", 403);
+        }
+        Message message = findMessage(conversationId, messageId);
+        if (message.getDeletedForEveryoneAt() != null) {
+            throw new BusinessException("Khong the ghim tin nhan da thu hoi", 400);
+        }
+
+        conversation.setPinnedMessageId(messageId);
+        conversation.setPinnedMessageAt(Instant.now());
+        conversation.setPinnedMessageBy(requesterId);
+        Conversation saved = conversationRepository.save(conversation);
+        ConversationResponse response = toConversationResponse(saved, requesterId);
+        publishConversationEvent(conversationId, "PINNED_MESSAGE_UPDATED", response);
+        return response;
+    }
+
+    @Transactional
+    public ConversationResponse unpinMessage(UUID conversationId, UUID requesterId) {
+        Conversation conversation = conversationRepository.findByIdAndIsDeletedFalse(conversationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay cuoc tro chuyen: " + conversationId));
+        ConversationMember requester = ensureMember(conversationId, requesterId);
+        if (conversation.getType() == ConversationType.GROUP && !canModerate(requester)) {
+            throw new BusinessException("Chi admin hoac moderator moi duoc bo ghim tin nhan nhom", 403);
+        }
+
+        conversation.setPinnedMessageId(null);
+        conversation.setPinnedMessageAt(null);
+        conversation.setPinnedMessageBy(null);
+        Conversation saved = conversationRepository.save(conversation);
+        ConversationResponse response = toConversationResponse(saved, requesterId);
+        publishConversationEvent(conversationId, "PINNED_MESSAGE_UPDATED", response);
+        return response;
+    }
+
+    public void publishTyping(UUID conversationId, UUID userId, boolean typing) {
+        ensureMember(conversationId, userId);
+        Map<String, Object> event = Map.of(
+                "type", "TYPING",
+                "conversationId", conversationId,
+                "userId", userId,
+                "typing", typing,
+                "timestamp", Instant.now().toString());
+        publishConversationEvent(conversationId, "TYPING", event);
     }
 
     @Transactional
@@ -180,6 +430,9 @@ public class MessagingService {
                             .userId(memberId)
                             .joinAt(Instant.now())
                             .isAdmin(false)
+                            .role(ConversationMemberRole.MEMBER)
+                            .canChat(true)
+                            .notificationsMuted(false)
                             .build();
                 })
                 .toList();
@@ -272,6 +525,74 @@ public class MessagingService {
         messageReadRepository.saveAll(newReads);
     }
 
+    private void saveMentions(UUID messageId, UUID conversationId, List<UUID> mentionUserIds) {
+        messageMentionRepository.deleteByMessageId(messageId);
+        if (mentionUserIds == null || mentionUserIds.isEmpty()) {
+            return;
+        }
+        List<MessageMention> mentions = mentionUserIds.stream()
+                .filter(Objects::nonNull)
+                .distinct()
+                .peek(mentionedUserId -> ensureMember(conversationId, mentionedUserId))
+                .map(mentionedUserId -> MessageMention.builder()
+                        .messageId(messageId)
+                        .mentionedUserId(mentionedUserId)
+                        .build())
+                .toList();
+        messageMentionRepository.saveAll(mentions);
+    }
+
+    private Message findMessage(UUID conversationId, UUID messageId) {
+        Message message = messageRepository.findById(messageId)
+                .filter(candidate -> Boolean.FALSE.equals(candidate.getIsDeleted()))
+                .orElseThrow(() -> new ResourceNotFoundException("Khong tim thay tin nhan: " + messageId));
+        if (!message.getConversationId().equals(conversationId)) {
+            throw new BusinessException("Tin nhan khong thuoc cuoc tro chuyen nay", 400);
+        }
+        return message;
+    }
+
+    private void ensureCanChat(ConversationMember member) {
+        if (Boolean.FALSE.equals(member.getCanChat()) || member.getBannedAt() != null) {
+            throw new BusinessException("Ban dang bi cam chat trong cuoc tro chuyen nay", 403);
+        }
+        if (member.getMutedUntil() != null && member.getMutedUntil().isAfter(Instant.now())) {
+            throw new BusinessException("Ban dang bi tam khoa chat den " + member.getMutedUntil(), 403);
+        }
+    }
+
+    private boolean canModerate(ConversationMember member) {
+        ConversationMemberRole role = member.getRole();
+        return role == ConversationMemberRole.ADMIN || role == ConversationMemberRole.MODERATOR;
+    }
+
+    private String normalizeEmoji(String emoji) {
+        String normalized = emoji == null ? "" : emoji.trim();
+        Set<String> allowed = Set.of("👍", "❤️", "😂", "😮", "😢", "😡");
+        if (!allowed.contains(normalized)) {
+            throw new BusinessException("Emoji reaction khong duoc ho tro", 400);
+        }
+        return normalized;
+    }
+
+    private ConversationMemberRole parseMemberRole(String value) {
+        try {
+            return ConversationMemberRole.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception error) {
+            throw new BusinessException("Vai tro thanh vien khong hop le: " + value, 400);
+        }
+    }
+
+    private void publishConversationEvent(UUID conversationId, String type, Object payload) {
+        messagingTemplate.convertAndSend(
+                "/topic/conversation/" + conversationId + "/events",
+                Map.of(
+                        "type", type,
+                        "conversationId", conversationId,
+                        "payload", payload,
+                        "timestamp", Instant.now().toString()));
+    }
+
     private void publishMessage(MessageResponse response, UUID senderId) {
         messagingTemplate.convertAndSend(
                 "/topic/conversation/" + response.conversationId(),
@@ -289,10 +610,10 @@ public class MessagingService {
     private void notifyMembers(MessageResponse response, UUID senderId) {
         conversationMemberRepository.findByConversationId(response.conversationId())
                 .stream()
-                .map(ConversationMember::getUserId)
-                .filter(userId -> !userId.equals(senderId))
-                .forEach(userId -> notificationService.sendToUser(
-                        userId,
+                .filter(member -> !member.getUserId().equals(senderId))
+                .filter(member -> !Boolean.TRUE.equals(member.getNotificationsMuted()))
+                .forEach(member -> notificationService.sendToUser(
+                        member.getUserId(),
                         NotificationType.NEW_MESSAGE,
                         "Tin nhắn mới",
                         response.contentPreview(),
@@ -315,6 +636,11 @@ public class MessagingService {
         Message lastMessage = messageRepository
                 .findFirstByConversationIdAndIsDeletedFalseOrderBySentAtDesc(conversation.getId())
                 .orElse(null);
+        Message pinnedMessage = conversation.getPinnedMessageId() == null
+                ? null
+                : messageRepository.findById(conversation.getPinnedMessageId())
+                .filter(message -> Boolean.FALSE.equals(message.getIsDeleted()))
+                .orElse(null);
 
         return new ConversationResponse(
                 conversation.getId(),
@@ -325,6 +651,10 @@ public class MessagingService {
                         .map(member -> toMemberInfo(member, usersById.get(member.getUserId())))
                         .toList(),
                 lastMessage != null ? toMessageInfo(lastMessage) : null,
+                pinnedMessage != null ? toMessageInfo(pinnedMessage) : null,
+                viewerMember != null && viewerMember.getPinnedAt() != null,
+                viewerMember == null ? null : viewerMember.getPinnedAt(),
+                viewerMember != null && Boolean.TRUE.equals(viewerMember.getNotificationsMuted()),
                 viewerMember == null ? 0 : (viewerMember.getLastReadAt() == null
                         ? messageRepository.countUnread(conversation.getId(), viewerId)
                         : messageRepository.countUnreadAfter(conversation.getId(), viewerId, viewerMember.getLastReadAt())),
@@ -338,17 +668,41 @@ public class MessagingService {
                 .stream()
                 .map(MessageRead::getUserId)
                 .toList();
+        List<UUID> mentionUserIds = messageMentionRepository.findByMessageId(message.getId())
+                .stream()
+                .map(MessageMention::getMentionedUserId)
+                .toList();
+        List<MessageResponse.ReactionInfo> reactions = reactionInfo(message.getId());
+        boolean deletedForEveryone = message.getDeletedForEveryoneAt() != null;
 
         return new MessageResponse(
                 message.getId(),
                 message.getConversationId(),
                 new MessageResponse.SenderInfo(sender.getId(), sender.getFullName(), sender.getAvatarUrl()),
-                message.getContent(),
-                message.getMediaUrl(),
-                message.getMessageType().name(),
+                deletedForEveryone ? "Tin nhan da duoc thu hoi" : message.getContent(),
+                deletedForEveryone ? null : message.getMediaUrl(),
+                deletedForEveryone ? MessageType.SYSTEM.name() : message.getMessageType().name(),
                 message.getSentAt(),
-                readByUserIds
+                message.getEditedAt(),
+                message.getDeletedForEveryoneAt(),
+                readByUserIds,
+                mentionUserIds,
+                reactions
         );
+    }
+
+    private List<MessageResponse.ReactionInfo> reactionInfo(UUID messageId) {
+        return messageReactionRepository.findByMessageId(messageId)
+                .stream()
+                .collect(Collectors.groupingBy(MessageReaction::getEmoji))
+                .entrySet()
+                .stream()
+                .map(entry -> new MessageResponse.ReactionInfo(
+                        entry.getKey(),
+                        entry.getValue().size(),
+                        entry.getValue().stream().map(MessageReaction::getUserId).toList()))
+                .sorted(Comparator.comparing(MessageResponse.ReactionInfo::emoji))
+                .toList();
     }
 
     private ConversationResponse.MemberInfo toMemberInfo(ConversationMember member, UserEntity user) {
@@ -357,7 +711,9 @@ public class MessagingService {
                 user != null ? user.getFullName() : "Không xác định",
                 user != null ? user.getEmployeeCode() : null,
                 user != null ? user.getAvatarUrl() : null,
-                member.getIsAdmin()
+                member.getIsAdmin(),
+                member.getRole() == null ? ConversationMemberRole.MEMBER.name() : member.getRole().name(),
+                member.getCanChat()
         );
     }
 
@@ -366,8 +722,8 @@ public class MessagingService {
         return new ConversationResponse.MessageInfo(
                 message.getId(),
                 sender != null ? sender.getFullName() : "Không xác định",
-                message.getContent(),
-                message.getMessageType().name(),
+                message.getDeletedForEveryoneAt() != null ? "Tin nhan da duoc thu hoi" : message.getContent(),
+                message.getDeletedForEveryoneAt() != null ? MessageType.SYSTEM.name() : message.getMessageType().name(),
                 message.getSentAt()
         );
     }
@@ -470,7 +826,9 @@ public class MessagingService {
         }
         if ((messageType == MessageType.IMAGE
                 || messageType == MessageType.VIDEO
-                || messageType == MessageType.FILE)
+                || messageType == MessageType.FILE
+                || messageType == MessageType.STICKER
+                || messageType == MessageType.GIF)
                 && !StringUtils.hasText(mediaUrl)) {
             throw new BusinessException("Tin nhắn media phải có mediaUrl");
         }

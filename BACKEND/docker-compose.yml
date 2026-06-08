@@ -32,7 +32,25 @@ services:
       - minio_data:/data
     command: server /data --address ":9000" --console-address ":9001"
 
+  face-ai:
+    build:
+      context: ./face_ai_service
+      dockerfile: Dockerfile
+    container_name: SI_face_ai
+    environment:
+      FACE_AI_HOST: 0.0.0.0
+      FACE_AI_PORT: 5000
+      FACE_AI_MODEL_ROOT: /models
+      FACE_AI_MODEL_NAME: buffalo_l
+      FACE_AI_MATCH_THRESHOLD: ${ATTENDANCE_FACE_MATCH_THRESHOLD:-0.57}
+    ports:
+      - "5000:5000"
+    volumes:
+      - face_ai_models:/models
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
   minio_data:
+  face_ai_models:

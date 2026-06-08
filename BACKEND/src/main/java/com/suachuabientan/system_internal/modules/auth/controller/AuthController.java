@@ -3,6 +3,7 @@ package com.suachuabientan.system_internal.modules.auth.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.ChangePasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
@@ -59,20 +60,20 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(authService.refreshToken(request)));
     }
 
-    @Operation(summary = "Gui ma OTP dat lai mat khau qua thong bao day cua thiet bi")
+    @Operation(summary = "Gửi mã OTP đặt lại mật khẩu qua thông báo đẩy của thiết bị")
     @PostMapping("/forgot-password/otp")
     public ResponseEntity<ApiResponse<Void>> requestForgotPasswordOtp(
             @Valid @RequestBody RequestPasswordResetOtpRequest request) {
         authService.requestPasswordResetOtp(request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Da gui ma OTP"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đã gửi mã OTP"));
     }
 
-    @Operation(summary = "Dat lai mat khau sau khi xac minh OTP")
+    @Operation(summary = "Đặt lại mật khẩu sau khi xác minh OTP")
     @PostMapping("/forgot-password")
     public ResponseEntity<ApiResponse<Void>> forgotPassword(
             @Valid @RequestBody ForgotPasswordRequest request) {
         authService.forgotPassword(request);
-        return ResponseEntity.ok(ApiResponse.success(null, "Dat lai mat khau thanh cong"));
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mật khẩu thành công"));
     }
 
     @Operation(summary = "Đăng xuất thiết bị hiện tại — revoke refresh token")
@@ -90,6 +91,16 @@ public class AuthController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         authService.logoutAllDevices(userDetails.getUserId());
         return ResponseEntity.ok(ApiResponse.success(null, "Đã đăng xuất tất cả thiết bị"));
+    }
+
+    @Operation(summary = "Đổi mật khẩu tài khoản hiện tại")
+    @PostMapping("/change-password")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.changePassword(userDetails.getUserId(), request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
     }
 
     // ── Duyệt tài khoản — chỉ MANAGER+ ──────────────────────
