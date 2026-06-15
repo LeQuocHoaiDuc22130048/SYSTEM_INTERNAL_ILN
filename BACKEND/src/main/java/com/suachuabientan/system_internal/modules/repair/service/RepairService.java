@@ -106,8 +106,8 @@ public class RepairService {
         UserEntity technician = userRepository.findByIdAndIsDeletedFalse(request.technicianId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         STR."Không tìm thấy kỹ thuật viên: \{request.technicianId()}"));
-        if (technician.getRole() != UserRole.EMPLOYEE) {
-            throw new BusinessException("Chỉ nhân viên mới được phân công sửa chữa");
+        if (technician.getRole() != UserRole.EMPLOYEE && technician.getRole() != UserRole.TECHNICIAN) {
+            throw new BusinessException("Chỉ nhân viên hoặc kỹ thuật viên mới được phân công sửa chữa");
         }
         if (technician.getStatus() != UserStatus.ACTIVE) {
             throw new BusinessException("Nhân viên được phân công phải đang hoạt động");

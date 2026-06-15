@@ -13,6 +13,7 @@ import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Collection;
 import java.util.Date;
 import java.util.Map;
 import java.util.UUID;
@@ -36,11 +37,20 @@ public class JwtUtil {
     }
 
     public String generateAccessToken(UUID userId, String username, String role) {
+        return generateAccessToken(userId, username, role, java.util.List.of());
+    }
+
+    public String generateAccessToken(
+            UUID userId,
+            String username,
+            String role,
+            Collection<String> permissions) {
         return Jwts.builder()
                 .subject(userId.toString())
                 .claims(Map.of(
                         "username", username,
                         "role", role,
+                        "permissions", permissions,
                         "type", "access"
                 ))
                 .issuedAt(new Date())

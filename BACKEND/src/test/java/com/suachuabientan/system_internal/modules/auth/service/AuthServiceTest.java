@@ -50,6 +50,7 @@ class AuthServiceTest {
     @Mock private UserRegistrationRequestRepository userRegistrationRequestRepository;
     @Mock private NotificationService notificationService;
     @Mock private PasswordResetOtpRepository passwordResetOtpRepository;
+    @Mock private RbacService rbacService;
 
     private AuthService authService;
     private UserEntity user;
@@ -66,7 +67,8 @@ class AuthServiceTest {
                 refreshTokenRepository,
                 userRegistrationRequestRepository,
                 notificationService,
-                passwordResetOtpRepository);
+                passwordResetOtpRepository,
+                rbacService);
         user = new UserEntity();
         user.setId(UUID.randomUUID());
         user.setUsername("employee");

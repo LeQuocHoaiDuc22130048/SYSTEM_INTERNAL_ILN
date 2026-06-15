@@ -9,6 +9,11 @@ public record QrScanResponse(
         String name,
         String category,
         String location,
+        String serialNumber,
+        UUID partId,
+        String partIpn,
+        UUID currentLocationId,
+        String currentLocationCode,
         String status,
 
         HolderInfo holder

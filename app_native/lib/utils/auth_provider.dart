@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../models/app_permission.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 
@@ -24,6 +25,18 @@ class AuthProvider extends ChangeNotifier {
   String? get logoutWarning => _logoutWarning;
   UserRole get role => _currentUser?.role ?? UserRole.employee;
   bool get isEmployee => role == UserRole.employee;
+  bool get isManagerOrAbove => role.isManagerOrAbove;
+  bool get isAdminOrAbove => role.isAdminOrAbove;
+  bool get isAttendanceAccount =>
+      _currentUser?.username.trim().toLowerCase() == 'attendance';
+
+  bool can(AppPermission permission) {
+    return _currentUser?.can(permission) ?? role.can(permission);
+  }
+
+  bool canAny(Iterable<AppPermission> permissions) {
+    return permissions.any(can);
+  }
 
   Future<void> login({
     required String username,
@@ -178,7 +191,23 @@ class AuthProvider extends ChangeNotifier {
       _log('Loading current user profile');
       final data = await api.get('/api/v1/employees/me');
       if (data is Map<String, dynamic>) {
-        _currentUser = User.fromJson(data);
+        final loadedUser = User.fromJson(data);
+        _currentUser = loadedUser.permissions == null && _currentUser != null
+            ? User(
+                id: loadedUser.id,
+                username: loadedUser.username,
+                name: loadedUser.name,
+                email: loadedUser.email,
+                employeeId: loadedUser.employeeId,
+                role: loadedUser.role,
+                status: loadedUser.status,
+                avatar: loadedUser.avatar,
+                department: loadedUser.department,
+                phone: loadedUser.phone,
+                faceEnrolled: loadedUser.faceEnrolled,
+                permissions: _currentUser!.permissions,
+              )
+            : loadedUser;
         _log('Profile loaded for username=${_currentUser?.username}');
         notifyListeners();
       }

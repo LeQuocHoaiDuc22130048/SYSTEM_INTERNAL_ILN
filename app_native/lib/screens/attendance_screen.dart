@@ -33,6 +33,12 @@ class AttendanceScreen extends StatefulWidget {
     this.initialBackendEmployeeId,
     this.popOnEnrollmentSuccess = false,
     this.popOnVerificationSuccess = false,
+    this.allowEnrollment = true,
+    this.showBackButton = true,
+    this.selfCheckOnly = false,
+    this.refreshAttendanceAfterVerification = true,
+    this.showMatchedEmployeeInfo = true,
+    this.trailingAction,
   });
 
   final AttendanceMode initialMode;
@@ -41,6 +47,12 @@ class AttendanceScreen extends StatefulWidget {
   final String? initialBackendEmployeeId;
   final bool popOnEnrollmentSuccess;
   final bool popOnVerificationSuccess;
+  final bool allowEnrollment;
+  final bool showBackButton;
+  final bool selfCheckOnly;
+  final bool refreshAttendanceAfterVerification;
+  final bool showMatchedEmployeeInfo;
+  final Widget? trailingAction;
 
   @override
   State<AttendanceScreen> createState() => _AttendanceScreenState();
@@ -125,7 +137,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   @override
   void initState() {
     super.initState();
-    _mode = widget.initialMode;
+    _mode =
+        !widget.allowEnrollment &&
+            widget.initialMode == AttendanceMode.enrollment
+        ? AttendanceMode.verification
+        : widget.initialMode;
     _employeeIdController.text = widget.initialEmployeeId ?? '';
     _employeeNameController.text = widget.initialEmployeeName ?? '';
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -808,7 +824,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     required String employeeName,
   }) async {
     final initialBackendEmployeeId = widget.initialBackendEmployeeId;
-    if (initialBackendEmployeeId != null && initialBackendEmployeeId.isNotEmpty) {
+    if (initialBackendEmployeeId != null &&
+        initialBackendEmployeeId.isNotEmpty) {
       return initialBackendEmployeeId;
     }
     final cached = _resolvedEnrollmentBackendEmployeeId;
@@ -1017,8 +1034,11 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     try {
       _setStatus('Đang gửi ảnh lên server để xác minh...');
       final auth = context.read<AuthProvider>();
+      final selfCheckOnly = widget.selfCheckOnly || auth.isAttendanceAccount;
       final response = await auth.api.post(
-        '/api/v1/attendance/face-identify',
+        selfCheckOnly
+            ? '/api/v1/attendance/face-check'
+            : '/api/v1/attendance/face-identify',
         body: {
           'faceImageBase64': faceImageBase64,
           'imageContentType': 'image/jpeg',
@@ -1026,7 +1046,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         },
       );
       _isPendingServerConfirmation = false;
-      if (mounted) {
+      if (mounted &&
+          widget.refreshAttendanceAfterVerification &&
+          !auth.isAttendanceAccount) {
         await context.read<BackendDataProvider>().loadAttendance();
       }
 
@@ -1039,7 +1061,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         'latency_ms': stopwatch.elapsedMilliseconds,
       });
       _setStatus(
-        employeeName == null || employeeName.isEmpty
+        !widget.showMatchedEmployeeInfo ||
+                employeeName == null ||
+                employeeName.isEmpty
             ? 'Chấm công thành công'
             : 'Chấm công thành công: $employeeName',
         showSnackBar: true,
@@ -1175,12 +1199,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         'latency_ms': stopwatch.elapsedMilliseconds,
       });
       final displayStatusText = synced > 0
-          ? 'Chấm công thành công: ${match.employee.name}'
+          ? widget.showMatchedEmployeeInfo
+                ? 'Chấm công thành công: ${match.employee.name}'
+                : 'Chấm công thành công'
           : nearbyDuplicate
           ? 'Đã có bản ghi gần thời điểm này'
           : serverRejection != null
           ? 'Server từ chối chấm công. Vui lòng chấm lại.'
-          : 'Chấm công tạm - chờ xác nhận: ${match.employee.name}';
+          : widget.showMatchedEmployeeInfo
+          ? 'Chấm công tạm - chờ xác nhận: ${match.employee.name}'
+          : 'Chấm công tạm - chờ xác nhận';
       _setStatus(
         displayStatusText,
         showSnackBar: true,
@@ -1224,7 +1252,10 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       );
       if (synced > 0 && mounted) {
         _isPendingServerConfirmation = false;
-        await context.read<BackendDataProvider>().loadAttendance();
+        if (widget.refreshAttendanceAfterVerification &&
+            !auth.isAttendanceAccount) {
+          await context.read<BackendDataProvider>().loadAttendance();
+        }
         if (showStatus) {
           _setStatus('Dữ liệu chấm công đã được cập nhật');
         }
@@ -1288,6 +1319,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<void> _switchMode(AttendanceMode mode) async {
+    if (!widget.allowEnrollment && mode == AttendanceMode.enrollment) return;
     if (_mode == mode) return;
     setState(() {
       _mode = mode;
@@ -1382,26 +1414,77 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       );
     }
 
-    return FittedBox(
-      fit: BoxFit.cover,
-      child: SizedBox(
-        width: controller.value.previewSize?.height ?? 1,
-        height: controller.value.previewSize?.width ?? 1,
-        child: CameraPreview(controller),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final previewSize = controller.value.previewSize;
+        final isLandscape = constraints.maxWidth > constraints.maxHeight;
+        var previewWidth = 1.0;
+        var previewHeight = 1.0;
+
+        if (previewSize != null) {
+          previewWidth = isLandscape ? previewSize.width : previewSize.height;
+          previewHeight = isLandscape ? previewSize.height : previewSize.width;
+        }
+
+        return ClipRect(
+          child: FittedBox(
+            fit: BoxFit.cover,
+            child: SizedBox(
+              width: previewWidth,
+              height: previewHeight,
+              child: CameraPreview(controller),
+            ),
+          ),
+        );
+      },
     );
   }
 
   Widget _buildHeader() {
+    if (!widget.allowEnrollment) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        child: Row(
+          children: [
+            if (widget.showBackButton)
+              IconButton(
+                onPressed: () => Navigator.maybePop(context),
+                icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
+                tooltip: 'Quay lại',
+              )
+            else
+              const SizedBox(width: 48),
+            const Expanded(
+              child: Text(
+                'Chấm công',
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            SizedBox(width: 48, child: widget.trailingAction),
+          ],
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.maybePop(context),
-            icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
-            tooltip: 'Quay lại',
-          ),
+          if (widget.showBackButton)
+            IconButton(
+              onPressed: () => Navigator.maybePop(context),
+              icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
+              tooltip: 'Quay lại',
+            )
+          else
+            const SizedBox(width: 48),
           const SizedBox(width: 4),
           Expanded(
             child: SegmentedButton<AttendanceMode>(

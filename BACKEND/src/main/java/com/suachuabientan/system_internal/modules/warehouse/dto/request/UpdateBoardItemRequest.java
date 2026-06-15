@@ -3,6 +3,8 @@ package com.suachuabientan.system_internal.modules.warehouse.dto.request;
 import com.suachuabientan.system_internal.modules.warehouse.enums.BoardStatus;
 import jakarta.validation.constraints.Size;
 
+import java.util.UUID;
+
 public record UpdateBoardItemRequest(
         @Size(max = 200)
         String name,
@@ -14,6 +16,13 @@ public record UpdateBoardItemRequest(
 
         @Size(max = 100)
         String location,
+
+        @Size(max = 100)
+        String serialNumber,
+
+        UUID partId,
+
+        UUID currentLocationId,
 
         BoardStatus status
 ) {

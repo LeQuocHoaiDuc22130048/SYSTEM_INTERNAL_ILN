@@ -11,6 +11,11 @@ public record BoardItemResponse(
         String description,
         String status,
         String location,
+        String serialNumber,
+        UUID partId,
+        String partIpn,
+        UUID currentLocationId,
+        String currentLocationCode,
         Instant createdAt,
 
         ActiveCheckoutInfo activeCheckoutInfo

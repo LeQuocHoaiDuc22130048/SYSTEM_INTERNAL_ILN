@@ -1,4 +1,12 @@
-enum BoardStatus { available, checkedOut, maintenance }
+enum BoardStatus {
+  available,
+  checkedOut,
+  inRepair,
+  damaged,
+  lost,
+  archived,
+  maintenance,
+}
 
 class Board {
   final String id;
@@ -11,6 +19,11 @@ class Board {
   final DateTime? checkedOutAt;
   final String? currentRepairOrder;
   final String? description;
+  final String? serialNumber;
+  final String? partId;
+  final String? partIpn;
+  final String? currentLocationId;
+  final String? currentLocationCode;
 
   Board({
     required this.id,
@@ -23,17 +36,15 @@ class Board {
     this.checkedOutAt,
     this.currentRepairOrder,
     this.description,
+    this.serialNumber,
+    this.partId,
+    this.partIpn,
+    this.currentLocationId,
+    this.currentLocationCode,
   });
 
   String get statusLabel {
-    switch (status) {
-      case BoardStatus.available:
-        return 'Sẵn sàng';
-      case BoardStatus.checkedOut:
-        return 'Đang dùng';
-      case BoardStatus.maintenance:
-        return 'Bảo trì';
-    }
+    return status.label;
   }
 
   factory Board.fromJson(Map<String, dynamic> json) {
@@ -43,7 +54,10 @@ class Board {
       name: json['name']?.toString() ?? '',
       qrCode: json['qrCode']?.toString() ?? '',
       model: json['category']?.toString() ?? '',
-      location: json['location']?.toString() ?? '',
+      location:
+          json['currentLocationCode']?.toString() ??
+          json['location']?.toString() ??
+          '',
       status: _statusFromBackend(json['status']?.toString()),
       checkedOutBy: checkout is Map<String, dynamic>
           ? checkout['takenByName']?.toString()
@@ -55,6 +69,11 @@ class Board {
           ? checkout['orderCode']?.toString()
           : null,
       description: json['description']?.toString(),
+      serialNumber: json['serialNumber']?.toString(),
+      partId: json['partId']?.toString(),
+      partIpn: json['partIpn']?.toString(),
+      currentLocationId: json['currentLocationId']?.toString(),
+      currentLocationCode: json['currentLocationCode']?.toString(),
     );
   }
 
@@ -65,8 +84,16 @@ class Board {
       case 'CHECKED_OUT':
       case 'IN_USE':
         return BoardStatus.checkedOut;
-      case 'MAINTENANCE':
+      case 'IN_REPAIR':
+        return BoardStatus.inRepair;
       case 'DAMAGED':
+        return BoardStatus.damaged;
+      case 'LOST':
+        return BoardStatus.lost;
+      case 'ARCHIVED':
+      case 'RETIRED':
+        return BoardStatus.archived;
+      case 'MAINTENANCE':
         return BoardStatus.maintenance;
       default:
         return BoardStatus.available;
@@ -76,5 +103,45 @@ class Board {
   static DateTime? _dateFromJson(dynamic value) {
     if (value == null) return null;
     return DateTime.tryParse(value.toString());
+  }
+}
+
+extension BoardStatusMetadata on BoardStatus {
+  String get label {
+    switch (this) {
+      case BoardStatus.available:
+        return 'San sang';
+      case BoardStatus.checkedOut:
+        return 'Dang dung';
+      case BoardStatus.inRepair:
+        return 'Dang sua';
+      case BoardStatus.damaged:
+        return 'Hong';
+      case BoardStatus.lost:
+        return 'That lac';
+      case BoardStatus.archived:
+        return 'Luu tru';
+      case BoardStatus.maintenance:
+        return 'Bao tri';
+    }
+  }
+
+  String get backendName {
+    switch (this) {
+      case BoardStatus.available:
+        return 'AVAILABLE';
+      case BoardStatus.checkedOut:
+        return 'CHECKED_OUT';
+      case BoardStatus.inRepair:
+        return 'IN_REPAIR';
+      case BoardStatus.damaged:
+        return 'DAMAGED';
+      case BoardStatus.lost:
+        return 'LOST';
+      case BoardStatus.archived:
+        return 'ARCHIVED';
+      case BoardStatus.maintenance:
+        return 'MAINTENANCE';
+    }
   }
 }

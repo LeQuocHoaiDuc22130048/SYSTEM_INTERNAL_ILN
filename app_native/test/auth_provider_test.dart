@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:system_internal_likenew/models/app_permission.dart';
+import 'package:system_internal_likenew/models/user.dart';
 import 'package:system_internal_likenew/utils/api_client.dart';
 import 'package:system_internal_likenew/utils/auth_provider.dart';
 
@@ -308,5 +310,32 @@ void main() {
         expect(authProvider.logoutWarning, isNotNull);
       },
     );
+  });
+
+  group('Role permission matrix', () {
+    test('employee can use operational modules but not management', () {
+      expect(UserRole.employee.can(AppPermission.viewRepairOrders), isTrue);
+      expect(UserRole.employee.can(AppPermission.viewWarehouse), isTrue);
+      expect(UserRole.employee.can(AppPermission.manageEmployees), isFalse);
+      expect(UserRole.employee.can(AppPermission.viewDashboard), isFalse);
+    });
+
+    test('manager can manage work but not admin-only security actions', () {
+      expect(UserRole.manager.can(AppPermission.viewDashboard), isTrue);
+      expect(UserRole.manager.can(AppPermission.manageEmployees), isTrue);
+      expect(UserRole.manager.can(AppPermission.assignRepairOrders), isTrue);
+      expect(
+        UserRole.manager.can(AppPermission.manageEmployeeSecurity),
+        isFalse,
+      );
+    });
+
+    test('admin and super admin include security permissions', () {
+      expect(UserRole.admin.can(AppPermission.manageEmployeeSecurity), isTrue);
+      expect(
+        UserRole.superAdmin.can(AppPermission.manageEmployeeSecurity),
+        isTrue,
+      );
+    });
   });
 }

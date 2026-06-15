@@ -10,5 +10,8 @@ public enum UserRole {
     SUPER_ADMIN,
     ADMIN,
     MANAGER,
+    TECHNICIAN,
+    WAREHOUSE,
+    RECEPTIONIST,
     EMPLOYEE
 }

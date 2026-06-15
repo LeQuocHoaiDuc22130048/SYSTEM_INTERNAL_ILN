@@ -1,8 +1,11 @@
 package com.suachuabientan.system_internal.modules.warehouse.entity;
 
 import com.suachuabientan.system_internal.common.model.BaseEntity;
+import com.suachuabientan.system_internal.modules.warehouse.enums.CheckoutStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Table;
 import lombok.*;
 
@@ -44,11 +47,18 @@ public class BoardCheckout extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "checkout_status", nullable = false, length = 20)
+    @Builder.Default
+    private CheckoutStatus checkoutStatus = CheckoutStatus.OPEN;
+
     public boolean isReturned() {
         return this.returnedAt != null;
     }
 
     public boolean isActive() {
-        return this.returnedAt == null && !Boolean.TRUE.equals(this.getIsDeleted());
+        return CheckoutStatus.OPEN.equals(this.checkoutStatus)
+                && this.returnedAt == null
+                && !Boolean.TRUE.equals(this.getIsDeleted());
     }
 }

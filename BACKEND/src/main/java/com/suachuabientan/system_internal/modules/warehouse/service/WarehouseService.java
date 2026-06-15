@@ -13,9 +13,17 @@ import com.suachuabientan.system_internal.modules.warehouse.dto.response.Checkou
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.QrScanResponse;
 import com.suachuabientan.system_internal.modules.warehouse.entity.BoardCheckout;
 import com.suachuabientan.system_internal.modules.warehouse.entity.BoardItem;
+import com.suachuabientan.system_internal.modules.warehouse.entity.Part;
+import com.suachuabientan.system_internal.modules.warehouse.entity.StockMovement;
+import com.suachuabientan.system_internal.modules.warehouse.entity.StoreLocation;
 import com.suachuabientan.system_internal.modules.warehouse.enums.BoardStatus;
+import com.suachuabientan.system_internal.modules.warehouse.enums.CheckoutStatus;
+import com.suachuabientan.system_internal.modules.warehouse.enums.StockMovementType;
 import com.suachuabientan.system_internal.modules.warehouse.repository.BoardCheckoutRepository;
 import com.suachuabientan.system_internal.modules.warehouse.repository.BoardItemRepository;
+import com.suachuabientan.system_internal.modules.warehouse.repository.PartRepository;
+import com.suachuabientan.system_internal.modules.warehouse.repository.StockMovementRepository;
+import com.suachuabientan.system_internal.modules.warehouse.repository.StoreLocationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +31,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -35,6 +45,9 @@ public class WarehouseService {
     private final BoardCheckoutRepository boardCheckoutRepository;
     private final UserRepository userRepository;
     private final QrCodeGenerator qrCodeGenerator;
+    private final PartRepository partRepository;
+    private final StoreLocationRepository storeLocationRepository;
+    private final StockMovementRepository stockMovementRepository;
 
 
     @Transactional
@@ -51,6 +64,9 @@ public class WarehouseService {
                 .category(request.category())
                 .description(request.description())
                 .location(request.location())
+                .serialNumber(request.serialNumber())
+                .partId(resolvePartId(request.partId()))
+                .currentLocationId(resolveLocationId(request.currentLocationId(), request.location()))
                 .status(BoardStatus.AVAILABLE)
                 .build();
 
@@ -80,6 +96,11 @@ public class WarehouseService {
         if (request.category() != null) item.setCategory(request.category());
         if (request.description() != null) item.setDescription(request.description());
         if (request.location() != null) item.setLocation(request.location());
+        if (request.serialNumber() != null) item.setSerialNumber(request.serialNumber());
+        if (request.partId() != null) item.setPartId(resolvePartId(request.partId()));
+        if (request.currentLocationId() != null || request.location() != null) {
+            item.setCurrentLocationId(resolveLocationId(request.currentLocationId(), request.location()));
+        }
 
         if (request.status() != null) {
             if (item.isCheckedOut() && request.status() != BoardStatus.CHECKED_OUT) {
@@ -135,6 +156,11 @@ public class WarehouseService {
                 item.getName(),
                 item.getCategory(),
                 item.getLocation(),
+                item.getSerialNumber(),
+                item.getPartId(),
+                partIpn(item.getPartId()),
+                item.getCurrentLocationId(),
+                locationCode(item.getCurrentLocationId()),
                 item.getStatus().name(),
                 holderInfo
         );
@@ -157,18 +183,27 @@ public class WarehouseService {
                 .repairOrderId(request.repairOrderId())
                 .takenAt(Instant.now())
                 .notes(request.note())
+                .checkoutStatus(CheckoutStatus.OPEN)
                 .build();
 
-        boardCheckoutRepository.save(checkout);
+        BoardCheckout savedCheckout = boardCheckoutRepository.save(checkout);
 
         // Cập nhật status bo mạch
         item.setStatus(BoardStatus.CHECKED_OUT);
         boardItemRepository.save(item);
+        saveBoardMovement(
+                item,
+                request.repairOrderId() != null ? StockMovementType.USE_FOR_REPAIR : StockMovementType.EXPORT,
+                item.getCurrentLocationId(),
+                null,
+                "BOARD_CHECKOUT",
+                savedCheckout.getId(),
+                request.note());
 
         log.info("Lấy bo mạch: boardId={}, takenBy={}, repairOrderId={}",
                 boardItemId, userId, request.repairOrderId());
 
-        return toCheckoutResponse(checkout, item);
+        return toCheckoutResponse(savedCheckout, item);
     }
 
     /**
@@ -190,11 +225,20 @@ public class WarehouseService {
 
         // Ghi nhận trả
         activeCheckout.setReturnedAt(Instant.now());
+        activeCheckout.setCheckoutStatus(CheckoutStatus.RETURNED);
         boardCheckoutRepository.save(activeCheckout);
 
         // Trả về AVAILABLE
         item.setStatus(BoardStatus.AVAILABLE);
         boardItemRepository.save(item);
+        saveBoardMovement(
+                item,
+                StockMovementType.RETURN,
+                null,
+                item.getCurrentLocationId(),
+                "BOARD_CHECKOUT",
+                activeCheckout.getId(),
+                activeCheckout.getNotes());
 
         log.info("Trả bo mạch: boardId={}, returnedBy={}", boardItemId, userId);
         return toCheckoutResponse(activeCheckout, item);
@@ -268,8 +312,67 @@ public class WarehouseService {
                 item.getDescription(),
                 item.getStatus().name(),
                 item.getLocation(),
+                item.getSerialNumber(),
+                item.getPartId(),
+                partIpn(item.getPartId()),
+                item.getCurrentLocationId(),
+                locationCode(item.getCurrentLocationId()),
                 item.getCreatedAt(),
                 activeCheckout
         );
+    }
+
+    private UUID resolvePartId(UUID partId) {
+        if (partId == null) return null;
+        return partRepository.findByIdAndIsDeletedFalse(partId)
+                .orElseThrow(() -> new ResourceNotFoundException(STR."KhÃ´ng tÃ¬m tháº¥y linh kiá»‡n: \{partId}"))
+                .getId();
+    }
+
+    private UUID resolveLocationId(UUID locationId, String legacyLocation) {
+        if (locationId != null) {
+            return storeLocationRepository.findByIdAndIsDeletedFalse(locationId)
+                    .orElseThrow(() -> new ResourceNotFoundException(STR."KhÃ´ng tÃ¬m tháº¥y vá»‹ trÃ­ kho: \{locationId}"))
+                    .getId();
+        }
+        if (!StringUtils.hasText(legacyLocation)) return null;
+        return storeLocationRepository.findByCodeAndIsDeletedFalse(legacyLocation.trim())
+                .map(StoreLocation::getId)
+                .orElse(null);
+    }
+
+    private void saveBoardMovement(
+            BoardItem item,
+            StockMovementType movementType,
+            UUID fromLocationId,
+            UUID toLocationId,
+            String refType,
+            UUID refId,
+            String note) {
+        stockMovementRepository.save(StockMovement.builder()
+                .boardItemId(item.getId())
+                .partId(item.getPartId())
+                .movementType(movementType)
+                .quantity(BigDecimal.ONE)
+                .fromLocationId(fromLocationId)
+                .toLocationId(toLocationId)
+                .refType(refType)
+                .refId(refId)
+                .note(note)
+                .build());
+    }
+
+    private String partIpn(UUID partId) {
+        if (partId == null) return null;
+        return partRepository.findByIdAndIsDeletedFalse(partId)
+                .map(Part::getIpn)
+                .orElse(null);
+    }
+
+    private String locationCode(UUID locationId) {
+        if (locationId == null) return null;
+        return storeLocationRepository.findByIdAndIsDeletedFalse(locationId)
+                .map(StoreLocation::getCode)
+                .orElse(null);
     }
 }

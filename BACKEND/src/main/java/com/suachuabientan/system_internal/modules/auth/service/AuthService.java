@@ -59,6 +59,7 @@ public class AuthService {
     private final UserRegistrationRequestRepository userRegistrationRequestRepository;
     private final NotificationService notificationService;
     private final PasswordResetOtpRepository passwordResetOtpRepository;
+    private final RbacService rbacService;
 
     /**
      * Đăng ký tài khoản mới — trạng thái PENDING_APPROVAL, chưa được login (SEC-03).
@@ -86,7 +87,8 @@ public class AuthService {
                 .build();
 
 
-        UserEntity saved = userRepository.save(user);
+        UserEntity saved = userRepository.saveAndFlush(user);
+        rbacService.ensurePrimaryRoleAssigned(saved.getId(), saved.getRole());
         notifyAccountPending(saved);
         log.info("Tài khoản mới đăng ký: username={}", saved.getUsername());
 
@@ -111,8 +113,9 @@ public class AuthService {
             throw new BusinessException(buildLoginBlockMessage(user.getStatus()), 403);
         }
 
+        List<String> permissions = permissionCodes(user);
         String accessToken = jwtUtil.generateAccessToken(
-                user.getId(), user.getUsername(), user.getRole().name());
+                user.getId(), user.getUsername(), user.getRole().name(), permissions);
         String refreshToken = jwtUtil.generateRefreshToken(user.getId());
         saveRefreshToken(user.getId(), refreshToken, request.deviceInfo());
 
@@ -122,7 +125,7 @@ public class AuthService {
                 accessToken, refreshToken, "Bearer", 900L,
                 new LoginResponse.UserInfo(user.getId(), user.getUsername(), user.getFullName(),
                         user.getRole().name(), user.getStatus().name(),
-                        user.getAvatarUrl(), user.getDepartment())
+                        user.getAvatarUrl(), user.getDepartment(), permissions)
         );
     }
 
@@ -153,8 +156,9 @@ public class AuthService {
         storedToken.revoke();
         refreshTokenRepository.save(storedToken);
 
+        List<String> permissions = permissionCodes(user);
         String newAccessToken = jwtUtil.generateAccessToken(
-                user.getId(), user.getUsername(), user.getRole().name());
+                user.getId(), user.getUsername(), user.getRole().name(), permissions);
 
         String newRefreshToken = jwtUtil.generateRefreshToken(user.getId());
         saveRefreshToken(user.getId(), newRefreshToken, storedToken.getDeviceInfo());
@@ -297,6 +301,7 @@ public class AuthService {
         boolean approved = request.action() == ApprovalAction.APPROVE;
         if (approved) {
             target.approve(reviewerUserId);
+            rbacService.ensurePrimaryRoleAssigned(target.getId(), target.getRole());
             log.info("Process user approval: userId={}", targetUserId);
         } else {
             if (!StringUtils.hasText(request.note())) throw new BusinessException("Lý do từ chối không được để trống");
@@ -378,12 +383,18 @@ public class AuthService {
                         user.getId(),
                         user.getUsername(),
                         user.getFullName(),
-                        user.getRole().name(),
-                        user.getStatus().name(),
-                        user.getAvatarUrl(),
-                        user.getDepartment()
+                user.getRole().name(),
+                user.getStatus().name(),
+                user.getAvatarUrl(),
+                user.getDepartment(),
+                permissionCodes(user)
                 )
         );
+    }
+
+    private List<String> permissionCodes(UserEntity user) {
+        List<String> permissions = rbacService.getPermissionCodes(user.getId());
+        return permissions != null ? permissions : List.of();
     }
 
     private void notifyAccountPending(UserEntity user) {

@@ -1,4 +1,34 @@
+name: si_backend
+
 services:
+  backend:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: SI_backend_app
+    env_file:
+      - .env
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SERVER_ADDRESS: 0.0.0.0
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-system_internal_db}
+      DB_USERNAME: ${DB_USERNAME:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-admin}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: http://minio:9000
+      FACE_RECOGNITION_BASE_URL: http://face-ai:5000
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - face-ai
+    restart: unless-stopped
+
   postgres:
     image: pgvector/pgvector:pg15
     container_name: SI_postgres
@@ -10,6 +40,7 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   redis:
     image: redis:alpine
@@ -18,6 +49,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
 
   minio:
     image: quay.io/minio/minio:latest
@@ -31,6 +63,7 @@ services:
     volumes:
       - minio_data:/data
     command: server /data --address ":9000" --console-address ":9001"
+    restart: unless-stopped
 
   face-ai:
     build:
@@ -51,6 +84,14 @@ services:
 
 volumes:
   postgres_data:
+    external: true
+    name: backend_postgres_data
   redis_data:
+    external: true
+    name: backend_redis_data
   minio_data:
+    external: true
+    name: backend_minio_data
   face_ai_models:
+    external: true
+    name: backend_face_ai_models

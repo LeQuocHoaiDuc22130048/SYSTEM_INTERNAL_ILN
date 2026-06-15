@@ -1,3 +1,5 @@
+import 'app_permission.dart';
+
 enum UserRole { superAdmin, admin, manager, employee }
 
 enum UserStatus { active, suspended, pending }
@@ -14,6 +16,7 @@ class User {
   final String? department;
   final String? phone;
   final bool faceEnrolled;
+  final Set<AppPermission>? permissions;
 
   User({
     required this.id,
@@ -27,6 +30,7 @@ class User {
     this.department,
     this.phone,
     this.faceEnrolled = false,
+    this.permissions,
   });
 
   String get roleLabel {
@@ -79,6 +83,7 @@ class User {
       avatar: json['avatarUrl']?.toString(),
       department: json['department']?.toString(),
       faceEnrolled: json['faceEnrolled'] == true,
+      permissions: permissionsFromBackend(json['permissions']),
     );
   }
 
@@ -96,6 +101,77 @@ class User {
       department: json['department']?.toString(),
       phone: json['phone']?.toString(),
       faceEnrolled: json['faceEnrolled'] == true,
+      permissions: permissionsFromBackend(json['permissions']),
     );
+  }
+
+  bool can(AppPermission permission) {
+    final serverPermissions = permissions;
+    if (serverPermissions != null) {
+      return serverPermissions.contains(permission);
+    }
+    return role.can(permission);
+  }
+
+  static Set<AppPermission>? permissionsFromBackend(Object? value) {
+    if (value is! List) return null;
+    return value
+        .map(
+          (item) => AppPermissionBackendCode.fromBackendCode(item.toString()),
+        )
+        .whereType<AppPermission>()
+        .toSet();
+  }
+}
+
+extension UserRolePermissions on UserRole {
+  bool get isManagerOrAbove =>
+      this == UserRole.manager ||
+      this == UserRole.admin ||
+      this == UserRole.superAdmin;
+
+  bool get isAdminOrAbove =>
+      this == UserRole.admin || this == UserRole.superAdmin;
+
+  bool can(AppPermission permission) => permissions.contains(permission);
+
+  Set<AppPermission> get permissions {
+    const employeePermissions = {
+      AppPermission.viewRepairOrders,
+      AppPermission.manageRepairOrders,
+      AppPermission.viewWarehouse,
+      AppPermission.manageWarehouse,
+      AppPermission.useMessages,
+      AppPermission.viewNotifications,
+      AppPermission.viewAttendance,
+      AppPermission.viewProfile,
+      AppPermission.updateOwnProfile,
+    };
+
+    const managerPermissions = {
+      ...employeePermissions,
+      AppPermission.viewDashboard,
+      AppPermission.assignRepairOrders,
+      AppPermission.manageAttendance,
+      AppPermission.manageEmployees,
+      AppPermission.approveAccounts,
+    };
+
+    const adminPermissions = {
+      ...managerPermissions,
+      AppPermission.deleteWarehouse,
+      AppPermission.manageEmployeeSecurity,
+    };
+
+    switch (this) {
+      case UserRole.superAdmin:
+        return AppPermission.values.toSet();
+      case UserRole.admin:
+        return adminPermissions;
+      case UserRole.manager:
+        return managerPermissions;
+      case UserRole.employee:
+        return employeePermissions;
+    }
   }
 }

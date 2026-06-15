@@ -9,6 +9,7 @@ import com.suachuabientan.system_internal.modules.warehouse.dto.response.Checkou
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.QrScanResponse;
 import com.suachuabientan.system_internal.modules.warehouse.enums.BoardStatus;
 import com.suachuabientan.system_internal.modules.warehouse.service.WarehouseService;
+import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,7 +35,7 @@ public class WarehouseController {
 
     @Operation(summary = "Tạo bo mạch mới")
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
     public ResponseEntity<ApiResponse<BoardItemResponse>> create(
             @Valid @RequestBody CreateBoardItemRequest request,
             @AuthenticationPrincipal UserDetails userDetails
@@ -46,6 +47,7 @@ public class WarehouseController {
 
     @Operation(summary = "Danh sách bo mạch — có filter và search")
     @GetMapping
+    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
     public ResponseEntity<ApiResponse<Page<BoardItemResponse>>> getAll(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) BoardStatus status,
@@ -56,13 +58,14 @@ public class WarehouseController {
 
     @Operation(summary = "Chi tiết bo mạch")
     @GetMapping("/{id}")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
     public ResponseEntity<ApiResponse<BoardItemResponse>> getById(@PathVariable UUID id) {
         return ResponseEntity.ok(ApiResponse.success(warehouseService.getById(id)));
     }
 
     @Operation(summary = "Cập nhật thông tin bo mạch")
     @PatchMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
     public ResponseEntity<ApiResponse<BoardItemResponse>> update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateBoardItemRequest request,
@@ -73,7 +76,7 @@ public class WarehouseController {
 
     @Operation(summary = "Xoá bo mạch (soft delete)")
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_DELETE)
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -84,6 +87,7 @@ public class WarehouseController {
     // ── QR Scan ───────────────────────────────────────────────
     @Operation(summary = "Quét mã QR — trả thông tin bo mạch + người đang giữ")
     @GetMapping("/scan/{qrCode}")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
     public ResponseEntity<ApiResponse<QrScanResponse>> scanQr(@PathVariable String qrCode) {
         return ResponseEntity.ok(ApiResponse.success(warehouseService.scanQr(qrCode)));
     }
@@ -91,7 +95,7 @@ public class WarehouseController {
     // ── Checkout / Return ─────────────────────────────────────
     @Operation(summary = "Lấy bo mạch để sửa chữa")
     @PostMapping("/{id}/checkout")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
     public ResponseEntity<ApiResponse<CheckoutResponse>> checkout(
             @PathVariable UUID id,
             @RequestBody(required = false) CheckoutRequest request,
@@ -105,7 +109,7 @@ public class WarehouseController {
 
     @Operation(summary = "Trả bo mạch về kho")
     @PatchMapping("/{id}/return")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
     public ResponseEntity<ApiResponse<CheckoutResponse>> returnBoard(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -119,7 +123,7 @@ public class WarehouseController {
     // ── History ───────────────────────────────────────────────
     @Operation(summary = "Lịch sử lấy/trả của bo mạch")
     @GetMapping("/{id}/history")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'WAREHOUSE_STAFF')")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
     public ResponseEntity<ApiResponse<Page<CheckoutResponse>>> getHistory(
             @PathVariable UUID id,
             @PageableDefault(size = 20) Pageable pageable) {

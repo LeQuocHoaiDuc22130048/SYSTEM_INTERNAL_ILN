@@ -1,5 +1,7 @@
 package com.suachuabientan.system_internal.modules.auth.dto.response;
 
+import java.util.List;
+
 public record LoginResponse(
         String accessToken,
         String refreshToken,
@@ -14,6 +16,7 @@ public record LoginResponse(
             String role,
             String status,
             String avatarUrl,
-            Object department
+            Object department,
+            List<String> permissions
     ){}
 }

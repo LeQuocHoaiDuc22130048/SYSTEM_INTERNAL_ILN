@@ -13,6 +13,7 @@ import com.suachuabientan.system_internal.modules.messaging.dto.request.UpdateMe
 import com.suachuabientan.system_internal.modules.messaging.dto.response.ConversationResponse;
 import com.suachuabientan.system_internal.modules.messaging.dto.response.MessageResponse;
 import com.suachuabientan.system_internal.modules.messaging.service.MessagingService;
+import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -23,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -44,6 +46,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/conversations")
 @RequiredArgsConstructor
+@PreAuthorize(RoleExpressions.ANY_ACTIVE_USER)
 public class MessagingController {
     private final MessagingService messagingService;
 

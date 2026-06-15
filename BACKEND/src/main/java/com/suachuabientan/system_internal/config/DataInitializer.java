@@ -4,6 +4,7 @@ import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.modules.auth.service.RbacService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,7 @@ import org.springframework.util.StringUtils;
 public class DataInitializer implements ApplicationRunner {
     private final UserRepository  userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final RbacService rbacService;
 
     @Value("${app.init.super-admin.username}")
     private String superAdminUsername;
@@ -59,6 +61,8 @@ public class DataInitializer implements ApplicationRunner {
 
         if (userRepository.existsByUsernameAndIsDeletedFalse(adminUsername)) {
             log.info("✓ ADMIN '{}' đã tồn tại — bỏ qua.", adminUsername);
+            userRepository.findByUsernameAndIsDeletedFalse(adminUsername)
+                    .ifPresent(user -> rbacService.ensurePrimaryRoleAssigned(user.getId(), user.getRole()));
             return;
         }
 
@@ -78,7 +82,8 @@ public class DataInitializer implements ApplicationRunner {
                 .faceEnrolled(false)
                 .build();
 
-        userRepository.save(admin);
+        UserEntity saved = userRepository.saveAndFlush(admin);
+        rbacService.ensurePrimaryRoleAssigned(saved.getId(), saved.getRole());
         log.info("✓ Đã tạo tài khoản ADMIN: username='{}'",
                 adminUsername);
     }
@@ -98,6 +103,8 @@ public class DataInitializer implements ApplicationRunner {
 
         if (userRepository.existsByUsernameAndIsDeletedFalse(superAdminUsername)) {
             log.info("✓ SUPER_ADMIN '{}' đã tồn tại — bỏ qua.", superAdminUsername);
+            userRepository.findByUsernameAndIsDeletedFalse(superAdminUsername)
+                    .ifPresent(user -> rbacService.ensurePrimaryRoleAssigned(user.getId(), user.getRole()));
             return;
         }
 
@@ -118,7 +125,8 @@ public class DataInitializer implements ApplicationRunner {
                 .faceEnrolled(false)
                 .build();
 
-        userRepository.save(superAdmin);
+        UserEntity saved = userRepository.saveAndFlush(superAdmin);
+        rbacService.ensurePrimaryRoleAssigned(saved.getId(), saved.getRole());
         log.info("✓ Đã tạo tài khoản SUPER_ADMIN: username='{}'",
                 superAdminUsername);
     }

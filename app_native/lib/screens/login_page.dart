@@ -154,7 +154,9 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
       setState(() => _loading = false);
-      context.read<BackendDataProvider>().loadAll();
+      if (!auth.isAttendanceAccount) {
+        context.read<BackendDataProvider>().loadAll();
+      }
       Navigator.of(context).pushReplacementNamed('/dashboard');
     } on ApiException catch (error) {
       if (!mounted) return;

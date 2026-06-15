@@ -20,6 +20,7 @@ public interface BoardCheckoutRepository extends JpaRepository<BoardCheckout, UU
     @Query("""
                 SELECT c FROM BoardCheckout c
                 WHERE c.boardItemId = :boardItemId
+                AND c.checkoutStatus = com.suachuabientan.system_internal.modules.warehouse.enums.CheckoutStatus.OPEN
                 AND c.returnedAt is NULL 
                 AND c.isDeleted = false
             """)

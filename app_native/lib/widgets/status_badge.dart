@@ -53,6 +53,25 @@ class StatusBadge extends StatelessWidget {
             'bgColor': AppColors.infoLight,
             'textColor': AppColors.info,
           };
+        case BoardStatus.inRepair:
+          return {
+            'label': status.label,
+            'bgColor': AppColors.infoLight,
+            'textColor': AppColors.info,
+          };
+        case BoardStatus.damaged:
+        case BoardStatus.lost:
+          return {
+            'label': status.label,
+            'bgColor': AppColors.errorLight,
+            'textColor': AppColors.error,
+          };
+        case BoardStatus.archived:
+          return {
+            'label': status.label,
+            'bgColor': const Color(0xFFF1F5F9),
+            'textColor': const Color(0xFF64748B),
+          };
         case BoardStatus.maintenance:
           return {
             'label': 'Bảo trì',

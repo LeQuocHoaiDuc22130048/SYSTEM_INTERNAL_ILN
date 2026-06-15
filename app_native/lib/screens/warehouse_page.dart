@@ -19,6 +19,10 @@ class WarehousePage extends StatefulWidget {
 }
 
 class _WarehousePageState extends State<WarehousePage> {
+  static final RegExp _uuidPattern = RegExp(
+    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+  );
+
   final TextEditingController _searchController = TextEditingController();
   final ValueNotifier<BoardStatus?> _filter = ValueNotifier(null);
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
@@ -45,12 +49,17 @@ class _WarehousePageState extends State<WarehousePage> {
     final currentFilter = _filter.value;
     final boards = context.read<BackendDataProvider>().boards;
     return boards.where((board) {
-      final matchesFilter = currentFilter == null || board.status == currentFilter;
+      final matchesFilter =
+          currentFilter == null || board.status == currentFilter;
       final matchesSearch =
           query.isEmpty ||
           board.name.toLowerCase().contains(query) ||
           board.qrCode.toLowerCase().contains(query) ||
-          board.model.toLowerCase().contains(query);
+          board.model.toLowerCase().contains(query) ||
+          board.location.toLowerCase().contains(query) ||
+          (board.serialNumber?.toLowerCase().contains(query) ?? false) ||
+          (board.partIpn?.toLowerCase().contains(query) ?? false) ||
+          (board.currentLocationCode?.toLowerCase().contains(query) ?? false);
       return matchesFilter && matchesSearch;
     }).toList();
   }
@@ -59,7 +68,21 @@ class _WarehousePageState extends State<WarehousePage> {
     return board.qrCode.isEmpty ? 'QR chờ backend tạo' : board.qrCode;
   }
 
+  String _inventoryLine(Board board) {
+    return [
+      if (board.serialNumber?.isNotEmpty ?? false) 'SN ${board.serialNumber}',
+      if (board.partIpn?.isNotEmpty ?? false) 'IPN ${board.partIpn}',
+    ].join(' | ');
+  }
 
+  String? _optionalText(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  bool _isUuidOrEmpty(String? value) {
+    return value == null || _uuidPattern.hasMatch(value);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -150,7 +173,10 @@ class _WarehousePageState extends State<WarehousePage> {
                                     _searchController.text = _searchQuery.value;
                                   }
                                 },
-                                icon: const Icon(Icons.qr_code_scanner, size: 16),
+                                icon: const Icon(
+                                  Icons.qr_code_scanner,
+                                  size: 16,
+                                ),
                                 label: const Text(
                                   'Quét QR',
                                   style: TextStyle(fontSize: 12),
@@ -389,11 +415,7 @@ class _WarehousePageState extends State<WarehousePage> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              _buildFilterChip(
-                                'Tất cả',
-                                null,
-                                boards.length,
-                              ),
+                              _buildFilterChip('Tất cả', null, boards.length),
                               const SizedBox(width: 6),
                               _buildFilterChip(
                                 'Sẵn sàng',
@@ -442,83 +464,83 @@ class _WarehousePageState extends State<WarehousePage> {
                       final filtered = _filteredBoards;
                       if (filtered.isEmpty) {
                         return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Text('🔌', style: TextStyle(fontSize: 48)),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Không tìm thấy bo mạch',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? AppColors.textPrimaryDark
-                                        : AppColors.textPrimaryLight,
-                                  ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Text('🔌', style: TextStyle(fontSize: 48)),
+                              const SizedBox(height: 16),
+                              Text(
+                                'Không tìm thấy bo mạch',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark
+                                      ? AppColors.textPrimaryDark
+                                      : AppColors.textPrimaryLight,
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Thử thay đổi bộ lọc',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight,
-                                  ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Thử thay đổi bộ lọc',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isDark
+                                      ? AppColors.textSecondaryDark
+                                      : AppColors.textSecondaryLight,
                                 ),
-                              ],
-                            ),
-                          );
+                              ),
+                            ],
+                          ),
+                        );
                       }
-                      
+
                       return _isGridView
-                        ? GridView.builder(
-                            padding: const EdgeInsets.all(16),
-                            gridDelegate:
-                                SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: wide ? 4 : 2,
-                                  mainAxisSpacing: 8,
-                                  crossAxisSpacing: 8,
-                                  childAspectRatio: wide ? 0.75 : 0.7,
-                                ),
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              return _buildBoardGridCard(filtered[index])
-                                  .animate(target: 1)
-                                  .fadeIn(
-                                    duration: 400.ms,
-                                    delay: (50 * index).ms,
-                                  )
-                                  .slideY(
-                                    begin: 0.2,
-                                    end: 0,
-                                    duration: 400.ms,
-                                    delay: (50 * index).ms,
-                                  );
-                            },
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16),
-                            itemCount: filtered.length,
-                            itemBuilder: (context, index) {
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildBoardListCard(filtered[index])
+                          ? GridView.builder(
+                              padding: const EdgeInsets.all(16),
+                              gridDelegate:
+                                  SliverGridDelegateWithFixedCrossAxisCount(
+                                    crossAxisCount: wide ? 4 : 2,
+                                    mainAxisSpacing: 8,
+                                    crossAxisSpacing: 8,
+                                    childAspectRatio: wide ? 0.75 : 0.7,
+                                  ),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                return _buildBoardGridCard(filtered[index])
                                     .animate(target: 1)
                                     .fadeIn(
                                       duration: 400.ms,
                                       delay: (50 * index).ms,
                                     )
-                                    .slideX(
-                                      begin: -0.2,
+                                    .slideY(
+                                      begin: 0.2,
                                       end: 0,
                                       duration: 400.ms,
                                       delay: (50 * index).ms,
-                                    ),
-                              );
-                            },
-                          );
+                                    );
+                              },
+                            )
+                          : ListView.builder(
+                              padding: const EdgeInsets.all(16),
+                              itemCount: filtered.length,
+                              itemBuilder: (context, index) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildBoardListCard(filtered[index])
+                                      .animate(target: 1)
+                                      .fadeIn(
+                                        duration: 400.ms,
+                                        delay: (50 * index).ms,
+                                      )
+                                      .slideX(
+                                        begin: -0.2,
+                                        end: 0,
+                                        duration: 400.ms,
+                                        delay: (50 * index).ms,
+                                      ),
+                                );
+                              },
+                            );
                     },
                   ),
                 ),
@@ -702,6 +724,7 @@ class _WarehousePageState extends State<WarehousePage> {
 
   Widget _buildBoardGridCard(Board board) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inventoryLine = _inventoryLine(board);
     final statusColor = board.status == BoardStatus.available
         ? AppColors.success
         : board.status == BoardStatus.checkedOut
@@ -828,6 +851,20 @@ class _WarehousePageState extends State<WarehousePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (inventoryLine.isNotEmpty) ...[
+                      const SizedBox(height: 1),
+                      Text(
+                        inventoryLine,
+                        style: TextStyle(
+                          fontSize: 8,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -864,6 +901,7 @@ class _WarehousePageState extends State<WarehousePage> {
 
   Widget _buildBoardListCard(Board board) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final inventoryLine = _inventoryLine(board);
     final statusColor = board.status == BoardStatus.available
         ? AppColors.success
         : board.status == BoardStatus.checkedOut
@@ -971,6 +1009,20 @@ class _WarehousePageState extends State<WarehousePage> {
                       ),
                     ],
                   ),
+                  if (inventoryLine.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      inventoryLine,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1017,7 +1069,7 @@ class _WarehousePageState extends State<WarehousePage> {
           TextButton(
             onPressed: () async {
               await context.read<BackendDataProvider>().deleteBoard(board);
-              if (!mounted) return;
+              if (!context.mounted) return;
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text('Đã xóa bo mạch ${board.name}')),
@@ -1036,6 +1088,9 @@ class _WarehousePageState extends State<WarehousePage> {
     final qrCodeCtrl = TextEditingController(text: board?.qrCode ?? '');
     final modelCtrl = TextEditingController(text: board?.model ?? '');
     final locationCtrl = TextEditingController(text: board?.location ?? '');
+    final serialCtrl = TextEditingController(text: board?.serialNumber ?? '');
+    final partIdCtrl = TextEditingController(text: board?.partId ?? '');
+    final currentLocationIdCtrl = TextEditingController();
     final descCtrl = TextEditingController(text: board?.description ?? '');
     BoardStatus selectedStatus = board?.status ?? BoardStatus.available;
 
@@ -1110,6 +1165,27 @@ class _WarehousePageState extends State<WarehousePage> {
                                 ),
                               ),
                               const SizedBox(height: 12),
+                              TextField(
+                                controller: serialCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Serial',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: partIdCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Part ID',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: currentLocationIdCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Location ID',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
                               DropdownButtonFormField<BoardStatus>(
                                 initialValue: selectedStatus,
                                 decoration: const InputDecoration(
@@ -1123,6 +1199,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                   if (s == BoardStatus.maintenance) {
                                     label = 'Bảo trì';
                                   }
+                                  label = s.label;
                                   return DropdownMenuItem(
                                     value: s,
                                     child: Text(label),
@@ -1130,9 +1207,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                 }).toList(),
                                 onChanged: (val) {
                                   if (val != null) {
-                                    setDialogState(
-                                      () => selectedStatus = val,
-                                    );
+                                    setDialogState(() => selectedStatus = val);
                                   }
                                 },
                               ),
@@ -1159,27 +1234,57 @@ class _WarehousePageState extends State<WarehousePage> {
                           const SizedBox(width: 8),
                           ElevatedButton(
                             onPressed: () async {
-                              if (nameCtrl.text.isEmpty) return;
+                              if (nameCtrl.text.trim().isEmpty) return;
 
-                              final backend = context.read<BackendDataProvider>();
-                              final body = {
-                                'name': nameCtrl.text,
-                                'category': modelCtrl.text,
-                                'location': locationCtrl.text,
-                                'description': descCtrl.text,
+                              final serialNumber = _optionalText(
+                                serialCtrl.text,
+                              );
+                              final partId = _optionalText(partIdCtrl.text);
+                              final currentLocationId = _optionalText(
+                                currentLocationIdCtrl.text,
+                              );
+                              if (!_isUuidOrEmpty(partId) ||
+                                  !_isUuidOrEmpty(currentLocationId)) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'ID phai dung dinh dang UUID',
+                                    ),
+                                  ),
+                                );
+                                return;
+                              }
+
+                              final backend = context
+                                  .read<BackendDataProvider>();
+                              final body = <String, dynamic>{
+                                'name': nameCtrl.text.trim(),
+                                'category': modelCtrl.text.trim(),
+                                'location': locationCtrl.text.trim(),
+                                'description': descCtrl.text.trim(),
+                                'serialNumber': serialNumber,
                                 if (isEditing)
                                   'status': _boardStatusName(selectedStatus),
                               };
+                              if (partId != null) {
+                                body['partId'] = partId;
+                              }
+                              if (currentLocationId != null) {
+                                body['currentLocationId'] = currentLocationId;
+                              }
                               if (isEditing) {
                                 await backend.api.patch(
                                   '/api/v1/boards/${board.id}',
                                   body: body,
                                 );
                               } else {
-                                await backend.api.post('/api/v1/boards', body: body);
+                                await backend.api.post(
+                                  '/api/v1/boards',
+                                  body: body,
+                                );
                               }
                               await backend.loadBoards();
-                              if (!mounted) return;
+                              if (!context.mounted) return;
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
@@ -1207,14 +1312,7 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   String _boardStatusName(BoardStatus status) {
-    switch (status) {
-      case BoardStatus.available:
-        return 'AVAILABLE';
-      case BoardStatus.checkedOut:
-        return 'CHECKED_OUT';
-      case BoardStatus.maintenance:
-        return 'MAINTENANCE';
-    }
+    return status.backendName;
   }
 }
 
@@ -1246,12 +1344,12 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
     if (!isOnline && mounted) {
       final isReturn = widget.board.status == BoardStatus.checkedOut;
       context.read<PendingSyncProvider>().addAction(
-            type: isReturn
-                ? PendingSyncType.boardReturn
-                : PendingSyncType.boardCheckout,
-            title: isReturn ? 'Trả bo mạch' : 'Lấy bo mạch',
-            description: '${widget.board.name} - ${widget.board.qrCode}',
-          );
+        type: isReturn
+            ? PendingSyncType.boardReturn
+            : PendingSyncType.boardCheckout,
+        title: isReturn ? 'Trả bo mạch' : 'Lấy bo mạch',
+        description: '${widget.board.name} - ${widget.board.qrCode}',
+      );
     }
 
     await Future.delayed(Duration(milliseconds: isOnline ? 1200 : 250));
@@ -1272,7 +1370,10 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isEmployee = Provider.of<AuthProvider>(context, listen: false).isEmployee;
+    final isEmployee = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    ).isEmployee;
 
     return Container(
       decoration: BoxDecoration(
@@ -1342,13 +1443,21 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.edit, size: 20, color: AppColors.primary),
+                    icon: const Icon(
+                      Icons.edit,
+                      size: 20,
+                      color: AppColors.primary,
+                    ),
                     onPressed: widget.onEdit,
                     tooltip: 'Chỉnh sửa',
                   ),
                   if (!isEmployee)
                     IconButton(
-                      icon: const Icon(Icons.delete, size: 20, color: AppColors.error),
+                      icon: const Icon(
+                        Icons.delete,
+                        size: 20,
+                        color: AppColors.error,
+                      ),
                       onPressed: widget.onDelete,
                       tooltip: 'Xóa',
                     ),
@@ -1363,6 +1472,12 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                 child: StatusBadge(status: widget.board.status),
               ),
               _buildInfoRow('Vị trí', widget.board.location),
+              if (widget.board.serialNumber?.isNotEmpty ?? false)
+                _buildInfoRow('Serial', widget.board.serialNumber!),
+              if (widget.board.partIpn?.isNotEmpty ?? false)
+                _buildInfoRow('IPN', widget.board.partIpn!),
+              if (widget.board.currentLocationCode?.isNotEmpty ?? false)
+                _buildInfoRow('Mã vị trí', widget.board.currentLocationCode!),
               if (widget.board.checkedOutBy != null)
                 _buildInfoRow('Đang dùng bởi', widget.board.checkedOutBy!),
               if (widget.board.currentRepairOrder != null)
@@ -1459,7 +1574,6 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(
             label,
@@ -1470,17 +1584,27 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                   : AppColors.textSecondaryLight,
             ),
           ),
-          child ??
-              Text(
-                value ?? '',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                ),
-              ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child:
+                  child ??
+                  Text(
+                    value ?? '',
+                    textAlign: TextAlign.right,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
+                  ),
+            ),
+          ),
         ],
       ),
     );
