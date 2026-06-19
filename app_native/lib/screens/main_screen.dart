@@ -202,7 +202,7 @@ class _MainScreenState extends State<MainScreen> {
           MaterialPageRoute(
             builder: (_) => const AttendanceScreen(
               allowEnrollment: false,
-              selfCheckOnly: true,
+              selfCheckOnly: false,
               refreshAttendanceAfterVerification: false,
               showMatchedEmployeeInfo: false,
               popOnVerificationSuccess: true,

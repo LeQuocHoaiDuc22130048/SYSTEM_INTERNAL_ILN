@@ -159,14 +159,10 @@ class _EmployeesPageState extends State<EmployeesPage> {
                     child: Row(
                       children: [
                         _buildFilterChip('Tất cả', null),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('Kỹ thuật', UserRole.employee),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('Quản lý', UserRole.manager),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('Admin', UserRole.admin),
-                        const SizedBox(width: 8),
-                        _buildFilterChip('Super Admin', UserRole.superAdmin),
+                        ...UserRole.values.expand((role) => [
+                          const SizedBox(width: 8),
+                          _buildFilterChip(role.label, role),
+                        ]),
                       ],
                     ),
                   ),
@@ -449,18 +445,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
     );
   }
 
-  Color _getAvatarColor(UserRole role) {
-    switch (role) {
-      case UserRole.superAdmin:
-        return AppColors.purple;
-      case UserRole.admin:
-        return AppColors.primary;
-      case UserRole.manager:
-        return const Color(0xFF6366F1); // indigo
-      case UserRole.employee:
-        return AppColors.success;
-    }
-  }
+  Color _getAvatarColor(UserRole role) => role.avatarColor;
 
   void _showEmployeeDetail(User user) {
     showModalBottomSheet(
@@ -477,18 +462,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
 
   const _EmployeeDetailSheet({required this.user});
 
-  Color _getAvatarColor(UserRole role) {
-    switch (role) {
-      case UserRole.superAdmin:
-        return AppColors.purple;
-      case UserRole.admin:
-        return AppColors.primary;
-      case UserRole.manager:
-        return const Color(0xFF6366F1);
-      case UserRole.employee:
-        return AppColors.success;
-    }
-  }
+  Color _getAvatarColor(UserRole role) => role.avatarColor;
 
   @override
   Widget build(BuildContext context) {
@@ -948,18 +922,7 @@ class _AddEmployeeSheetState extends State<_AddEmployeeSheet> {
     );
   }
 
-  String _getRoleLabel(UserRole role) {
-    switch (role) {
-      case UserRole.superAdmin:
-        return 'Super Admin';
-      case UserRole.admin:
-        return 'Admin';
-      case UserRole.manager:
-        return 'Quản lý';
-      case UserRole.employee:
-        return 'Nhân viên';
-    }
-  }
+  String _getRoleLabel(UserRole role) => role.label;
 
   Widget _buildTextField(
     BuildContext context, {
@@ -1183,21 +1146,7 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
                                     try {
                                       final cleanedPhone = _phoneCtrl.text
                                           .replaceAll(RegExp(r'\D'), '');
-                                      String roleKey;
-                                      switch (_selectedRole) {
-                                        case UserRole.superAdmin:
-                                          roleKey = 'SUPER_ADMIN';
-                                          break;
-                                        case UserRole.admin:
-                                          roleKey = 'ADMIN';
-                                          break;
-                                        case UserRole.manager:
-                                          roleKey = 'MANAGER';
-                                          break;
-                                        case UserRole.employee:
-                                          roleKey = 'EMPLOYEE';
-                                          break;
-                                      }
+                                      final roleKey = _selectedRole.backendCode;
                                       await context
                                           .read<BackendDataProvider>()
                                           .updateEmployee(widget.user.id, {
@@ -1320,18 +1269,12 @@ class _EditEmployeeSheetState extends State<_EditEmployeeSheet> {
             ),
           ),
           dropdownColor: isDark ? AppColors.surfaceDark : Colors.white,
-          items: const [
-            DropdownMenuItem(
-              value: UserRole.employee,
-              child: Text('Nhân viên'),
-            ),
-            DropdownMenuItem(value: UserRole.manager, child: Text('Quản lý')),
-            DropdownMenuItem(value: UserRole.admin, child: Text('Admin')),
-            DropdownMenuItem(
-              value: UserRole.superAdmin,
-              child: Text('Super Admin'),
-            ),
-          ],
+          items: UserRole.values.map((role) {
+            return DropdownMenuItem(
+              value: role,
+              child: Text(role.label),
+            );
+          }).toList(),
           onChanged: (val) {
             if (val != null) {
               setState(() {

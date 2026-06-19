@@ -29,9 +29,16 @@ public interface WorkScheduleRepository extends JpaRepository<WorkSchedule, UUID
             @Param("from") LocalDate from,
             @Param("to") LocalDate to);
 
-    /**
-     * Lịch làm việc của tất cả nhân viên trong ngày — Manager xem.
-     */
     List<WorkSchedule> findByWorkDateAndIsDeletedFalse(LocalDate workDate);
+
+    @Query("""
+            SELECT w FROM WorkSchedule w
+            WHERE w.workDate >= :startDate
+              AND w.workDate <= :endDate
+              AND w.isDeleted = false
+            """)
+    List<WorkSchedule> findByWorkDateBetween(
+            @Param("startDate") LocalDate startDate,
+            @Param("endDate") LocalDate endDate);
 }
 

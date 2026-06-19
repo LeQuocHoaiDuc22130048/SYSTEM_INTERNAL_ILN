@@ -220,7 +220,6 @@ class DatabaseService {
   static const biometricQueueRetention = Duration(days: 30);
   static const syncQueueRetention = Duration(days: 90);
   static const attendanceAttemptWindow = Duration(minutes: 1);
-  static const livenessLockDuration = Duration(minutes: 5);
 
   bool get lastSyncHadNearbyDuplicate => _lastNearbyDuplicateSkips > 0;
 
@@ -275,61 +274,6 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-  Future<int> countConsecutiveLivenessFailures({
-    String deviceId = 'flutter-mobile-offline-face',
-  }) async {
-    final db = await database;
-    final rows = await db.query(
-      'attendance_security_events',
-      columns: ['reason'],
-      where:
-          "device_id = ? AND reason IN ('LIVENESS_FAILED', 'LIVENESS_PASSED')",
-      whereArgs: [deviceId],
-      orderBy: 'occurred_at DESC',
-      limit: 10,
-    );
-    var count = 0;
-    for (final row in rows) {
-      final reason = row['reason']?.toString();
-      if (reason == 'LIVENESS_FAILED') {
-        count++;
-      } else {
-        break;
-      }
-    }
-    return count;
-  }
-
-  Future<DateTime?> getLivenessLockedUntil({
-    String deviceId = 'flutter-mobile-offline-face',
-  }) async {
-    final value = await _getMetadata('liveness_locked_until_$deviceId');
-    if (value == null || value.isEmpty) return null;
-    final parsed = DateTime.tryParse(value);
-    if (parsed == null) return null;
-    if (DateTime.now().toUtc().isAfter(parsed.toUtc())) {
-      await _setMetadata('liveness_locked_until_$deviceId', '');
-      return null;
-    }
-    return parsed.toUtc();
-  }
-
-  Future<DateTime> lockLiveness({
-    Duration duration = livenessLockDuration,
-    String deviceId = 'flutter-mobile-offline-face',
-  }) async {
-    final lockedUntil = DateTime.now().toUtc().add(duration);
-    await _setMetadata(
-      'liveness_locked_until_$deviceId',
-      lockedUntil.toIso8601String(),
-    );
-    await recordAttendanceSecurityEvent(
-      reason: 'LIVENESS_LOCKED',
-      detail: 'Locked until ${lockedUntil.toIso8601String()}',
-      deviceId: deviceId,
-    );
-    return lockedUntil;
-  }
 
   Future<Database> get database async {
     if (_db != null) return _db!;

@@ -1,6 +1,10 @@
+import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import 'app_permission.dart';
 
-enum UserRole { superAdmin, admin, manager, employee }
+// {{START_USER_ROLE_ENUM}}
+enum UserRole { superAdmin, admin, manager, technician, warehouse, employee }
+// {{END_USER_ROLE_ENUM}}
 
 enum UserStatus { active, suspended, pending }
 
@@ -33,19 +37,11 @@ class User {
     this.permissions,
   });
 
-  String get roleLabel {
-    switch (role) {
-      case UserRole.superAdmin:
-        return 'Super Admin';
-      case UserRole.admin:
-        return 'Admin';
-      case UserRole.manager:
-        return 'Quản lý';
-      case UserRole.employee:
-        return 'Nhân viên';
-    }
-  }
+  // {{START_ROLE_LABEL}}
+  String get roleLabel => role.label;
+  // {{END_ROLE_LABEL}}
 
+  // {{START_ROLE_FROM_BACKEND}}
   static UserRole roleFromBackend(String? role) {
     switch (role) {
       case 'SUPER_ADMIN':
@@ -54,10 +50,15 @@ class User {
         return UserRole.admin;
       case 'MANAGER':
         return UserRole.manager;
+      case 'TECHNICIAN':
+        return UserRole.technician;
+      case 'WAREHOUSE':
+        return UserRole.warehouse;
       default:
         return UserRole.employee;
     }
   }
+  // {{END_ROLE_FROM_BACKEND}}
 
   static UserStatus statusFromBackend(String? status) {
     switch (status) {
@@ -125,6 +126,63 @@ class User {
 }
 
 extension UserRolePermissions on UserRole {
+  // {{START_ROLE_AVATAR_COLOR}}
+  Color get avatarColor {
+    switch (this) {
+      case UserRole.superAdmin:
+        return AppColors.purple;
+      case UserRole.admin:
+        return AppColors.primary;
+      case UserRole.manager:
+        return const Color(0xFF6366F1);
+      case UserRole.technician:
+        return const Color(0xFF0D9488);
+      case UserRole.warehouse:
+        return const Color(0xFFD97706);
+      case UserRole.employee:
+        return AppColors.success;
+    }
+  }
+  // {{END_ROLE_AVATAR_COLOR}}
+
+  // {{START_ROLE_LABEL_GETTER}}
+  String get label {
+    switch (this) {
+      case UserRole.superAdmin:
+        return 'Super Admin';
+      case UserRole.admin:
+        return 'Admin';
+      case UserRole.manager:
+        return 'Quản lý';
+      case UserRole.technician:
+        return 'Kỹ thuật viên';
+      case UserRole.warehouse:
+        return 'Thủ kho';
+      case UserRole.employee:
+        return 'Nhân viên';
+    }
+  }
+  // {{END_ROLE_LABEL_GETTER}}
+
+  // {{START_ROLE_BACKEND_CODE}}
+  String get backendCode {
+    switch (this) {
+      case UserRole.superAdmin:
+        return 'SUPER_ADMIN';
+      case UserRole.admin:
+        return 'ADMIN';
+      case UserRole.manager:
+        return 'MANAGER';
+      case UserRole.technician:
+        return 'TECHNICIAN';
+      case UserRole.warehouse:
+        return 'WAREHOUSE';
+      case UserRole.employee:
+        return 'EMPLOYEE';
+    }
+  }
+  // {{END_ROLE_BACKEND_CODE}}
+
   bool get isManagerOrAbove =>
       this == UserRole.manager ||
       this == UserRole.admin ||
@@ -163,6 +221,7 @@ extension UserRolePermissions on UserRole {
       AppPermission.manageEmployeeSecurity,
     };
 
+    // {{START_ROLE_PERMISSIONS_SWITCH}}
     switch (this) {
       case UserRole.superAdmin:
         return AppPermission.values.toSet();
@@ -170,8 +229,11 @@ extension UserRolePermissions on UserRole {
         return adminPermissions;
       case UserRole.manager:
         return managerPermissions;
+      case UserRole.technician:
+      case UserRole.warehouse:
       case UserRole.employee:
         return employeePermissions;
     }
+    // {{END_ROLE_PERMISSIONS_SWITCH}}
   }
 }

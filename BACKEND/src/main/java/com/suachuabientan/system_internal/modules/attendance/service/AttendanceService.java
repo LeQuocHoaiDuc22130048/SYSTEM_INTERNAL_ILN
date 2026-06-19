@@ -431,12 +431,12 @@ public class AttendanceService {
     }
 
     private String lowConfidenceMessage(double score) {
-        return "Khuon mat nay chua duoc dang ky hoac do khop chua du tin cay "
-                + "(do khop "
+        return "Xác minh khuôn mặt thất bại: độ khớp chưa đủ tin cậy "
+                + "(độ khớp "
                 + percent(score)
-                + ", yeu cau toi thieu "
+                + ", yêu cầu tối thiểu "
                 + percent(faceMatchThreshold)
-                + "). Vui long quet lai voi anh sang tot hon hoac dang ky lai khuon mat.";
+                + "). Vui lòng quét lại với ánh sáng tốt hơn hoặc nhìn thẳng vào camera.";
     }
 
     private String ambiguousFaceMessage(double bestScore, double secondBestScore) {

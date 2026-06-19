@@ -15,6 +15,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,20 +59,23 @@ class EmployeeServiceTest {
     void enrollFaceStoresEncodingCreatedByAiService() {
         when(userRepository.save(any(UserEntity.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(faceRecognitionService.enroll("image-data", "image/jpeg"))
+        List<Double> dummyEncoding = List.of(0.2, -1.0, 3.5);
+        when(faceRecognitionService.encode("image-data", "image/jpeg"))
+                .thenReturn(dummyEncoding);
+        when(faceRecognitionService.serializeEncoding(dummyEncoding))
                 .thenReturn("[0.2,-1.0,3.5]");
 
         employeeService.enrollFace(employeeId, "image-data", "image/jpeg", UUID.randomUUID());
 
         assertEquals("[0.2,-1.0,3.5]", activeEmployee.getFaceEncoding());
         assertEquals(true, activeEmployee.getFaceEnrolled());
-        verify(faceRecognitionService).enroll("image-data", "image/jpeg");
+        verify(faceRecognitionService).encode("image-data", "image/jpeg");
         verify(userRepository).save(activeEmployee);
     }
 
     @Test
     void enrollFaceDoesNotSaveWhenAiRejectsImage() {
-        when(faceRecognitionService.enroll("bad-image", "image/jpeg"))
+        when(faceRecognitionService.encode("bad-image", "image/jpeg"))
                 .thenThrow(new BusinessException("Invalid image"));
 
         assertThrows(BusinessException.class,

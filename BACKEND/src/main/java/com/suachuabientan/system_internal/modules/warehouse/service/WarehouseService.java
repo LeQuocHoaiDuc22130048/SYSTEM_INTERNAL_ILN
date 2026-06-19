@@ -49,7 +49,6 @@ public class WarehouseService {
     private final StoreLocationRepository storeLocationRepository;
     private final StockMovementRepository stockMovementRepository;
 
-
     @Transactional
     public BoardItemResponse create(CreateBoardItemRequest request, UUID createdByUserId) {
         // Sinh QR duy nhất
@@ -92,12 +91,18 @@ public class WarehouseService {
     public BoardItemResponse update(UUID id, UpdateBoardItemRequest request, UUID updatedByUserId) {
         BoardItem item = findBoardById(id);
 
-        if (request.name() != null) item.setName(request.name());
-        if (request.category() != null) item.setCategory(request.category());
-        if (request.description() != null) item.setDescription(request.description());
-        if (request.location() != null) item.setLocation(request.location());
-        if (request.serialNumber() != null) item.setSerialNumber(request.serialNumber());
-        if (request.partId() != null) item.setPartId(resolvePartId(request.partId()));
+        if (request.name() != null)
+            item.setName(request.name());
+        if (request.category() != null)
+            item.setCategory(request.category());
+        if (request.description() != null)
+            item.setDescription(request.description());
+        if (request.location() != null)
+            item.setLocation(request.location());
+        if (request.serialNumber() != null)
+            item.setSerialNumber(request.serialNumber());
+        if (request.partId() != null)
+            item.setPartId(resolvePartId(request.partId()));
         if (request.currentLocationId() != null || request.location() != null) {
             item.setCurrentLocationId(resolveLocationId(request.currentLocationId(), request.location()));
         }
@@ -115,13 +120,14 @@ public class WarehouseService {
     @Transactional
     public void delete(UUID id, UUID deletedByUserId) {
         BoardItem item = findBoardById(id);
-        if (item.isCheckedOut()) throw new BusinessException("Không thể xóa bo mạch đang được mượn");
+        if (item.isCheckedOut())
+            throw new BusinessException("Không thể xóa bo mạch đang được mượn");
         item.softDelete(deletedByUserId);
         boardItemRepository.save(item);
         log.info("Xóa bo mạch: id={}, by={}", id, deletedByUserId);
     }
 
-    //QR SCAN
+    // QR SCAN
 
     /**
      * Quét qr trả đầy đủ thông tin để app hiển thị popup
@@ -129,7 +135,8 @@ public class WarehouseService {
      */
     @Transactional(readOnly = true)
     public QrScanResponse scanQr(String qrCode) {
-        BoardItem item = boardItemRepository.findByQrCodeAndIsDeletedFalse(qrCode).orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bo mạch với QR: " + qrCode));
+        BoardItem item = boardItemRepository.findByQrCodeAndIsDeletedFalse(qrCode)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bo mạch với QR: " + qrCode));
 
         QrScanResponse.HolderInfo holderInfo = null;
 
@@ -162,8 +169,7 @@ public class WarehouseService {
                 item.getCurrentLocationId(),
                 locationCode(item.getCurrentLocationId()),
                 item.getStatus().name(),
-                holderInfo
-        );
+                holderInfo);
     }
 
     // Checkout lấy bo mạch
@@ -213,7 +219,8 @@ public class WarehouseService {
     @Transactional
     public CheckoutResponse returnBoard(UUID boardItemId, UUID userId, boolean isAdmin) {
         BoardItem item = findBoardById(boardItemId);
-        if (!item.isCheckedOut()) throw new BusinessException("Bo mạch không đang được mượn");
+        if (!item.isCheckedOut())
+            throw new BusinessException("Bo mạch không đang được mượn");
 
         BoardCheckout activeCheckout = boardCheckoutRepository
                 .findActiveByBoardItemId(boardItemId)
@@ -257,7 +264,6 @@ public class WarehouseService {
                 });
     }
 
-
     // Helpers
     private CheckoutResponse toCheckoutResponse(BoardCheckout checkout, BoardItem item) {
         UserEntity taker = userRepository.findByIdAndIsDeletedFalse(checkout.getTakenBy()).orElse(null);
@@ -271,10 +277,8 @@ public class WarehouseService {
                 checkout.getTakenAt(),
                 checkout.getReturnedAt(),
                 checkout.getRepairOrderId(),
-                checkout.getNotes()
-        );
+                checkout.getNotes());
     }
-
 
     private BoardItem findBoardById(UUID id) {
         return boardItemRepository.findByIdAndIsDeletedFalse(id)
@@ -318,8 +322,7 @@ public class WarehouseService {
                 item.getCurrentLocationId(),
                 locationCode(item.getCurrentLocationId()),
                 item.getCreatedAt(),
-                activeCheckout
-        );
+                activeCheckout);
     }
 
     private UUID resolvePartId(UUID partId) {
@@ -363,14 +366,16 @@ public class WarehouseService {
     }
 
     private String partIpn(UUID partId) {
-        if (partId == null) return null;
+        if (partId == null)
+            return null;
         return partRepository.findByIdAndIsDeletedFalse(partId)
                 .map(Part::getIpn)
                 .orElse(null);
     }
 
     private String locationCode(UUID locationId) {
-        if (locationId == null) return null;
+        if (locationId == null)
+            return null;
         return storeLocationRepository.findByIdAndIsDeletedFalse(locationId)
                 .map(StoreLocation::getCode)
                 .orElse(null);

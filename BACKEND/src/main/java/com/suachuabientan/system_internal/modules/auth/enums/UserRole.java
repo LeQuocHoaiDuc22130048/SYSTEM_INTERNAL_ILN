@@ -12,6 +12,5 @@ public enum UserRole {
     MANAGER,
     TECHNICIAN,
     WAREHOUSE,
-    RECEPTIONIST,
     EMPLOYEE
 }

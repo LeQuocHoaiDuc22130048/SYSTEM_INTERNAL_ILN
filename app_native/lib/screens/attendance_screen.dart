@@ -120,9 +120,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   static const _frameInterval = Duration(milliseconds: 750);
   static const _enrollmentSamplePause = Duration(milliseconds: 1800);
-  static const _duplicateThreshold = 0.78;
   static const _requiredEnrollmentSamples = 5;
-  static const _maxEnrollmentSampleCosine = 0.997;
   static const _straightYawMax = 4.0;
   static const _sideYawMin = 5.0;
   static const _sideYawMax = 24.0;
@@ -131,7 +129,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   static const _blinkClosedThreshold = 0.25;
   static const _blinkOpenThreshold = 0.65;
   static const _maxAttemptsPerMinute = 5;
-  static const _maxConsecutiveLivenessFailures = 3;
+  // Liveness lock đã được xóa — chỉ dùng rate limit theo số lần thử/phút
   static const _serverFaceDeviceId = 'flutter-tablet-face';
 
   @override
@@ -355,15 +353,14 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                   metrics: faceResult.metrics,
                 );
               } else {
-                final alignedFace = _embeddingService.alignFace(
-                  frame: detected.frame,
-                  face: detected.face,
-                );
-                final embedding = await _embeddingService
-                    .extractEmbeddingFromAligned(alignedFace);
-                await _handleEnrollmentEmbedding(
-                  embedding,
-                  metrics: faceResult.metrics,
+                // Đăng ký khuôn mặt yêu cầu kết nối server để lưu faceEncoding
+                // vào database. Nếu chỉ lưu offline local thì server vẫn có
+                // faceEnrolled=false và sẽ báo "chưa đăng ký" khi chấm công.
+                _setStatus(
+                  'Đăng ký khuôn mặt cần kết nối mạng để lưu lên server. '
+                  'Vui lòng kết nối WiFi hoặc dữ liệu di động rồi thử lại.',
+                  showSnackBar: true,
+                  snackColor: AppColors.error,
                 );
               }
             } else {
@@ -415,11 +412,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<bool> _verifyLiveness(DetectedFace detected) async {
+    // Khi online: bỏ qua liveness local — server tự xử lý chống giả mạo.
+    // Khi offline: dùng MiniFASNet local để kiểm tra.
+    final isOnline = !(_network?.isOffline ?? true);
+    if (isOnline) {
+      _logFaceAuth('liveness_skipped', {'reason': 'online_server_handles'});
+      return true;
+    }
+
     if (!_livenessService.isAvailable) {
       _logFaceAuth('liveness_skipped', {'reason': 'model_unavailable'});
       await _databaseService.recordAttendanceSecurityEvent(
         reason: 'LIVENESS_SKIPPED',
-        detail: 'MiniFASNet model unavailable on tablet',
+        detail: 'MiniFASNet model unavailable on device',
       );
       return true;
     }
@@ -434,10 +439,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         'threshold': _roundScore(liveness.threshold),
         'raw_scores': liveness.rawScores.map(_roundScore).toList(),
       });
-      final locked = await _handleLivenessFailure(liveness);
-      if (!locked) {
-        _setStatus('Phát hiện dấu hiệu giả mạo khuôn mặt');
-      }
+      await _databaseService.recordAttendanceSecurityEvent(
+        reason: 'LIVENESS_FAILED',
+        detail:
+            'score=${liveness.score.toStringAsFixed(4)}, threshold=${liveness.threshold.toStringAsFixed(4)}',
+      );
+      _setStatus('Phát hiện dấu hiệu giả mạo khuôn mặt');
       return false;
     }
 
@@ -509,18 +516,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   }
 
   Future<bool> _allowAttendanceAttempt() async {
-    final lockedUntil = await _databaseService.getLivenessLockedUntil();
-    if (lockedUntil != null) {
-      _setStatus(
-        'Thiết bị đang tạm khóa chống giả mạo. Thử lại sau ${_remainingLockText(lockedUntil)}.',
-      );
-      await _databaseService.recordAttendanceSecurityEvent(
-        reason: 'RATE_LIMITED',
-        detail: 'Liveness lock active until ${lockedUntil.toIso8601String()}',
-      );
-      return false;
-    }
-
     final attempts = await _databaseService.countRecentAttendanceAttempts();
     if (attempts >= _maxAttemptsPerMinute) {
       _setStatus('Thử quá nhiều lần. Vui lòng chờ 1 phút rồi thử lại.');
@@ -538,31 +533,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return true;
   }
 
-  Future<bool> _handleLivenessFailure(LivenessResult liveness) async {
-    await _databaseService.recordAttendanceSecurityEvent(
-      reason: 'LIVENESS_FAILED',
-      detail:
-          'score=${liveness.score.toStringAsFixed(4)}, threshold=${liveness.threshold.toStringAsFixed(4)}',
-    );
-    final failures = await _databaseService.countConsecutiveLivenessFailures();
-    if (failures >= _maxConsecutiveLivenessFailures) {
-      final lockedUntil = await _databaseService.lockLiveness();
-      _setStatus(
-        'Liveness thất bại liên tục. Thiết bị bị khóa 5 phút, thử lại sau ${_remainingLockText(lockedUntil)}.',
-      );
-      return true;
-    }
-    return false;
-  }
 
-  String _remainingLockText(DateTime lockedUntil) {
-    final remaining = lockedUntil.toUtc().difference(DateTime.now().toUtc());
-    if (remaining.isNegative) return 'ít phút';
-    final minutes = remaining.inMinutes;
-    final seconds = remaining.inSeconds % 60;
-    if (minutes <= 0) return '$seconds giây';
-    return '$minutes phút ${seconds.toString().padLeft(2, '0')} giây';
-  }
 
   EnrollmentVariationSlot? _nextEnrollmentSlot(FaceQualityMetrics metrics) {
     final collectedSlots = _collectedEnrollmentSlots();
@@ -714,6 +685,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     required String faceImageBase64,
     required FaceQualityMetrics? metrics,
   }) async {
+    final backend = context.read<BackendDataProvider>();
+    final auth = context.read<AuthProvider>();
     final employeeId = _employeeIdController.text.trim();
     final employeeName = _employeeNameController.text.trim();
     if (_isEnrollmentCompleted) {
@@ -771,8 +744,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         return;
       }
 
-      final backend = context.read<BackendDataProvider>();
-      final auth = context.read<AuthProvider>();
       await _showEnrollmentSampleAccepted(
         acceptedMessage:
             'Da thu $_requiredEnrollmentSamples/$_requiredEnrollmentSamples mau',
@@ -859,102 +830,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return null;
   }
 
-  Future<void> _handleEnrollmentEmbedding(
-    List<double> embedding, {
-    required FaceQualityMetrics? metrics,
-  }) async {
-    final employeeId = _employeeIdController.text.trim();
-    final employeeName = _employeeNameController.text.trim();
-    if (_isEnrollmentCompleted) {
-      _setStatus('Đăng ký đã hoàn tất. Chuyển sang chấm công hoặc quay lại.');
-      return;
-    }
-    if (employeeId.isEmpty || employeeName.isEmpty) {
-      _setStatus('Nhập mã và tên nhân viên trước khi đăng ký');
-      return;
-    }
-    if (metrics == null) {
-      _setStatus('Chưa đủ thông tin chất lượng ảnh. Vui lòng thử lại.');
-      return;
-    }
-
-    _isSaving = true;
-    try {
-      final duplicate = await _databaseService.findDuplicateEnrollment(
-        embedding,
-        employeeId: employeeId,
-        modelName: _embeddingService.modelName,
-        backendEmployeeId: widget.initialBackendEmployeeId,
-        threshold: _duplicateThreshold,
-      );
-      if (duplicate != null) {
-        _setStatus(
-          'Khuôn mặt này đã được đăng ký cho nhân viên khác. Vui lòng kiểm tra lại.',
-        );
-        return;
-      }
-
-      final slot = _nextEnrollmentSlot(metrics);
-      if (slot == null) {
-        _setStatus(_enrollmentGuidanceForMetrics(metrics));
-        await Future<void>.delayed(const Duration(milliseconds: 900));
-        return;
-      }
-
-      final tooSimilarToExistingSample = _enrollmentSamples.any(
-        (sample) =>
-            _cosineSimilarity(sample.embedding, embedding) >
-            _maxEnrollmentSampleCosine,
-      );
-      if (tooSimilarToExistingSample) {
-        _setStatus(
-          'Mẫu này quá giống mẫu đã thu. Giữ đúng hướng dẫn hiện tại và đổi nhẹ góc mặt.',
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 900));
-        return;
-      }
-
-      _enrollmentSamples.add(
-        EnrollmentSample(embedding: embedding, metrics: metrics, slot: slot),
-      );
-
-      if (_enrollmentSamples.length < _requiredEnrollmentSamples) {
-        await _showEnrollmentSampleAccepted(
-          acceptedMessage:
-              'Đã thu ${_enrollmentSamples.length}/$_requiredEnrollmentSamples mẫu',
-          nextInstruction: _nextEnrollmentInstruction(),
-        );
-        return;
-      }
-
-      await _showEnrollmentSampleAccepted(
-        acceptedMessage:
-            'Đã thu $_requiredEnrollmentSamples/$_requiredEnrollmentSamples mẫu',
-        nextInstruction: 'Đang lưu dữ liệu đăng ký...',
-      );
-
-      await _databaseService.replaceEmployeeFaceSamples(
-        employee: EnrolledEmployee(
-          id: employeeId,
-          name: employeeName,
-          backendEmployeeId: widget.initialBackendEmployeeId,
-          modelName: _embeddingService.modelName,
-        ),
-        embeddings: _enrollmentSamples
-            .map((sample) => sample.embedding)
-            .toList(growable: false),
-      );
-      _isEnrollmentCompleted = true;
-      _setStatus('Đăng ký thành công: $employeeName');
-      if (widget.popOnEnrollmentSuccess && mounted) {
-        Navigator.pop(context, true);
-        return;
-      }
-      await Future<void>.delayed(const Duration(seconds: 2));
-    } finally {
-      _isSaving = false;
-    }
-  }
 
   Future<void> _showEnrollmentSampleAccepted({
     required String acceptedMessage,
@@ -973,22 +848,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     });
   }
 
-  double _cosineSimilarity(List<double> a, List<double> b) {
-    if (a.length != b.length) return -1;
-    var dot = 0.0;
-    var normA = 0.0;
-    var normB = 0.0;
-    for (var i = 0; i < a.length; i++) {
-      dot += a[i] * b[i];
-      normA += a[i] * a[i];
-      normB += b[i] * b[i];
-    }
-    final denominator = normA == 0 || normB == 0
-        ? 0.0
-        : math.sqrt(normA) * math.sqrt(normB);
-    if (denominator == 0) return -1;
-    return dot / denominator;
-  }
 
   double? _roundScore(double? value) {
     if (value == null) return null;
@@ -998,12 +857,19 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
   String _serverFaceFailureMessage(Object error) {
     if (error is ApiException) {
       final message = error.message.trim();
+      // Luôn ưu tiên message chi tiết từ server (đã được sửa để rõ ràng hơn)
       if (message.isNotEmpty) return message;
       if (error.statusCode == 0) {
         return 'Không kết nối được server chấm công. Kiểm tra WiFi, IP backend và cổng 8080.';
       }
-      if (error.statusCode == 401 || error.statusCode == 403) {
-        return 'Quét khuôn mặt thất bại: khuôn mặt chưa được đăng ký, chưa đủ độ khớp, hoặc tài khoản không có quyền chấm công.';
+      if (error.statusCode == 400) {
+        return 'Khuôn mặt chưa được đăng ký trên server. Vui lòng liên hệ Admin để đăng ký khuôn mặt qua trang Quản lý nhân viên (cần kết nối mạng).';
+      }
+      if (error.statusCode == 401) {
+        return 'Phiên đăng nhập đã hết hạn. Vui lòng đăng xuất và đăng nhập lại.';
+      }
+      if (error.statusCode == 403) {
+        return 'Xác minh khuôn mặt thất bại: độ khớp chưa đủ tin cậy. Vui lòng quét lại với ánh sáng tốt hơn hoặc nhìn thẳng vào camera.';
       }
       if (error.statusCode == 409) {
         return 'Khuôn mặt này đã được đăng ký cho nhân viên khác. Vui lòng kiểm tra lại hồ sơ nhân viên.';
@@ -1034,7 +900,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     try {
       _setStatus('Đang gửi ảnh lên server để xác minh...');
       final auth = context.read<AuthProvider>();
-      final selfCheckOnly = widget.selfCheckOnly || auth.isAttendanceAccount;
+      final selfCheckOnly = widget.selfCheckOnly;
       final response = await auth.api.post(
         selfCheckOnly
             ? '/api/v1/attendance/face-check'
@@ -1060,12 +926,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         'attendance_type': attendanceType,
         'latency_ms': stopwatch.elapsedMilliseconds,
       });
+      final isOut = attendanceType == 'OUT';
       _setStatus(
         !widget.showMatchedEmployeeInfo ||
                 employeeName == null ||
                 employeeName.isEmpty
-            ? 'Chấm công thành công'
-            : 'Chấm công thành công: $employeeName',
+            ? (isOut ? 'Chấm công về thành công' : 'Chấm công thành công')
+            : (isOut ? 'Xin cảm ơn $employeeName' : 'Xin chào $employeeName'),
         showSnackBar: true,
         snackColor: AppColors.success,
       );
@@ -1198,16 +1065,23 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         'pending_server_confirmation': _isPendingServerConfirmation,
         'latency_ms': stopwatch.elapsedMilliseconds,
       });
+      final logs = await _databaseService.getRecentAttendanceLogs(limit: 1);
+      final insertedType = logs.isNotEmpty ? logs.first.type : 'IN';
+      final isOut = insertedType == 'OUT';
       final displayStatusText = synced > 0
           ? widget.showMatchedEmployeeInfo
-                ? 'Chấm công thành công: ${match.employee.name}'
-                : 'Chấm công thành công'
+                ? (isOut
+                    ? 'Xin cảm ơn ${match.employee.name}'
+                    : 'Xin chào ${match.employee.name}')
+                : (isOut ? 'Chấm công về thành công' : 'Chấm công thành công')
           : nearbyDuplicate
           ? 'Đã có bản ghi gần thời điểm này'
           : serverRejection != null
           ? 'Server từ chối chấm công. Vui lòng chấm lại.'
           : widget.showMatchedEmployeeInfo
-          ? 'Chấm công tạm - chờ xác nhận: ${match.employee.name}'
+          ? (isOut
+              ? 'Chấm công tạm - chờ xác nhận: Xin cảm ơn ${match.employee.name}'
+              : 'Chấm công tạm - chờ xác nhận: Xin chào ${match.employee.name}')
           : 'Chấm công tạm - chờ xác nhận';
       _setStatus(
         displayStatusText,

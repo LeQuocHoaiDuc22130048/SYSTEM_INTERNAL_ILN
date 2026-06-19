@@ -93,4 +93,30 @@ public interface AttendanceRecordRepository extends JpaRepository<AttendanceReco
             @Param("type") String type,
             @Param("from") Instant from,
             @Param("to") Instant to);
+
+    @Query("""
+            SELECT a FROM AttendanceRecord a
+            WHERE a.checkTime >= :start
+              AND a.checkTime < :end
+              AND a.isDeleted = false
+              AND a.isValid = true
+            ORDER BY a.checkTime ASC
+            """)
+    List<AttendanceRecord> findByCheckTimeBetween(
+            @Param("start") Instant start,
+            @Param("end") Instant end);
+
+    @Query("""
+            SELECT a FROM AttendanceRecord a
+            WHERE a.employeeId = :employeeId
+              AND a.checkTime >= :start
+              AND a.checkTime < :end
+              AND a.isDeleted = false
+              AND a.isValid = true
+            ORDER BY a.checkTime ASC
+            """)
+    List<AttendanceRecord> findByEmployeeIdAndCheckTimeBetween(
+            @Param("employeeId") UUID employeeId,
+            @Param("start") Instant start,
+            @Param("end") Instant end);
 }
