@@ -64,7 +64,7 @@ public class AttendanceController {
 
     @Operation(summary = "Tablet kiosk nhan dien nhan vien bang khuon mat va cham cong")
     @PostMapping("/face-identify")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER') or authentication.name.equalsIgnoreCase('attendance')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN') or authentication.name.equalsIgnoreCase('attendance')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> faceIdentify(
             @Valid @RequestBody FaceCheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -103,7 +103,7 @@ public class AttendanceController {
 
     @Operation(summary = "Dong bo batch log cham cong offline tu mobile")
     @PostMapping("/sync")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER') or authentication.name.equalsIgnoreCase('attendance')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN') or authentication.name.equalsIgnoreCase('attendance')")
     public ResponseEntity<ApiResponse<AttendanceSyncResponse>> syncOfflineLogs(
             @Valid @RequestBody AttendanceSyncRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -114,7 +114,7 @@ public class AttendanceController {
 
     @Operation(summary = "Dong bo log ket qua nhan dien khuon mat de monitor false reject rate")
     @PostMapping("/recognition-logs/batch")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER') or authentication.name.equalsIgnoreCase('attendance')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN') or authentication.name.equalsIgnoreCase('attendance')")
     public ResponseEntity<ApiResponse<Integer>> syncRecognitionLogs(
             @Valid @RequestBody FaceRecognitionLogBatchRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

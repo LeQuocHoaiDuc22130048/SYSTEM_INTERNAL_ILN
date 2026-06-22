@@ -532,16 +532,24 @@ public class AttendanceService {
     @Transactional(readOnly = true)
     public List<DailyAttendanceResponse> getReport(LocalDate date) {
         LocalDate reportDate = date != null ? date : LocalDate.now(BUSINESS_ZONE);
+        List<UUID> allowedUserIds = userRepository.findAll().stream()
+                .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
+                .filter(u -> u.getRole() != UserRole.ADMIN && u.getRole() != UserRole.SUPER_ADMIN)
+                .map(UserEntity::getId)
+                .toList();
+
         List<AttendanceRecord> records = attendanceRecordRepository
                 .findAllByDate(startOfDay(reportDate), startOfDay(reportDate.plusDays(1)))
                 .stream()
                 .filter(record -> Boolean.TRUE.equals(record.getIsValid()))
+                .filter(record -> allowedUserIds.contains(record.getEmployeeId()))
                 .toList();
 
         Map<UUID, List<AttendanceRecord>> byEmployee = records.stream()
                 .collect(Collectors.groupingBy(AttendanceRecord::getEmployeeId));
         Map<UUID, WorkSchedule> schedules = workScheduleRepository.findByWorkDateAndIsDeletedFalse(reportDate)
                 .stream()
+                .filter(schedule -> allowedUserIds.contains(schedule.getEmployeeId()))
                 .collect(Collectors.toMap(WorkSchedule::getEmployeeId, schedule -> schedule));
 
         return byEmployee.entrySet().stream()

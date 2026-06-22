@@ -8,6 +8,7 @@ import com.suachuabientan.system_internal.modules.attendance.repository.Attendan
 import com.suachuabientan.system_internal.modules.attendance.repository.WorkScheduleRepository;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -39,7 +40,9 @@ public class AttendanceQueryController {
             @RequestParam(defaultValue = "2025") int year,
             @RequestParam(defaultValue = "6") int month) {
 
-        List<UserEntity> employees = checkAndSeedUsers();
+        List<UserEntity> employees = checkAndSeedUsers().stream()
+                .filter(u -> u.getRole() != UserRole.ADMIN && u.getRole() != UserRole.SUPER_ADMIN)
+                .toList();
 
         LocalDate startLocalDate = LocalDate.of(year, month, 1);
         LocalDate endLocalDate = startLocalDate.plusMonths(1).minusDays(1);
@@ -121,15 +124,8 @@ public class AttendanceQueryController {
                             }
                         }
 
-                        if (isLate) {
-                            patternBuilder.append("l");
-                            lateCount++;
-                        } else {
-                            patternBuilder.append("p");
-                        }
-                        workDays++;
-
-                        // Calculate working hours
+                        boolean isOvertime = false;
+                        // Calculate working hours and check for overtime
                         if (checkIn != null && checkOut != null) {
                             double minutes = Duration.between(checkIn, checkOut).toMinutes();
                             totalHours += Math.max(0.0, minutes / 60.0);
@@ -139,8 +135,24 @@ public class AttendanceQueryController {
                             if (checkOut.isAfter(shiftEndInstant)) {
                                 double otMinutes = Duration.between(shiftEndInstant, checkOut).toMinutes();
                                 overtimeHours += Math.max(0.0, otMinutes / 60.0);
+                                if (otMinutes > 0) {
+                                    isOvertime = true;
+                                }
                             }
                         }
+
+                        if (isOvertime) {
+                            patternBuilder.append("o");
+                        } else if (isLate) {
+                            patternBuilder.append("l");
+                        } else {
+                            patternBuilder.append("p");
+                        }
+
+                        if (isLate) {
+                            lateCount++;
+                        }
+                        workDays++;
                     }
                 }
             }
@@ -171,6 +183,10 @@ public class AttendanceQueryController {
 
         UserEntity employee = userRepository.findByIdAndIsDeletedFalse(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên"));
+
+        if (employee.getRole() == UserRole.ADMIN || employee.getRole() == UserRole.SUPER_ADMIN) {
+            throw new IllegalArgumentException("Không tìm thấy nhân viên");
+        }
 
         LocalDate startLocalDate = LocalDate.of(year, month, 1);
         LocalDate endLocalDate = startLocalDate.plusMonths(1).minusDays(1);
@@ -243,14 +259,7 @@ public class AttendanceQueryController {
                         }
                     }
 
-                    if (isLate) {
-                        status = "LATE";
-                        lateCount++;
-                    } else {
-                        status = "PRESENT";
-                    }
-                    workDays++;
-
+                    boolean isOvertime = false;
                     if (checkIn != null && checkOut != null) {
                         double minutes = Duration.between(checkIn, checkOut).toMinutes();
                         totalHours += minutes / 60.0;
@@ -259,8 +268,24 @@ public class AttendanceQueryController {
                         if (checkOut.isAfter(shiftEndInstant)) {
                             double otMinutes = Duration.between(shiftEndInstant, checkOut).toMinutes();
                             overtimeHours += otMinutes / 60.0;
+                            if (otMinutes > 0) {
+                                isOvertime = true;
+                            }
                         }
                     }
+
+                    if (isOvertime) {
+                        status = "OVERTIME";
+                    } else if (isLate) {
+                        status = "LATE";
+                    } else {
+                        status = "PRESENT";
+                    }
+
+                    if (isLate) {
+                        lateCount++;
+                    }
+                    workDays++;
                 }
             }
 
@@ -367,6 +392,7 @@ public class AttendanceQueryController {
                     .employeeCode("ADM-2025-004")
                     .department("Administration")
                     .status(com.suachuabientan.system_internal.modules.auth.enums.UserStatus.ACTIVE)
+                    .role(UserRole.ADMIN)
                     .faceEnrolled(true)
                     .build();
             u4.setIsDeleted(false);
