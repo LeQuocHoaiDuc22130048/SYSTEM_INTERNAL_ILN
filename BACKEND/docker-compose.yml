@@ -84,7 +84,7 @@ services:
 
   frontend:
     build:
-      context: ../frontend/manager-attendance
+      context: ../frontend
       dockerfile: Dockerfile
     container_name: SI_frontend_app
     ports:
