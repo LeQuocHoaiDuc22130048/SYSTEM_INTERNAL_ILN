@@ -42,6 +42,7 @@ public class AttendanceQueryController {
 
         List<UserEntity> employees = checkAndSeedUsers().stream()
                 .filter(u -> u.getRole() != UserRole.ADMIN && u.getRole() != UserRole.SUPER_ADMIN)
+                .filter(u -> !"attendance".equals(u.getUsername()))
                 .toList();
 
         LocalDate startLocalDate = LocalDate.of(year, month, 1);
@@ -63,6 +64,7 @@ public class AttendanceQueryController {
 
         List<EmployeeMonthlyStats> employeeStatsList = new ArrayList<>();
         int totalDaysInMonth = startLocalDate.lengthOfMonth();
+        LocalDate today = LocalDate.now(ZONE);
 
         for (UserEntity employee : employees) {
             UUID empId = employee.getId();
@@ -83,14 +85,16 @@ public class AttendanceQueryController {
             for (int d = 1; d <= totalDaysInMonth; d++) {
                 LocalDate date = LocalDate.of(year, month, d);
                 DayOfWeek dow = date.getDayOfWeek();
-                boolean isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
+                boolean isWeekend = dow == DayOfWeek.SUNDAY;
 
                 List<AttendanceRecord> dayRecords = recordsByDate.getOrDefault(date, Collections.emptyList());
                 WorkSchedule schedule = empSchedules.get(date);
                 LocalTime shiftStart = schedule != null ? schedule.getShiftStart() : DEFAULT_SHIFT_START;
                 LocalTime shiftEnd = schedule != null ? schedule.getShiftEnd() : DEFAULT_SHIFT_END;
 
-                if (isWeekend) {
+                if (date.isAfter(today)) {
+                    patternBuilder.append("f");
+                } else if (isWeekend) {
                     patternBuilder.append("h");
                 } else {
                     if (dayRecords.isEmpty()) {
@@ -205,6 +209,7 @@ public class AttendanceQueryController {
         List<DailyHistoryLog> daysList = new ArrayList<>();
         int totalDaysInMonth = startLocalDate.lengthOfMonth();
         DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZONE);
+        LocalDate today = LocalDate.now(ZONE);
 
         int workDays = 0;
         int lateCount = 0;
@@ -215,7 +220,7 @@ public class AttendanceQueryController {
         for (int d = 1; d <= totalDaysInMonth; d++) {
             LocalDate date = LocalDate.of(year, month, d);
             DayOfWeek dow = date.getDayOfWeek();
-            boolean isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
+            boolean isWeekend = dow == DayOfWeek.SUNDAY;
 
             // DayOfWeek Vietnamese format
             String dowStr = getVietnameseDayOfWeek(dow);
@@ -228,7 +233,9 @@ public class AttendanceQueryController {
             String status = "PRESENT";
             List<HistoryEvent> events = new ArrayList<>();
 
-            if (isWeekend) {
+            if (date.isAfter(today)) {
+                status = "FUTURE";
+            } else if (isWeekend) {
                 status = "HOLIDAY";
             } else {
                 if (dayRecords.isEmpty()) {
@@ -291,6 +298,7 @@ public class AttendanceQueryController {
 
             for (AttendanceRecord rec : dayRecords) {
                 events.add(new HistoryEvent(
+                        rec.getId(),
                         timeFormatter.format(rec.getCheckTime()),
                         rec.getType().name(),
                         "MANUAL".equals(rec.getDeviceId()) ? "MANUAL" : "FACE",
@@ -425,7 +433,7 @@ public class AttendanceQueryController {
 
         for (LocalDate date = start; !date.isAfter(end); date = date.plusDays(1)) {
             DayOfWeek dow = date.getDayOfWeek();
-            boolean isWeekend = dow == DayOfWeek.SATURDAY || dow == DayOfWeek.SUNDAY;
+            boolean isWeekend = dow == DayOfWeek.SUNDAY;
             if (isWeekend) continue;
 
             for (UserEntity user : users) {
@@ -514,6 +522,7 @@ public class AttendanceQueryController {
     ) {}
 
     public record HistoryEvent(
+            UUID id,
             String logTime,
             String type,
             String source,

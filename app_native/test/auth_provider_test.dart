@@ -294,6 +294,41 @@ void main() {
       expect(authProvider.currentUser?.username, 'synced');
     });
 
+    test('TC12: tryAutoLogin fails when no token in storage', () async {
+      setupMockClient((request) async {
+        return http.Response('Not found', 404);
+      });
+      final success = await authProvider.tryAutoLogin();
+      expect(success, isFalse);
+      expect(authProvider.isAuthenticated, isFalse);
+    });
+
+    test('TC13: tryAutoLogin succeeds when valid token is in storage', () async {
+      setupMockClient((request) async {
+        if (request.url.path == '/api/v1/employees/me') {
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'id': 1,
+                'username': 'testuser',
+                'fullName': 'Test User',
+                'role': 'EMPLOYEE',
+              },
+            }),
+            200,
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+      apiClient.accessToken = 'fake_access_token';
+      apiClient.refreshToken = 'fake_refresh_token';
+
+      final success = await authProvider.tryAutoLogin();
+      expect(success, isTrue);
+      expect(authProvider.isAuthenticated, isTrue);
+      expect(authProvider.currentUser?.username, 'testuser');
+    });
+
     test(
       'TC11: offline logout clears local session and reports warning',
       () async {

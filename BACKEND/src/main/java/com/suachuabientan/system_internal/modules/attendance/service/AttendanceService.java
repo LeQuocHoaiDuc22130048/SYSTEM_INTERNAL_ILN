@@ -8,6 +8,7 @@ import com.suachuabientan.system_internal.modules.attendance.dto.request.Attenda
 import com.suachuabientan.system_internal.modules.attendance.dto.request.CreateScheduleRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.FaceCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.ManualCheckinRequest;
+import com.suachuabientan.system_internal.modules.attendance.dto.request.UpdateAttendanceRecordRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceSyncItemResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceSyncResponse;
@@ -670,5 +671,41 @@ public class AttendanceService {
     }
 
     private record FaceCandidate(UserEntity employee, double score) {
+    }
+
+    @Transactional
+    public AttendanceResponse updateRecord(UUID recordId, UpdateAttendanceRecordRequest request, UUID updatedByUserId) {
+        AttendanceRecord record = attendanceRecordRepository.findById(recordId)
+                .filter(r -> !Boolean.TRUE.equals(r.getIsDeleted()))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bản ghi chấm công hoặc bản ghi đã bị xóa"));
+
+        record.setCheckTime(request.checkTime());
+        if (request.isValid() != null) {
+            record.setIsValid(request.isValid());
+        }
+        if (request.note() != null) {
+            record.setNote(request.note());
+        }
+        record.setUpdatedBy(updatedByUserId);
+
+        AttendanceRecord saved = attendanceRecordRepository.save(record);
+        UserEntity employee = userRepository.findByIdAndIsDeletedFalse(saved.getEmployeeId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy nhân viên liên kết"));
+
+        log.info("Attendance record updated: recordId={}, employeeId={}, by={}",
+                recordId, saved.getEmployeeId(), updatedByUserId);
+        return toAttendanceResponse(saved, employee);
+    }
+
+    @Transactional
+    public void deleteRecord(UUID recordId, UUID deletedByUserId) {
+        AttendanceRecord record = attendanceRecordRepository.findById(recordId)
+                .filter(r -> !Boolean.TRUE.equals(r.getIsDeleted()))
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bản ghi chấm công hoặc bản ghi đã bị xóa"));
+
+        record.softDelete(deletedByUserId);
+        attendanceRecordRepository.save(record);
+        log.info("Attendance record soft deleted: recordId={}, employeeId={}, by={}",
+                recordId, record.getEmployeeId(), deletedByUserId);
     }
 }

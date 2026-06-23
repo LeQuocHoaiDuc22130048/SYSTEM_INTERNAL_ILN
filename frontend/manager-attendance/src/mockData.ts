@@ -30,6 +30,7 @@ export interface HistorySummary {
 }
 
 export interface HistoryEvent {
+  id?: string;
   logTime: string;
   type: 'CHECK_IN' | 'CHECK_OUT';
   source: 'FACE' | 'MANUAL' | 'QR';
@@ -40,7 +41,7 @@ export interface HistoryEvent {
 export interface DailyHistoryLog {
   date: string;
   dayOfWeek: string;
-  status: 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'OVERTIME';
+  status: 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'OVERTIME' | 'FUTURE';
   events: HistoryEvent[];
 }
 

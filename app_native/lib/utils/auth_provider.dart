@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/app_permission.dart';
 import '../models/user.dart';
 import 'api_client.dart';
@@ -6,7 +7,8 @@ import 'api_client.dart';
 class AuthProvider extends ChangeNotifier {
   final ApiClient api;
 
-  AuthProvider({ApiClient? apiClient}) : api = apiClient ?? ApiClient() {
+  AuthProvider({ApiClient? apiClient})
+      : api = apiClient ?? ApiClient(secureStorage: const FlutterSecureStorage()) {
     api.onSessionExpired = _expireSession;
   }
 
@@ -250,6 +252,35 @@ class AuthProvider extends ChangeNotifier {
     _profileError = null;
     _log('Session expired because refresh token was rejected');
     notifyListeners();
+  }
+
+  Future<bool> tryAutoLogin() async {
+    _log('Attempting auto login');
+    try {
+      await api.loadPersistedTokens();
+      if (api.accessToken == null) {
+        _log('No access token found in secure storage');
+        return false;
+      }
+
+      await loadMe();
+      if (_currentUser != null) {
+        _log('Auto login successful for user=${_currentUser?.username}');
+        return true;
+      }
+
+      _log('Auto login failed: _currentUser is null after loading profile');
+      api.accessToken = null;
+      api.refreshToken = null;
+      return false;
+    } catch (e) {
+      _log('Auto login failed with exception: $e');
+      api.accessToken = null;
+      api.refreshToken = null;
+      _currentUser = null;
+      notifyListeners();
+      return false;
+    }
   }
 
   Future<void> _run(Future<void> Function() action) async {

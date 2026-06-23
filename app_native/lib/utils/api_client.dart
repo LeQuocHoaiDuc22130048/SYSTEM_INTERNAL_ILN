@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
@@ -16,10 +17,12 @@ enum TokenRefreshResult { success, rejected, unavailable }
 
 class ApiClient {
   final http.Client _client;
+  final FlutterSecureStorage? _secureStorage;
   VoidCallback? onSessionExpired;
 
-  ApiClient({http.Client? client, this.onSessionExpired})
-    : _client = client ?? http.Client();
+  ApiClient({http.Client? client, this.onSessionExpired, FlutterSecureStorage? secureStorage})
+    : _client = client ?? http.Client(),
+      _secureStorage = secureStorage;
 
   static const Duration _timeout = Duration(seconds: 12);
 
@@ -56,8 +59,46 @@ class ApiClient {
     return candidates;
   }
 
-  String? accessToken;
-  String? refreshToken;
+  String? _accessToken;
+  String? _refreshToken;
+
+  String? get accessToken => _accessToken;
+  set accessToken(String? value) {
+    _accessToken = value;
+    _saveToken('access_token', value);
+  }
+
+  String? get refreshToken => _refreshToken;
+  set refreshToken(String? value) {
+    _refreshToken = value;
+    _saveToken('refresh_token', value);
+  }
+
+  void _saveToken(String key, String? value) {
+    final storage = _secureStorage;
+    if (storage == null) return;
+    if (value == null) {
+      storage.delete(key: key).catchError((e) {
+        _log('Error deleting $key from secure storage: $e');
+      });
+    } else {
+      storage.write(key: key, value: value).catchError((e) {
+        _log('Error writing $key to secure storage: $e');
+      });
+    }
+  }
+
+  Future<void> loadPersistedTokens() async {
+    final storage = _secureStorage;
+    if (storage == null) return;
+    try {
+      _accessToken = await storage.read(key: 'access_token');
+      _refreshToken = await storage.read(key: 'refresh_token');
+      _log('Loaded persisted tokens: access=${_accessToken != null}, refresh=${_refreshToken != null}');
+    } catch (e) {
+      _log('Error loading persisted tokens: $e');
+    }
+  }
   bool _isRefreshing = false;
   String? _lastSuccessfulBaseUrl;
 

@@ -7,6 +7,7 @@ import com.suachuabientan.system_internal.modules.attendance.dto.request.CreateS
 import com.suachuabientan.system_internal.modules.attendance.dto.request.FaceRecognitionLogBatchRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.FaceCheckinRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.request.ManualCheckinRequest;
+import com.suachuabientan.system_internal.modules.attendance.dto.request.UpdateAttendanceRecordRequest;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.AttendanceSyncResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.DailyAttendanceResponse;
@@ -169,5 +170,27 @@ public class AttendanceController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         return ResponseEntity.ok(ApiResponse.success(attendanceService.getSchedules(employeeId, from, to)));
+    }
+
+    @Operation(summary = "Cap nhat ban ghi cham cong")
+    @PutMapping("/records/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<AttendanceResponse>> updateRecord(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateAttendanceRecordRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                attendanceService.updateRecord(id, request, userDetails.getUserId()),
+                "Cap nhat cham cong thanh cong"));
+    }
+
+    @Operation(summary = "Xoa ban ghi cham cong (soft delete)")
+    @DeleteMapping("/records/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    public ResponseEntity<ApiResponse<Void>> deleteRecord(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        attendanceService.deleteRecord(id, userDetails.getUserId());
+        return ResponseEntity.ok(ApiResponse.success(null, "Xoa cham cong thanh cong"));
     }
 }

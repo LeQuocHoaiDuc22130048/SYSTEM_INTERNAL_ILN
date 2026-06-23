@@ -25,6 +25,32 @@ class _LoginPageState extends State<LoginPage> {
   bool _isLogin = true;
   String _error = '';
   bool _loading = false;
+  bool _checkingAutoLogin = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAutoLogin();
+    });
+  }
+
+  Future<void> _checkAutoLogin() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final success = await auth.tryAutoLogin();
+    if (!mounted) return;
+
+    if (success) {
+      if (!auth.isAttendanceAccount) {
+        context.read<BackendDataProvider>().loadAll();
+      }
+      Navigator.of(context).pushReplacementNamed('/dashboard');
+    } else {
+      setState(() {
+        _checkingAutoLogin = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -455,6 +481,21 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAutoLogin) {
+      return const Scaffold(
+        body: Stack(
+          children: [
+            LoginBackground(),
+            Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: Stack(

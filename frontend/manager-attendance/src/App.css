@@ -327,6 +327,7 @@
 .mini-day.v { background-color: var(--color-leave); }
 .mini-day.h { background-color: #cbd5e1; }
 .mini-day.o { background-color: var(--color-ot); }
+.mini-day.f { background-color: #e2e8f0; opacity: 0.5; }
 
 .tooltip {
   visibility: hidden;
@@ -552,6 +553,7 @@
 .calendar-cell.v { background-color: var(--color-leave-light); border: 0.5px solid var(--color-leave); color: var(--color-leave); }
 .calendar-cell.h { background-color: var(--color-holiday-light); border: 0.5px solid #cbd5e1; color: var(--color-holiday); }
 .calendar-cell.o { background-color: var(--color-ot-light); border: 0.5px solid var(--color-ot); color: var(--color-ot); }
+.calendar-cell.f { background-color: #f8fafc; border: 0.5px dashed #cbd5e1; color: var(--color-text-light); opacity: 0.6; }
 
 .calendar-date {
   align-self: flex-start;

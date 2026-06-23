@@ -59,7 +59,7 @@ class AttendanceServiceTest {
         employee.setFullName("Test Employee");
         employee.setFaceEnrolled(true);
         employee.setFaceEncoding("[0.1,0.2,0.3,0.4,0.5,0.6]");
-        when(userRepository.findByIdAndIsDeletedFalse(employeeId))
+        org.mockito.Mockito.lenient().when(userRepository.findByIdAndIsDeletedFalse(employeeId))
                 .thenReturn(Optional.of(employee));
     }
 
@@ -90,5 +90,58 @@ class AttendanceServiceTest {
                 new FaceCheckinRequest("other-face", "image/jpeg", "phone")));
 
         verify(attendanceRecordRepository, never()).save(any(AttendanceRecord.class));
+    }
+
+    @Test
+    void updateRecordModifiesPropertiesAndSaves() {
+        UUID recordId = UUID.randomUUID();
+        AttendanceRecord record = AttendanceRecord.builder()
+                .employeeId(employeeId)
+                .type(com.suachuabientan.system_internal.modules.attendance.enums.AttendanceType.IN)
+                .checkTime(java.time.Instant.parse("2026-06-22T08:00:00Z"))
+                .isValid(true)
+                .build();
+        record.setIsDeleted(false);
+
+        when(attendanceRecordRepository.findById(recordId))
+                .thenReturn(Optional.of(record));
+        when(attendanceRecordRepository.save(any(AttendanceRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        UUID managerId = UUID.randomUUID();
+        java.time.Instant newTime = java.time.Instant.parse("2026-06-22T08:15:00Z");
+        com.suachuabientan.system_internal.modules.attendance.dto.request.UpdateAttendanceRecordRequest req =
+                new com.suachuabientan.system_internal.modules.attendance.dto.request.UpdateAttendanceRecordRequest(
+                        newTime, false, "Chỉnh sửa");
+
+        var response = attendanceService.updateRecord(recordId, req, managerId);
+
+        assertEquals(newTime, response.checkTime());
+        assertEquals(false, response.isValid());
+        assertEquals("Chỉnh sửa", response.note());
+        verify(attendanceRecordRepository).save(record);
+    }
+
+    @Test
+    void deleteRecordSoftDeletesRecord() {
+        UUID recordId = UUID.randomUUID();
+        AttendanceRecord record = AttendanceRecord.builder()
+                .employeeId(employeeId)
+                .type(com.suachuabientan.system_internal.modules.attendance.enums.AttendanceType.IN)
+                .checkTime(java.time.Instant.parse("2026-06-22T08:00:00Z"))
+                .isValid(true)
+                .build();
+        record.setIsDeleted(false);
+
+        when(attendanceRecordRepository.findById(recordId))
+                .thenReturn(Optional.of(record));
+        when(attendanceRecordRepository.save(any(AttendanceRecord.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        UUID managerId = UUID.randomUUID();
+        attendanceService.deleteRecord(recordId, managerId);
+
+        assertEquals(true, record.getIsDeleted());
+        verify(attendanceRecordRepository).save(record);
     }
 }
