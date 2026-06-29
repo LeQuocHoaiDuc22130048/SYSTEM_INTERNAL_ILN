@@ -2114,3 +2114,225 @@
     gap: 16px;
   }
 }
+
+/* ============================================================
+   Refactored component classes — replacing inline styles
+   ============================================================ */
+
+/* Header */
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.tab-buttons {
+  display: flex;
+  gap: 8px;
+  background: #f1f5f9;
+  padding: 4px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.tab-btn {
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+  background: transparent;
+  color: var(--color-text-light);
+  box-shadow: none;
+  transition: all 0.2s;
+}
+
+.tab-btn.active {
+  background: #ffffff;
+  color: var(--color-primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.banner-icon--error {
+  color: #ef4444;
+}
+
+.banner-text--error {
+  color: #ef4444;
+}
+
+/* Date picker in daily mode */
+.date-picker-wrapper {
+  gap: 8px;
+}
+
+.date-picker-icon {
+  color: var(--color-text-light);
+}
+
+.date-picker-input {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-dark);
+  outline: none;
+  font-family: inherit;
+}
+
+/* DailyTab */
+.shift-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.action-btn-sm {
+  padding: 5px 10px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 6px;
+}
+
+/* Calendar loading text */
+.calendar-loading {
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-light);
+}
+
+/* Calendar time labels */
+.time-label {
+  font-weight: bold;
+}
+
+/* HistoryModal */
+.no-data-text {
+  font-size: 13px;
+  color: var(--color-text-light);
+  font-style: italic;
+  margin: 0;
+}
+
+/* EditModal & ManualModal */
+.modal-content--narrow {
+  max-width: 450px;
+}
+
+.modal-body--gap {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.edit-employee-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #f8fafc;
+  padding: 12px;
+  border-radius: 8px;
+}
+
+.edit-employee-name {
+  font-weight: bold;
+  color: var(--color-text-dark);
+}
+
+.edit-employee-date {
+  font-size: 12px;
+  color: var(--color-text-light);
+}
+
+.edit-record-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.edit-record-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.edit-time-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.edit-time-label {
+  font-size: 12px;
+  color: var(--color-text-light);
+}
+
+.edit-time-input {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  font-size: 14px;
+}
+
+.edit-time-input--disabled {
+  background: #f1f5f9;
+  color: var(--color-text-light);
+  cursor: not-allowed;
+}
+
+.edit-note-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.edit-note-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-dark);
+}
+
+.edit-note-textarea {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  outline: none;
+  font-size: 14px;
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+/* ManualModal radio options */
+.manual-type-options {
+  display: flex;
+  gap: 16px;
+}
+
+.manual-type-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 24px;
+  border-top: 1px solid #e2e8f0;
+}

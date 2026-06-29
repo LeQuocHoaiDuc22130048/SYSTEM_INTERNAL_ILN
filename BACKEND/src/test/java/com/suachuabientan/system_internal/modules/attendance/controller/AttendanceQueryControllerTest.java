@@ -1,0 +1,170 @@
+package com.suachuabientan.system_internal.modules.attendance.controller;
+
+import com.suachuabientan.system_internal.common.util.JwtUtil;
+import com.suachuabientan.system_internal.config.SecurityConfig;
+import com.suachuabientan.system_internal.modules.attendance.repository.AttendanceRecordRepository;
+import com.suachuabientan.system_internal.modules.attendance.repository.WorkScheduleRepository;
+import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
+import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.security.filter.JwtAuthFilter;
+import com.suachuabientan.system_internal.security.model.CustomUserDetails;
+import com.suachuabientan.system_internal.security.service.UserDetailsServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.test.context.support.WithUserDetails;
+import org.springframework.security.test.context.support.TestExecutionEvent;
+import org.springframework.test.web.servlet.MockMvc;
+import jakarta.servlet.FilterChain;
+import org.mockito.Mockito;
+
+import java.util.Collections;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+@WebMvcTest(AttendanceQueryController.class)
+@Import(SecurityConfig.class)
+class AttendanceQueryControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean
+    private UserRepository userRepository;
+
+    @MockBean
+    private AttendanceRecordRepository attendanceRecordRepository;
+
+    @MockBean
+    private WorkScheduleRepository workScheduleRepository;
+
+    @MockBean
+    private JwtAuthFilter jwtAuthFilter;
+
+    @MockBean
+    private UserDetailsServiceImpl userDetailsService;
+
+    @MockBean
+    private JwtUtil jwtUtil;
+
+    private UUID employeeId;
+
+    @BeforeEach
+    void setUp() throws Exception {
+        employeeId = UUID.randomUUID();
+        SecurityContextHolder.clearContext();
+
+        Mockito.doAnswer(invocation -> {
+            jakarta.servlet.ServletRequest request = invocation.getArgument(0);
+            jakarta.servlet.ServletResponse response = invocation.getArgument(1);
+            FilterChain filterChain = invocation.getArgument(2);
+            filterChain.doFilter(request, response);
+            return null;
+        }).when(jwtAuthFilter).doFilter(any(), any(), any());
+
+        // Mock UserDetailsService trước khi @WithUserDetails chạy ở Test Lifecycle
+        UserEntity employee = new UserEntity();
+        employee.setId(employeeId);
+        employee.setUsername("testemployee");
+        employee.setRole(UserRole.EMPLOYEE);
+        employee.setStatus(UserStatus.ACTIVE);
+
+        CustomUserDetails userDetails = new CustomUserDetails(employee);
+        when(userDetailsService.loadUserByUsername("testemployee")).thenReturn(userDetails);
+
+        // MockUserRepository mặc định cho self test
+        when(userRepository.findByIdAndIsDeletedFalse(employeeId)).thenReturn(Optional.of(employee));
+    }
+
+    @Test
+    void getMonthlyWithoutAuthReturns403() throws Exception {
+        mockMvc.perform(get("/api/attendance/monthly")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "EMPLOYEE")
+    void getMonthlyWithEmployeeRoleReturns403() throws Exception {
+        mockMvc.perform(get("/api/attendance/monthly")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void getMonthlyWithManagerRoleSucceeds() throws Exception {
+        UserEntity mockEmployee = new UserEntity();
+        mockEmployee.setId(UUID.randomUUID());
+        mockEmployee.setRole(UserRole.EMPLOYEE);
+        mockEmployee.setIsDeleted(false);
+        when(userRepository.findAll()).thenReturn(java.util.List.of(mockEmployee));
+        when(attendanceRecordRepository.findByCheckTimeBetween(any(), any())).thenReturn(Collections.emptyList());
+        when(workScheduleRepository.findByWorkDateBetween(any(), any())).thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/attendance/monthly")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithUserDetails(value = "testemployee", setupBefore = TestExecutionEvent.TEST_EXECUTION)
+    void getEmployeeLogsForSelfSucceeds() throws Exception {
+        when(attendanceRecordRepository.findByEmployeeIdAndCheckTimeBetween(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(workScheduleRepository.findByEmployeeAndDateRange(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/attendance/" + employeeId + "/logs")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithUserDetails(value = "testemployee", setupBefore = TestExecutionEvent.TEST_EXECUTION)
+    void getEmployeeLogsForOtherAsEmployeeReturns403() throws Exception {
+        UUID otherEmployeeId = UUID.randomUUID();
+        mockMvc.perform(get("/api/attendance/" + otherEmployeeId + "/logs")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void getEmployeeLogsForOtherAsManagerSucceeds() throws Exception {
+        UserEntity employee = new UserEntity();
+        employee.setId(employeeId);
+        employee.setUsername("testemployee");
+        employee.setRole(UserRole.EMPLOYEE);
+        employee.setStatus(UserStatus.ACTIVE);
+
+        when(userRepository.findByIdAndIsDeletedFalse(employeeId)).thenReturn(Optional.of(employee));
+        when(attendanceRecordRepository.findByEmployeeIdAndCheckTimeBetween(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(workScheduleRepository.findByEmployeeAndDateRange(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/attendance/" + employeeId + "/logs")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isOk());
+    }
+}

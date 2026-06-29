@@ -9,7 +9,7 @@ export interface EmployeeMonthlyStats {
   totalHours: number;
   overtimeHours: number;
   leavedays: number;
-  dailyPattern: string; // p=present, l=late, a=absent, v=leave, h=holiday/weekend
+  dailyPattern: string; // p=present, l=late, a=absent, v=leave, h=holiday/weekend, o=overtime, f=future
 }
 
 export interface EmployeeInfo {
@@ -50,3 +50,16 @@ export interface EmployeeHistoryResponse {
   summary: HistorySummary;
   days: DailyHistoryLog[];
 }
+
+/** Thông tin user đang đăng nhập, trả về từ API login */
+export interface UserInfo {
+  username: string;
+  fullName?: string;
+  role?: string;
+}
+
+/** Ký tự đại diện cho trạng thái ngày trong dailyPattern */
+export type DailyStatusChar = 'p' | 'l' | 'a' | 'v' | 'h' | 'o' | 'f';
+
+/** Loại chấm công thủ công */
+export type AttendanceCheckType = 'IN' | 'OUT';

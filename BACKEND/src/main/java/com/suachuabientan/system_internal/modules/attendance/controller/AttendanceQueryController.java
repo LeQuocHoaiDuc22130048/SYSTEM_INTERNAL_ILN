@@ -12,6 +12,7 @@ import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.*;
@@ -36,6 +37,7 @@ public class AttendanceQueryController {
     private static final int LATE_GRACE_MINUTES = 15;
 
     @GetMapping("/monthly")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<MonthlyAttendanceResponse>> getMonthly(
             @RequestParam(defaultValue = "2025") int year,
             @RequestParam(defaultValue = "6") int month) {
@@ -180,6 +182,7 @@ public class AttendanceQueryController {
     }
 
     @GetMapping("/{employeeId}/logs")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER') or principal.userId.toString() == #p0.toString()")
     public ResponseEntity<ApiResponse<EmployeeHistoryResponse>> getEmployeeLogs(
             @PathVariable UUID employeeId,
             @RequestParam(defaultValue = "2025") int year,

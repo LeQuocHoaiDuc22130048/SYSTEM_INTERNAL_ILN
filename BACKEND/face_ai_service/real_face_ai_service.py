@@ -166,7 +166,7 @@ class FaceAiHandler(BaseHTTPRequestHandler):
                         "status": "UP",
                         "modelLoaded": True,
                         "faceModelLoaded": True,
-                        "miniFasNetLoaded": False,
+                        "miniFasNetLoaded": True,
                         "embeddingDimension": 512,
                         "implementation": "insightface-onnxruntime",
                         "modelName": MODEL_NAME,

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Search, Plus } from 'lucide-react';
 import type { EmployeeMonthlyStats } from '../mockData';
+import { getAvatarLetters, getDailyStatusFromPattern } from '../utils/employee';
 
 interface DailyTabProps {
   filteredDailyEmployees: EmployeeMonthlyStats[];
@@ -13,6 +14,19 @@ interface DailyTabProps {
   setShowManualModal: (show: boolean) => void;
 }
 
+function formatTime(isoString: string | null): string {
+  if (!isoString) return '-';
+  try {
+    return new Date(isoString).toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+  } catch {
+    return '-';
+  }
+}
+
 export const DailyTab: React.FC<DailyTabProps> = ({
   filteredDailyEmployees,
   dailyReportMap,
@@ -23,47 +37,31 @@ export const DailyTab: React.FC<DailyTabProps> = ({
   setManualEmployee,
   setShowManualModal,
 }) => {
-  const getAvatarLetters = (name: string) => {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
+  const getStatusPill = (report: any, statusChar: string) => {
+    if (report) {
+      if (report.isLate && report.isEarlyLeave) return <span className="pill-badge late">Đi muộn & Về sớm</span>;
+      if (report.isLate) return <span className="pill-badge late">Đi muộn</span>;
+      if (report.isEarlyLeave) return <span className="pill-badge late">Về sớm</span>;
+      if (report.checkOut) return <span className="pill-badge present">Đủ công</span>;
+      return <span className="pill-badge present">Đang làm</span>;
     }
-    return name.slice(0, 2).toUpperCase();
-  };
-
-  const formatTime = (isoString: string | null) => {
-    if (!isoString) return '-';
-    try {
-      const date = new Date(isoString);
-      return date.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    } catch (e) {
-      return '-';
-    }
-  };
-
-  const getDailyStatusFromPattern = (emp: EmployeeMonthlyStats, dateStr: string) => {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const day = parseInt(parts[2], 10);
-      if (emp.dailyPattern && day >= 1 && day <= emp.dailyPattern.length) {
-        return emp.dailyPattern[day - 1];
-      }
-    }
-    return '';
+    if (statusChar === 'v') return <span className="pill-badge leave">Nghỉ phép</span>;
+    if (statusChar === 'h') return <span className="pill-badge holiday">Cuối tuần / Lễ</span>;
+    if (statusChar === 'a') return <span className="pill-badge absent">Vắng không phép</span>;
+    return <span className="pill-badge absent">Chưa check-in</span>;
   };
 
   return (
     <>
-      {/* Daily Toolbar filter */}
       <section className="toolbar">
         <div className="search-box">
           <div className="search-wrapper">
             <Search className="search-icon" size={18} />
-            <input 
+            <input
               id="daily-search-input"
-              type="text" 
-              className="search-input" 
-              placeholder="Tìm theo tên, mã NV..." 
+              type="text"
+              className="search-input"
+              placeholder="Tìm theo tên, mã NV..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -71,7 +69,6 @@ export const DailyTab: React.FC<DailyTabProps> = ({
         </div>
       </section>
 
-      {/* Daily Table list */}
       <main className="table-card">
         {dailyLoading ? (
           <div className="loading-overlay">Đang tải dữ liệu chấm công ngày...</div>
@@ -94,58 +91,17 @@ export const DailyTab: React.FC<DailyTabProps> = ({
               {filteredDailyEmployees.map((emp) => {
                 const report = dailyReportMap[emp.id];
                 const statusChar = getDailyStatusFromPattern(emp, selectedDate);
-                
-                let checkInText = '-';
-                let checkInClass = '';
-                let checkOutText = '-';
-                let checkOutClass = '';
 
-                if (report) {
-                  if (report.checkIn) {
-                    checkInText = `In: ${formatTime(report.checkIn)}`;
-                    checkInClass = report.isLate ? 'warning' : 'success';
-                  }
-                  if (report.checkOut) {
-                    checkOutText = `Out: ${formatTime(report.checkOut)}`;
-                    checkOutClass = report.isEarlyLeave ? 'warning' : 'success';
-                  }
-                }
-
-                const workingHours = report && report.totalMinutes 
+                const checkInText = report?.checkIn ? `In: ${formatTime(report.checkIn)}` : '-';
+                const checkInClass = report?.checkIn ? (report.isLate ? 'warning' : 'success') : '';
+                const checkOutText = report?.checkOut ? `Out: ${formatTime(report.checkOut)}` : '-';
+                const checkOutClass = report?.checkOut ? (report.isEarlyLeave ? 'warning' : 'success') : '';
+                const workingHours = report?.totalMinutes
                   ? `${(report.totalMinutes / 60).toFixed(1)}h`
                   : '-';
 
-                const getStatusPill = () => {
-                  if (report) {
-                    if (report.isLate && report.isEarlyLeave) {
-                      return <span className="pill-badge late">Đi muộn & Về sớm</span>;
-                    }
-                    if (report.isLate) {
-                      return <span className="pill-badge late">Đi muộn</span>;
-                    }
-                    if (report.isEarlyLeave) {
-                      return <span className="pill-badge late">Về sớm</span>;
-                    }
-                    if (report.checkOut) {
-                      return <span className="pill-badge present">Đủ công</span>;
-                    }
-                    return <span className="pill-badge present">Đang làm</span>;
-                  } else {
-                    if (statusChar === 'v') {
-                      return <span className="pill-badge leave">Nghỉ phép</span>;
-                    }
-                    if (statusChar === 'h') {
-                      return <span className="pill-badge holiday">Cuối tuần / Lễ</span>;
-                    }
-                    if (statusChar === 'a') {
-                      return <span className="pill-badge absent">Vắng không phép</span>;
-                    }
-                    return <span className="pill-badge absent">Chưa check-in</span>;
-                  }
-                };
-
-                const shiftStart = report?.shiftStart || '08:00';
-                const shiftEnd = report?.shiftEnd || '17:00';
+                const shiftStart = report?.shiftStart ?? '08:00';
+                const shiftEnd = report?.shiftEnd ?? '17:00';
 
                 return (
                   <tr key={emp.id} className="table-row">
@@ -159,31 +115,17 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                       </div>
                     </td>
                     <td>
-                      <span style={{ fontSize: '13px', fontWeight: 500, color: 'var(--color-text)' }}>
+                      <span className="shift-label">
                         Ca hành chính ({shiftStart} - {shiftEnd})
                       </span>
                     </td>
-                    <td className={`number-cell ${checkInClass}`} style={{ fontWeight: 600 }}>
-                      {checkInText}
-                    </td>
-                    <td className={`number-cell ${checkOutClass}`} style={{ fontWeight: 600 }}>
-                      {checkOutText}
-                    </td>
+                    <td className={`number-cell ${checkInClass}`}>{checkInText}</td>
+                    <td className={`number-cell ${checkOutClass}`}>{checkOutText}</td>
                     <td className="number-cell">{workingHours}</td>
+                    <td>{getStatusPill(report, statusChar)}</td>
                     <td>
-                      {getStatusPill()}
-                    </td>
-                    <td>
-                      <button 
-                        className="action-btn-outline" 
-                        style={{ 
-                          padding: '5px 10px', 
-                          fontSize: '12px',
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '4px',
-                          borderRadius: '6px'
-                        }}
+                      <button
+                        className="action-btn-outline action-btn-sm"
                         onClick={(e) => {
                           e.stopPropagation();
                           setManualEmployee(emp);

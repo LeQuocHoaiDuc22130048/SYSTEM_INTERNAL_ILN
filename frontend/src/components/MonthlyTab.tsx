@@ -1,11 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Download, 
-  ExternalLink, 
-  Edit3 
-} from 'lucide-react';
+import { Search, Download, ExternalLink, Edit3 } from 'lucide-react';
 import type { EmployeeMonthlyStats, EmployeeHistoryResponse } from '../mockData';
+import { getAvatarLetters, normalizeHistoryResponse, DAILY_STATUS_LABEL_MAP, CALENDAR_STATUS_LABEL_MAP } from '../utils/employee';
+import { getAuthHeaders } from '../utils/auth';
 
 interface MonthlyTabProps {
   filteredEmployees: EmployeeMonthlyStats[];
@@ -18,20 +15,6 @@ interface MonthlyTabProps {
   setHistoryEmployee: (emp: { id: string; name: string; dept: string } | null) => void;
   showToast: (message: string) => void;
 }
-
-const normalizeHistoryResponse = (data: any): any => {
-  if (!data || !data.days) return data;
-  return {
-    ...data,
-    days: data.days.map((day: any) => ({
-      ...day,
-      events: day.events.map((evt: any) => ({
-        ...evt,
-        type: evt.type === 'IN' ? 'CHECK_IN' : evt.type === 'OUT' ? 'CHECK_OUT' : evt.type
-      }))
-    }))
-  };
-};
 
 export const MonthlyTab: React.FC<MonthlyTabProps> = ({
   filteredEmployees,
@@ -48,8 +31,6 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
   const [expandedLogs, setExpandedLogs] = useState<Record<string, EmployeeHistoryResponse>>({});
   const [expandedLogsLoading, setExpandedLogsLoading] = useState<Record<string, boolean>>({});
 
-
-  // Fetch logs for expanded employee inline
   useEffect(() => {
     if (!expandedEmployeeId) return;
     if (expandedLogs[expandedEmployeeId] || expandedLogsLoading[expandedEmployeeId]) return;
@@ -57,30 +38,27 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
     const fetchExpandedLog = async () => {
       setExpandedLogsLoading(prev => ({ ...prev, [expandedEmployeeId]: true }));
       try {
-        const token = localStorage.getItem('accessToken');
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        const response = await fetch(`/api/attendance/${expandedEmployeeId}/logs?year=${currentYear}&month=${currentMonth}`, {
-          headers,
-        });
-        if (!response.ok) {
-          throw new Error('Không thể tải lịch sử chi tiết từ server');
-        }
+        const response = await fetch(
+          `/api/attendance/${expandedEmployeeId}/logs?year=${currentYear}&month=${currentMonth}`,
+          { headers: getAuthHeaders() }
+        );
+        if (!response.ok) throw new Error('Không thể tải lịch sử chi tiết từ server');
         const apiData = await response.json();
-        if (apiData && apiData.data) {
-          setExpandedLogs(prev => ({ ...prev, [expandedEmployeeId]: normalizeHistoryResponse(apiData.data) }));
+        if (apiData?.data) {
+          setExpandedLogs(prev => ({
+            ...prev,
+            [expandedEmployeeId]: normalizeHistoryResponse(apiData.data),
+          }));
         }
       } catch (err) {
         console.error('Lỗi tải lịch sử chi tiết cho:', expandedEmployeeId);
-        setExpandedLogs(prev => ({ 
-          ...prev, 
-          [expandedEmployeeId]: { 
-            employee: { id: expandedEmployeeId, name: '', dept: '', shiftName: '', shiftStart: '', shiftEnd: '' }, 
-            summary: { workDays: 0, totalHours: 0, lateCount: 0, absentDays: 0, overtimeHours: 0 }, 
-            days: [] 
-          } 
+        setExpandedLogs(prev => ({
+          ...prev,
+          [expandedEmployeeId]: {
+            employee: { id: expandedEmployeeId, name: '', dept: '', shiftName: '', shiftStart: '', shiftEnd: '' },
+            summary: { workDays: 0, totalHours: 0, lateCount: 0, absentDays: 0, overtimeHours: 0 },
+            days: [],
+          },
         }));
       } finally {
         setExpandedLogsLoading(prev => ({ ...prev, [expandedEmployeeId]: false }));
@@ -90,38 +68,38 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
     fetchExpandedLog();
   }, [expandedEmployeeId, currentYear, currentMonth, expandedLogs, expandedLogsLoading]);
 
-  const getAvatarLetters = (name: string) => {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
+  const getEmployeeStatusBadge = (emp: EmployeeMonthlyStats) => {
+    if (emp.absentDays > 2) return <span className="pill-badge absent">Vắng nhiều ({emp.absentDays})</span>;
+    if (emp.lateCount > 2) return <span className="pill-badge late">Đi muộn ({emp.lateCount})</span>;
+    if (emp.leavedays > 2) return <span className="pill-badge leave">Nghỉ phép ({emp.leavedays})</span>;
+    return <span className="pill-badge present">Đủ công</span>;
   };
 
-  const getEmployeeStatusBadge = (emp: EmployeeMonthlyStats) => {
-    if (emp.absentDays > 2) {
-      return <span className="pill-badge absent">Vắng nhiều ({emp.absentDays})</span>;
-    } else if (emp.lateCount > 2) {
-      return <span className="pill-badge late">Đi muộn ({emp.lateCount})</span>;
-    } else if (emp.leavedays > 2) {
-      return <span className="pill-badge leave">Nghỉ phép ({emp.leavedays})</span>;
-    } else {
-      return <span className="pill-badge present">Đủ công</span>;
+  const buildCalendarDays = (emp: EmployeeMonthlyStats) => {
+    const numDays = new Date(currentYear, currentMonth, 0).getDate();
+    const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay();
+    const spacerCount = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1;
+
+    const days: { day: number; state: string }[] = [];
+    for (let s = 0; s < spacerCount; s++) days.push({ day: -1, state: 'empty' });
+    for (let d = 1; d <= numDays; d++) {
+      const char = emp.dailyPattern[d - 1] || 'a';
+      days.push({ day: d, state: char });
     }
+    return days;
   };
 
   return (
     <>
-      {/* Toolbar filter */}
       <section className="toolbar">
         <div className="search-box">
           <div className="search-wrapper">
             <Search className="search-icon" size={18} />
-            <input 
+            <input
               id="monthly-search-input"
-              type="text" 
-              className="search-input" 
-              placeholder="Tìm theo tên, mã NV..." 
+              type="text"
+              className="search-input"
+              placeholder="Tìm theo tên, mã NV..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
@@ -133,7 +111,6 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
         </button>
       </section>
 
-      {/* Table list */}
       <main className="table-card">
         {loading ? (
           <div className="loading-overlay">Đang tải dữ liệu chấm công...</div>
@@ -157,8 +134,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                 const isExpanded = expandedEmployeeId === emp.id;
                 return (
                   <React.Fragment key={emp.id}>
-                    {/* Standard Row */}
-                    <tr 
+                    <tr
                       className={`table-row ${isExpanded ? 'expanded' : ''}`}
                       onClick={() => setExpandedEmployeeId(isExpanded ? null : emp.id)}
                     >
@@ -181,29 +157,18 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                       <td className="number-cell">{emp.totalHours}h</td>
                       <td>
                         <div className="mini-bar">
-                          {emp.dailyPattern.split('').map((char, index) => {
-                            let statusText = "Đủ công";
-                            if (char === 'l') statusText = "Đi muộn";
-                            else if (char === 'a') statusText = "Vắng không phép";
-                            else if (char === 'v') statusText = "Nghỉ phép";
-                            else if (char === 'h') statusText = "Nghỉ lễ / Cuối tuần";
-                            else if (char === 'o') statusText = "Tăng ca";
-                            else if (char === 'f') statusText = "Chưa diễn ra";
-
-                            return (
-                              <div key={index} className={`mini-day ${char}`}>
-                                <span className="tooltip">Ngày {index + 1}: {statusText}</span>
-                              </div>
-                            );
-                          })}
+                          {emp.dailyPattern.split('').map((char, index) => (
+                            <div key={index} className={`mini-day ${char}`}>
+                              <span className="tooltip">
+                                Ngày {index + 1}: {DAILY_STATUS_LABEL_MAP[char as keyof typeof DAILY_STATUS_LABEL_MAP] ?? 'Đủ công'}
+                              </span>
+                            </div>
+                          ))}
                         </div>
                       </td>
-                      <td>
-                        {getEmployeeStatusBadge(emp)}
-                      </td>
+                      <td>{getEmployeeStatusBadge(emp)}</td>
                     </tr>
 
-                    {/* Inline Expanded Row */}
                     {isExpanded && (
                       <tr className="expanded-row">
                         <td colSpan={7}>
@@ -211,9 +176,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                             <div className="expanded-header-row">
                               <h4 className="expanded-title">Chi tiết chấm công & Lịch sử trong tháng</h4>
                             </div>
-                            
                             <div className="expanded-grid">
-                              {/* Left side stats and calendar */}
                               <div className="expanded-left">
                                 <div className="card-stats-5">
                                   <div className="mini-stats-card">
@@ -238,85 +201,49 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                   </div>
                                 </div>
 
-                                {/* Monthly mini calendar grid */}
                                 <div className="calendar-wrapper">
                                   <div className="calendar-header">Lịch chi tiết</div>
-                                  
                                   {expandedLogsLoading[emp.id] ? (
-                                    <div style={{ padding: '20px', textAlign: 'center', fontSize: '13px', color: 'var(--color-text-light)' }}>
-                                      Đang tải lịch sử chấm công...
-                                    </div>
+                                    <div className="calendar-loading">Đang tải lịch sử chấm công...</div>
                                   ) : (
                                     <div className="calendar-grid">
-                                      {/* Spacer cells for calendar layout */}
-                                      {(() => {
-                                        const days = [];
-                                        const numDays = new Date(currentYear, currentMonth, 0).getDate();
-                                        const firstDayOfWeek = new Date(currentYear, currentMonth - 1, 1).getDay();
-                                        const spacerCount = firstDayOfWeek === 0 ? 6 : firstDayOfWeek - 1; // Mon to Sun
-                                        
-                                        for (let s = 0; s < spacerCount; s++) {
-                                          days.push({ day: -1, state: 'empty' });
-                                        }
-                                        for (let d = 1; d <= numDays; d++) {
-                                          const char = emp.dailyPattern[d - 1] || 'a';
-                                          let stateClass = 'a';
-                                          if (char === 'p') stateClass = 'p';
-                                          else if (char === 'l') stateClass = 'l';
-                                          else if (char === 'v') stateClass = 'v';
-                                          else if (char === 'h') stateClass = 'h';
-                                          else if (char === 'o') stateClass = 'o';
-                                          else if (char === 'f') stateClass = 'f';
-                                          
-                                          days.push({ day: d, state: stateClass });
-                                        }
-                                        return days;
-                                      })().map((dayObj, dIndex) => {
+                                      {buildCalendarDays(emp).map((dayObj, dIndex) => {
                                         if (dayObj.day === -1) {
-                                          return <div key={`empty-${dIndex}`} className="calendar-cell empty"></div>;
+                                          return <div key={`empty-${dIndex}`} className="calendar-cell empty" />;
                                         }
 
                                         const empLog = expandedLogs[emp.id];
                                         const dateStr = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-${dayObj.day.toString().padStart(2, '0')}`;
                                         const dayLog = empLog?.days.find(d => d.date === dateStr);
-
                                         const checkInEvent = dayLog?.events?.find(e => e.type === 'CHECK_IN');
                                         const checkOutEvent = dayLog?.events?.find(e => e.type === 'CHECK_OUT');
-
-                                        const statusLabelMap: Record<string, string> = {
-                                          p: 'PRESENT',
-                                          l: 'LATE',
-                                          a: 'ABSENT',
-                                          v: 'LEAVE',
-                                          h: 'HOLIDAY',
-                                          o: 'OT',
-                                          f: 'FUTURE'
-                                        };
 
                                         return (
                                           <div key={`day-${dayObj.day}`} className={`calendar-cell ${dayObj.state}`}>
                                             <div className="calendar-cell-top">
                                               <span className="calendar-date">{dayObj.day}</span>
                                               {dayObj.state !== 'f' && (
-                                                <span className="calendar-status">{statusLabelMap[dayObj.state] || 'ABSENT'}</span>
+                                                <span className="calendar-status">
+                                                  {CALENDAR_STATUS_LABEL_MAP[dayObj.state as keyof typeof CALENDAR_STATUS_LABEL_MAP] ?? 'ABSENT'}
+                                                </span>
                                               )}
                                             </div>
-                                            {(checkInEvent || checkOutEvent) ? (
+                                            {(checkInEvent || checkOutEvent) && (
                                               <div className="calendar-cell-times">
                                                 {checkInEvent && (
                                                   <div className="calendar-time-row in">
-                                                    <span style={{ fontWeight: 'bold' }}>In:</span>
+                                                    <span className="time-label">In:</span>
                                                     <span>{checkInEvent.logTime}</span>
                                                   </div>
                                                 )}
                                                 {checkOutEvent && (
                                                   <div className="calendar-time-row out">
-                                                    <span style={{ fontWeight: 'bold' }}>Out:</span>
+                                                    <span className="time-label">Out:</span>
                                                     <span>{checkOutEvent.logTime}</span>
                                                   </div>
                                                 )}
                                               </div>
-                                            ) : null}
+                                            )}
                                           </div>
                                         );
                                       })}
@@ -325,9 +252,8 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                 </div>
                               </div>
 
-                              {/* Right side action buttons */}
                               <div className="expanded-actions">
-                                <button 
+                                <button
                                   className="action-btn-primary"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -337,7 +263,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                   <ExternalLink size={16} />
                                   Xem log chi tiết
                                 </button>
-                                <button 
+                                <button
                                   className="action-btn-outline"
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -362,34 +288,22 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
         )}
       </main>
 
-      {/* Color Legend Footer */}
       <footer className="legend-section">
         <span className="legend-title">Chú thích màu sắc:</span>
         <div className="legend-items">
-          <div className="legend-item">
-            <div className="legend-dot p"></div>
-            <span>Đủ công (#639922)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-dot l"></div>
-            <span>Vào muộn (#BA7517)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-dot a"></div>
-            <span>Vắng không phép (#E24B4A)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-dot v"></div>
-            <span>Nghỉ phép (#378ADD)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-dot h"></div>
-            <span>Cuối tuần / Lễ (#cbd5e1)</span>
-          </div>
-          <div className="legend-item">
-            <div className="legend-dot o"></div>
-            <span>Tăng ca (#8B5CF6)</span>
-          </div>
+          {[
+            { key: 'p', label: 'Đủ công (#639922)' },
+            { key: 'l', label: 'Vào muộn (#BA7517)' },
+            { key: 'a', label: 'Vắng không phép (#E24B4A)' },
+            { key: 'v', label: 'Nghỉ phép (#378ADD)' },
+            { key: 'h', label: 'Cuối tuần / Lễ (#cbd5e1)' },
+            { key: 'o', label: 'Tăng ca (#8B5CF6)' },
+          ].map(({ key, label }) => (
+            <div key={key} className="legend-item">
+              <div className={`legend-dot ${key}`} />
+              <span>{label}</span>
+            </div>
+          ))}
         </div>
       </footer>
     </>

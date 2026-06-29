@@ -469,8 +469,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarColor = _getAvatarColor(user.role);
     final currentRole = context.watch<AuthProvider>().role;
-    final canEnrollFace =
-        currentRole == UserRole.superAdmin || currentRole == UserRole.admin;
+    final canEnrollFace = currentRole.isManagerOrAbove;
 
     return Container(
       decoration: BoxDecoration(

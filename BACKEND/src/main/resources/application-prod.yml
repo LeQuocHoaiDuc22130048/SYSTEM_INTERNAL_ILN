@@ -51,7 +51,7 @@ application:
       secret-key: ${JWT_SECRET_KEY}
       expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:86400000}
       refresh-token:
-        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}
+        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:3153600000000}
 
 logging:
   level:

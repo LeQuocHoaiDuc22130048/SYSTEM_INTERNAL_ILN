@@ -71,7 +71,6 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/message-media/**").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/repair-media/**").permitAll()
-                        .requestMatchers("/api/attendance/**").permitAll()
                         // Swagger — chỉ dev
                         .requestMatchers("/swagger-ui/**", "/api-docs/**").permitAll()
                         // Actuator health check

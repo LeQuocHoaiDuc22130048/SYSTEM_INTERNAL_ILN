@@ -58,4 +58,4 @@ application:
       secret-key: ${JWT_SECRET_KEY:dev-only-jwt-secret-key-change-me-32bytes-minimum}
       expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:86400000}
       refresh-token:
-        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}
+        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:3153600000000}

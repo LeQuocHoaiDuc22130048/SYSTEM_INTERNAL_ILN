@@ -1,8 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import type { EmployeeMonthlyStats } from './mockData';
+import type { EmployeeMonthlyStats, UserInfo } from './mockData';
 import './App.css';
 
-// Import split components
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
 import { MonthlyStatsGrid } from './components/MonthlyStatsGrid';
@@ -13,12 +12,29 @@ import { HistoryModal } from './components/HistoryModal';
 import { EditModal } from './components/EditModal';
 import { ManualModal } from './components/ManualModal';
 
+import { getAuthHeaders, getJsonAuthHeaders, createTimeoutController, STANDARD_WORK_DAYS } from './utils/auth';
+import { getDailyStatusFromPattern } from './utils/employee';
+import { exportAttendanceExcel } from './utils/excel';
+
+
+/** Trạng thái nguồn dữ liệu kết nối */
+type DataSource = 'api' | 'error' | 'loading';
+
+/** Tab đang hiển thị */
+type ActiveTab = 'monthly' | 'daily';
+
+/** Dữ liệu target để mở EditModal */
+interface EditModalTarget {
+  employee: any;
+  date: string;
+  dayLog: any;
+}
+
 function App() {
-  // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return !!localStorage.getItem('accessToken');
   });
-  const [currentUser, setCurrentUser] = useState<any>(() => {
+  const [currentUser, setCurrentUser] = useState<UserInfo | null>(() => {
     const userStr = localStorage.getItem('currentUser');
     try {
       return userStr ? JSON.parse(userStr) : null;
@@ -27,24 +43,19 @@ function App() {
     }
   });
 
-  // Navigation State
   const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth() + 1);
 
-  // Data State
   const [employees, setEmployees] = useState<EmployeeMonthlyStats[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  // Connection Status
-  const [dataSource, setDataSource] = useState<'api' | 'error' | 'loading'>('loading');
+  const [dataSource, setDataSource] = useState<DataSource>('loading');
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState<number>(0);
 
-  // Search & Filter State
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  // Daily View State
-  const [activeTab, setActiveTab] = useState<'monthly' | 'daily'>('monthly');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('monthly');
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -55,29 +66,17 @@ function App() {
   const [dailyReports, setDailyReports] = useState<any[]>([]);
   const [dailyLoading, setDailyLoading] = useState<boolean>(false);
 
-  // Modal Targets
   const [historyEmployee, setHistoryEmployee] = useState<{ id: string; name: string; dept: string } | null>(null);
-  
-  const [showManualModal, setShowManualModal] = useState<boolean>(false);
-  const [manualEmployee, setManualEmployee] = useState<EmployeeMonthlyStats | null>(null);
+  const [manualModalEmployee, setManualModalEmployee] = useState<EmployeeMonthlyStats | null>(null);
+  const [editModalTarget, setEditModalTarget] = useState<EditModalTarget | null>(null);
 
-  const [showEditModal, setShowEditModal] = useState<boolean>(false);
-  const [editEmployee, setEditEmployee] = useState<any>(null);
-  const [editDate, setEditDate] = useState<string>('');
-  const [editDayLog, setEditDayLog] = useState<any>(null);
-
-  // Toast State
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  // Show Toast Helper
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
-    setTimeout(() => {
-      setToastMessage(null);
-    }, 3000);
+    setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
-  // Logout handler
   const handleLogout = useCallback(async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     try {
@@ -85,8 +84,7 @@ function App() {
         await fetch('/api/v1/auth/logout', {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+            ...getJsonAuthHeaders(),
           },
           body: JSON.stringify({ refreshToken }),
         });
@@ -102,25 +100,18 @@ function App() {
     showToast('Đăng xuất thành công.');
   }, [showToast]);
 
-  // Fetch Monthly Data
   const fetchMonthlyData = useCallback(async () => {
     if (!isAuthenticated) return;
     setLoading(true);
     setDataSource('loading');
     setConnectionError(null);
+    const { signal, clear } = createTimeoutController();
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
-      const token = localStorage.getItem('accessToken');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const response = await fetch(`/api/attendance/monthly?year=${currentYear}&month=${currentMonth}`, {
-        signal: controller.signal,
-        headers,
-      });
-      clearTimeout(timeoutId);
+      const response = await fetch(
+        `/api/attendance/monthly?year=${currentYear}&month=${currentMonth}`,
+        { signal, headers: getAuthHeaders() }
+      );
+      clear();
       if (!response.ok) {
         if (response.status === 401 || response.status === 403) {
           handleLogout();
@@ -129,7 +120,7 @@ function App() {
         throw new Error(`Server trả về lỗi: ${response.status}`);
       }
       const apiData = await response.json();
-      if (apiData && apiData.data && apiData.data.employees) {
+      if (apiData?.data?.employees) {
         setEmployees(apiData.data.employees);
         setDataSource('api');
         setConnectionError(null);
@@ -153,34 +144,28 @@ function App() {
     fetchMonthlyData();
   }, [fetchMonthlyData, retryCount]);
 
-  // Daily Attendance report loading
   const fetchDailyReport = useCallback(async (dateStr: string) => {
     if (!isAuthenticated) return;
     setDailyLoading(true);
     try {
-      const token = localStorage.getItem('accessToken');
-      const headers: Record<string, string> = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
       const response = await fetch(`/api/v1/attendance/report?date=${dateStr}`, {
-        headers,
+        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const result = await response.json();
-        if (result && result.data) {
+        if (result?.data) {
           const normalized = result.data.map((report: any) => ({
             ...report,
             records: report.records.map((r: any) => ({
               ...r,
-              type: r.type === 'IN' ? 'CHECK_IN' : r.type === 'OUT' ? 'CHECK_OUT' : r.type
-            }))
+              type: r.type === 'IN' ? 'CHECK_IN' : r.type === 'OUT' ? 'CHECK_OUT' : r.type,
+            })),
           }));
           setDailyReports(normalized);
         }
       }
     } catch (e) {
-      console.error("Lỗi khi tải báo cáo chấm công ngày:", e);
+      console.error('Lỗi khi tải báo cáo chấm công ngày:', e);
     } finally {
       setDailyLoading(false);
     }
@@ -192,13 +177,11 @@ function App() {
     }
   }, [activeTab, selectedDate, fetchDailyReport, retryCount]);
 
-  // Retry connection handler
   const handleRetryConnection = () => {
     setRetryCount(prev => prev + 1);
     showToast('Đang thử kết nối lại đến server...');
   };
 
-  // Month Navigator
   const prevMonth = () => {
     if (currentMonth === 1) {
       setCurrentMonth(12);
@@ -226,93 +209,54 @@ function App() {
     }
   };
 
-  const getDailyStatusFromPattern = (emp: EmployeeMonthlyStats, dateStr: string) => {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const day = parseInt(parts[2], 10);
-      if (emp.dailyPattern && day >= 1 && day <= emp.dailyPattern.length) {
-        return emp.dailyPattern[day - 1];
-      }
-    }
-    return '';
-  };
-
-  // Open Edit Modal
   const handleOpenEditModal = (dayLog: any, employee: any) => {
-    setEditEmployee(employee);
-    setEditDate(dayLog.date);
-    setEditDayLog(dayLog);
-    setShowEditModal(true);
+    setEditModalTarget({ employee, date: dayLog.date, dayLog });
   };
 
-  // Export Excel Sim
-  const handleExportExcel = () => {
-    showToast("Đang kết xuất dữ liệu chấm công tháng...");
-    let csvContent = "\ufeff"; // BOM for UTF-8
-    csvContent += "Mã NV,Họ tên,Phòng ban,Ngày làm chuẩn,Đủ công,Đi muộn,Vắng KP,Tổng giờ,Nghỉ phép\n";
-    filteredEmployees.forEach(e => {
-      csvContent += `${e.employeeCode},${e.name},${e.dept},22,${e.workDays},${e.lateCount},${e.absentDays},${e.totalHours},${e.leavedays}\n`;
-    });
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.setAttribute("href", url);
-    link.setAttribute("download", `ChamCong_Thang_${currentMonth}_${currentYear}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-
-    setTimeout(() => {
-      showToast("Xuất Excel chấm công thành công!");
-    }, 800);
+  const handleExportExcel = async () => {
+    showToast('Đang kết xuất dữ liệu chấm công tháng...');
+    try {
+      await exportAttendanceExcel(filteredEmployees, currentMonth, currentYear);
+      showToast('Xuất Excel chấm công thành công!');
+    } catch (err) {
+      console.error(err);
+      showToast('Có lỗi xảy ra khi xuất file Excel!');
+    }
   };
 
   const dailyReportMap = useMemo(() => {
     const map: Record<string, any> = {};
     dailyReports.forEach(report => {
-      if (report.records && report.records.length > 0) {
+      if (report.records?.length > 0) {
         const empId = report.records[0].employeeId;
-        if (empId) {
-          map[empId] = report;
-        }
+        if (empId) map[empId] = report;
       }
     });
     return map;
   }, [dailyReports]);
 
-  // Get active employees list (excluding administrative accounts)
   const activeEmployees = useMemo(() => {
     return employees.filter(emp => {
-      const isSystemAdmin = 
-        emp.name.toLowerCase().includes('admin') ||
-        emp.employeeCode.toLowerCase().includes('admin') ||
-        emp.dept.toLowerCase().includes('admin') ||
-        emp.dept.toLowerCase().includes('quản trị');
-      return !isSystemAdmin;
+      const nameLower = emp.name.toLowerCase();
+      const codeLower = emp.employeeCode.toLowerCase();
+      const deptLower = emp.dept.toLowerCase();
+      return !(
+        nameLower.includes('admin') ||
+        codeLower.includes('admin') ||
+        deptLower.includes('admin') ||
+        deptLower.includes('quản trị')
+      );
     });
   }, [employees]);
 
-  // Filter logic (Monthly)
   const filteredEmployees = useMemo(() => {
-    return activeEmployees.filter(emp => {
-      return (
-        emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.employeeCode.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    });
+    const term = searchTerm.toLowerCase();
+    return activeEmployees.filter(emp =>
+      emp.name.toLowerCase().includes(term) ||
+      emp.employeeCode.toLowerCase().includes(term)
+    );
   }, [activeEmployees, searchTerm]);
 
-  // Filter logic (Daily)
-  const filteredDailyEmployees = useMemo(() => {
-    return activeEmployees.filter(emp => {
-      return (
-        emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        emp.employeeCode.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    });
-  }, [activeEmployees, searchTerm]);
-
-  // Daily Stats Calculation
   const dailyStats = useMemo(() => {
     const total = activeEmployees.length;
     let onTime = 0;
@@ -324,43 +268,35 @@ function App() {
       const statusChar = getDailyStatusFromPattern(emp, selectedDate);
       if (report) {
         if (report.checkIn) {
-          if (report.isLate) {
-            lateEarly++;
-          } else {
-            onTime++;
-          }
+          if (report.isLate) { lateEarly++; } else { onTime++; }
         }
-        if (report.isEarlyLeave && !report.isLate) {
-          lateEarly++;
-        }
+        if (report.isEarlyLeave && !report.isLate) lateEarly++;
       } else {
-        if (statusChar === 'a' || statusChar === '' || statusChar === 'v') {
-          absent++;
-        }
+        if (statusChar === 'a' || statusChar === '' || statusChar === 'v') absent++;
       }
     });
 
     return { total, onTime, lateEarly, absent };
   }, [activeEmployees, dailyReportMap, selectedDate]);
 
-  // Calculate Overall Dashboard Stats
-  const totalStandardDays = 22; // chuẩn
-  const employeesCount = filteredEmployees.length;
-  
-  const totalPresentCount = filteredEmployees.reduce((sum, emp) => sum + emp.workDays, 0);
-  const averagePresent = employeesCount > 0 ? Math.round((totalPresentCount / employeesCount) * 10) / 10 : 0;
-  
-  const totalLateCount = filteredEmployees.reduce((sum, emp) => sum + emp.lateCount, 0);
-  const totalAbsentDays = filteredEmployees.reduce((sum, emp) => sum + emp.absentDays, 0);
+  const monthlyStats = useMemo(() => {
+    const count = filteredEmployees.length;
+    const totalPresent = filteredEmployees.reduce((sum, emp) => sum + emp.workDays, 0);
+    return {
+      averagePresent: count > 0 ? Math.round((totalPresent / count) * 10) / 10 : 0,
+      totalLateCount: filteredEmployees.reduce((sum, emp) => sum + emp.lateCount, 0),
+      totalAbsentDays: filteredEmployees.reduce((sum, emp) => sum + emp.absentDays, 0),
+    };
+  }, [filteredEmployees]);
 
   if (!isAuthenticated) {
     return (
-      <LoginScreen 
+      <LoginScreen
         onLoginSuccess={(userInfo) => {
           setIsAuthenticated(true);
           setCurrentUser(userInfo);
-        }} 
-        showToast={showToast} 
+        }}
+        showToast={showToast}
       />
     );
   }
@@ -371,14 +307,9 @@ function App() {
 
   return (
     <div className="container">
-      {/* Toast popup */}
-      {toastMessage && (
-        <div className="toast-msg">
-          {toastMessage}
-        </div>
-      )}
+      {toastMessage && <div className="toast-msg">{toastMessage}</div>}
 
-      <Header 
+      <Header
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         currentMonth={currentMonth}
@@ -396,13 +327,13 @@ function App() {
 
       {activeTab === 'monthly' ? (
         <>
-          <MonthlyStatsGrid 
-            totalStandardDays={totalStandardDays}
-            averagePresent={averagePresent}
-            totalLateCount={totalLateCount}
-            totalAbsentDays={totalAbsentDays}
+          <MonthlyStatsGrid
+            totalStandardDays={STANDARD_WORK_DAYS}
+            averagePresent={monthlyStats.averagePresent}
+            totalLateCount={monthlyStats.totalLateCount}
+            totalAbsentDays={monthlyStats.totalAbsentDays}
           />
-          <MonthlyTab 
+          <MonthlyTab
             key={`${currentMonth}-${currentYear}`}
             filteredEmployees={filteredEmployees}
             searchTerm={searchTerm}
@@ -417,28 +348,27 @@ function App() {
         </>
       ) : (
         <>
-          <DailyStatsGrid 
+          <DailyStatsGrid
             total={dailyStats.total}
             onTime={dailyStats.onTime}
             lateEarly={dailyStats.lateEarly}
             absent={dailyStats.absent}
           />
-          <DailyTab 
-            filteredDailyEmployees={filteredDailyEmployees}
+          <DailyTab
+            filteredDailyEmployees={filteredEmployees}
             dailyReportMap={dailyReportMap}
             searchTerm={searchTerm}
             setSearchTerm={setSearchTerm}
             selectedDate={selectedDate}
             dailyLoading={dailyLoading}
-            setManualEmployee={setManualEmployee}
-            setShowManualModal={setShowManualModal}
+            setManualEmployee={setManualModalEmployee}
+            setShowManualModal={(show) => { if (!show) setManualModalEmployee(null); }}
           />
         </>
       )}
 
-      {/* History Log Modal Screen */}
       {historyEmployee && (
-        <HistoryModal 
+        <HistoryModal
           employee={historyEmployee}
           currentMonth={currentMonth}
           currentYear={currentYear}
@@ -448,15 +378,11 @@ function App() {
         />
       )}
 
-      {/* Manual Check-in Modal */}
-      {showManualModal && manualEmployee && (
-        <ManualModal 
-          employee={manualEmployee}
+      {manualModalEmployee && (
+        <ManualModal
+          employee={manualModalEmployee}
           selectedDate={selectedDate}
-          onClose={() => {
-            setShowManualModal(false);
-            setManualEmployee(null);
-          }}
+          onClose={() => setManualModalEmployee(null)}
           showToast={showToast}
           onSaveSuccess={() => {
             fetchDailyReport(selectedDate);
@@ -465,21 +391,14 @@ function App() {
         />
       )}
 
-      {/* Edit Attendance Modal */}
-      {showEditModal && editEmployee && (
-        <EditModal 
-          employee={editEmployee}
-          date={editDate}
-          dayLog={editDayLog}
-          onClose={() => {
-            setShowEditModal(false);
-            setEditEmployee(null);
-            setEditDate('');
-            setEditDayLog(null);
-          }}
+      {editModalTarget && (
+        <EditModal
+          employee={editModalTarget.employee}
+          date={editModalTarget.date}
+          dayLog={editModalTarget.dayLog}
+          onClose={() => setEditModalTarget(null)}
           showToast={showToast}
           onSaveSuccess={() => {
-            // refresh history view
             if (historyEmployee) {
               const emp = { ...historyEmployee };
               setHistoryEmployee(null);

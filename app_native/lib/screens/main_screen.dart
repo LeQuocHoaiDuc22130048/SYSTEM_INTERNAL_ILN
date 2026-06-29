@@ -204,7 +204,7 @@ class _MainScreenState extends State<MainScreen> {
               allowEnrollment: false,
               selfCheckOnly: false,
               refreshAttendanceAfterVerification: false,
-              showMatchedEmployeeInfo: false,
+              showMatchedEmployeeInfo: true,
               popOnVerificationSuccess: true,
             ),
           ),

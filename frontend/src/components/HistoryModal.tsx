@@ -1,12 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  X, 
-  LogIn, 
-  LogOut, 
-  ChevronDown, 
-  ChevronUp 
-} from 'lucide-react';
+import { X, LogIn, LogOut, ChevronDown, ChevronUp } from 'lucide-react';
 import type { EmployeeHistoryResponse } from '../mockData';
+import { getAvatarLetters, normalizeHistoryResponse } from '../utils/employee';
+import { getAuthHeaders, createTimeoutController, LATE_GRACE_MINUTES } from '../utils/auth';
 
 interface HistoryModalProps {
   employee: { id: string; name: string; dept: string };
@@ -17,21 +13,16 @@ interface HistoryModalProps {
   showToast: (message: string) => void;
 }
 
-const normalizeHistoryResponse = (data: any): any => {
-  if (!data || !data.days) return data;
-  return {
-    ...data,
-    days: data.days.map((day: any) => ({
-      ...day,
-      events: day.events.map((evt: any) => ({
-        ...evt,
-        type: evt.type === 'IN' ? 'CHECK_IN' : evt.type === 'OUT' ? 'CHECK_OUT' : evt.type
-      }))
-    }))
-  };
-};
+/** Фильтры для отображения дней */
+type HistoryFilter = 'ALL' | 'LATE' | 'EARLY' | 'MANUAL' | 'HOLIDAY';
 
-const LATE_GRACE_MINUTES = 15;
+const FILTER_OPTIONS: { key: HistoryFilter; label: string }[] = [
+  { key: 'ALL', label: 'Tất cả' },
+  { key: 'LATE', label: 'Đi muộn' },
+  { key: 'EARLY', label: 'Về sớm' },
+  { key: 'MANUAL', label: 'Chỉnh thủ công' },
+  { key: 'HOLIDAY', label: 'Cuối tuần / lễ' },
+];
 
 export const HistoryModal: React.FC<HistoryModalProps> = ({
   employee,
@@ -42,32 +33,23 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   showToast,
 }) => {
   const [historyData, setHistoryData] = useState<EmployeeHistoryResponse | null>(null);
-  const [historyFilter, setHistoryFilter] = useState<string>('ALL');
+  const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('ALL');
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({});
 
-  // Fetch History Logs
   useEffect(() => {
     const fetchHistoryData = async () => {
       setHistoryLoading(true);
+      const { signal, clear } = createTimeoutController();
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 8000);
-        const token = localStorage.getItem('accessToken');
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        const response = await fetch(`/api/attendance/${employee.id}/logs?year=${currentYear}&month=${currentMonth}`, {
-          signal: controller.signal,
-          headers,
-        });
-        clearTimeout(timeoutId);
-        if (!response.ok) {
-          throw new Error('Không thể tải lịch sử chi tiết từ server');
-        }
+        const response = await fetch(
+          `/api/attendance/${employee.id}/logs?year=${currentYear}&month=${currentMonth}`,
+          { signal, headers: getAuthHeaders() }
+        );
+        clear();
+        if (!response.ok) throw new Error('Không thể tải lịch sử chi tiết từ server');
         const apiData = await response.json();
-        if (apiData && apiData.data) {
+        if (apiData?.data) {
           setHistoryData(normalizeHistoryResponse(apiData.data));
         } else {
           throw new Error('Dữ liệu không đúng cấu trúc');
@@ -83,68 +65,42 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     fetchHistoryData();
   }, [employee, currentYear, currentMonth]);
 
-  const getAvatarLetters = (name: string) => {
-    const parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[parts.length - 2][0] + parts[parts.length - 1][0]).toUpperCase();
-    }
-    return name.slice(0, 2).toUpperCase();
-  };
-
   const toggleDayCollapse = (date: string) => {
-    setExpandedDays(prev => ({
-      ...prev,
-      [date]: !prev[date]
-    }));
+    setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }));
   };
 
   const getModalDayStatusBadge = (status: string) => {
-    switch (status) {
-      case 'PRESENT':
-        return <span className="pill-badge present">Đủ công</span>;
-      case 'LATE':
-        return <span className="pill-badge late">Vào muộn</span>;
-      case 'ABSENT':
-        return <span className="pill-badge absent">Vắng KP</span>;
-      case 'LEAVE':
-        return <span className="pill-badge leave">Nghỉ phép</span>;
-      case 'HOLIDAY':
-        return <span className="pill-badge holiday">Nghỉ lễ/CN</span>;
-      case 'FUTURE':
-        return null;
-      default:
-        return <span className="pill-badge holiday">Nghỉ lễ/CN</span>;
-    }
+    const badgeMap: Record<string, React.ReactNode> = {
+      PRESENT: <span className="pill-badge present">Đủ công</span>,
+      LATE: <span className="pill-badge late">Vào muộn</span>,
+      ABSENT: <span className="pill-badge absent">Vắng KP</span>,
+      LEAVE: <span className="pill-badge leave">Nghỉ phép</span>,
+      HOLIDAY: <span className="pill-badge holiday">Nghỉ lễ/CN</span>,
+      FUTURE: null,
+    };
+    return badgeMap[status] ?? <span className="pill-badge holiday">Nghỉ lễ/CN</span>;
   };
 
   const getEventTimeDiffs = (events: any[], shiftStart: string, shiftEnd: string) => {
     const inEvent = events.find(e => e.type === 'CHECK_IN');
     const outEvent = events.find(e => e.type === 'CHECK_OUT');
 
-    let inMsg = "Vào: --";
-    let outMsg = "Ra: --";
-    let realMsg = "Thực làm: 0h";
+    let inMsg = 'Vào: --';
+    let outMsg = 'Ra: --';
+    let realMsg = 'Thực làm: 0h';
 
     if (inEvent) {
       const [sh, sm] = shiftStart.split(':').map(Number);
       const [eh, em] = inEvent.logTime.split(':').map(Number);
       const diffMin = (eh * 60 + em) - (sh * 60 + sm);
-      if (diffMin > LATE_GRACE_MINUTES) {
-        inMsg = `Vào: muộn +${diffMin}p`;
-      } else {
-        inMsg = "Vào: đúng giờ";
-      }
+      inMsg = diffMin > LATE_GRACE_MINUTES ? `Vào: muộn +${diffMin}p` : 'Vào: đúng giờ';
     }
 
     if (outEvent) {
       const [sh, sm] = shiftEnd.split(':').map(Number);
       const [eh, em] = outEvent.logTime.split(':').map(Number);
       const diffMin = (sh * 60 + sm) - (eh * 60 + em);
-      if (diffMin > 5) {
-        outMsg = `Ra: sớm -${diffMin}p`;
-      } else {
-        outMsg = "Ra: đúng giờ";
-      }
+      outMsg = diffMin > 5 ? `Ra: sớm -${diffMin}p` : 'Ra: đúng giờ';
     }
 
     if (inEvent && outEvent) {
@@ -161,33 +117,18 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
   const getFilteredHistoryDays = () => {
     if (!historyData) return [];
-    
     return historyData.days.filter(day => {
       if (historyFilter === 'ALL') return true;
-      
-      const outEvent = day.events.find(e => e.type === 'CHECK_OUT');
-      const hasManual = day.events.some(e => e.source === 'MANUAL');
-
-      if (historyFilter === 'LATE') {
-        return day.status === 'LATE';
-      }
-      
+      if (historyFilter === 'LATE') return day.status === 'LATE';
+      if (historyFilter === 'HOLIDAY') return day.status === 'HOLIDAY';
+      if (historyFilter === 'MANUAL') return day.events.some(e => e.source === 'MANUAL');
       if (historyFilter === 'EARLY') {
-        if (!outEvent) return false;
+        const outEvent = day.events.find(e => e.type === 'CHECK_OUT');
+        if (!outEvent || !historyData.employee.shiftEnd) return false;
         const [sh, sm] = historyData.employee.shiftEnd.split(':').map(Number);
         const [eh, em] = outEvent.logTime.split(':').map(Number);
-        const diffMin = (sh * 60 + sm) - (eh * 60 + em);
-        return diffMin > 5;
+        return (sh * 60 + sm) - (eh * 60 + em) > 5;
       }
-
-      if (historyFilter === 'MANUAL') {
-        return hasManual;
-      }
-
-      if (historyFilter === 'HOLIDAY') {
-        return day.status === 'HOLIDAY';
-      }
-
       return true;
     });
   };
@@ -201,8 +142,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             <div className="modal-emp-info">
               <span className="modal-emp-name">{employee.name}</span>
               <span className="modal-emp-meta">
-                Phòng ban: <strong>{employee.dept}</strong> &middot; 
-                Tháng {currentMonth}/{currentYear} &middot; 
+                Phòng ban: <strong>{employee.dept}</strong> &middot;{' '}
+                Tháng {currentMonth}/{currentYear} &middot;{' '}
                 Ca làm việc: <strong>Ca hành chính (08:00 - 17:00)</strong>
               </span>
             </div>
@@ -219,7 +160,6 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
             <div className="loading-overlay">Không thể tải dữ liệu. Vui lòng thử lại.</div>
           ) : (
             <>
-              {/* Summary horizontal stats cards */}
               <div className="modal-stats-row">
                 <div className="modal-stat-card">
                   <span className="modal-stat-label">Ngày làm việc</span>
@@ -243,84 +183,47 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                 </div>
               </div>
 
-              {/* Filter Quick Pills */}
               <div className="filter-pills">
-                <button 
-                  className={`filter-pill ${historyFilter === 'ALL' ? 'active' : ''}`}
-                  onClick={() => setHistoryFilter('ALL')}
-                >
-                  Tất cả
-                </button>
-                <button 
-                  className={`filter-pill ${historyFilter === 'LATE' ? 'active' : ''}`}
-                  onClick={() => setHistoryFilter('LATE')}
-                >
-                  Đi muộn
-                </button>
-                <button 
-                  className={`filter-pill ${historyFilter === 'EARLY' ? 'active' : ''}`}
-                  onClick={() => setHistoryFilter('EARLY')}
-                >
-                  Về sớm
-                </button>
-                <button 
-                  className={`filter-pill ${historyFilter === 'MANUAL' ? 'active' : ''}`}
-                  onClick={() => setHistoryFilter('MANUAL')}
-                >
-                  Chỉnh thủ công
-                </button>
-                <button 
-                  className={`filter-pill ${historyFilter === 'HOLIDAY' ? 'active' : ''}`}
-                  onClick={() => setHistoryFilter('HOLIDAY')}
-                >
-                  Cuối tuần / lễ
-                </button>
+                {FILTER_OPTIONS.map(({ key, label }) => (
+                  <button
+                    key={key}
+                    className={`filter-pill ${historyFilter === key ? 'active' : ''}`}
+                    onClick={() => setHistoryFilter(key)}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
 
-              {/* Daily Blocks list */}
               <div className="logs-list">
                 {getFilteredHistoryDays().map((dayLog) => {
                   const isCollapsed = !expandedDays[dayLog.date];
-                  
                   const { inMsg, outMsg, realMsg } = getEventTimeDiffs(
-                    dayLog.events, 
-                    historyData.employee.shiftStart, 
+                    dayLog.events,
+                    historyData.employee.shiftStart,
                     historyData.employee.shiftEnd
                   );
-
                   const checkInEvent = dayLog.events.find(e => e.type === 'CHECK_IN');
                   const checkOutEvent = dayLog.events.find(e => e.type === 'CHECK_OUT');
-
                   const hasLate = dayLog.status === 'LATE';
                   const hasManual = dayLog.events.some(e => e.source === 'MANUAL');
                   const hasOT = dayLog.events.some(e => e.note.includes('OT'));
 
                   return (
                     <div key={dayLog.date} className="day-block">
-                      {/* Day summary row */}
-                      <div 
-                        className="day-header-summary"
-                        onClick={() => toggleDayCollapse(dayLog.date)}
-                      >
+                      <div className="day-header-summary" onClick={() => toggleDayCollapse(dayLog.date)}>
                         <div className="day-title-info">
                           <span className="day-date">{dayLog.date.split('-').reverse().slice(0, 2).join('/')}</span>
                           <span className="day-dow">{dayLog.dayOfWeek}</span>
-                          
                           <div className="day-chips">
                             {checkInEvent ? (
-                              <span className="chip-io in">
-                                <LogIn size={12} />
-                                {checkInEvent.logTime}
-                              </span>
+                              <span className="chip-io in"><LogIn size={12} />{checkInEvent.logTime}</span>
                             ) : dayLog.status !== 'HOLIDAY' && dayLog.status !== 'LEAVE' && dayLog.status !== 'FUTURE' ? (
                               <span className="chip-io absent">Không check-in</span>
                             ) : null}
 
                             {checkOutEvent ? (
-                              <span className="chip-io out">
-                                <LogOut size={12} />
-                                {checkOutEvent.logTime}
-                              </span>
+                              <span className="chip-io out"><LogOut size={12} />{checkOutEvent.logTime}</span>
                             ) : checkInEvent ? (
                               <span className="chip-io absent">Không check-out</span>
                             ) : null}
@@ -330,38 +233,33 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             {hasManual && <span className="chip-badge holiday">Thủ công</span>}
                           </div>
                         </div>
-
                         <div className="day-right-side">
                           {getModalDayStatusBadge(dayLog.status)}
                           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                         </div>
                       </div>
 
-                      {/* Expanded detailed timeline */}
                       {!isCollapsed && (
                         <div className="day-details">
                           {dayLog.events.length === 0 ? (
-                            <div style={{ fontSize: '13px', color: 'var(--color-text-light)', fontStyle: 'italic' }}>
-                              Không ghi nhận dữ liệu chấm công.
-                            </div>
+                            <p className="no-data-text">Không ghi nhận dữ liệu chấm công.</p>
                           ) : (
                             <div className="timeline">
                               {dayLog.events.map((evt, evtIdx) => (
                                 <div key={evtIdx} className="timeline-event">
                                   <div className="event-details">
-                                    <div className={`timeline-dot ${evt.type.toLowerCase()} ${evt.source.toLowerCase()}`}></div>
+                                    <div className={`timeline-dot ${evt.type.toLowerCase()} ${evt.source.toLowerCase()}`} />
                                     <span className="event-time">{evt.logTime}</span>
                                     <span className="event-label">
                                       {evt.type === 'CHECK_IN' ? 'Check-in thành công' : 'Check-out thành công'}
                                     </span>
                                     <span className={`source-tag ${evt.source.toLowerCase()}`}>
-                                      {evt.source === 'FACE' ? `Face ID · ${Math.round(evt.confidence * 100)}%` : 'Thủ công'}
+                                      {evt.source === 'FACE'
+                                        ? `Face ID · ${Math.round(evt.confidence * 100)}%`
+                                        : 'Thủ công'}
                                     </span>
                                   </div>
-                                  
-                                  {evt.note && (
-                                    <div className="event-note">Ghi chú: {evt.note}</div>
-                                  )}
+                                  {evt.note && <div className="event-note">Ghi chú: {evt.note}</div>}
                                 </div>
                               ))}
                             </div>
@@ -374,15 +272,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             </div>
                           )}
 
-                          {/* Action buttons inside day block */}
                           <div className="day-actions">
-                            <button 
+                            <button
                               className="mini-action-btn"
                               onClick={() => showToast(`Chi tiết log thô cho ngày ${dayLog.date}: ${JSON.stringify(dayLog.events)}`)}
                             >
                               Xem log chi tiết
                             </button>
-                            <button 
+                            <button
                               className="mini-action-btn primary"
                               onClick={() => onOpenEditModal(dayLog, employee)}
                             >
