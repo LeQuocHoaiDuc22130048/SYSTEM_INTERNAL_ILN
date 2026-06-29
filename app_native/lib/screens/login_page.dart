@@ -42,7 +42,9 @@ class _LoginPageState extends State<LoginPage> {
 
     if (success) {
       if (!auth.isAttendanceAccount) {
-        context.read<BackendDataProvider>().loadAll();
+        context.read<BackendDataProvider>().loadAll(
+          isManagerOrAbove: auth.isManagerOrAbove,
+        );
       }
       Navigator.of(context).pushReplacementNamed('/dashboard');
     } else {
@@ -181,7 +183,9 @@ class _LoginPageState extends State<LoginPage> {
       if (!mounted) return;
       setState(() => _loading = false);
       if (!auth.isAttendanceAccount) {
-        context.read<BackendDataProvider>().loadAll();
+        context.read<BackendDataProvider>().loadAll(
+          isManagerOrAbove: auth.isManagerOrAbove,
+        );
       }
       Navigator.of(context).pushReplacementNamed('/dashboard');
     } on ApiException catch (error) {

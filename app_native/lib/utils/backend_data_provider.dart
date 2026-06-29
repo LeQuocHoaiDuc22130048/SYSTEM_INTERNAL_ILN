@@ -20,19 +20,26 @@ class BackendDataProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
-  Future<void> loadAll() async {
+  Future<void> loadAll({bool isManagerOrAbove = false}) async {
     isLoading = true;
     error = null;
     notifyListeners();
 
     try {
-      await Future.wait([
-        loadEmployees(notify: false),
-        loadPendingUsers(notify: false),
+      final futures = <Future>[
         loadRepairOrders(notify: false),
         loadBoards(notify: false),
-        loadAttendance(notify: false),
-      ]);
+      ];
+
+      if (isManagerOrAbove) {
+        futures.addAll([
+          loadEmployees(notify: false),
+          loadPendingUsers(notify: false),
+          loadAttendance(notify: false),
+        ]);
+      }
+
+      await Future.wait(futures);
     } on ApiException catch (e) {
       error = e.message;
     } catch (_) {
@@ -62,12 +69,25 @@ class BackendDataProvider extends ChangeNotifier {
   }
 
   Future<void> loadRepairOrders({bool notify = true}) async {
-    final data = await api.get(
-      '/api/v1/repair-orders',
-      queryParameters: {'size': 200},
-    );
-    repairOrders = _content(data).map(RepairOrder.fromJson).toList();
+    isLoading = true;
+    error = null;
     if (notify) notifyListeners();
+
+    try {
+      final data = await api.get(
+        '/api/v1/repair-orders',
+        queryParameters: {'size': 200},
+      );
+      repairOrders = _content(data).map(RepairOrder.fromJson).toList();
+      error = null;
+    } on ApiException catch (e) {
+      error = e.message;
+    } catch (_) {
+      error = 'Không thể tải dữ liệu từ backend.';
+    } finally {
+      isLoading = false;
+      if (notify) notifyListeners();
+    }
   }
 
   Future<RepairOrder> createRepairOrder({

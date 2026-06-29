@@ -149,6 +149,16 @@ public class RepairService {
             throw new BusinessException("Chỉ kỹ thuật viên được phân công mới có thể cập nhật trạng thái này");
         }
 
+        // Kiểm tra quyền hủy: chỉ SUPER_ADMIN hoặc ADMIN mới có thể hủy
+        if (request.status() == RepairStatus.CANCELLED) {
+            UserEntity currentUser = userRepository.findByIdAndIsDeletedFalse(userId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            STR."Không tìm thấy người dùng: \{userId}"));
+            if (currentUser.getRole() != UserRole.SUPER_ADMIN && currentUser.getRole() != UserRole.ADMIN) {
+                throw new BusinessException("Chỉ quản trị viên mới có quyền hủy đơn hàng", 403);
+            }
+        }
+
         RepairStatus oldStatus = order.getStatus();
         order.setStatus(request.status());
 

@@ -5,7 +5,6 @@ import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../models/repair_order.dart';
 import '../models/user.dart';
@@ -13,6 +12,7 @@ import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/video_player_dialog.dart';
 
 class RepairOrdersPage extends StatefulWidget {
   final String? targetOrderId;
@@ -229,6 +229,10 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                         _buildFilterChip(
                                           'Đã giao',
                                           RepairOrderStatus.delivered,
+                                        ),
+                                        _buildFilterChip(
+                                          'Đã hủy',
+                                          RepairOrderStatus.cancelled,
                                         ),
                                       ]
                                       .map(
@@ -707,7 +711,15 @@ class _OrderDetailSheet extends StatelessWidget {
                         color: AppColors.primary,
                       ),
                       title: Text(media.caption ?? 'Video đính kèm'),
-                      onTap: () => launchUrl(Uri.parse(url)),
+                      onTap: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => VideoPlayerDialog(
+                            videoUrl: url,
+                            title: media.caption ?? 'Video đính kèm',
+                          ),
+                        );
+                      },
                     );
                   }
                   return Padding(
@@ -922,14 +934,24 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   }
 
   List<MapEntry<String, String>> _availableStatuses() {
+    final auth = context.read<AuthProvider>();
+    final isAdmin = auth.role == UserRole.superAdmin || auth.role == UserRole.admin;
+
     switch (widget.order.status) {
       case RepairOrderStatus.pending:
-        return const [MapEntry('IN_PROGRESS', 'Đang sửa')];
+        return [
+          const MapEntry('IN_PROGRESS', 'Đang sửa'),
+          if (isAdmin) const MapEntry('CANCELLED', 'Hủy đơn'),
+        ];
       case RepairOrderStatus.inProgress:
-        return const [MapEntry('COMPLETED', 'Hoàn thành')];
+        return [
+          const MapEntry('COMPLETED', 'Hoàn thành'),
+          if (isAdmin) const MapEntry('CANCELLED', 'Hủy đơn'),
+        ];
       case RepairOrderStatus.completed:
         return const [MapEntry('DELIVERED', 'Đã giao')];
       case RepairOrderStatus.delivered:
+      case RepairOrderStatus.cancelled:
         return const [];
     }
   }

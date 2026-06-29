@@ -1,4 +1,4 @@
-enum RepairOrderStatus { pending, inProgress, completed, delivered }
+enum RepairOrderStatus { pending, inProgress, completed, delivered, cancelled }
 
 class RepairMedia {
   final String url;
@@ -66,6 +66,8 @@ class RepairOrder {
         return 'Hoàn thành';
       case RepairOrderStatus.delivered:
         return 'Đã giao';
+      case RepairOrderStatus.cancelled:
+        return 'Đã hủy';
     }
   }
 
@@ -114,6 +116,8 @@ class RepairOrder {
         return RepairOrderStatus.completed;
       case 'DELIVERED':
         return RepairOrderStatus.delivered;
+      case 'CANCELLED':
+        return RepairOrderStatus.cancelled;
       default:
         return RepairOrderStatus.pending;
     }

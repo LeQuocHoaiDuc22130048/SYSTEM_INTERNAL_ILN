@@ -106,7 +106,7 @@ public class RepairController {
 
     @Operation(summary = "Huỷ đơn sửa chữa")
     @PatchMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> cancel(
             @PathVariable UUID id,
             @RequestParam(required = false) String reason,

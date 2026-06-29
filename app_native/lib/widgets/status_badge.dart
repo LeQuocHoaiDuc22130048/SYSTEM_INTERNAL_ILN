@@ -38,6 +38,12 @@ class StatusBadge extends StatelessWidget {
             'bgColor': const Color(0xFFF1F5F9),
             'textColor': const Color(0xFF64748B),
           };
+        case RepairOrderStatus.cancelled:
+          return {
+            'label': 'Đã hủy',
+            'bgColor': AppColors.errorLight,
+            'textColor': AppColors.error,
+          };
       }
     } else if (status is BoardStatus) {
       switch (status as BoardStatus) {
