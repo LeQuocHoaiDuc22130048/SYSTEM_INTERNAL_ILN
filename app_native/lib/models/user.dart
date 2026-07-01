@@ -3,7 +3,7 @@ import '../theme/app_colors.dart';
 import 'app_permission.dart';
 
 // {{START_USER_ROLE_ENUM}}
-enum UserRole { superAdmin, admin, manager, technician, warehouse, employee }
+enum UserRole { superAdmin, admin, manager, technician, warehouse, employee, attendance }
 // {{END_USER_ROLE_ENUM}}
 
 enum UserStatus { active, suspended, pending }
@@ -54,6 +54,8 @@ class User {
         return UserRole.technician;
       case 'WAREHOUSE':
         return UserRole.warehouse;
+      case 'ATTENDANCE':
+        return UserRole.attendance;
       default:
         return UserRole.employee;
     }
@@ -141,6 +143,8 @@ extension UserRolePermissions on UserRole {
         return const Color(0xFFD97706);
       case UserRole.employee:
         return AppColors.success;
+      case UserRole.attendance:
+        return const Color(0xFF3B82F6);
     }
   }
   // {{END_ROLE_AVATAR_COLOR}}
@@ -160,6 +164,8 @@ extension UserRolePermissions on UserRole {
         return 'Thủ kho';
       case UserRole.employee:
         return 'Nhân viên';
+      case UserRole.attendance:
+        return 'Máy chấm công';
     }
   }
   // {{END_ROLE_LABEL_GETTER}}
@@ -179,6 +185,8 @@ extension UserRolePermissions on UserRole {
         return 'WAREHOUSE';
       case UserRole.employee:
         return 'EMPLOYEE';
+      case UserRole.attendance:
+        return 'ATTENDANCE';
     }
   }
   // {{END_ROLE_BACKEND_CODE}}
@@ -233,6 +241,8 @@ extension UserRolePermissions on UserRole {
       case UserRole.warehouse:
       case UserRole.employee:
         return employeePermissions;
+      case UserRole.attendance:
+        return const { AppPermission.viewAttendance };
     }
     // {{END_ROLE_PERMISSIONS_SWITCH}}
   }

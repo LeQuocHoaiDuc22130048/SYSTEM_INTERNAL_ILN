@@ -6,6 +6,7 @@ import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.modules.auth.service.RbacService;
 import com.suachuabientan.system_internal.modules.attendance.service.FaceRecognitionService;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -35,6 +36,8 @@ class EmployeeServiceTest {
     private RepairOrderRepository repairOrderRepository;
     @Mock
     private FaceRecognitionService faceRecognitionService;
+    @Mock
+    private RbacService rbacService;
 
     private EmployeeService employeeService;
     private UUID employeeId;
@@ -46,7 +49,8 @@ class EmployeeServiceTest {
                 userRepository,
                 attendanceRepository,
                 repairOrderRepository,
-                faceRecognitionService);
+                faceRecognitionService,
+                rbacService);
         employeeId = UUID.randomUUID();
         activeEmployee = new UserEntity();
         activeEmployee.setRole(UserRole.EMPLOYEE);

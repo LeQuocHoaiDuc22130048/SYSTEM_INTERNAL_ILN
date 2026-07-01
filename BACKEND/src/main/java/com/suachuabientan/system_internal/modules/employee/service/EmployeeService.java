@@ -1,6 +1,7 @@
 package com.suachuabientan.system_internal.modules.employee.service;
 
 import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.service.RbacService;
 import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
@@ -50,6 +51,7 @@ public class EmployeeService implements InitializingBean {
     private final AttendanceRecordRepository attendanceRepository;
     private final RepairOrderRepository repairOrderRepository;
     private final FaceRecognitionService faceRecognitionService;
+    private final RbacService rbacService;
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String FACE_MODEL_NAME = "face-embedding";
 
@@ -177,6 +179,7 @@ public class EmployeeService implements InitializingBean {
             try {
                 UserRole newRole = UserRole.valueOf(request.role().toUpperCase());
                 user.setRole(newRole);
+                rbacService.updateRole(user.getId(), newRole);
             } catch (IllegalArgumentException e) {
                 throw new BusinessException("Vai trò không hợp lệ: " + request.role(), 400);
             }

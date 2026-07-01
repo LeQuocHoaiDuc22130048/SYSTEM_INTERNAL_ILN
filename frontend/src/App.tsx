@@ -263,16 +263,49 @@ function App() {
     let lateEarly = 0;
     let absent = 0;
 
+    const todayStr = new Date().toLocaleDateString('sv-SE');
+    const isToday = selectedDate === todayStr;
+    const isPast = selectedDate < todayStr;
+    const isFuture = selectedDate > todayStr;
+
+    const isPastShiftEnd = (shiftEndStr: string) => {
+      const now = new Date();
+      const currentHours = now.getHours();
+      const currentMinutes = now.getMinutes();
+      const [endHours, endMinutes] = shiftEndStr.split(':').map(Number);
+      return (currentHours > endHours) || (currentHours === endHours && currentMinutes > endMinutes);
+    };
+
     activeEmployees.forEach(emp => {
       const report = dailyReportMap[emp.id];
       const statusChar = getDailyStatusFromPattern(emp, selectedDate);
+
       if (report) {
-        if (report.checkIn) {
-          if (report.isLate) { lateEarly++; } else { onTime++; }
+        const hasIn = !!report.checkIn;
+        const hasOut = !!report.checkOut;
+
+        if (!hasIn && hasOut) {
+          lateEarly++;
+        } else if (hasIn && !hasOut) {
+          const shiftEnd = report.shiftEnd ?? '17:00';
+          if (isPast || (isToday && isPastShiftEnd(shiftEnd))) {
+            lateEarly++;
+          } else {
+            onTime++;
+          }
+        } else if (hasIn && hasOut) {
+          if (report.isLate || report.isEarlyLeave) {
+            lateEarly++;
+          } else {
+            onTime++;
+          }
         }
-        if (report.isEarlyLeave && !report.isLate) lateEarly++;
       } else {
-        if (statusChar === 'a' || statusChar === '' || statusChar === 'v') absent++;
+        if (!isFuture && statusChar !== 'f' && statusChar !== 'h') {
+          if (statusChar === 'a' || statusChar === 'v' || statusChar === 'o' || statusChar === '') {
+            absent++;
+          }
+        }
       }
     });
 

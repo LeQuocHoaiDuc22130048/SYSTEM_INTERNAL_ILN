@@ -52,4 +52,10 @@ public class RbacService {
                 ON CONFLICT DO NOTHING
                 """, userId, roleCode);
     }
+
+    @Transactional
+    public void updateRole(UUID userId, UserRole role) {
+        jdbcTemplate.update("DELETE FROM user_roles WHERE user_id = ?", userId);
+        ensurePrimaryRoleAssigned(userId, role);
+    }
 }

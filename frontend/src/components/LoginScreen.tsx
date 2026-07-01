@@ -16,12 +16,23 @@ interface LoginScreenProps {
 }
 
 export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showToast }) => {
+  // Mode state: login or register
+  const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
+
   // Login Form State
   const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
   const [loginLoading, setLoginLoading] = useState<boolean>(false);
+
+  // Register Form State
+  const [fullName, setFullName] = useState<string>('');
+  const [phone, setPhone] = useState<string>('');
+  const [registerUsername, setRegisterUsername] = useState<string>('');
+  const [registerPassword, setRegisterPassword] = useState<string>('');
+  const [registerShowPassword, setRegisterShowPassword] = useState<boolean>(false);
+  const [registerLoading, setRegisterLoading] = useState<boolean>(false);
 
   // Forgot Password State
   const [forgotUsername, setForgotUsername] = useState<string>('');
@@ -68,6 +79,59 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showTo
       setError(err.message || 'Không thể kết nối đến máy chủ.');
     } finally {
       setLoginLoading(false);
+    }
+  };
+
+  // Register handler
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    
+    if (!fullName.trim() || !phone.trim() || !registerUsername.trim() || !registerPassword) {
+      setError('Vui lòng điền đầy đủ thông tin.');
+      return;
+    }
+
+    // Strong password check: same regex as Flutter mobile client
+    const strongPassword = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/.test(registerPassword);
+    if (!strongPassword) {
+      setError('Mật khẩu cần tối thiểu 8 ký tự, có chữ hoa, chữ thường và số.');
+      return;
+    }
+
+    setRegisterLoading(true);
+    try {
+      const response = await fetch('/api/v1/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          username: registerUsername.trim(),
+          password: registerPassword,
+          fullName: fullName.trim(),
+          phone: phone.trim(),
+          department: 'Nhân viên',
+        }),
+      });
+
+      if (!response.ok) {
+        const errResult = await response.json();
+        throw new Error(errResult.message || 'Đăng ký thất bại. Tên đăng nhập có thể đã tồn tại.');
+      }
+
+      showToast('Đăng ký thành công! Vui lòng chờ duyệt trước khi đăng nhập.');
+      
+      // Reset registration form fields and toggle back to login mode
+      setFullName('');
+      setPhone('');
+      setRegisterUsername('');
+      setRegisterPassword('');
+      setIsRegisterMode(false);
+    } catch (err: any) {
+      setError(err.message || 'Không thể đăng ký. Vui lòng thử lại.');
+    } finally {
+      setRegisterLoading(false);
     }
   };
 
@@ -130,79 +194,208 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showTo
             <p className="login-subtitle-p">Ứng dụng quản lý giám sát chấm công và thiết bị IoT nội bộ.</p>
           </div>
 
-          {/* Right side login form */}
+          {/* Right side form */}
           <div className="login-form-container">
             <div className="login-card">
-              <h2 className="login-card-title">Đăng nhập Quản trị</h2>
-              <p className="login-card-subtitle">Vui lòng điền thông tin tài khoản của bạn</p>
+              {!isRegisterMode ? (
+                // Login Form Layout
+                <>
+                  <h2 className="login-card-title">Đăng nhập Quản trị</h2>
+                  <p className="login-card-subtitle">Vui lòng điền thông tin tài khoản của bạn</p>
 
-              {error && (
-                <div className="login-error-card">
-                  <AlertCircle size={18} style={{ color: '#ef4444' }} />
-                  <span className="login-error-text">{error}</span>
-                </div>
-              )}
+                  {error && (
+                    <div className="login-error-card">
+                      <AlertCircle size={18} style={{ color: '#ef4444' }} />
+                      <span className="login-error-text">{error}</span>
+                    </div>
+                  )}
 
-              <form onSubmit={handleLoginSubmit}>
-                <div className="login-form-group">
-                  <label className="login-input-label">Tên đăng nhập</label>
-                  <div className="login-input-wrapper">
-                    <User className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
-                    <input 
-                      type="text" 
-                      className="login-input-field" 
-                      placeholder="Nhập username..."
-                      value={username}
-                      onChange={(e) => setUsername(e.target.value)}
-                      required
+                  <form onSubmit={handleLoginSubmit}>
+                    <div className="login-form-group">
+                      <label className="login-input-label">Tên đăng nhập</label>
+                      <div className="login-input-wrapper">
+                        <User className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
+                        <input 
+                          type="text" 
+                          className="login-input-field" 
+                          placeholder="Nhập username..."
+                          value={username}
+                          onChange={(e) => setUsername(e.target.value)}
+                          required
+                          disabled={loginLoading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="login-form-group">
+                      <label className="login-input-label">Mật khẩu</label>
+                      <div className="login-input-wrapper">
+                        <Lock className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
+                        <input 
+                          type={showPassword ? "text" : "password"} 
+                          className="login-input-field" 
+                          placeholder="Nhập mật khẩu..."
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          required
+                          disabled={loginLoading}
+                        />
+                        <button 
+                          type="button" 
+                          className="login-password-toggle"
+                          onClick={() => setShowPassword(!showPassword)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer' }}
+                        >
+                          {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                      <button 
+                        type="button" 
+                        className="login-forgot-pwd-btn"
+                        onClick={() => setShowForgotPasswordModal(true)}
+                        style={{ border: 'none', background: 'none', cursor: 'pointer' }}
+                      >
+                        Quên mật khẩu?
+                      </button>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      className="login-btn-primary"
                       disabled={loginLoading}
-                    />
-                  </div>
-                </div>
+                    >
+                      {loginLoading ? <span className="login-spinner"></span> : 'Đăng nhập'}
+                    </button>
+                  </form>
 
-                <div className="login-form-group">
-                  <label className="login-input-label">Mật khẩu</label>
-                  <div className="login-input-wrapper">
-                    <Lock className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
-                    <input 
-                      type={showPassword ? "text" : "password"} 
-                      className="login-input-field" 
-                      placeholder="Nhập mật khẩu..."
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      disabled={loginLoading}
-                    />
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
                     <button 
                       type="button" 
-                      className="login-password-toggle"
-                      onClick={() => setShowPassword(!showPassword)}
-                      style={{ border: 'none', background: 'none', cursor: 'pointer' }}
+                      className="login-forgot-pwd-btn"
+                      onClick={() => {
+                        setIsRegisterMode(true);
+                        setError('');
+                      }}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
                     >
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      Chưa có tài khoản? Đăng ký ngay
                     </button>
                   </div>
-                </div>
+                </>
+              ) : (
+                // Register Form Layout
+                <>
+                  <h2 className="login-card-title">Đăng ký Tài khoản</h2>
+                  <p className="login-card-subtitle">Vui lòng điền thông tin cá nhân của bạn</p>
 
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
-                  <button 
-                    type="button" 
-                    className="login-forgot-pwd-btn"
-                    onClick={() => setShowForgotPasswordModal(true)}
-                    style={{ border: 'none', background: 'none', cursor: 'pointer' }}
-                  >
-                    Quên mật khẩu?
-                  </button>
-                </div>
+                  {error && (
+                    <div className="login-error-card">
+                      <AlertCircle size={18} style={{ color: '#ef4444' }} />
+                      <span className="login-error-text">{error}</span>
+                    </div>
+                  )}
 
-                <button 
-                  type="submit" 
-                  className="login-btn-primary"
-                  disabled={loginLoading}
-                >
-                  {loginLoading ? <span className="login-spinner"></span> : 'Đăng nhập'}
-                </button>
-              </form>
+                  <form onSubmit={handleRegisterSubmit}>
+                    <div className="login-form-group">
+                      <label className="login-input-label">Họ và tên</label>
+                      <div className="login-input-wrapper">
+                        <User className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
+                        <input 
+                          type="text" 
+                          className="login-input-field" 
+                          placeholder="Nhập họ và tên..."
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          required
+                          disabled={registerLoading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="login-form-group">
+                      <label className="login-input-label">Số điện thoại</label>
+                      <div className="login-input-wrapper">
+                        <Phone className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
+                        <input 
+                          type="text" 
+                          className="login-input-field" 
+                          placeholder="Nhập số điện thoại..."
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          required
+                          disabled={registerLoading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="login-form-group">
+                      <label className="login-input-label">Tên đăng nhập</label>
+                      <div className="login-input-wrapper">
+                        <User className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
+                        <input 
+                          type="text" 
+                          className="login-input-field" 
+                          placeholder="Nhập tên đăng nhập..."
+                          value={registerUsername}
+                          onChange={(e) => setRegisterUsername(e.target.value)}
+                          required
+                          disabled={registerLoading}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="login-form-group">
+                      <label className="login-input-label">Mật khẩu</label>
+                      <div className="login-input-wrapper">
+                        <Lock className="login-input-icon-left" size={18} style={{ color: 'var(--color-text-light)' }} />
+                        <input 
+                          type={registerShowPassword ? "text" : "password"} 
+                          className="login-input-field" 
+                          placeholder="Nhập mật khẩu..."
+                          value={registerPassword}
+                          onChange={(e) => setRegisterPassword(e.target.value)}
+                          required
+                          disabled={registerLoading}
+                        />
+                        <button 
+                          type="button" 
+                          className="login-password-toggle"
+                          onClick={() => setRegisterShowPassword(!registerShowPassword)}
+                          style={{ border: 'none', background: 'none', cursor: 'pointer' }}
+                        >
+                          {registerShowPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <button 
+                      type="submit" 
+                      className="login-btn-primary"
+                      disabled={registerLoading}
+                      style={{ marginTop: '10px' }}
+                    >
+                      {registerLoading ? <span className="login-spinner"></span> : 'Đăng ký'}
+                    </button>
+                  </form>
+
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+                    <button 
+                      type="button" 
+                      className="login-forgot-pwd-btn"
+                      onClick={() => {
+                        setIsRegisterMode(false);
+                        setError('');
+                      }}
+                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+                    >
+                      Đã có tài khoản? Đăng nhập ngay
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>

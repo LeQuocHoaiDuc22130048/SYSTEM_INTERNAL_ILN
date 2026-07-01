@@ -30,7 +30,8 @@ class AuthProvider extends ChangeNotifier {
   bool get isManagerOrAbove => role.isManagerOrAbove;
   bool get isAdminOrAbove => role.isAdminOrAbove;
   bool get isAttendanceAccount =>
-      _currentUser?.username.trim().toLowerCase() == 'attendance';
+      _currentUser?.username.trim().toLowerCase() == 'attendance' ||
+      role == UserRole.attendance;
 
   bool can(AppPermission permission) {
     return _currentUser?.can(permission) ?? role.can(permission);

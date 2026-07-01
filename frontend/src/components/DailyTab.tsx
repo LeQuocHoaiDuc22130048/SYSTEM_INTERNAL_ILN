@@ -37,18 +37,87 @@ export const DailyTab: React.FC<DailyTabProps> = ({
   setManualEmployee,
   setShowManualModal,
 }) => {
+  const getTodayStr = () => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = (d.getMonth() + 1).toString().padStart(2, '0');
+    const day = d.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  const isPastDate = (dateStr: string, todayStr: string) => {
+    return dateStr < todayStr;
+  };
+
+  const isFutureDate = (dateStr: string, todayStr: string) => {
+    return dateStr > todayStr;
+  };
+
+  const isPastShiftEnd = (shiftEndStr: string) => {
+    const now = new Date();
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const [endHours, endMinutes] = shiftEndStr.split(':').map(Number);
+    return (currentHours > endHours) || (currentHours === endHours && currentMinutes > endMinutes);
+  };
+
   const getStatusPill = (report: any, statusChar: string) => {
+    const todayStr = getTodayStr();
+    const isToday = selectedDate === todayStr;
+    const isPast = isPastDate(selectedDate, todayStr);
+    const isFuture = isFutureDate(selectedDate, todayStr);
+
     if (report) {
-      if (report.isLate && report.isEarlyLeave) return <span className="pill-badge late">Đi muộn & Về sớm</span>;
-      if (report.isLate) return <span className="pill-badge late">Đi muộn</span>;
-      if (report.isEarlyLeave) return <span className="pill-badge late">Về sớm</span>;
-      if (report.checkOut) return <span className="pill-badge present">Đủ công</span>;
-      return <span className="pill-badge present">Đang làm</span>;
+      const hasIn = !!report.checkIn;
+      const hasOut = !!report.checkOut;
+
+      if (!hasIn && hasOut) {
+        return <span className="pill-badge late">Thiếu check-in</span>;
+      }
+      if (hasIn && !hasOut) {
+        const shiftEnd = report.shiftEnd ?? '17:00';
+        if (isPast || (isToday && isPastShiftEnd(shiftEnd))) {
+          return <span className="pill-badge late">Thiếu check-out</span>;
+        }
+        return <span className="pill-badge present">Đang làm</span>;
+      }
+      if (hasIn && hasOut) {
+        if (report.isLate && report.isEarlyLeave) {
+          return <span className="pill-badge late">Đi muộn & Về sớm</span>;
+        }
+        if (report.isLate) {
+          return <span className="pill-badge late">Đi muộn</span>;
+        }
+        if (report.isEarlyLeave) {
+          return <span className="pill-badge late">Về sớm</span>;
+        }
+        if (statusChar === 'h' || statusChar === 'o') {
+          return <span className="pill-badge ot">Tăng ca</span>;
+        }
+        return <span className="pill-badge present">Đủ công</span>;
+      }
     }
-    if (statusChar === 'v') return <span className="pill-badge leave">Nghỉ phép</span>;
-    if (statusChar === 'h') return <span className="pill-badge holiday">Cuối tuần / Lễ</span>;
-    if (statusChar === 'a') return <span className="pill-badge absent">Vắng không phép</span>;
-    return <span className="pill-badge absent">Chưa check-in</span>;
+
+    if (isFuture || statusChar === 'f') {
+      return <span className="pill-badge holiday">Chưa diễn ra</span>;
+    }
+    if (statusChar === 'v') {
+      return <span className="pill-badge leave">Nghỉ phép</span>;
+    }
+    if (statusChar === 'h') {
+      return <span className="pill-badge holiday">Cuối tuần / Lễ</span>;
+    }
+    if (statusChar === 'a') {
+      if (isToday) {
+        return <span className="pill-badge absent">Chưa check-in</span>;
+      }
+      return <span className="pill-badge absent">Vắng không phép</span>;
+    }
+
+    if (isToday) {
+      return <span className="pill-badge absent">Chưa check-in</span>;
+    }
+    return <span className="pill-badge absent">Vắng không phép</span>;
   };
 
   return (
