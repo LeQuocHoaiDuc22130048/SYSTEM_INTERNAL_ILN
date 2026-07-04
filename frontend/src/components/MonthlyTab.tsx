@@ -68,12 +68,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
     fetchExpandedLog();
   }, [expandedEmployeeId, currentYear, currentMonth, expandedLogs, expandedLogsLoading]);
 
-  const getEmployeeStatusBadge = (emp: EmployeeMonthlyStats) => {
-    if (emp.absentDays > 2) return <span className="pill-badge absent">Vắng nhiều ({emp.absentDays})</span>;
-    if (emp.lateCount > 2) return <span className="pill-badge late">Đi muộn ({emp.lateCount})</span>;
-    if (emp.leavedays > 2) return <span className="pill-badge leave">Nghỉ phép ({emp.leavedays})</span>;
-    return <span className="pill-badge present">Đủ công</span>;
-  };
+
 
   const buildCalendarDays = (emp: EmployeeMonthlyStats) => {
     const numDays = new Date(currentYear, currentMonth, 0).getDate();
@@ -126,7 +121,6 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                 <th>Vắng KP</th>
                 <th>Tổng giờ</th>
                 <th>Biểu đồ cả tháng (30 ngày)</th>
-                <th>Trạng thái</th>
               </tr>
             </thead>
             <tbody>
@@ -166,12 +160,11 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                           ))}
                         </div>
                       </td>
-                      <td>{getEmployeeStatusBadge(emp)}</td>
                     </tr>
 
                     {isExpanded && (
                       <tr className="expanded-row">
-                        <td colSpan={7}>
+                        <td colSpan={6}>
                           <div className="expanded-container">
                             <div className="expanded-header-row">
                               <h4 className="expanded-title">Chi tiết chấm công & Lịch sử trong tháng</h4>
@@ -218,13 +211,30 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                         const checkInEvent = dayLog?.events?.find(e => e.type === 'CHECK_IN');
                                         const checkOutEvent = dayLog?.events?.find(e => e.type === 'CHECK_OUT');
 
+                                        const getCellState = () => {
+                                          if (dayLog) {
+                                            switch (dayLog.status as string) {
+                                              case 'PRESENT': return 'p';
+                                              case 'LATE': return 'l';
+                                              case 'ABSENT': return 'a';
+                                              case 'LEAVE': return 'v';
+                                              case 'HOLIDAY': return 'h';
+                                              case 'OVERTIME':
+                                              case 'OT': return 'o';
+                                              case 'FUTURE': return 'f';
+                                            }
+                                          }
+                                          return dayObj.state;
+                                        };
+                                        const cellState = getCellState();
+
                                         return (
-                                          <div key={`day-${dayObj.day}`} className={`calendar-cell ${dayObj.state}`}>
+                                          <div key={`day-${dayObj.day}`} className={`calendar-cell ${cellState}`}>
                                             <div className="calendar-cell-top">
                                               <span className="calendar-date">{dayObj.day}</span>
-                                              {dayObj.state !== 'f' && (
+                                              {cellState !== 'f' && (
                                                 <span className="calendar-status">
-                                                  {CALENDAR_STATUS_LABEL_MAP[dayObj.state as keyof typeof CALENDAR_STATUS_LABEL_MAP] ?? 'ABSENT'}
+                                                  {CALENDAR_STATUS_LABEL_MAP[cellState as keyof typeof CALENDAR_STATUS_LABEL_MAP] ?? 'ABSENT'}
                                                 </span>
                                               )}
                                             </div>

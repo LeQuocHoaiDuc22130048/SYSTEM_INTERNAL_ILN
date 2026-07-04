@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { getAvatarLetters } from '../utils/employee';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
+import { TimePicker24h } from './TimePicker24h';
+
 
 interface EditModalProps {
   employee: { id: string; name: string; [key: string]: any };
@@ -37,11 +39,11 @@ export const EditModal: React.FC<EditModalProps> = ({
     const checkOutEvent = dayLog.events?.find((e: any) => e.type === 'CHECK_OUT');
 
     setHasEditCheckIn(!!checkInEvent);
-    setEditCheckInTime(checkInEvent?.logTime ?? '08:00');
+    setEditCheckInTime(checkInEvent?.logTime?.substring(0, 5) ?? '08:00');
     setEditCheckInRecordId(checkInEvent?.id ?? null);
 
     setHasEditCheckOut(!!checkOutEvent);
-    setEditCheckOutTime(checkOutEvent?.logTime ?? '17:00');
+    setEditCheckOutTime(checkOutEvent?.logTime?.substring(0, 5) ?? '17:00');
     setEditCheckOutRecordId(checkOutEvent?.id ?? null);
 
     setEditNote('');
@@ -54,7 +56,8 @@ export const EditModal: React.FC<EditModalProps> = ({
     time: string,
     note: string
   ) => {
-    const timeFull = `${date}T${time}:00+07:00`;
+    const cleanTime = time.substring(0, 5);
+    const timeFull = `${date}T${cleanTime}:00+07:00`;
     const headers = getJsonAuthHeaders();
 
     if (has) {
@@ -132,12 +135,9 @@ export const EditModal: React.FC<EditModalProps> = ({
               {hasEditCheckIn && (
                 <div className="edit-time-group">
                   <label className="edit-time-label">Giờ Check-in</label>
-                  <input
-                    type="time"
-                    className="edit-time-input"
+                  <TimePicker24h
                     value={editCheckInTime}
-                    onChange={(e) => setEditCheckInTime(e.target.value)}
-                    required
+                    onChange={setEditCheckInTime}
                   />
                 </div>
               )}
@@ -155,12 +155,9 @@ export const EditModal: React.FC<EditModalProps> = ({
               {hasEditCheckOut && (
                 <div className="edit-time-group">
                   <label className="edit-time-label">Giờ Check-out</label>
-                  <input
-                    type="time"
-                    className="edit-time-input"
+                  <TimePicker24h
                     value={editCheckOutTime}
-                    onChange={(e) => setEditCheckOutTime(e.target.value)}
-                    required
+                    onChange={setEditCheckOutTime}
                   />
                 </div>
               )}

@@ -1,5 +1,6 @@
 import ExcelJS from 'exceljs';
-import type { EmployeeMonthlyStats } from '../mockData';
+import type { EmployeeMonthlyStats, EmployeeHistoryResponse } from '../mockData';
+
 
 /**
  * Xuất danh sách chấm công tháng ra file Excel (.xlsx) định dạng lịch chi tiết (Calendar-style)
@@ -205,34 +206,43 @@ export async function exportAttendanceExcel(
         ? emp.dailyPattern[d - 1] 
         : 'f';
 
-      if (statusChar === 'p') {
-        cell.value = 1;
-      } else if (statusChar === 'l') {
-        // Đi muộn -> hiện số 1 trên nền đỏ
-        cell.value = 1;
-        cell.fill = redFill;
-        cell.font = { name: 'Arial', size: 10, color: { argb: 'FFFFFFFF' } }; // Chữ trắng trên nền đỏ
-      } else if (statusChar === 'a') {
-        // Vắng không phép -> hiện số 1 trên nền đỏ
-        cell.value = 1;
-        cell.fill = redFill;
-        cell.font = { name: 'Arial', size: 10, color: { argb: 'FFFFFFFF' } };
-      } else if (statusChar === 'v') {
-        // Nghỉ phép -> hiện số 0 trên nền xanh lá pastel
-        cell.value = 0;
-        cell.fill = greenFill;
-        cell.font = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
-      } else if (statusChar === 'o') {
-        // Tăng ca -> mặc định 1.5 ngày công (nếu là CN thì màu chữ đỏ/cam trên nền vàng)
-        cell.value = 1.5;
+      const isWorked = statusChar === 'p' || statusChar === 'l' || statusChar === 'o';
+
+      if (isWorked) {
         if (isSunday) {
-          cell.font = { name: 'Arial', size: 10, color: { argb: 'FFD66A00' }, bold: true }; // Màu chữ cam đậm
+          cell.value = 1.5;
+          cell.fill = yellowFill;
+          cell.font = { name: 'Arial', size: 10, color: { argb: 'FFD66A00' }, bold: true }; // Chữ cam đậm trên nền vàng
         } else {
-          cell.font = { name: 'Arial', size: 10, bold: true };
+          if (statusChar === 'o') {
+            cell.value = 1.5;
+            cell.font = { name: 'Arial', size: 10, bold: true };
+          } else {
+            cell.value = 1;
+            if (statusChar === 'l') {
+              cell.fill = redFill;
+              cell.font = { name: 'Arial', size: 10, color: { argb: 'FFFFFFFF' } }; // Chữ trắng trên nền đỏ
+            }
+          }
         }
       } else {
-        // Cuối tuần/lễ (h) hoặc tương lai (f): để trống
-        cell.value = '';
+        // Không đi làm (a, v, h)
+        if (statusChar === 'f') {
+          cell.value = '';
+        } else {
+          cell.value = 0;
+          if (statusChar === 'v') {
+            cell.fill = greenFill;
+            cell.font = { name: 'Arial', size: 10, color: { argb: 'FF000000' } };
+          } else if (statusChar === 'a') {
+            cell.fill = redFill;
+            cell.font = { name: 'Arial', size: 10, color: { argb: 'FFFFFFFF' } }; // Chữ trắng trên nền đỏ
+          } else if (statusChar === 'h') {
+            if (isSunday) {
+              cell.fill = yellowFill;
+            }
+          }
+        }
       }
 
       // Cấu hình định dạng hiển thị cho số ngày công
@@ -282,3 +292,201 @@ export async function exportAttendanceExcel(
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Xuất chi tiết bảng công của một nhân viên cụ thể theo tháng ra file Excel
+ */
+export async function exportEmployeeHistoryExcel(
+  historyData: EmployeeHistoryResponse,
+  month: number,
+  year: number
+): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet(`Chấm công ${historyData.employee.name}`);
+
+  worksheet.views = [{ showGridLines: true }];
+
+  // Cấu hình các cột
+  worksheet.columns = [
+    { header: 'STT', key: 'stt', width: 6 },
+    { header: 'Ngày', key: 'date', width: 14 },
+    { header: 'Thứ', key: 'dayOfWeek', width: 8 },
+    { header: 'Check-in (Vào)', key: 'checkIn', width: 16 },
+    { header: 'Check-out (Ra)', key: 'checkOut', width: 16 },
+    { header: 'Thực làm (Giờ)', key: 'workHours', width: 16 },
+    { header: 'Trạng thái', key: 'status', width: 18 },
+    { header: 'Ghi chú', key: 'note', width: 30 }
+  ];
+
+  // Định nghĩa các styles
+  const thinBorder: ExcelJS.Border = { style: 'thin', color: { argb: 'FF000000' } };
+  const borderAllBlack: Partial<ExcelJS.Borders> = {
+    top: thinBorder,
+    left: thinBorder,
+    bottom: thinBorder,
+    right: thinBorder
+  };
+
+  const sundayFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFFFCE' } // Vàng nhạt cho Chủ Nhật
+  };
+
+  const lateFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFFC7CE' } // Đỏ nhạt cho đi muộn/vắng
+  };
+
+  const leaveFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFC6EFCE' } // Xanh lá nhạt cho nghỉ phép
+  };
+
+  const headerFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FF1F4E78' } // Xanh dương đậm cho header
+  };
+
+  // Tạo các hàng trống phía trên để ghi thông tin chung
+  worksheet.insertRow(1, []);
+  worksheet.insertRow(2, []);
+  worksheet.insertRow(3, []);
+  worksheet.insertRow(4, []);
+  worksheet.insertRow(5, []);
+  worksheet.insertRow(6, []);
+
+  // Tiêu đề: Dòng 2
+  worksheet.mergeCells('A2:H2');
+  const titleCell = worksheet.getCell('A2');
+  titleCell.value = `BẢNG CHI TIẾT CHẤM CÔNG THÁNG ${month.toString().padStart(2, '0')}/${year}`;
+  titleCell.font = { name: 'Arial', size: 16, bold: true, color: { argb: 'FF1F4E78' } };
+  titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+
+  // Thông tin nhân viên: Dòng 4 & 5
+  worksheet.getCell('A4').value = 'Nhân viên:';
+  worksheet.getCell('B4').value = historyData.employee.name;
+  worksheet.getCell('B4').font = { bold: true };
+  
+  worksheet.getCell('D4').value = 'Phòng ban:';
+  worksheet.getCell('E4').value = historyData.employee.dept;
+  worksheet.getCell('E4').font = { bold: true };
+
+  worksheet.getCell('A5').value = 'Ca làm việc:';
+  worksheet.getCell('B5').value = `${historyData.employee.shiftName || 'Ca hành chính'} (${historyData.employee.shiftStart || '08:00'} - ${historyData.employee.shiftEnd || '17:00'})`;
+  worksheet.getCell('B5').font = { bold: true };
+
+  // Khối thống kê: Cột G & H
+  worksheet.getCell('G4').value = 'Số ngày công:';
+  worksheet.getCell('H4').value = `${historyData.summary.workDays} ngày`;
+  worksheet.getCell('H4').font = { bold: true };
+
+  worksheet.getCell('G5').value = 'Tổng giờ làm:';
+  worksheet.getCell('H5').value = `${historyData.summary.totalHours} giờ`;
+  worksheet.getCell('H5').font = { bold: true };
+
+  worksheet.getCell('G6').value = 'Vào muộn:';
+  worksheet.getCell('H6').value = `${historyData.summary.lateCount} lần`;
+  worksheet.getCell('H6').font = { bold: true, color: { argb: 'FFFF0000' } };
+
+  // Định dạng dòng tiêu đề bảng (Dòng 8)
+  const headerRow = worksheet.getRow(8);
+  headerRow.values = ['STT', 'Ngày', 'Thứ', 'Check-in (Vào)', 'Check-out (Ra)', 'Thực làm (Giờ)', 'Trạng thái', 'Ghi chú'];
+  headerRow.height = 25;
+  headerRow.eachCell((cell) => {
+    cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+    cell.fill = headerFill;
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = borderAllBlack;
+  });
+
+  // Điền dữ liệu từ dòng 9 trở đi
+  historyData.days.forEach((day, idx) => {
+    const rowNum = 9 + idx;
+    const row = worksheet.getRow(rowNum);
+    row.height = 22;
+
+    const checkInEvent = day.events.find(e => e.type === 'CHECK_IN');
+    const checkOutEvent = day.events.find(e => e.type === 'CHECK_OUT');
+
+    // Tính thời gian thực làm
+    let hoursVal = 0;
+    if (checkInEvent && checkOutEvent) {
+      const [ih, im] = checkInEvent.logTime.split(':').map(Number);
+      const [oh, om] = checkOutEvent.logTime.split(':').map(Number);
+      hoursVal = parseFloat(((oh * 60 + om - (ih * 60 + im)) / 60).toFixed(2));
+    }
+
+    // Format ngày sang DD/MM/YYYY
+    const dateFormatted = day.date.split('-').reverse().join('/');
+
+    // Ánh xạ trạng thái
+    const STATUS_MAP = {
+      PRESENT: 'Đúng giờ',
+      LATE: 'Đi muộn',
+      ABSENT: 'Vắng',
+      LEAVE: 'Nghỉ phép',
+      HOLIDAY: 'Cuối tuần / Lễ',
+      OVERTIME: 'Tăng ca',
+      FUTURE: '-'
+    };
+    const statusLabel = STATUS_MAP[day.status as keyof typeof STATUS_MAP] || day.status;
+
+    // Lấy ghi chú thủ công/chính
+    const manualEvents = day.events.filter(e => e.source === 'MANUAL');
+    const noteText = manualEvents.map(e => e.note).filter(Boolean).join('; ') || day.events.map(e => e.note).filter(Boolean).join('; ');
+
+    row.getCell(1).value = idx + 1;
+    row.getCell(2).value = dateFormatted;
+    row.getCell(3).value = day.dayOfWeek;
+    row.getCell(4).value = checkInEvent ? checkInEvent.logTime : '--:--';
+    row.getCell(5).value = checkOutEvent ? checkOutEvent.logTime : '--:--';
+    row.getCell(6).value = hoursVal > 0 ? hoursVal : '';
+    row.getCell(7).value = statusLabel;
+    row.getCell(8).value = noteText;
+
+    // Định dạng viền và căn chỉnh
+    row.eachCell((cell, colIdx) => {
+      cell.font = { name: 'Arial', size: 10 };
+      cell.border = borderAllBlack;
+      cell.alignment = { vertical: 'middle', horizontal: colIdx === 8 ? 'left' : 'center' };
+
+      // Tô màu Chủ Nhật
+      if (day.dayOfWeek === 'CN') {
+        cell.fill = sundayFill;
+      }
+    });
+
+    // Tô màu trạng thái đặc biệt
+    const statusCell = row.getCell(7);
+    if (day.status === 'LATE' || day.status === 'ABSENT') {
+      statusCell.fill = lateFill;
+      statusCell.font = { name: 'Arial', size: 10, color: { argb: 'FF9C0006' }, bold: true };
+    } else if (day.status === 'LEAVE') {
+      statusCell.fill = leaveFill;
+      statusCell.font = { name: 'Arial', size: 10, color: { argb: 'FF006100' }, bold: true };
+    }
+  });
+
+  // Xuất file
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob(
+    [buffer],
+    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+  );
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `BangCong_ChiTiet_${historyData.employee.name.replace(/\s+/g, '')}_Thang_${month.toString().padStart(2, '0')}_${year}.xlsx`);
+
+  document.body.appendChild(link);
+  link.click();
+
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+

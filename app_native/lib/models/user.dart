@@ -125,6 +125,23 @@ class User {
         .whereType<AppPermission>()
         .toSet();
   }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'username': username,
+      'fullName': name,
+      'email': email,
+      'employeeCode': employeeId,
+      'role': role.backendCode,
+      'status': status.name.toUpperCase(),
+      'avatarUrl': avatar,
+      'department': department,
+      'phone': phone,
+      'faceEnrolled': faceEnrolled,
+      'permissions': permissions?.map((p) => p.backendCode).toList(),
+    };
+  }
 }
 
 extension UserRolePermissions on UserRole {

@@ -136,10 +136,11 @@ public class AttendanceQueryController {
                             double minutes = Duration.between(checkIn, checkOut).toMinutes();
                             totalHours += Math.max(0.0, minutes / 60.0);
 
-                            // Calculate overtime
-                            Instant shiftEndInstant = date.atTime(shiftEnd).atZone(ZONE).toInstant();
-                            if (checkOut.isAfter(shiftEndInstant)) {
-                                double otMinutes = Duration.between(shiftEndInstant, checkOut).toMinutes();
+                            // Calculate overtime (past 18:00)
+                            LocalTime overtimeStart = LocalTime.of(18, 0);
+                            Instant overtimeStartInstant = date.atTime(overtimeStart).atZone(ZONE).toInstant();
+                            if (checkOut.isAfter(overtimeStartInstant)) {
+                                double otMinutes = Duration.between(overtimeStartInstant, checkOut).toMinutes();
                                 overtimeHours += Math.max(0.0, otMinutes / 60.0);
                                 if (otMinutes > 0) {
                                     isOvertime = true;
@@ -274,9 +275,10 @@ public class AttendanceQueryController {
                         double minutes = Duration.between(checkIn, checkOut).toMinutes();
                         totalHours += minutes / 60.0;
 
-                        Instant shiftEndInstant = date.atTime(shiftEnd).atZone(ZONE).toInstant();
-                        if (checkOut.isAfter(shiftEndInstant)) {
-                            double otMinutes = Duration.between(shiftEndInstant, checkOut).toMinutes();
+                        LocalTime overtimeStart = LocalTime.of(18, 0);
+                        Instant overtimeStartInstant = date.atTime(overtimeStart).atZone(ZONE).toInstant();
+                        if (checkOut.isAfter(overtimeStartInstant)) {
+                            double otMinutes = Duration.between(overtimeStartInstant, checkOut).toMinutes();
                             overtimeHours += otMinutes / 60.0;
                             if (otMinutes > 0) {
                                 isOvertime = true;
@@ -456,7 +458,12 @@ public class AttendanceQueryController {
                 } else {
                     // Present
                     LocalTime checkInTime = LocalTime.of(7, 45 + (hash % 14));
-                    LocalTime checkOutTime = LocalTime.of(17, 5 + (hash % 30));
+                    LocalTime checkOutTime;
+                    if (hash % 5 == 0) {
+                        checkOutTime = LocalTime.of(18, 5 + (hash % 30)); // Overtime (after 18:00)
+                    } else {
+                        checkOutTime = LocalTime.of(17, 5 + (hash % 30));
+                    }
                     insertRecord(user.getId(), date.atTime(checkInTime).atZone(ZONE).toInstant(), AttendanceType.IN);
                     insertRecord(user.getId(), date.atTime(checkOutTime).atZone(ZONE).toInstant(), AttendanceType.OUT);
                 }

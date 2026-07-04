@@ -4,6 +4,8 @@ import com.suachuabientan.system_internal.common.util.JwtUtil;
 import com.suachuabientan.system_internal.config.SecurityConfig;
 import com.suachuabientan.system_internal.modules.attendance.repository.AttendanceRecordRepository;
 import com.suachuabientan.system_internal.modules.attendance.repository.WorkScheduleRepository;
+import com.suachuabientan.system_internal.modules.attendance.entity.AttendanceRecord;
+import com.suachuabientan.system_internal.modules.attendance.enums.AttendanceType;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
@@ -166,5 +168,74 @@ class AttendanceQueryControllerTest {
                 .param("year", "2026")
                 .param("month", "6"))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void getMonthlyCalculatesLateAndOvertimeCorrectly() throws Exception {
+        UUID empId = UUID.randomUUID();
+        UserEntity employee = new UserEntity();
+        employee.setId(empId);
+        employee.setUsername("employee1");
+        employee.setFullName("Employee One");
+        employee.setEmployeeCode("EMP-001");
+        employee.setRole(UserRole.EMPLOYEE);
+        employee.setIsDeleted(false);
+
+        when(userRepository.findAll()).thenReturn(java.util.List.of(employee));
+
+        // Let's create records for 2026-06-01:
+        // IN at 08:15 (not late because grace is 15 mins), OUT at 18:30 (overtime starts past 18:00, so 0.5 hrs overtime)
+        java.time.Instant checkIn1 = java.time.LocalDateTime.of(2026, 6, 1, 8, 15).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        java.time.Instant checkOut1 = java.time.LocalDateTime.of(2026, 6, 1, 18, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+
+        AttendanceRecord recIn1 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.IN)
+                .checkTime(checkIn1)
+                .isValid(true)
+                .build();
+        recIn1.setIsDeleted(false);
+
+        AttendanceRecord recOut1 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.OUT)
+                .checkTime(checkOut1)
+                .isValid(true)
+                .build();
+        recOut1.setIsDeleted(false);
+
+        // Let's create records for 2026-06-02:
+        // IN at 08:16 (late because grace is 15 mins, so > 8:15 is late), OUT at 18:00 (not overtime because OT starts after 18:00)
+        java.time.Instant checkIn2 = java.time.LocalDateTime.of(2026, 6, 2, 8, 16).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        java.time.Instant checkOut2 = java.time.LocalDateTime.of(2026, 6, 2, 18, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+
+        AttendanceRecord recIn2 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.IN)
+                .checkTime(checkIn2)
+                .isValid(true)
+                .build();
+        recIn2.setIsDeleted(false);
+
+        AttendanceRecord recOut2 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.OUT)
+                .checkTime(checkOut2)
+                .isValid(true)
+                .build();
+        recOut2.setIsDeleted(false);
+
+        when(attendanceRecordRepository.findByCheckTimeBetween(any(), any()))
+                .thenReturn(java.util.List.of(recIn1, recOut1, recIn2, recOut2));
+        when(workScheduleRepository.findByWorkDateBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/attendance/monthly")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].lateCount").value(1))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].overtimeHours").value(0.5));
     }
 }

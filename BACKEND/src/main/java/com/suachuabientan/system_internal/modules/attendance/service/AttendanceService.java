@@ -54,7 +54,7 @@ public class AttendanceService {
     private static final ZoneId BUSINESS_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final LocalTime DEFAULT_SHIFT_START = LocalTime.of(8, 0);
     private static final LocalTime DEFAULT_SHIFT_END = LocalTime.of(17, 0);
-    private static final Duration LATE_GRACE = Duration.ofMinutes(5);
+    private static final Duration LATE_GRACE = Duration.ofMinutes(15);
     private static final Duration OFFLINE_DEDUP_WINDOW = Duration.ofMinutes(2);
 
     private final AttendanceRecordRepository attendanceRecordRepository;

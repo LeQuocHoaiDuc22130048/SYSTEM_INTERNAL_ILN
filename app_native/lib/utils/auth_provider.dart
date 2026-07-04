@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/app_permission.dart';
@@ -6,6 +7,8 @@ import 'api_client.dart';
 
 class AuthProvider extends ChangeNotifier {
   final ApiClient api;
+  static const _userCacheKey = 'cached_user_info';
+  final _secureStorage = const FlutterSecureStorage();
 
   AuthProvider({ApiClient? apiClient})
       : api = apiClient ?? ApiClient(secureStorage: const FlutterSecureStorage()) {
@@ -71,6 +74,10 @@ class AuthProvider extends ChangeNotifier {
       }
 
       _currentUser = User.fromLoginJson(userInfo);
+      await _secureStorage.write(
+        key: _userCacheKey,
+        value: jsonEncode(_currentUser!.toJson()),
+      );
       _log(
         'Login success for username=${_currentUser?.username}, role=${_currentUser?.roleLabel}',
       );
@@ -211,6 +218,10 @@ class AuthProvider extends ChangeNotifier {
                 permissions: _currentUser!.permissions,
               )
             : loadedUser;
+        await _secureStorage.write(
+          key: _userCacheKey,
+          value: jsonEncode(_currentUser!.toJson()),
+        );
         _log('Profile loaded for username=${_currentUser?.username}');
         notifyListeners();
       }
@@ -242,6 +253,7 @@ class AuthProvider extends ChangeNotifier {
     api.accessToken = null;
     api.refreshToken = null;
     _currentUser = null;
+    await _secureStorage.delete(key: _userCacheKey);
     _log('Logout completed locally');
     notifyListeners();
   }
@@ -251,6 +263,7 @@ class AuthProvider extends ChangeNotifier {
     api.refreshToken = null;
     _currentUser = null;
     _profileError = null;
+    _secureStorage.delete(key: _userCacheKey);
     _log('Session expired because refresh token was rejected');
     notifyListeners();
   }
@@ -264,13 +277,35 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      await loadMe();
+      try {
+        await loadMe();
+      } catch (e) {
+        _log('loadMe failed during auto login, will try cache: $e');
+      }
+
+      if (api.accessToken == null) {
+        _log('Session was invalidated during auto login profile load');
+        return false;
+      }
+
+      if (_currentUser == null) {
+        final cachedUserJson = await _secureStorage.read(key: _userCacheKey);
+        if (cachedUserJson != null) {
+          try {
+            _currentUser = User.fromJson(jsonDecode(cachedUserJson));
+            _log('Loaded cached user profile offline: username=${_currentUser?.username}');
+          } catch (e) {
+            _log('Failed to parse cached user: $e');
+          }
+        }
+      }
+
       if (_currentUser != null) {
         _log('Auto login successful for user=${_currentUser?.username}');
         return true;
       }
 
-      _log('Auto login failed: _currentUser is null after loading profile');
+      _log('Auto login failed: no user profile available (online or offline)');
       api.accessToken = null;
       api.refreshToken = null;
       return false;

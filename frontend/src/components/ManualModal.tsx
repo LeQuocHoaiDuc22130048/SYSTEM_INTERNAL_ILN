@@ -3,6 +3,8 @@ import { X } from 'lucide-react';
 import type { AttendanceCheckType } from '../mockData';
 import { getAvatarLetters } from '../utils/employee';
 import { getJsonAuthHeaders } from '../utils/auth';
+import { TimePicker24h } from './TimePicker24h';
+
 
 interface ManualModalProps {
   employee: { id: string; name: string; employeeCode: string; [key: string]: any };
@@ -30,10 +32,11 @@ export const ManualModal: React.FC<ManualModalProps> = ({
 
     setManualSubmitting(true);
     try {
+      const cleanTime = manualTime.substring(0, 5);
       const body = {
         employeeId: employee.id,
         type: manualType,
-        checkTime: `${selectedDate}T${manualTime}:00+07:00`,
+        checkTime: `${selectedDate}T${cleanTime}:00+07:00`,
         note: manualNote || 'Chấm công thủ công bởi quản trị viên',
       };
 
@@ -108,12 +111,9 @@ export const ManualModal: React.FC<ManualModalProps> = ({
 
             <div className="edit-note-group">
               <label className="edit-note-label">Giờ chấm công</label>
-              <input
-                type="time"
-                className="edit-time-input"
+              <TimePicker24h
                 value={manualTime}
-                onChange={(e) => setManualTime(e.target.value)}
-                required
+                onChange={setManualTime}
               />
             </div>
 

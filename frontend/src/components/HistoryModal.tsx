@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { X, LogIn, LogOut, ChevronDown, ChevronUp } from 'lucide-react';
+import { X, LogIn, LogOut, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import type { EmployeeHistoryResponse } from '../mockData';
 import { getAvatarLetters, normalizeHistoryResponse } from '../utils/employee';
 import { getAuthHeaders, createTimeoutController, LATE_GRACE_MINUTES } from '../utils/auth';
+import { exportEmployeeHistoryExcel } from '../utils/excel';
+
 
 interface HistoryModalProps {
   employee: { id: string; name: string; dept: string };
@@ -148,9 +150,20 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               </span>
             </div>
           </div>
-          <button className="modal-close" onClick={onClose}>
-            <X size={20} />
-          </button>
+          <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            {historyData && (
+              <button
+                className="action-btn-outline"
+                onClick={() => exportEmployeeHistoryExcel(historyData, currentMonth, currentYear)}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '13px' }}
+              >
+                <Download size={14} /> Xuất Excel
+              </button>
+            )}
+            <button className="modal-close" onClick={onClose}>
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         <div className="modal-body">
