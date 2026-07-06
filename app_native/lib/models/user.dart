@@ -220,6 +220,7 @@ extension UserRolePermissions on UserRole {
 
   Set<AppPermission> get permissions {
     const employeePermissions = {
+      AppPermission.viewDashboard,
       AppPermission.viewRepairOrders,
       AppPermission.manageRepairOrders,
       AppPermission.viewWarehouse,
@@ -231,9 +232,16 @@ extension UserRolePermissions on UserRole {
       AppPermission.updateOwnProfile,
     };
 
+    const technicianPermissions = {
+      AppPermission.viewRepairOrders,
+      AppPermission.manageRepairOrders,
+      AppPermission.assignRepairOrders,
+      AppPermission.viewProfile,
+      AppPermission.updateOwnProfile,
+    };
+
     const managerPermissions = {
       ...employeePermissions,
-      AppPermission.viewDashboard,
       AppPermission.assignRepairOrders,
       AppPermission.manageAttendance,
       AppPermission.manageEmployees,
@@ -255,6 +263,7 @@ extension UserRolePermissions on UserRole {
       case UserRole.manager:
         return managerPermissions;
       case UserRole.technician:
+        return technicianPermissions;
       case UserRole.warehouse:
       case UserRole.employee:
         return employeePermissions;

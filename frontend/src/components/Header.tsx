@@ -12,8 +12,8 @@ import {
 import type { UserInfo } from '../mockData';
 
 interface HeaderProps {
-  activeTab: 'monthly' | 'daily';
-  setActiveTab: (tab: 'monthly' | 'daily') => void;
+  activeTab: 'monthly' | 'daily' | 'devices';
+  setActiveTab: (tab: 'monthly' | 'daily' | 'devices') => void;
   currentMonth: number;
   currentYear: number;
   prevMonth: () => void;
@@ -92,6 +92,13 @@ export const Header: React.FC<HeaderProps> = ({
             >
               Xem theo ngày
             </button>
+            <button
+              id="tab-devices"
+              className={`tab-btn ${activeTab === 'devices' ? 'active' : ''}`}
+              onClick={() => setActiveTab('devices')}
+            >
+              Trạng thái Thiết bị
+            </button>
           </div>
         </div>
 
@@ -122,7 +129,7 @@ export const Header: React.FC<HeaderProps> = ({
                 <ChevronRight size={18} />
               </button>
             </div>
-          ) : (
+          ) : activeTab === 'daily' ? (
             <div className="month-navigator date-picker-wrapper">
               <Calendar size={18} className="date-picker-icon" />
               <input
@@ -132,6 +139,11 @@ export const Header: React.FC<HeaderProps> = ({
                 value={selectedDate}
                 onChange={(e) => handleDateChange(e.target.value)}
               />
+            </div>
+          ) : (
+            <div className="month-navigator real-time-indicator">
+              <span className="real-time-dot" />
+              <span className="real-time-text">Thời gian thực</span>
             </div>
           )}
 

@@ -43,7 +43,7 @@ export function createTimeoutController(timeoutMs = REQUEST_TIMEOUT_MS) {
 export function setupFetchInterceptor() {
   const originalFetch = window.fetch;
   window.fetch = async function (input, init) {
-    let response = await originalFetch(input, init);
+    const response = await originalFetch(input, init);
 
     if (response.status === 401 || response.status === 403) {
       const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input as Request).url);

@@ -44,6 +44,7 @@ public class AttendanceQueryController {
 
         List<UserEntity> employees = checkAndSeedUsers().stream()
                 .filter(u -> u.getRole() != UserRole.ADMIN && u.getRole() != UserRole.SUPER_ADMIN)
+                .filter(u -> u.getRole() != UserRole.TECHNICIAN && u.getRole() != UserRole.WAREHOUSE && u.getRole() != UserRole.ATTENDANCE)
                 .filter(u -> !"attendance".equals(u.getUsername()))
                 .toList();
 
@@ -192,7 +193,9 @@ public class AttendanceQueryController {
         UserEntity employee = userRepository.findByIdAndIsDeletedFalse(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên"));
 
-        if (employee.getRole() == UserRole.ADMIN || employee.getRole() == UserRole.SUPER_ADMIN) {
+        if (employee.getRole() == UserRole.ADMIN || employee.getRole() == UserRole.SUPER_ADMIN ||
+            employee.getRole() == UserRole.TECHNICIAN || employee.getRole() == UserRole.WAREHOUSE ||
+            employee.getRole() == UserRole.ATTENDANCE) {
             throw new IllegalArgumentException("Không tìm thấy nhân viên");
         }
 

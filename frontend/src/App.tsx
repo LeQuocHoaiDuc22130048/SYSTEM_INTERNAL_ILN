@@ -11,6 +11,7 @@ import { DailyTab } from './components/DailyTab';
 import { HistoryModal } from './components/HistoryModal';
 import { EditModal } from './components/EditModal';
 import { ManualModal } from './components/ManualModal';
+import { DeviceTab } from './components/DeviceTab';
 
 import { getAuthHeaders, getJsonAuthHeaders, createTimeoutController, STANDARD_WORK_DAYS } from './utils/auth';
 import { getDailyStatusFromPattern } from './utils/employee';
@@ -21,7 +22,7 @@ import { exportAttendanceExcel } from './utils/excel';
 type DataSource = 'api' | 'error' | 'loading';
 
 /** Tab đang hiển thị */
-type ActiveTab = 'monthly' | 'daily';
+type ActiveTab = 'monthly' | 'daily' | 'devices';
 
 /** Dữ liệu target để mở EditModal */
 interface EditModalTarget {
@@ -379,7 +380,7 @@ function App() {
             showToast={showToast}
           />
         </>
-      ) : (
+      ) : activeTab === 'daily' ? (
         <>
           <DailyStatsGrid
             total={dailyStats.total}
@@ -398,6 +399,11 @@ function App() {
             setShowManualModal={(show) => { if (!show) setManualModalEmployee(null); }}
           />
         </>
+      ) : (
+        <DeviceTab
+          showToast={showToast}
+          currentUser={currentUser}
+        />
       )}
 
       {historyEmployee && (

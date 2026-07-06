@@ -536,6 +536,7 @@ public class AttendanceService {
         List<UUID> allowedUserIds = userRepository.findAll().stream()
                 .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
                 .filter(u -> u.getRole() != UserRole.ADMIN && u.getRole() != UserRole.SUPER_ADMIN)
+                .filter(u -> u.getRole() != UserRole.TECHNICIAN && u.getRole() != UserRole.WAREHOUSE && u.getRole() != UserRole.ATTENDANCE)
                 .map(UserEntity::getId)
                 .toList();
 

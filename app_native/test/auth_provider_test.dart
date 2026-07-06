@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -8,9 +9,44 @@ import 'package:system_internal_likenew/utils/api_client.dart';
 import 'package:system_internal_likenew/utils/auth_provider.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
+  final Map<String, String> mockSecureStorage = {};
+
+  const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
+  TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+      .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
+    if (methodCall.method == 'write') {
+      final String key = methodCall.arguments['key'];
+      final String value = methodCall.arguments['value'];
+      mockSecureStorage[key] = value;
+      return null;
+    } else if (methodCall.method == 'read') {
+      final String key = methodCall.arguments['key'];
+      return mockSecureStorage[key];
+    } else if (methodCall.method == 'delete') {
+      final String key = methodCall.arguments['key'];
+      mockSecureStorage.remove(key);
+      return null;
+    } else if (methodCall.method == 'readAll') {
+      return mockSecureStorage;
+    } else if (methodCall.method == 'deleteAll') {
+      mockSecureStorage.clear();
+      return null;
+    } else if (methodCall.method == 'containsKey') {
+      final String key = methodCall.arguments['key'];
+      return mockSecureStorage.containsKey(key);
+    }
+    return null;
+  });
+
   group('AuthProvider Tests', () {
     late AuthProvider authProvider;
     late ApiClient apiClient;
+
+    setUp(() {
+      mockSecureStorage.clear();
+    });
 
     // Helper method to setup provider with a mock response
     void setupMockClient(Future<http.Response> Function(http.Request) handler) {
@@ -352,7 +388,20 @@ void main() {
       expect(UserRole.employee.can(AppPermission.viewRepairOrders), isTrue);
       expect(UserRole.employee.can(AppPermission.viewWarehouse), isTrue);
       expect(UserRole.employee.can(AppPermission.manageEmployees), isFalse);
-      expect(UserRole.employee.can(AppPermission.viewDashboard), isFalse);
+      expect(UserRole.employee.can(AppPermission.viewDashboard), isTrue);
+    });
+
+    test('technician can only access orders and has full permissions on them', () {
+      expect(UserRole.technician.can(AppPermission.viewRepairOrders), isTrue);
+      expect(UserRole.technician.can(AppPermission.manageRepairOrders), isTrue);
+      expect(UserRole.technician.can(AppPermission.assignRepairOrders), isTrue);
+      
+      expect(UserRole.technician.can(AppPermission.viewDashboard), isFalse);
+      expect(UserRole.technician.can(AppPermission.viewWarehouse), isFalse);
+      expect(UserRole.technician.can(AppPermission.manageWarehouse), isFalse);
+      expect(UserRole.technician.can(AppPermission.useMessages), isFalse);
+      expect(UserRole.technician.can(AppPermission.viewAttendance), isFalse);
+      expect(UserRole.technician.can(AppPermission.manageEmployees), isFalse);
     });
 
     test('manager can manage work but not admin-only security actions', () {
