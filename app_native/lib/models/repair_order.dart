@@ -27,6 +27,8 @@ class RepairOrder {
   final RepairOrderStatus status;
   final String? assignedToId;
   final String? assignedToName;
+  final List<String> assigneeIds;
+  final List<String> assigneeNames;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? description;
@@ -42,6 +44,8 @@ class RepairOrder {
     required this.status,
     this.assignedToId,
     this.assignedToName,
+    this.assigneeIds = const [],
+    this.assigneeNames = const [],
     required this.createdAt,
     this.updatedAt,
     this.description,
@@ -74,6 +78,35 @@ class RepairOrder {
   factory RepairOrder.fromJson(Map<String, dynamic> json) {
     final assignedTo = json['assignedTo'];
     final images = json['images'];
+    
+    final assigneesJson = json['assignees'];
+    final List<String> assigneeIds = [];
+    final List<String> assigneeNames = [];
+    if (assigneesJson is List) {
+      for (final item in assigneesJson) {
+        if (item is Map<String, dynamic>) {
+          final id = item['id']?.toString();
+          final name = item['fullName']?.toString();
+          if (id != null && name != null) {
+            assigneeIds.add(id);
+            assigneeNames.add(name);
+          }
+        }
+      }
+    }
+
+    String? assignedToId = assignedTo is Map<String, dynamic>
+        ? assignedTo['id']?.toString()
+        : null;
+    String? assignedToName = assignedTo is Map<String, dynamic>
+        ? assignedTo['fullName']?.toString()
+        : null;
+
+    if (assigneeIds.isNotEmpty && assignedToId == null) {
+      assignedToId = assigneeIds.first;
+      assignedToName = assigneeNames.first;
+    }
+
     return RepairOrder(
       id: json['id']?.toString() ?? '',
       orderNumber: json['orderCode']?.toString() ?? '',
@@ -81,12 +114,10 @@ class RepairOrder {
       customerName: json['customerName']?.toString() ?? '',
       customerPhone: json['customerPhone']?.toString(),
       status: _statusFromBackend(json['status']?.toString()),
-      assignedToId: assignedTo is Map<String, dynamic>
-          ? assignedTo['id']?.toString()
-          : null,
-      assignedToName: assignedTo is Map<String, dynamic>
-          ? assignedTo['fullName']?.toString()
-          : null,
+      assignedToId: assignedToId,
+      assignedToName: assignedToName,
+      assigneeIds: assigneeIds,
+      assigneeNames: assigneeNames,
       createdAt: _dateFromJson(json['createdAt']) ?? DateTime.now(),
       updatedAt: _dateFromJson(json['updatedAt']),
       description: json['description']?.toString(),

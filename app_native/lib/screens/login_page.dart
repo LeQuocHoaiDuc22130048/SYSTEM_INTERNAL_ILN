@@ -447,7 +447,10 @@ class _LoginPageState extends State<LoginPage> {
                 TextButton(
                   onPressed: loading
                       ? null
-                      : () => Navigator.of(dialogContext).pop(),
+                      : () {
+                          FocusScope.of(dialogContext).unfocus();
+                          Navigator.of(dialogContext).pop();
+                        },
                   child: const Text('Hủy'),
                 ),
                 ElevatedButton(
@@ -476,11 +479,14 @@ class _LoginPageState extends State<LoginPage> {
       },
     );
 
-    usernameController.dispose();
-    phoneController.dispose();
-    otpController.dispose();
-    newPasswordController.dispose();
-    confirmPasswordController.dispose();
+    // Delay controller disposal to prevent text fields from accessing disposed controllers during transition
+    Future.delayed(const Duration(milliseconds: 500), () {
+      usernameController.dispose();
+      phoneController.dispose();
+      otpController.dispose();
+      newPasswordController.dispose();
+      confirmPasswordController.dispose();
+    });
   }
 
   @override

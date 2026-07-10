@@ -24,6 +24,7 @@ public record RepairOrderResponse(
         // Phân công
         UserSummary receivedBy,
         UserSummary assignedTo,
+        List<UserSummary> assignees,
 
         // Thời gian
         Instant receivedAt,

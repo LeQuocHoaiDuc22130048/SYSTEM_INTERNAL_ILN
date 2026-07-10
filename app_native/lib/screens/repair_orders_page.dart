@@ -8,11 +8,13 @@ import 'package:provider/provider.dart';
 
 import '../models/repair_order.dart';
 import '../models/user.dart';
+import '../models/app_permission.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/video_player_dialog.dart';
+import '../widgets/image_preview_dialog.dart';
 
 class RepairOrdersPage extends StatefulWidget {
   final String? targetOrderId;
@@ -25,6 +27,7 @@ class RepairOrdersPage extends StatefulWidget {
 class _RepairOrdersPageState extends State<RepairOrdersPage> {
   final ValueNotifier<RepairOrderStatus?> _filter = ValueNotifier(null);
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
+  final ValueNotifier<DateTime?> _dateFilter = ValueNotifier(null);
 
   @override
   void initState() {
@@ -63,7 +66,39 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   void dispose() {
     _searchQuery.dispose();
     _filter.dispose();
+    _dateFilter.dispose();
     super.dispose();
+  }
+
+  void _showDatePickerDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
+            width: 320,
+            height: 380,
+            child: CalendarDatePicker(
+              initialDate: _dateFilter.value ?? DateTime.now(),
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now().add(const Duration(days: 365)),
+              onDateChanged: (DateTime date) {
+                setState(() {
+                  _dateFilter.value = date;
+                });
+                Navigator.pop(context);
+              },
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _showCreateOrderSheet(BuildContext context) {
@@ -78,17 +113,27 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   List<RepairOrder> get _filteredOrders {
     final query = _searchQuery.value.toLowerCase();
     final currentFilter = _filter.value;
+    final selectedDate = _dateFilter.value;
     final orders = context.read<BackendDataProvider>().repairOrders;
     return orders.where((order) {
       final matchesFilter =
           currentFilter == null || order.status == currentFilter;
+
+      bool matchesDate = true;
+      if (selectedDate != null) {
+        matchesDate = order.createdAt.year == selectedDate.year &&
+            order.createdAt.month == selectedDate.month &&
+            order.createdAt.day == selectedDate.day;
+      }
+
       final matchesSearch =
           query.isEmpty ||
           order.deviceName.toLowerCase().contains(query) ||
           order.orderNumber.toLowerCase().contains(query) ||
           order.customerName.toLowerCase().contains(query) ||
-          (order.assignedToName ?? '').toLowerCase().contains(query);
-      return matchesFilter && matchesSearch;
+          (order.assignedToName ?? '').toLowerCase().contains(query) ||
+          order.assigneeNames.any((name) => name.toLowerCase().contains(query));
+      return matchesFilter && matchesSearch && matchesDate;
     }).toList();
   }
 
@@ -96,7 +141,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backend = context.watch<BackendDataProvider>();
+    final auth = context.watch<AuthProvider>();
     final orders = backend.repairOrders;
+    final isEmployee = auth.role == UserRole.employee;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -149,101 +196,120 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   ],
                                 ),
                               ),
-                              ElevatedButton.icon(
-                                onPressed: () => _showCreateOrderSheet(context),
-                                icon: const Icon(Icons.add, size: 18),
-                                label: const Text('Tạo đơn'),
-                              ),
+                              if (!isEmployee)
+                                ElevatedButton.icon(
+                                  onPressed: () => _showCreateOrderSheet(context),
+                                  icon: const Icon(Icons.add, size: 18),
+                                  label: const Text('Tạo đơn'),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  onChanged: (value) =>
-                                      _searchQuery.value = value,
-                                  decoration: InputDecoration(
-                                    hintText:
-                                        'Tìm theo mã đơn, thiết bị, khách hàng...',
-                                    prefixIcon: const Icon(
-                                      Icons.search,
-                                      size: 20,
-                                    ),
-                                    filled: true,
-                                    fillColor: isDark
-                                        ? AppColors.surfaceDark
-                                        : Colors.white,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 13,
-                                    ),
-                                  ),
-                                ),
+                          TextField(
+                            onChanged: (value) =>
+                                _searchQuery.value = value,
+                            decoration: InputDecoration(
+                              hintText:
+                                  'Tìm theo mã đơn, thiết bị, khách, người sửa...',
+                              prefixIcon: const Icon(
+                                Icons.search,
+                                size: 20,
                               ),
-                              const SizedBox(width: 8),
-                              Container(
-                                decoration: BoxDecoration(
-                                  color: isDark
-                                      ? AppColors.surfaceDark
-                                      : Colors.white,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(
-                                    color: isDark
-                                        ? AppColors.borderDark
-                                        : AppColors.borderLight,
-                                  ),
-                                ),
-                                child: IconButton(
-                                  onPressed: () {},
-                                  icon: const Icon(
-                                    LucideIcons.listFilter,
-                                    size: 20,
-                                  ),
-                                  color: isDark
-                                      ? AppColors.textPrimaryDark
-                                      : AppColors.textPrimaryLight,
-                                ),
+                              filled: true,
+                              fillColor: isDark
+                                  ? AppColors.surfaceDark
+                                  : Colors.white,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 13,
                               ),
-                            ],
+                            ),
                           ),
                           const SizedBox(height: 12),
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(
-                              children:
-                                  [
-                                        _buildFilterChip('Tất cả', null),
-                                        _buildFilterChip(
-                                          'Chờ xử lý',
-                                          RepairOrderStatus.pending,
+                              children: [
+                                if (_dateFilter.value != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: InputChip(
+                                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                                      selectedColor: AppColors.primary.withValues(alpha: 0.2),
+                                      side: const BorderSide(color: AppColors.primary),
+                                      avatar: const Icon(Icons.date_range, size: 14, color: AppColors.primary),
+                                      label: Text(
+                                        DateFormat('dd/MM/yyyy').format(_dateFilter.value!),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                          fontWeight: FontWeight.w600,
                                         ),
-                                        _buildFilterChip(
-                                          'Đang sửa',
-                                          RepairOrderStatus.inProgress,
+                                      ),
+                                      deleteIcon: const Icon(Icons.cancel, size: 16, color: AppColors.primary),
+                                      onDeleted: () {
+                                        setState(() {
+                                          _dateFilter.value = null;
+                                        });
+                                      },
+                                      onPressed: () => _showDatePickerDialog(context),
+                                    ),
+                                  )
+                                else
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: ActionChip(
+                                      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+                                      side: BorderSide(
+                                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                      ),
+                                      avatar: Icon(
+                                        Icons.calendar_today,
+                                        size: 14,
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
+                                      label: Text(
+                                        DateFormat('dd/MM/yyyy').format(DateTime.now()),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
                                         ),
-                                        _buildFilterChip(
-                                          'Hoàn thành',
-                                          RepairOrderStatus.completed,
-                                        ),
-                                        _buildFilterChip(
-                                          'Đã giao',
-                                          RepairOrderStatus.delivered,
-                                        ),
-                                        _buildFilterChip(
-                                          'Đã hủy',
-                                          RepairOrderStatus.cancelled,
-                                        ),
-                                      ]
-                                      .map(
-                                        (child) => Padding(
-                                          padding: const EdgeInsets.only(
-                                            right: 8,
-                                          ),
-                                          child: child,
-                                        ),
-                                      )
-                                      .toList(),
+                                      ),
+                                      onPressed: () => _showDatePickerDialog(context),
+                                    ),
+                                  ),
+                                ...[
+                                  _buildFilterChip('Tất cả', null),
+                                  _buildFilterChip(
+                                    'Chờ xử lý',
+                                    RepairOrderStatus.pending,
+                                  ),
+                                  _buildFilterChip(
+                                    'Đang sửa',
+                                    RepairOrderStatus.inProgress,
+                                  ),
+                                  _buildFilterChip(
+                                    'Hoàn thành',
+                                    RepairOrderStatus.completed,
+                                  ),
+                                  _buildFilterChip(
+                                    'Đã giao',
+                                    RepairOrderStatus.delivered,
+                                  ),
+                                  _buildFilterChip(
+                                    'Đã hủy',
+                                    RepairOrderStatus.cancelled,
+                                  ),
+                                ]
+                                .map(
+                                  (child) => Padding(
+                                    padding: const EdgeInsets.only(
+                                      right: 8,
+                                    ),
+                                    child: child,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -263,7 +329,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                           isDark: isDark,
                         )
                       : AnimatedBuilder(
-                          animation: Listenable.merge([_searchQuery, _filter]),
+                          animation: Listenable.merge([_searchQuery, _filter, _dateFilter]),
                           builder: (context, _) {
                             final filtered = _filteredOrders;
                             if (filtered.isEmpty) {
@@ -452,8 +518,11 @@ class _OrderCard extends StatelessWidget {
                   _InfoLine(
                     icon: Icons.engineering_outlined,
                     label: 'Người sửa',
-                    value: order.assignedToName ?? 'Chưa phân công',
+                    value: order.assigneeNames.isNotEmpty
+                        ? order.assigneeNames.join('\n')
+                        : (order.assignedToName ?? 'Chưa phân công'),
                     isDark: isDark,
+                    maxLines: null,
                   ),
                   _InfoLine(
                     icon: Icons.schedule,
@@ -518,52 +587,58 @@ class _InfoLine extends StatelessWidget {
   final String label;
   final String value;
   final bool isDark;
+  final int? maxLines;
 
   const _InfoLine({
     required this.icon,
     required this.label,
     required this.value,
     required this.isDark,
+    this.maxLines = 1,
   });
 
   @override
   Widget build(BuildContext context) {
+    final labelStyle = TextStyle(
+      fontSize: 13,
+      color: isDark
+          ? AppColors.textSecondaryDark
+          : AppColors.textSecondaryLight,
+    );
+    final valueStyle = TextStyle(
+      fontSize: 13,
+      fontWeight: FontWeight.w700,
+      color: isDark
+          ? AppColors.textPrimaryDark
+          : AppColors.textPrimaryLight,
+    );
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8, right: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 16,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Icon(
+              icon,
+              size: 16,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
           ),
           const SizedBox(width: 8),
+          Text(
+            '$label: ',
+            style: labelStyle,
+          ),
           Expanded(
-            child: RichText(
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              text: TextSpan(
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-                children: [
-                  TextSpan(text: '$label: '),
-                  TextSpan(
-                    text: value,
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                ],
-              ),
+            child: Text(
+              value,
+              style: valueStyle,
+              maxLines: maxLines,
+              overflow: maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -651,7 +726,12 @@ class _OrderDetailSheet extends StatelessWidget {
               const SizedBox(height: 22),
               _DetailRow('Khách hàng', order.customerName),
               _DetailRow('SĐT khách', order.customerPhone ?? 'Chưa có'),
-              _DetailRow('Người sửa', order.assignedToName ?? 'Chưa phân công'),
+              _DetailRow(
+                'Người sửa',
+                order.assigneeNames.isNotEmpty
+                    ? order.assigneeNames.join('\n')
+                    : (order.assignedToName ?? 'Chưa phân công'),
+              ),
               _DetailRow(
                 'Ngày tạo',
                 DateFormat('dd/MM/yyyy HH:mm').format(order.createdAt),
@@ -698,43 +778,105 @@ class _OrderDetailSheet extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-                ...order.media.map((media) {
-                  final url = context
-                      .read<BackendDataProvider>()
-                      .api
-                      .resolveUrl(media.url);
-                  if (media.isVideo) {
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(
-                        Icons.play_circle_outline,
-                        color: AppColors.primary,
-                      ),
-                      title: Text(media.caption ?? 'Video đính kèm'),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: order.media.length,
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 4,
+                    mainAxisSpacing: 8,
+                    crossAxisSpacing: 8,
+                    childAspectRatio: 1.0,
+                  ),
+                  itemBuilder: (context, index) {
+                    final media = order.media[index];
+                    final url = context
+                        .read<BackendDataProvider>()
+                        .api
+                        .resolveUrl(media.url);
+                    if (media.isVideo) {
+                      return GestureDetector(
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) => VideoPlayerDialog(
+                              videoUrl: url,
+                              title: media.caption ?? 'Video đính kèm',
+                            ),
+                          );
+                        },
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            color: isDark ? AppColors.surfaceDark : Colors.grey[200],
+                            child: const Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                Icon(
+                                  Icons.play_circle_outline,
+                                  color: AppColors.primary,
+                                  size: 32,
+                                ),
+                                Positioned(
+                                  bottom: 4,
+                                  child: Text(
+                                    'VIDEO',
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      fontWeight: FontWeight.bold,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+                    return GestureDetector(
                       onTap: () {
                         showDialog(
                           context: context,
-                          builder: (context) => VideoPlayerDialog(
-                            videoUrl: url,
-                            title: media.caption ?? 'Video đính kèm',
+                          builder: (context) => ImagePreviewDialog(
+                            imageUrl: url,
+                            caption: media.caption,
                           ),
                         );
                       },
-                    );
-                  }
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.network(
-                        url,
-                        width: double.infinity,
-                        height: 160,
-                        fit: BoxFit.cover,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          url,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return Container(
+                              color: isDark ? AppColors.surfaceDark : Colors.grey[200],
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: isDark ? AppColors.surfaceDark : Colors.grey[200],
+                              child: const Center(
+                                child: Icon(Icons.broken_image, size: 20),
+                              ),
+                            );
+                          },
+                        ),
                       ),
-                    ),
-                  );
-                }),
+                    );
+                  },
+                ),
               ],
               const SizedBox(height: 24),
               Row(
@@ -756,7 +898,11 @@ class _OrderDetailSheet extends StatelessWidget {
                           builder: (context) => _EditOrderSheet(order: order),
                         );
                         if (updated == true && context.mounted) {
-                          Navigator.pop(context);
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          });
                         }
                       },
                       child: const Text('Chỉnh sửa'),
@@ -785,8 +931,10 @@ class _DetailRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
+          SizedBox(
+            width: 110,
             child: Text(
               label,
               style: TextStyle(
@@ -797,10 +945,11 @@ class _DetailRow extends StatelessWidget {
               ),
             ),
           ),
-          Flexible(
+          const SizedBox(width: 12),
+          Expanded(
             child: Text(
               value,
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.left,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
@@ -915,16 +1064,35 @@ class _EditOrderSheet extends StatefulWidget {
 
 class _EditOrderSheetState extends State<_EditOrderSheet> {
   final _noteController = TextEditingController();
-  String? _technicianId;
+  final Set<String> _technicianIds = <String>{};
   String? _nextStatus;
   bool _saving = false;
 
-  bool get _canAssign => context.read<AuthProvider>().role != UserRole.employee;
+  bool get _canAssign => context.read<AuthProvider>().can(AppPermission.assignRepairOrders);
+
+  String get _currentStatusBackendCode {
+    switch (widget.order.status) {
+      case RepairOrderStatus.pending:
+        return 'PENDING';
+      case RepairOrderStatus.inProgress:
+        return 'IN_PROGRESS';
+      case RepairOrderStatus.completed:
+        return 'COMPLETED';
+      case RepairOrderStatus.delivered:
+        return 'DELIVERED';
+      case RepairOrderStatus.cancelled:
+        return 'CANCELLED';
+    }
+  }
 
   @override
   void initState() {
     super.initState();
-    _technicianId = widget.order.assignedToId;
+    _technicianIds.addAll(widget.order.assigneeIds);
+    if (_technicianIds.isEmpty && widget.order.assignedToId != null) {
+      _technicianIds.add(widget.order.assignedToId!);
+    }
+    _nextStatus = _currentStatusBackendCode;
   }
 
   @override
@@ -934,38 +1102,32 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   }
 
   List<MapEntry<String, String>> _availableStatuses() {
-    final auth = context.read<AuthProvider>();
-    final isAdmin = auth.role == UserRole.superAdmin || auth.role == UserRole.admin;
-
-    switch (widget.order.status) {
-      case RepairOrderStatus.pending:
-        return [
-          const MapEntry('IN_PROGRESS', 'Đang sửa'),
-          if (isAdmin) const MapEntry('CANCELLED', 'Hủy đơn'),
-        ];
-      case RepairOrderStatus.inProgress:
-        return [
-          const MapEntry('COMPLETED', 'Hoàn thành'),
-          if (isAdmin) const MapEntry('CANCELLED', 'Hủy đơn'),
-        ];
-      case RepairOrderStatus.completed:
-        return const [MapEntry('DELIVERED', 'Đã giao')];
-      case RepairOrderStatus.delivered:
-      case RepairOrderStatus.cancelled:
-        return const [];
-    }
+    return const [
+      MapEntry('PENDING', 'Chờ xử lý'),
+      MapEntry('IN_PROGRESS', 'Đang sửa'),
+      MapEntry('COMPLETED', 'Hoàn thành'),
+      MapEntry('DELIVERED', 'Đã giao'),
+      MapEntry('CANCELLED', 'Đã hủy'),
+    ];
   }
 
   Future<void> _save() async {
-    final assignmentChanged =
-        _canAssign && _technicianId != widget.order.assignedToId;
-    if (assignmentChanged && _technicianId == null) {
+    final Set<String> originalIds = widget.order.assigneeIds.toSet();
+    if (originalIds.isEmpty && widget.order.assignedToId != null) {
+      originalIds.add(widget.order.assignedToId!);
+    }
+
+    final assignmentChanged = _canAssign &&
+        (!originalIds.containsAll(_technicianIds) || !_technicianIds.containsAll(originalIds));
+
+    if (assignmentChanged && _technicianIds.isEmpty) {
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn người sửa.')));
+      ).showSnackBar(const SnackBar(content: Text('Vui lòng chọn ít nhất một người sửa.')));
       return;
     }
-    if (!assignmentChanged && _nextStatus == null) {
+    final statusChanged = _nextStatus != null && _nextStatus != _currentStatusBackendCode;
+    if (!assignmentChanged && !statusChanged) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Chưa có thay đổi để lưu.')));
@@ -979,12 +1141,12 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
       if (assignmentChanged) {
         await backend.assignRepairOrder(
           widget.order.id,
-          technicianId: _technicianId!,
+          technicianIds: _technicianIds.toList(),
           note: note.isEmpty ? null : note,
-          reload: _nextStatus == null,
+          reload: !statusChanged,
         );
       }
-      if (_nextStatus != null) {
+      if (statusChanged) {
         await backend.updateRepairOrderStatus(
           widget.order.id,
           status: _nextStatus!,
@@ -1025,7 +1187,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     final technicians = backend.employees
         .where(
           (user) =>
-              user.role == UserRole.employee &&
+              (user.role == UserRole.employee || user.role == UserRole.technician) &&
               user.status == UserStatus.active,
         )
         .toList();
@@ -1058,38 +1220,121 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 8),
-                _AssignedTechnicianCard(
-                  name:
-                      assignedTechnician?.name ??
-                      widget.order.assignedToName ??
-                      'Chưa phân công',
-                  employeeId: assignedTechnician?.employeeId,
-                  department: assignedTechnician?.department,
-                  phone: assignedTechnician?.phone,
-                  isAssigned: widget.order.assignedToId != null,
-                  isDark: isDark,
-                ),
+                if (widget.order.assigneeIds.isEmpty && widget.order.assignedToId == null)
+                  _AssignedTechnicianCard(
+                    name: 'Chưa phân công',
+                    employeeId: null,
+                    department: null,
+                    phone: null,
+                    isAssigned: false,
+                    isDark: isDark,
+                  )
+                else ...[
+                  ...widget.order.assigneeIds.map((id) {
+                    final tech = backend.employees.firstWhere(
+                      (t) => t.id == id,
+                      orElse: () => User(
+                        id: id,
+                        name: widget.order.assigneeNames.length > widget.order.assigneeIds.indexOf(id)
+                            ? widget.order.assigneeNames[widget.order.assigneeIds.indexOf(id)]
+                            : 'Kỹ thuật viên',
+                        email: '',
+                        employeeId: '',
+                        role: UserRole.employee,
+                        status: UserStatus.active,
+                      ),
+                    );
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8.0),
+                      child: _AssignedTechnicianCard(
+                        name: tech.name,
+                        employeeId: tech.employeeId,
+                        department: tech.department,
+                        phone: tech.phone,
+                        isAssigned: true,
+                        isDark: isDark,
+                      ),
+                    );
+                  }),
+                  if (widget.order.assigneeIds.isEmpty && widget.order.assignedToId != null)
+                    _AssignedTechnicianCard(
+                      name: assignedTechnician?.name ?? widget.order.assignedToName ?? 'Kỹ thuật viên',
+                      employeeId: assignedTechnician?.employeeId,
+                      department: assignedTechnician?.department,
+                      phone: assignedTechnician?.phone,
+                      isAssigned: true,
+                      isDark: isDark,
+                    ),
+                ],
                 const SizedBox(height: 18),
                 if (_canAssign) ...[
                   const Text(
-                    'Phân công người sửa',
+                    'Phân công người sửa (Có thể chọn nhiều)',
                     style: TextStyle(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: _technicianId,
-                    items: technicians
-                        .map(
-                          (technician) => DropdownMenuItem(
-                            value: technician.id,
-                            child: Text(technician.name),
+                  InkWell(
+                    onTap: () async {
+                      final selected = await showDialog<Set<String>>(
+                        context: context,
+                        builder: (context) {
+                          return _TechnicianMultiSelectDialog(
+                            technicians: technicians,
+                            initialSelected: _technicianIds,
+                            isDark: isDark,
+                          );
+                        },
+                      );
+                      if (selected != null) {
+                        setState(() {
+                          _technicianIds.clear();
+                          _technicianIds.addAll(selected);
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[400]!),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: _technicianIds.isEmpty
+                                ? Text(
+                                    'Chọn nhân viên',
+                                    style: TextStyle(
+                                      color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                    ),
+                                  )
+                                : Wrap(
+                                    spacing: 6,
+                                    runSpacing: 6,
+                                    children: _technicianIds.map((id) {
+                                      final name = backend.employees.firstWhere((t) => t.id == id, orElse: () => User(id: id, name: 'Kỹ thuật viên', email: '', employeeId: '', role: UserRole.employee, status: UserStatus.active)).name;
+                                      return Chip(
+                                        label: Text(
+                                          name,
+                                          style: const TextStyle(fontSize: 12),
+                                        ),
+                                        padding: EdgeInsets.zero,
+                                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                        onDeleted: () {
+                                          setState(() {
+                                            _technicianIds.remove(id);
+                                          });
+                                        },
+                                      );
+                                    }).toList(),
+                                  ),
                           ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => _technicianId = value),
-                    decoration: const InputDecoration(
-                      hintText: 'Chọn nhân viên',
-                      border: OutlineInputBorder(),
+                          Icon(
+                            Icons.arrow_drop_down,
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -1109,14 +1354,10 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                         ),
                       )
                       .toList(),
-                  onChanged: statuses.isEmpty
-                      ? null
-                      : (value) => setState(() => _nextStatus = value),
-                  decoration: InputDecoration(
-                    hintText: statuses.isEmpty
-                        ? 'Đơn đã hoàn tất'
-                        : 'Giữ nguyên trạng thái',
-                    border: const OutlineInputBorder(),
+                  onChanged: (value) => setState(() => _nextStatus = value),
+                  decoration: const InputDecoration(
+                    hintText: 'Chọn trạng thái',
+                    border: OutlineInputBorder(),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -1239,17 +1480,33 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   final _deviceNameController = TextEditingController();
   final _descriptionController = TextEditingController();
   bool _isLoading = false;
-  String? _technicianId;
-  XFile? _selectedMedia;
-  bool _selectedIsVideo = false;
+  final Set<String> _technicianIds = <String>{};
+  final List<XFile> _selectedMedias = [];
   final ImagePicker _picker = ImagePicker();
+
+  bool _isVideo(String path) {
+    final lowercase = path.toLowerCase();
+    return lowercase.endsWith('.mp4') ||
+        lowercase.endsWith('.mov') ||
+        lowercase.endsWith('.avi') ||
+        lowercase.endsWith('.mkv') ||
+        lowercase.endsWith('.webm');
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     final pickedFile = await _picker.pickImage(source: source);
     if (pickedFile != null) {
       setState(() {
-        _selectedMedia = pickedFile;
-        _selectedIsVideo = false;
+        _selectedMedias.add(pickedFile);
+      });
+    }
+  }
+
+  Future<void> _pickMultiImages() async {
+    final List<XFile> pickedFiles = await _picker.pickMultiImage();
+    if (pickedFiles.isNotEmpty) {
+      setState(() {
+        _selectedMedias.addAll(pickedFiles);
       });
     }
   }
@@ -1258,8 +1515,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     final pickedFile = await _picker.pickVideo(source: ImageSource.gallery);
     if (pickedFile != null) {
       setState(() {
-        _selectedMedia = pickedFile;
-        _selectedIsVideo = true;
+        _selectedMedias.add(pickedFile);
       });
     }
   }
@@ -1279,18 +1535,18 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
         deviceName: _deviceNameController.text.trim(),
         description: _descriptionController.text.trim(),
       );
-      if (_selectedMedia != null) {
+      for (final media in _selectedMedias) {
         await backend.uploadRepairMedia(
           order.id,
-          bytes: await _selectedMedia!.readAsBytes(),
-          filename: _selectedMedia!.name,
-          isVideo: _selectedIsVideo,
+          bytes: await media.readAsBytes(),
+          filename: media.name,
+          isVideo: _isVideo(media.path),
         );
       }
-      if (_technicianId != null) {
+      if (_technicianIds.isNotEmpty) {
         await backend.assignRepairOrder(
           order.id,
-          technicianId: _technicianId!,
+          technicianIds: _technicianIds.toList(),
           reload: false,
         );
       }
@@ -1327,13 +1583,13 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canAssign = context.watch<AuthProvider>().role != UserRole.employee;
+    final canAssign = context.watch<AuthProvider>().can(AppPermission.assignRepairOrders);
     final technicians = context
         .watch<BackendDataProvider>()
         .employees
         .where(
           (user) =>
-              user.role == UserRole.employee &&
+              (user.role == UserRole.employee || user.role == UserRole.technician) &&
               user.status == UserStatus.active,
         )
         .toList();
@@ -1412,7 +1668,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                   if (canAssign) ...[
                     const SizedBox(height: 16),
                     Text(
-                      'Phân công người sửa',
+                      'Phân công người sửa (Có thể chọn nhiều)',
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
@@ -1422,21 +1678,68 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    DropdownButtonFormField<String>(
-                      initialValue: _technicianId,
-                      items: technicians
-                          .map(
-                            (technician) => DropdownMenuItem(
-                              value: technician.id,
-                              child: Text(technician.name),
+                    InkWell(
+                      onTap: () async {
+                        final selected = await showDialog<Set<String>>(
+                          context: context,
+                          builder: (context) {
+                            return _TechnicianMultiSelectDialog(
+                              technicians: technicians,
+                              initialSelected: _technicianIds,
+                              isDark: isDark,
+                            );
+                          },
+                        );
+                        if (selected != null) {
+                          setState(() {
+                            _technicianIds.clear();
+                            _technicianIds.addAll(selected);
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+                        decoration: BoxDecoration(
+                          border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[400]!),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: _technicianIds.isEmpty
+                                  ? Text(
+                                      'Chọn nhân viên (không bắt buộc)',
+                                      style: TextStyle(
+                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
+                                      ),
+                                    )
+                                  : Wrap(
+                                      spacing: 6,
+                                      runSpacing: 6,
+                                      children: _technicianIds.map((id) {
+                                        final name = technicians.firstWhere((t) => t.id == id, orElse: () => User(id: id, name: 'Kỹ thuật viên', email: '', employeeId: '', role: UserRole.employee, status: UserStatus.active)).name;
+                                        return Chip(
+                                          label: Text(
+                                            name,
+                                            style: const TextStyle(fontSize: 12),
+                                          ),
+                                          padding: EdgeInsets.zero,
+                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                          onDeleted: () {
+                                            setState(() {
+                                              _technicianIds.remove(id);
+                                            });
+                                          },
+                                        );
+                                      }).toList(),
+                                    ),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) =>
-                          setState(() => _technicianId = value),
-                      decoration: const InputDecoration(
-                        hintText: 'Chọn nhân viên (không bắt buộc)',
-                        border: OutlineInputBorder(),
+                            Icon(
+                              Icons.arrow_drop_down,
+                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],
@@ -1452,75 +1755,88 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  if (_selectedMedia != null)
-                    Stack(
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _selectedIsVideo
-                              ? Container(
-                                  width: double.infinity,
-                                  height: 120,
-                                  color: AppColors.infoLight,
-                                  child: const Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(Icons.play_circle_outline, size: 42),
-                                      SizedBox(height: 6),
-                                      Text('Video đã chọn'),
-                                    ],
+                  if (_selectedMedias.isNotEmpty) ...[
+                    SizedBox(
+                      height: 120,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _selectedMedias.length,
+                        separatorBuilder: (context, index) => const SizedBox(width: 8),
+                        itemBuilder: (context, index) {
+                          final file = _selectedMedias[index];
+                          final isVideo = _isVideo(file.path);
+                          return Stack(
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: isVideo
+                                    ? Container(
+                                        width: 120,
+                                        height: 120,
+                                        color: AppColors.infoLight.withOpacity(0.2),
+                                        child: const Column(
+                                          mainAxisAlignment: MainAxisAlignment.center,
+                                          children: [
+                                            Icon(Icons.play_circle_outline, size: 36, color: AppColors.primary),
+                                            SizedBox(height: 4),
+                                            Text('Video', style: TextStyle(fontSize: 12)),
+                                          ],
+                                        ),
+                                      )
+                                    : Image.file(
+                                        File(file.path),
+                                        width: 120,
+                                        height: 120,
+                                        fit: BoxFit.cover,
+                                      ),
+                              ),
+                              Positioned(
+                                top: 4,
+                                right: 4,
+                                child: GestureDetector(
+                                  onTap: () => setState(() => _selectedMedias.removeAt(index)),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(2),
+                                    decoration: const BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.close,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
                                   ),
-                                )
-                              : Image.file(
-                                  File(_selectedMedia!.path),
-                                  width: double.infinity,
-                                  height: 150,
-                                  fit: BoxFit.cover,
                                 ),
-                        ),
-                        Positioned(
-                          top: 8,
-                          right: 8,
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedMedia = null),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 20,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  else
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: () => _pickImage(ImageSource.camera),
-                          icon: const Icon(Icons.camera_alt),
-                          label: const Text('Chụp ảnh'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: () => _pickImage(ImageSource.gallery),
-                          icon: const Icon(Icons.photo_library),
-                          label: const Text('Chọn ảnh'),
-                        ),
-                        OutlinedButton.icon(
-                          onPressed: _pickVideo,
-                          icon: const Icon(Icons.videocam_outlined),
-                          label: const Text('Chọn video'),
-                        ),
-                      ],
+                            ],
+                          );
+                        },
+                      ),
                     ),
+                    const SizedBox(height: 12),
+                  ],
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      OutlinedButton.icon(
+                        onPressed: () => _pickImage(ImageSource.camera),
+                        icon: const Icon(Icons.camera_alt, size: 18),
+                        label: const Text('Chụp ảnh'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _pickMultiImages,
+                        icon: const Icon(Icons.photo_library, size: 18),
+                        label: const Text('Chọn nhiều ảnh'),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: _pickVideo,
+                        icon: const Icon(Icons.videocam_outlined, size: 18),
+                        label: const Text('Chọn video'),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 32),
                   SizedBox(
                     width: double.infinity,
@@ -1628,6 +1944,72 @@ class _KeyboardBottomPadding extends StatelessWidget {
       duration: const Duration(milliseconds: 120),
       curve: Curves.easeOutCubic,
       child: child,
+    );
+  }
+}
+
+class _TechnicianMultiSelectDialog extends StatefulWidget {
+  final List<User> technicians;
+  final Set<String> initialSelected;
+  final bool isDark;
+
+  const _TechnicianMultiSelectDialog({
+    required this.technicians,
+    required this.initialSelected,
+    required this.isDark,
+  });
+
+  @override
+  State<_TechnicianMultiSelectDialog> createState() => _TechnicianMultiSelectDialogState();
+}
+
+class _TechnicianMultiSelectDialogState extends State<_TechnicianMultiSelectDialog> {
+  final Set<String> _selected = <String>{};
+
+  @override
+  void initState() {
+    super.initState();
+    _selected.addAll(widget.initialSelected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Chọn kỹ thuật viên'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: widget.technicians.isEmpty
+              ? [const Padding(padding: EdgeInsets.all(16), child: Text('Không có kỹ thuật viên khả dụng.'))]
+              : widget.technicians.map((tech) {
+                  final isChecked = _selected.contains(tech.id);
+                  return CheckboxListTile(
+                    title: Text(tech.name),
+                    subtitle: Text(tech.employeeId.isNotEmpty ? tech.employeeId : tech.role.label),
+                    value: isChecked,
+                    onChanged: (bool? checked) {
+                      setState(() {
+                        if (checked == true) {
+                          _selected.add(tech.id);
+                        } else {
+                          _selected.remove(tech.id);
+                        }
+                      });
+                    },
+                  );
+                }).toList(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Hủy'),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, _selected),
+          child: const Text('Chọn'),
+        ),
+      ],
     );
   }
 }

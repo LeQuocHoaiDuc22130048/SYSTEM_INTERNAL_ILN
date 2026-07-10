@@ -124,13 +124,17 @@ class BackendDataProvider extends ChangeNotifier {
 
   Future<void> assignRepairOrder(
     String orderId, {
-    required String technicianId,
+    required List<String> technicianIds,
     String? note,
     bool reload = true,
   }) async {
     await api.put(
       '/api/v1/repair-orders/$orderId/assign',
-      body: {'technicianId': technicianId, 'note': note},
+      body: {
+        'technicianIds': technicianIds,
+        if (technicianIds.isNotEmpty) 'technicianId': technicianIds.first,
+        'note': note,
+      },
     );
     if (reload) await loadRepairOrders();
   }

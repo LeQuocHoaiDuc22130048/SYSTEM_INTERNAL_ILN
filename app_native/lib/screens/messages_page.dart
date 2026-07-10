@@ -729,7 +729,10 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
+              onPressed: () {
+                FocusScope.of(dialogContext).unfocus();
+                Navigator.pop(dialogContext);
+              },
               child: const Text('Huy'),
             ),
             FilledButton(
@@ -751,8 +754,11 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
         ),
       );
     } finally {
-      urlController.dispose();
-      captionController.dispose();
+      // Delay disposal to prevent text fields from accessing disposed controllers during transition
+      Future.delayed(const Duration(milliseconds: 500), () {
+        urlController.dispose();
+        captionController.dispose();
+      });
     }
   }
 

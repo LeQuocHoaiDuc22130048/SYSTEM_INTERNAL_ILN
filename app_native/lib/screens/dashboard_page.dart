@@ -6,13 +6,16 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../models/board.dart';
 import '../models/repair_order.dart';
+import '../navigation/main_tabs.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
 
 class DashboardPage extends StatelessWidget {
-  const DashboardPage({super.key});
+  final void Function(int tabIndex)? onNavigateToTab;
+
+  const DashboardPage({super.key, this.onNavigateToTab});
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +91,7 @@ class DashboardPage extends StatelessWidget {
                             const SizedBox(height: 20),
                             _TodayAttendanceCard(isDark: isDark),
                             const SizedBox(height: 20),
-                            _RecentOrdersCard(isDark: isDark),
+                            _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
                           ],
                         ),
                 ),
@@ -155,7 +158,7 @@ class DashboardPage extends StatelessWidget {
           },
         ),
         const SizedBox(height: 20),
-        _RecentOrdersCard(isDark: isDark),
+        _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
       ],
     );
   }
@@ -895,8 +898,9 @@ class _TodayAttendanceCard extends StatelessWidget {
 
 class _RecentOrdersCard extends StatelessWidget {
   final bool isDark;
+  final void Function(int tabIndex)? onNavigateToTab;
 
-  const _RecentOrdersCard({required this.isDark});
+  const _RecentOrdersCard({required this.isDark, this.onNavigateToTab});
 
   @override
   Widget build(BuildContext context) {
@@ -911,12 +915,19 @@ class _RecentOrdersCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: _SectionTitle('Đơn gần đây', isDark: isDark)),
-                TextButton(onPressed: () {}, child: const Text('Xem tất cả')),
+                TextButton(
+                  onPressed: () {
+                    if (onNavigateToTab != null) {
+                      onNavigateToTab!(MainTabs.repairOrders);
+                    }
+                  },
+                  child: const Text('Xem tất cả'),
+                ),
               ],
             ),
           ),
           ...orders
-              .take(4)
+              .take(10)
               .map((order) => _RecentOrderRow(order: order, isDark: isDark)),
         ],
       ),

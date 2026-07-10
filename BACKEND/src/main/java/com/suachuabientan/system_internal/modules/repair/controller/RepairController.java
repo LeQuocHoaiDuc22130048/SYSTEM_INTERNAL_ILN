@@ -53,15 +53,18 @@ public class RepairController {
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) RepairStatus status,
             @RequestParam(required = false) UUID assignedTo,
-            @PageableDefault(size = 20) Pageable pageable) {
+            @PageableDefault(size = 20) Pageable pageable,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
-                repairService.getAll(keyword, status, assignedTo, pageable)));
+                repairService.getAll(keyword, status, assignedTo, pageable, userDetails)));
     }
 
     @Operation(summary = "Chi tiết đơn sửa chữa")
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<RepairOrderResponse>> getById(@PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(repairService.getById(id)));
+    public ResponseEntity<ApiResponse<RepairOrderResponse>> getById(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(repairService.getById(id, userDetails)));
     }
 
     // ── Phân công ─────────────────────────────────────────────
@@ -87,7 +90,7 @@ public class RepairController {
             @Valid @RequestBody UpdateStatusRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
-                repairService.updateStatus(id, request, userDetails.getUserId())));
+                repairService.updateStatus(id, request, userDetails)));
     }
 
     // ── Sắp xếp ưu tiên ──────────────────────────────────────
@@ -120,8 +123,9 @@ public class RepairController {
     @Operation(summary = "Lịch sử vòng đời đơn")
     @GetMapping("/{id}/timeline")
     public ResponseEntity<ApiResponse<List<RepairTimelineResponse>>> getTimeline(
-            @PathVariable UUID id) {
-        return ResponseEntity.ok(ApiResponse.success(repairService.getTimeline(id)));
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(repairService.getTimeline(id, userDetails)));
     }
 
     // ── Ảnh đính kèm ─────────────────────────────────────────
@@ -135,7 +139,7 @@ public class RepairController {
             @RequestParam(required = false) String caption,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(201).body(ApiResponse.created(
-                repairService.addImage(id, imageUrl, caption, userDetails.getUserId())));
+                repairService.addImage(id, imageUrl, caption, userDetails)));
     }
 
     @Operation(summary = "Upload anh hoac video vao don sua chua")
@@ -148,6 +152,6 @@ public class RepairController {
             @RequestParam(required = false) String caption,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(201).body(ApiResponse.created(
-                repairService.addMedia(id, file, type, caption, userDetails.getUserId())));
+                repairService.addMedia(id, file, type, caption, userDetails)));
     }
 }

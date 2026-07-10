@@ -37,6 +37,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
     final currentRole = _roleFilter.value;
     final employees = context.read<BackendDataProvider>().employees;
     return employees.where((user) {
+      if (user.role.isAdminOrAbove) return false;
       final matchesSearch =
           query.isEmpty ||
           user.name.toLowerCase().contains(query) ||
@@ -151,21 +152,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
 
-                  // Filters
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        _buildFilterChip('Tất cả', null),
-                        ...UserRole.values.expand((role) => [
-                          const SizedBox(width: 8),
-                          _buildFilterChip(role.label, role),
-                        ]),
-                      ],
-                    ),
-                  ),
                 ],
               ),
             ),

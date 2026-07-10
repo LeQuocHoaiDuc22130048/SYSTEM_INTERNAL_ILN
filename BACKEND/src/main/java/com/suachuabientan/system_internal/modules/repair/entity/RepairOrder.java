@@ -6,6 +6,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -65,6 +67,16 @@ public class RepairOrder extends BaseEntity {
     /** Kỹ thuật viên được assign — nullable khi mới tạo */
     @Column(name = "assigned_to")
     private UUID assignedTo;
+
+    /** Danh sách kỹ thuật viên cùng tiếp nhận sửa chữa */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(
+            name = "repair_order_assignees",
+            joinColumns = @JoinColumn(name = "order_id")
+    )
+    @Column(name = "technician_id")
+    @Builder.Default
+    private Set<UUID> assignees = new HashSet<>();
 
     // ── Mốc thời gian ─────────────────────────────────────────
 

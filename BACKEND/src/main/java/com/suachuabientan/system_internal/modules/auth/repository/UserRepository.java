@@ -44,6 +44,10 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
             
             SELECT u FROM UserEntity u
                WHERE u.isDeleted = false
+                 AND u.role NOT IN (
+                   com.suachuabientan.system_internal.modules.auth.enums.UserRole.SUPER_ADMIN,
+                   com.suachuabientan.system_internal.modules.auth.enums.UserRole.ADMIN
+                 )
                  AND (
                    COALESCE(TRIM(:keyword), '') = ''
                    OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', TRIM(:keyword), '%'))

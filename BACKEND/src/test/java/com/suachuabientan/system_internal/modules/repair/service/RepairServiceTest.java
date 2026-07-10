@@ -18,6 +18,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.suachuabientan.system_internal.security.model.CustomUserDetails;
+import com.suachuabientan.system_internal.modules.repair.enums.RepairStatus;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -66,7 +68,7 @@ class RepairServiceTest {
                 .thenReturn(Optional.of(selectedUser));
 
         assertThrows(BusinessException.class,
-                () -> repairService.assign(orderId, new AssignRequest(selectedUserId, null), managerId));
+                () -> repairService.assign(orderId, new AssignRequest(selectedUserId, java.util.List.of(selectedUserId), null), managerId));
 
         verify(repairOrderRepository, never()).save(org.mockito.ArgumentMatchers.any());
     }
@@ -87,8 +89,92 @@ class RepairServiceTest {
                 .thenReturn(Optional.of(selectedUser));
 
         assertThrows(BusinessException.class,
-                () -> repairService.assign(orderId, new AssignRequest(selectedUserId, null), managerId));
+                () -> repairService.assign(orderId, new AssignRequest(selectedUserId, java.util.List.of(selectedUserId), null), managerId));
 
         verify(repairOrderRepository, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void employeeCannotGetOrderNotAssigned() {
+        UUID orderId = UUID.randomUUID();
+        UUID employeeId = UUID.randomUUID();
+        
+        RepairOrder order = new RepairOrder();
+        order.setId(orderId);
+        order.setAssignedTo(UUID.randomUUID());
+        
+        when(repairOrderRepository.findByIdAndIsDeletedFalse(orderId))
+                .thenReturn(Optional.of(order));
+                
+        UserEntity employee = UserEntity.builder()
+                .role(UserRole.EMPLOYEE)
+                .status(UserStatus.ACTIVE)
+                .build();
+        employee.setId(employeeId);
+        
+        CustomUserDetails userDetails = new CustomUserDetails(employee);
+        
+        assertThrows(BusinessException.class, () -> repairService.getById(orderId, userDetails));
+    }
+
+    @Test
+    void employeeCanGetOrderAssignedToThem() {
+        UUID orderId = UUID.randomUUID();
+        UUID employeeId = UUID.randomUUID();
+        
+        RepairOrder order = new RepairOrder();
+        order.setId(orderId);
+        order.setOrderCode("RO-20260708-001");
+        order.setDeviceName("Laptop Dell");
+        order.setCustomerName("Khach Hang A");
+        order.setCustomerPhone("0987654321");
+        order.setStatus(RepairStatus.PENDING);
+        order.setAssignedTo(employeeId);
+        
+        when(repairOrderRepository.findByIdAndIsDeletedFalse(orderId))
+                .thenReturn(Optional.of(order));
+                
+        UserEntity employee = UserEntity.builder()
+                .role(UserRole.EMPLOYEE)
+                .status(UserStatus.ACTIVE)
+                .build();
+        employee.setId(employeeId);
+        
+        CustomUserDetails userDetails = new CustomUserDetails(employee);
+        
+        var response = repairService.getById(orderId, userDetails);
+        org.junit.jupiter.api.Assertions.assertNotNull(response);
+        org.junit.jupiter.api.Assertions.assertEquals(orderId, response.id());
+    }
+
+    @Test
+    void employeeCanGetOrderReceivedByThem() {
+        UUID orderId = UUID.randomUUID();
+        UUID employeeId = UUID.randomUUID();
+        
+        RepairOrder order = new RepairOrder();
+        order.setId(orderId);
+        order.setOrderCode("RO-20260708-002");
+        order.setDeviceName("Laptop Dell");
+        order.setCustomerName("Khach Hang B");
+        order.setCustomerPhone("0987654321");
+        order.setStatus(RepairStatus.PENDING);
+        order.setReceivedBy(employeeId); // Received by them
+        order.setAssignedTo(null); // Not assigned to them
+        
+        when(repairOrderRepository.findByIdAndIsDeletedFalse(orderId))
+                .thenReturn(Optional.of(order));
+                
+        UserEntity employee = UserEntity.builder()
+                .role(UserRole.EMPLOYEE)
+                .status(UserStatus.ACTIVE)
+                .build();
+        employee.setId(employeeId);
+        
+        CustomUserDetails userDetails = new CustomUserDetails(employee);
+        
+        var response = repairService.getById(orderId, userDetails);
+        org.junit.jupiter.api.Assertions.assertNotNull(response);
+        org.junit.jupiter.api.Assertions.assertEquals(orderId, response.id());
     }
 }

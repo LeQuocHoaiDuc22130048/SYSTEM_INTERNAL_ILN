@@ -35,10 +35,12 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
      * Native query để tránh lỗi Hibernate type interface và Null parameter
      */
     @Query(value = """
-            SELECT * FROM repair_orders r
+            SELECT DISTINCT r.* FROM repair_orders r
+            LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
             WHERE r.is_deleted = false
               AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
-              AND (CAST(:assignedTo AS TEXT) IS NULL OR r.assigned_to = CAST(:assignedTo AS uuid))
+              AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid))
+              AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
               AND (
                   CAST(:keyword AS TEXT) IS NULL
                   OR LOWER(r.device_name)    LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
@@ -49,10 +51,12 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
             ORDER BY r.priority ASC, r.received_at DESC
             """,
             countQuery = """
-                    SELECT COUNT(*) FROM repair_orders r
+                    SELECT COUNT(DISTINCT r.id) FROM repair_orders r
+                    LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
                     WHERE r.is_deleted = false
                       AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
-                      AND (CAST(:assignedTo AS TEXT) IS NULL OR r.assigned_to = CAST(:assignedTo AS uuid))
+                      AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid))
+                      AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
                       AND (
                           CAST(:keyword AS TEXT) IS NULL
                           OR LOWER(r.device_name)    LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
@@ -66,6 +70,7 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
             @Param("keyword") String keyword,
             @Param("status") String status,
             @Param("assignedTo") String assignedTo,
+            @Param("staffId") String staffId,
             Pageable pageable);
 
 
@@ -87,8 +92,8 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
      * Đơn active của một kỹ thuật viên — dùng để kiểm tra workload.
      */
     @Query("""
-            SELECT r FROM RepairOrder r
-            WHERE r.assignedTo = :userId
+            SELECT DISTINCT r FROM RepairOrder r LEFT JOIN r.assignees a
+            WHERE (r.assignedTo = :userId OR a = :userId)
               AND r.isDeleted = false
               AND r.status IN ('PENDING', 'IN_PROGRESS')
             ORDER BY r.priority ASC

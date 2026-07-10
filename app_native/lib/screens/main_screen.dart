@@ -101,7 +101,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget _buildPage(int index) {
     switch (index) {
       case MainTabs.dashboard:
-        return const DashboardPage();
+        return DashboardPage(onNavigateToTab: _setCurrentIndex);
       case MainTabs.repairOrders:
         return RepairOrdersPage(targetOrderId: _targetRepairOrderId);
       case MainTabs.warehouse:
@@ -109,7 +109,7 @@ class _MainScreenState extends State<MainScreen> {
       case MainTabs.attendance:
         return context.read<AuthProvider>().isAttendanceAccount
             ? _buildAttendanceOnlyScaffold()
-            : const DashboardPage();
+            : DashboardPage(onNavigateToTab: _setCurrentIndex);
       case MainTabs.messages:
         return const MessagesPage();
       case MainTabs.notifications:
@@ -130,7 +130,7 @@ class _MainScreenState extends State<MainScreen> {
       case MainTabs.profile:
         return const ProfilePage();
       default:
-        return const DashboardPage();
+        return DashboardPage(onNavigateToTab: _setCurrentIndex);
     }
   }
 

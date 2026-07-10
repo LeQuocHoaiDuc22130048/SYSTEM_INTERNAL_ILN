@@ -339,7 +339,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   TextButton(
                     onPressed: isSaving
                         ? null
-                        : () => Navigator.of(dialogContext).pop(),
+                        : () {
+                            FocusScope.of(dialogContext).unfocus();
+                            Navigator.of(dialogContext).pop();
+                          },
                     child: const Text('Hủy'),
                   ),
                   FilledButton(
@@ -361,9 +364,12 @@ class _ProfilePageState extends State<ProfilePage> {
         },
       );
     } finally {
-      nameController.dispose();
-      phoneController.dispose();
-      departmentController.dispose();
+      // Delay disposal to prevent text fields from accessing disposed controllers during transition
+      Future.delayed(const Duration(milliseconds: 500), () {
+        nameController.dispose();
+        phoneController.dispose();
+        departmentController.dispose();
+      });
     }
   }
 
@@ -467,10 +473,13 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 actions: [
-                  TextButton(
+                   TextButton(
                     onPressed: isSaving
                         ? null
-                        : () => Navigator.of(dialogContext).pop(),
+                        : () {
+                            FocusScope.of(dialogContext).unfocus();
+                            Navigator.of(dialogContext).pop();
+                          },
                     child: const Text('Hủy'),
                   ),
                   FilledButton(
@@ -492,9 +501,12 @@ class _ProfilePageState extends State<ProfilePage> {
         },
       );
     } finally {
-      currentController.dispose();
-      newController.dispose();
-      confirmController.dispose();
+      // Delay disposal to prevent text fields from accessing disposed controllers during transition
+      Future.delayed(const Duration(milliseconds: 500), () {
+        currentController.dispose();
+        newController.dispose();
+        confirmController.dispose();
+      });
     }
   }
 
