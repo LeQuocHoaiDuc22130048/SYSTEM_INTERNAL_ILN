@@ -12,6 +12,11 @@ import { HistoryModal } from './components/HistoryModal';
 import { EditModal } from './components/EditModal';
 import { ManualModal } from './components/ManualModal';
 import { DeviceTab } from './components/DeviceTab';
+import { UpdateTab } from './components/UpdateTab';
+import { Sidebar } from './components/Sidebar';
+import { OrdersTab } from './components/OrdersTab';
+import { WarehouseTab } from './components/WarehouseTab';
+import { AccountsTab } from './components/AccountsTab';
 
 import { getAuthHeaders, getJsonAuthHeaders, createTimeoutController, STANDARD_WORK_DAYS } from './utils/auth';
 import { getDailyStatusFromPattern } from './utils/employee';
@@ -22,7 +27,7 @@ import { exportAttendanceExcel } from './utils/excel';
 type DataSource = 'api' | 'error' | 'loading';
 
 /** Tab đang hiển thị */
-type ActiveTab = 'monthly' | 'daily' | 'devices';
+type ActiveTab = 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
 
 /** Dữ liệu target để mở EditModal */
 interface EditModalTarget {
@@ -35,6 +40,7 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return !!localStorage.getItem('accessToken');
   });
+  const [sidebarOpen, setSidebarOpen] = useState<boolean>(window.innerWidth > 1024);
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(() => {
     const userStr = localStorage.getItem('currentUser');
     try {
@@ -340,71 +346,99 @@ function App() {
   }
 
   return (
-    <div className="container">
+    <div className="app-layout">
       {toastMessage && <div className="toast-msg">{toastMessage}</div>}
 
-      <Header
+      <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        currentMonth={currentMonth}
-        currentYear={currentYear}
-        prevMonth={prevMonth}
-        nextMonth={nextMonth}
-        selectedDate={selectedDate}
-        handleDateChange={handleDateChange}
-        dataSource={dataSource}
-        connectionError={connectionError}
-        handleRetryConnection={handleRetryConnection}
         currentUser={currentUser}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
         handleLogout={handleLogout}
       />
 
-      {activeTab === 'monthly' ? (
-        <>
-          <MonthlyStatsGrid
-            totalStandardDays={STANDARD_WORK_DAYS}
-            averagePresent={monthlyStats.averagePresent}
-            totalLateCount={monthlyStats.totalLateCount}
-            totalAbsentDays={monthlyStats.totalAbsentDays}
-          />
-          <MonthlyTab
-            key={`${currentMonth}-${currentYear}`}
-            filteredEmployees={filteredEmployees}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            currentMonth={currentMonth}
-            currentYear={currentYear}
-            loading={loading}
-            handleExportExcel={handleExportExcel}
-            setHistoryEmployee={setHistoryEmployee}
-            showToast={showToast}
-          />
-        </>
-      ) : activeTab === 'daily' ? (
-        <>
-          <DailyStatsGrid
-            total={dailyStats.total}
-            onTime={dailyStats.onTime}
-            lateEarly={dailyStats.lateEarly}
-            absent={dailyStats.absent}
-          />
-          <DailyTab
-            filteredDailyEmployees={filteredEmployees}
-            dailyReportMap={dailyReportMap}
-            searchTerm={searchTerm}
-            setSearchTerm={setSearchTerm}
-            selectedDate={selectedDate}
-            dailyLoading={dailyLoading}
-            setManualEmployee={setManualModalEmployee}
-            setShowManualModal={(show) => { if (!show) setManualModalEmployee(null); }}
-          />
-        </>
-      ) : (
-        <DeviceTab
-          showToast={showToast}
-          currentUser={currentUser}
+      <div className="main-container">
+        <Header
+          activeTab={activeTab}
+          currentMonth={currentMonth}
+          currentYear={currentYear}
+          prevMonth={prevMonth}
+          nextMonth={nextMonth}
+          selectedDate={selectedDate}
+          handleDateChange={handleDateChange}
+          dataSource={dataSource}
+          connectionError={connectionError}
+          handleRetryConnection={handleRetryConnection}
+          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
-      )}
+
+        <div className="main-content-inner">
+          {activeTab === 'monthly' ? (
+            <>
+              <MonthlyStatsGrid
+                totalStandardDays={STANDARD_WORK_DAYS}
+                averagePresent={monthlyStats.averagePresent}
+                totalLateCount={monthlyStats.totalLateCount}
+                totalAbsentDays={monthlyStats.totalAbsentDays}
+              />
+              <MonthlyTab
+                key={`${currentMonth}-${currentYear}`}
+                filteredEmployees={filteredEmployees}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                currentMonth={currentMonth}
+                currentYear={currentYear}
+                loading={loading}
+                handleExportExcel={handleExportExcel}
+                setHistoryEmployee={setHistoryEmployee}
+                showToast={showToast}
+              />
+            </>
+          ) : activeTab === 'daily' ? (
+            <>
+              <DailyStatsGrid
+                total={dailyStats.total}
+                onTime={dailyStats.onTime}
+                lateEarly={dailyStats.lateEarly}
+                absent={dailyStats.absent}
+              />
+              <DailyTab
+                filteredDailyEmployees={filteredEmployees}
+                dailyReportMap={dailyReportMap}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                selectedDate={selectedDate}
+                dailyLoading={dailyLoading}
+                setManualEmployee={setManualModalEmployee}
+                setShowManualModal={(show) => { if (!show) setManualModalEmployee(null); }}
+              />
+            </>
+          ) : activeTab === 'devices' ? (
+            <DeviceTab
+              showToast={showToast}
+              currentUser={currentUser}
+            />
+          ) : activeTab === 'updates' ? (
+            <UpdateTab
+              showToast={showToast}
+            />
+          ) : activeTab === 'orders' ? (
+            <OrdersTab
+              showToast={showToast}
+            />
+          ) : activeTab === 'accounts' ? (
+            <AccountsTab
+              showToast={showToast}
+              currentUser={currentUser}
+            />
+          ) : (
+            <WarehouseTab
+              showToast={showToast}
+            />
+          )}
+        </div>
+      </div>
 
       {historyEmployee && (
         <HistoryModal

@@ -96,7 +96,7 @@ class RepairDevice {
       case RepairOrderStatus.delivered:
         return 'Đã giao';
       case RepairOrderStatus.cancelled:
-        return 'Đã hủy';
+        return 'Đã trả';
     }
   }
 

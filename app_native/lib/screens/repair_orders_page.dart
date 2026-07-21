@@ -338,7 +338,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                     RepairOrderStatus.delivered,
                                   ),
                                   _buildFilterChip(
-                                    'Đã hủy',
+                                    'Đã trả',
                                     RepairOrderStatus.cancelled,
                                   ),
                                 ]
@@ -1931,7 +1931,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
       MapEntry('IN_PROGRESS', 'Đang sửa'),
       MapEntry('COMPLETED', 'Hoàn thành'),
       MapEntry('DELIVERED', 'Đã giao'),
-      MapEntry('CANCELLED', 'Đã hủy'),
+      MapEntry('CANCELLED', 'Đã trả'),
     ];
   }
 

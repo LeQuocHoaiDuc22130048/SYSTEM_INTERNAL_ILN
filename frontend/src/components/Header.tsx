@@ -2,18 +2,15 @@ import React from 'react';
 import {
   WifiOff,
   RefreshCw,
-  Database,
   Wifi,
   ChevronLeft,
   ChevronRight,
   Calendar,
-  LogOut,
+  Menu,
 } from 'lucide-react';
-import type { UserInfo } from '../mockData';
 
 interface HeaderProps {
-  activeTab: 'monthly' | 'daily' | 'devices';
-  setActiveTab: (tab: 'monthly' | 'daily' | 'devices') => void;
+  activeTab: 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
   currentMonth: number;
   currentYear: number;
   prevMonth: () => void;
@@ -23,13 +20,11 @@ interface HeaderProps {
   dataSource: 'api' | 'error' | 'loading';
   connectionError: string | null;
   handleRetryConnection: () => void;
-  currentUser: UserInfo | null;
-  handleLogout: () => void;
+  onToggleSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   activeTab,
-  setActiveTab,
   currentMonth,
   currentYear,
   prevMonth,
@@ -39,9 +34,9 @@ export const Header: React.FC<HeaderProps> = ({
   dataSource,
   connectionError,
   handleRetryConnection,
-  currentUser,
-  handleLogout,
+  onToggleSidebar,
 }) => {
+
   return (
     <>
       {dataSource === 'error' && (
@@ -62,44 +57,30 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {dataSource === 'api' && (
-        <div className="connection-banner success">
-          <div className="banner-content">
-            <Database size={18} />
-            <div className="banner-text">
-              <strong>Đã kết nối</strong>
-            </div>
-          </div>
-          <div className="banner-status-dot connected" />
-        </div>
-      )}
+      {/* Connection success banner removed as requested */}
 
       <header className="header">
         <div className="header-left">
-          <h1 className="title">Quản lý Chấm công</h1>
-          <div className="tab-buttons">
-            <button
-              id="tab-monthly"
-              className={`tab-btn ${activeTab === 'monthly' ? 'active' : ''}`}
-              onClick={() => setActiveTab('monthly')}
-            >
-              Xem theo tháng
+          {onToggleSidebar && (
+            <button className="sidebar-toggle-btn" onClick={onToggleSidebar} aria-label="Toggle sidebar">
+              <Menu size={20} />
             </button>
-            <button
-              id="tab-daily"
-              className={`tab-btn ${activeTab === 'daily' ? 'active' : ''}`}
-              onClick={() => setActiveTab('daily')}
-            >
-              Xem theo ngày
-            </button>
-            <button
-              id="tab-devices"
-              className={`tab-btn ${activeTab === 'devices' ? 'active' : ''}`}
-              onClick={() => setActiveTab('devices')}
-            >
-              Trạng thái Thiết bị
-            </button>
-          </div>
+          )}
+          <h1 className="title">
+            {activeTab === 'monthly'
+              ? 'Chấm công theo tháng'
+              : activeTab === 'daily'
+              ? 'Chấm công theo ngày'
+              : activeTab === 'devices'
+              ? 'Trạng thái Thiết bị'
+              : activeTab === 'updates'
+              ? 'Cập nhật ứng dụng'
+              : activeTab === 'orders'
+              ? 'Quản lý đơn sửa chữa'
+              : activeTab === 'accounts'
+              ? 'Quản lý tài khoản'
+              : 'Kho bo mạch'}
+          </h1>
         </div>
 
         <div className="header-right">
@@ -140,18 +121,31 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => handleDateChange(e.target.value)}
               />
             </div>
-          ) : (
+          ) : activeTab === 'devices' ? (
             <div className="month-navigator real-time-indicator">
               <span className="real-time-dot" />
               <span className="real-time-text">Thời gian thực</span>
             </div>
-          )}
-
-          {currentUser && (
-            <button id="btn-logout" className="login-header-logout" onClick={handleLogout} title="Đăng xuất">
-              <LogOut size={16} />
-              <span>{currentUser.fullName || currentUser.username}</span>
-            </button>
+          ) : activeTab === 'updates' ? (
+            <div className="month-navigator real-time-indicator" style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
+              <span className="real-time-dot" style={{ backgroundColor: '#8b5cf6', boxShadow: '0 0 0 0.15rem rgba(139, 92, 246, 0.4)' }} />
+              <span className="real-time-text" style={{ color: '#6d28d9' }}>Phát hành phiên bản</span>
+            </div>
+          ) : activeTab === 'orders' ? (
+            <div className="month-navigator real-time-indicator" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0' }}>
+              <span className="real-time-dot" style={{ backgroundColor: '#10b981', boxShadow: '0 0 0 0.15rem rgba(16, 185, 129, 0.4)' }} />
+              <span className="real-time-text" style={{ color: '#047857' }}>Hệ thống sửa chữa</span>
+            </div>
+          ) : activeTab === 'accounts' ? (
+            <div className="month-navigator real-time-indicator" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
+              <span className="real-time-dot" style={{ backgroundColor: '#3b82f6', boxShadow: '0 0 0 0.15rem rgba(59, 130, 246, 0.4)' }} />
+              <span className="real-time-text" style={{ color: '#1d4ed8' }}>Quản lý tài khoản</span>
+            </div>
+          ) : (
+            <div className="month-navigator real-time-indicator" style={{ background: '#fff7ed', border: '1px solid #ffedd5' }}>
+              <span className="real-time-dot" style={{ backgroundColor: '#f97316', boxShadow: '0 0 0 0.15rem rgba(249, 115, 22, 0.4)' }} />
+              <span className="real-time-text" style={{ color: '#c2410c' }}>Quản lý linh kiện</span>
+            </div>
           )}
         </div>
       </header>

@@ -223,6 +223,7 @@ extension UserRolePermissions on UserRole {
       AppPermission.viewDashboard,
       AppPermission.viewRepairOrders,
       AppPermission.manageRepairOrders,
+      AppPermission.updateRepairOrderStatus,
       AppPermission.viewWarehouse,
       AppPermission.manageWarehouse,
       AppPermission.useMessages,
@@ -234,6 +235,7 @@ extension UserRolePermissions on UserRole {
     const technicianPermissions = {
       AppPermission.viewRepairOrders,
       AppPermission.manageRepairOrders,
+      AppPermission.updateRepairOrderStatus,
       AppPermission.assignRepairOrders,
       AppPermission.viewProfile,
       AppPermission.updateOwnProfile,

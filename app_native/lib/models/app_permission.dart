@@ -2,6 +2,7 @@ enum AppPermission {
   viewDashboard,
   viewRepairOrders,
   manageRepairOrders,
+  updateRepairOrderStatus,
   assignRepairOrders,
   viewWarehouse,
   manageWarehouse,
@@ -26,6 +27,8 @@ extension AppPermissionBackendCode on AppPermission {
         return 'REPAIR_VIEW';
       case AppPermission.manageRepairOrders:
         return 'REPAIR_MANAGE';
+      case AppPermission.updateRepairOrderStatus:
+        return 'REPAIR_STATUS_UPDATE';
       case AppPermission.assignRepairOrders:
         return 'REPAIR_ASSIGN';
       case AppPermission.viewWarehouse:

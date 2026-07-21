@@ -8,5 +8,5 @@ public enum RepairStatus {
     IN_PROGRESS,        // Đang sửa
     COMPLETED,          // Hoàn thành
     DELIVERED,          // Đã giao
-    CANCELLED           // Đã hủy
+    CANCELLED           // Đã trả
 }

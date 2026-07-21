@@ -53,9 +53,14 @@ export interface EmployeeHistoryResponse {
 
 /** Thông tin user đang đăng nhập, trả về từ API login */
 export interface UserInfo {
+  id?: string;
   username: string;
   fullName?: string;
   role?: string;
+  status?: string;
+  avatarUrl?: string;
+  department?: string;
+  permissions?: string[];
 }
 
 /** Ký tự đại diện cho trạng thái ngày trong dailyPattern */

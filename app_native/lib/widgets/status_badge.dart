@@ -58,7 +58,7 @@ class StatusBadge extends StatelessWidget {
           };
         case RepairOrderStatus.cancelled:
           return {
-            'label': 'Đã hủy',
+            'label': 'Đã trả',
             'bgColor': AppColors.errorLight,
             'textColor': AppColors.error,
           };

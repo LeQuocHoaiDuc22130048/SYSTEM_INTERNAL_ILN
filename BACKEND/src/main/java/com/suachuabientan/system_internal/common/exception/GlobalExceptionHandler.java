@@ -126,6 +126,13 @@ public class GlobalExceptionHandler {
                         "Du lieu bi trung hoac vi pham rang buoc trong he thong"));
     }
 
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSizeExceeded(org.springframework.web.multipart.MaxUploadSizeExceededException ex) {
+        log.warn("Max upload size exceeded: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(ApiResponse.error(413, "Dung lượng file vượt quá giới hạn cho phép (tối đa 500MB)"));
+    }
+
     @ExceptionHandler(RestClientException.class)
     public ResponseEntity<ApiResponse<Void>> handleRestClient(RestClientException ex) {
         log.error("External service error: {}", ex.getMessage(), ex);

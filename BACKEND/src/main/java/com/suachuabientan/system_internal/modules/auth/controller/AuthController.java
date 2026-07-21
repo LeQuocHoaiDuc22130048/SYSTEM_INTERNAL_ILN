@@ -9,6 +9,10 @@ import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RequestPasswordResetOtpRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.UpdateUserRoleRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.UpdateUserStatusRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.UpdateUserPermissionsRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.response.UserPermissionDetailResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
 import com.suachuabientan.system_internal.modules.auth.service.AuthService;
@@ -24,9 +28,9 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @Tag(name = "Auth", description = "Xác thực và quản lý tài khoản")
@@ -132,5 +136,57 @@ public class AuthController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         authService.deleteUser(userId, userDetails.getUserId());
         return ResponseEntity.ok(ApiResponse.success(null, "Xoá tài khoản thành công"));
+    }
+
+    // ── Quản lý tài khoản & phân quyền — chỉ ADMIN+ ─────────────────────
+
+    @Operation(summary = "Danh sách tất cả user (có filter) — chỉ ADMIN+")
+    @GetMapping("/users")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<Page<UserResponse>>> getUsers(
+            @RequestParam(required = false, defaultValue = "") String keyword,
+            @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(authService.getUsers(keyword, pageable)));
+    }
+
+    @Operation(summary = "Đổi role của user — chỉ SUPER_ADMIN")
+    @PatchMapping("/users/{userId}/role")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> updateUserRole(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateUserRoleRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                authService.updateUserRole(userId, request.role(), userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Suspend hoặc Activate tài khoản — chỉ ADMIN+")
+    @PatchMapping("/users/{userId}/status")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<UserResponse>> updateUserStatus(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateUserStatusRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                authService.updateUserStatus(userId, request.action(), userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Xem permissions chi tiết của user — chỉ ADMIN+")
+    @GetMapping("/users/{userId}/permissions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<UserPermissionDetailResponse>>> getUserPermissions(
+            @PathVariable UUID userId) {
+        return ResponseEntity.ok(ApiResponse.success(authService.getUserPermissions(userId)));
+    }
+
+    @Operation(summary = "Cập nhật permission overrides của user — chỉ ADMIN+")
+    @PutMapping("/users/{userId}/permissions")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    public ResponseEntity<ApiResponse<List<UserPermissionDetailResponse>>> updateUserPermissions(
+            @PathVariable UUID userId,
+            @Valid @RequestBody UpdateUserPermissionsRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                authService.updateUserPermissions(userId, request.overrides(), userDetails.getUserId())));
     }
 }

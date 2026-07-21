@@ -39,6 +39,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
      */
     Page<UserEntity> findByStatusAndIsDeletedFalse(UserStatus status, Pageable pageable);
 
+    List<UserEntity> findByStatusAndIsDeletedFalse(UserStatus status);
+
     /**
      * Tìm kiếm nhân viên theo tên hoặc mã nhân viên.
      */

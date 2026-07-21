@@ -20,6 +20,7 @@ import com.suachuabientan.system_internal.modules.auth.dto.request.RegisterReque
 import com.suachuabientan.system_internal.modules.auth.dto.request.RequestPasswordResetOtpRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.response.LoginResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.response.UserResponse;
+import com.suachuabientan.system_internal.modules.auth.dto.response.UserPermissionDetailResponse;
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.RefreshTokenRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.PasswordResetOtpRepository;
@@ -40,6 +41,7 @@ import org.springframework.util.StringUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.Map;
 import java.security.SecureRandom;
 import java.util.UUID;
 
@@ -337,7 +339,6 @@ public class AuthService {
                 .map(userMapper::toResponse);
     }
 
-
     @Transactional
     public void deleteUser(UUID targetUserId, UUID performedByUserId) {
         UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
@@ -348,6 +349,124 @@ public class AuthService {
         user.setStatus(UserStatus.DELETED);
         userRepository.save(user);
         log.info("Xoá tài khoản (soft): userId={}, by={}", targetUserId, performedByUserId);
+    }
+
+    // ── User management ───────────────────────────────────────────────────
+
+    /**
+     * Danh sách tất cả user (có filter keyword) — chỉ ADMIN+ mới được xem.
+     */
+    @Transactional(readOnly = true)
+    public Page<UserResponse> getUsers(String keyword, Pageable pageable) {
+        return userRepository.searchUsers(keyword, pageable).map(userMapper::toResponse);
+    }
+
+    /**
+     * Đổi role của user — chỉ SUPER_ADMIN mới có quyền.
+     */
+    @Transactional
+    public UserResponse updateUserRole(UUID targetUserId, String newRoleStr, UUID performedByUserId) {
+        UserRole newRole;
+        try {
+            newRole = UserRole.valueOf(newRoleStr.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            throw new BusinessException("Role không hợp lệ: " + newRoleStr, 400);
+        }
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + targetUserId));
+
+        if (targetUserId.equals(performedByUserId)) {
+            throw new BusinessException("Không thể tự đổi role của bản thân", 400);
+        }
+
+        user.setRole(newRole);
+        rbacService.updateRole(targetUserId, newRole);
+        UserEntity saved = userRepository.save(user);
+        log.info("Cập nhật role: userId={}, newRole={}, by={}", targetUserId, newRole, performedByUserId);
+        return userMapper.toResponse(saved);
+    }
+
+    /**
+     * Suspend hoặc Activate tài khoản — ADMIN+ mới có quyền.
+     */
+    @Transactional
+    public UserResponse updateUserStatus(UUID targetUserId, String action, UUID performedByUserId) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + targetUserId));
+
+        if (targetUserId.equals(performedByUserId)) {
+            throw new BusinessException("Không thể tự thay đổi trạng thái tài khoản của bản thân", 400);
+        }
+
+        switch (action.toUpperCase()) {
+            case "SUSPEND" -> {
+                user.suspend();
+                log.info("Tạm khóa tài khoản: userId={}, by={}", targetUserId, performedByUserId);
+            }
+            case "ACTIVATE" -> {
+                user.activate();
+                log.info("Kích hoạt tài khoản: userId={}, by={}", targetUserId, performedByUserId);
+            }
+            default -> throw new BusinessException("Action không hợp lệ: " + action + ". Dùng SUSPEND hoặc ACTIVATE", 400);
+        }
+
+        return userMapper.toResponse(userRepository.save(user));
+    }
+
+    /**
+     * Lấy chi tiết permissions của user (từng quyền, nguồn gốc, override).
+     */
+    @Transactional(readOnly = true)
+    public List<UserPermissionDetailResponse> getUserPermissions(UUID targetUserId) {
+        userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + targetUserId));
+
+        return rbacService.getUserPermissionDetails(targetUserId).stream()
+                .map(row -> {
+                    boolean fromRole = Boolean.TRUE.equals(row.get("from_role"));
+                    Boolean overrideGranted = (Boolean) row.get("override_granted");
+
+                    boolean effective;
+                    if (overrideGranted != null) {
+                        effective = overrideGranted;
+                    } else {
+                        effective = fromRole;
+                    }
+
+                    return new UserPermissionDetailResponse(
+                            (String) row.get("code"),
+                            (String) row.get("name"),
+                            (String) row.get("module"),
+                            (String) row.get("description"),
+                            fromRole,
+                            overrideGranted,
+                            effective
+                    );
+                })
+                .toList();
+    }
+
+    /**
+     * Cập nhật permission overrides của user.
+     */
+    @Transactional
+    public List<UserPermissionDetailResponse> updateUserPermissions(
+            UUID targetUserId,
+            Map<String, Boolean> overrides,
+            UUID performedByUserId) {
+
+        userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + targetUserId));
+
+        if (targetUserId.equals(performedByUserId)) {
+            throw new BusinessException("Không thể tự thay đổi quyền của bản thân", 400);
+        }
+
+        rbacService.setUserPermissionOverrides(targetUserId, overrides, performedByUserId);
+        log.info("Cập nhật permissions: userId={}, overrides={}, by={}", targetUserId, overrides.keySet(), performedByUserId);
+
+        return getUserPermissions(targetUserId);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -383,11 +502,11 @@ public class AuthService {
                         user.getId(),
                         user.getUsername(),
                         user.getFullName(),
-                user.getRole().name(),
-                user.getStatus().name(),
-                user.getAvatarUrl(),
-                user.getDepartment(),
-                permissionCodes(user)
+                        user.getRole().name(),
+                        user.getStatus().name(),
+                        user.getAvatarUrl(),
+                        user.getDepartment(),
+                        permissionCodes(user)
                 )
         );
     }

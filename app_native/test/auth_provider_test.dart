@@ -395,6 +395,7 @@ void main() {
     test('technician can only access orders and has full permissions on them', () {
       expect(UserRole.technician.can(AppPermission.viewRepairOrders), isTrue);
       expect(UserRole.technician.can(AppPermission.manageRepairOrders), isTrue);
+      expect(UserRole.technician.can(AppPermission.updateRepairOrderStatus), isTrue);
       expect(UserRole.technician.can(AppPermission.assignRepairOrders), isTrue);
       
       expect(UserRole.technician.can(AppPermission.viewDashboard), isFalse);

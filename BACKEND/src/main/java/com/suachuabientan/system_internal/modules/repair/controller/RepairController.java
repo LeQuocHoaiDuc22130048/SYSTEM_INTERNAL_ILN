@@ -96,7 +96,7 @@ public class RepairController {
 
     @Operation(summary = "Cập nhật trạng thái đơn")
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
+    @PreAuthorize("hasAuthority('REPAIR_STATUS_UPDATE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> updateStatus(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateStatusRequest request,
@@ -121,7 +121,7 @@ public class RepairController {
 
     @Operation(summary = "Huỷ đơn sửa chữa")
     @PatchMapping("/{id}/cancel")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAuthority('REPAIR_MANAGE') or hasAuthority('REPAIR_STATUS_UPDATE') or hasAnyRole('SUPER_ADMIN', 'ADMIN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> cancel(
             @PathVariable UUID id,
             @RequestParam(required = false) String reason,

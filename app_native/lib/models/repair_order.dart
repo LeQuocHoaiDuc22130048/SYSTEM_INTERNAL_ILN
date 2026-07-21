@@ -1,6 +1,15 @@
 import 'repair_device.dart';
 
-enum RepairOrderStatus { pending, waitingForCheck, checking, checked, inProgress, completed, delivered, cancelled }
+enum RepairOrderStatus {
+  pending,
+  waitingForCheck,
+  checking,
+  checked,
+  inProgress,
+  completed,
+  delivered,
+  cancelled,
+}
 
 class RepairMedia {
   final String id;
@@ -8,7 +17,12 @@ class RepairMedia {
   final String type;
   final String? caption;
 
-  const RepairMedia({required this.id, required this.url, required this.type, this.caption});
+  const RepairMedia({
+    required this.id,
+    required this.url,
+    required this.type,
+    this.caption,
+  });
 
   bool get isVideo => type == 'VIDEO';
 
@@ -87,14 +101,14 @@ class RepairOrder {
       case RepairOrderStatus.delivered:
         return 'Đã giao';
       case RepairOrderStatus.cancelled:
-        return 'Đã hủy';
+        return 'Đã trả';
     }
   }
 
   factory RepairOrder.fromJson(Map<String, dynamic> json) {
     final assignedTo = json['assignedTo'];
     final images = json['images'];
-    
+
     final assigneesJson = json['assignees'];
     final List<String> assigneeIds = [];
     final List<String> assigneeNames = [];
@@ -142,16 +156,16 @@ class RepairOrder {
       notes: json['notes']?.toString(),
       media: images is List
           ? images
-              .whereType<Map<String, dynamic>>()
-              .map(RepairMedia.fromJson)
-              .where((attachment) => attachment.url.isNotEmpty)
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map(RepairMedia.fromJson)
+                .where((attachment) => attachment.url.isNotEmpty)
+                .toList()
           : const [],
       devices: (json['devices'] is List)
           ? (json['devices'] as List)
-              .whereType<Map<String, dynamic>>()
-              .map(RepairDevice.fromJson)
-              .toList()
+                .whereType<Map<String, dynamic>>()
+                .map(RepairDevice.fromJson)
+                .toList()
           : const [],
     );
   }
