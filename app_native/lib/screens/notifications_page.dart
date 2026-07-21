@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../models/app_notification.dart';
 import '../theme/app_colors.dart';
 import '../utils/notification_provider.dart';
+import '../utils/update_provider.dart';
 
 class NotificationsPage extends StatefulWidget {
   final Function(int, {String? refId, int? subTab})? onNavigateToTab;
@@ -24,9 +25,14 @@ class _NotificationsPageState extends State<NotificationsPage> {
   }
 
   void _handleNotificationTap(AppNotification item) {
+    final type = item.type;
+    if (type == 'APP_UPDATE') {
+      context.read<UpdateProvider>().checkForUpdate(context, manual: true);
+      return;
+    }
+
     if (widget.onNavigateToTab == null) return;
 
-    final type = item.type;
     final refType = item.refType;
     final refId = item.refId;
 
@@ -318,6 +324,12 @@ class _NotificationVisuals {
 
   factory _NotificationVisuals.fromType(String type) {
     switch (type) {
+      case 'APP_UPDATE':
+        return const _NotificationVisuals(
+          icon: LucideIcons.download,
+          color: AppColors.primary,
+          background: AppColors.infoLight,
+        );
       case 'ACCOUNT_PENDING':
       case 'ACCOUNT_APPROVED':
       case 'ACCOUNT_REJECTED':

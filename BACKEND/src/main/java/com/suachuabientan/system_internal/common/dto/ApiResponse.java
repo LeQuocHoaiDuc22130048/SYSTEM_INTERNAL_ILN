@@ -10,6 +10,7 @@ import java.util.List;
 
 @Getter
 @Builder
+@ToString
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
 
@@ -68,6 +69,7 @@ public class ApiResponse<T> {
 
     @Getter
     @Builder
+    @ToString
     public static class FieldError {
         private final String field;
         private final String message;

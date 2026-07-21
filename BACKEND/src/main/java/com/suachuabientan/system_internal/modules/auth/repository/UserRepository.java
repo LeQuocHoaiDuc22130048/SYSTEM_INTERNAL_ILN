@@ -32,6 +32,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
 
     boolean existsByEmployeeCodeAndIsDeletedFalse(String employeeCode);
 
+    boolean existsByEmployeeCode(String employeeCode);
+
     /**
      * Danh sách user đang chờ duyệt — chỉ ADMIN/MANAGER mới xem được (SEC-03).
      */
@@ -44,10 +46,7 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
             
             SELECT u FROM UserEntity u
                WHERE u.isDeleted = false
-                 AND u.role NOT IN (
-                   com.suachuabientan.system_internal.modules.auth.enums.UserRole.SUPER_ADMIN,
-                   com.suachuabientan.system_internal.modules.auth.enums.UserRole.ADMIN
-                 )
+                 AND cast(u.role as String) NOT IN ('SUPER_ADMIN', 'ADMIN')
                  AND (
                    COALESCE(TRIM(:keyword), '') = ''
                    OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', TRIM(:keyword), '%'))

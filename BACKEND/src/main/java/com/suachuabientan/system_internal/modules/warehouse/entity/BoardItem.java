@@ -19,10 +19,10 @@ public class BoardItem extends BaseEntity {
     @Column(name = "qr_code", nullable = false, unique = true, length = 100)
     private String qrCode;
 
-    @Column(nullable = false, length = 200)
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String name;
 
-    @Column(length = 100)
+    @Column(length = 255)
     private String category;
 
     @Column(columnDefinition = "TEXT")
@@ -33,7 +33,7 @@ public class BoardItem extends BaseEntity {
     @Builder.Default
     private BoardStatus status = BoardStatus.AVAILABLE;
 
-    @Column(length = 100)
+    @Column(length = 255)
     private String location;
 
     @Column(name = "serial_number", unique = true, length = 100)

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../app/app_routes.dart';
 import '../app/theme_provider.dart';
 import '../models/app_notification.dart';
+import '../models/app_permission.dart';
 import '../navigation/main_tabs.dart';
 import '../navigation/navigation_config.dart';
 import '../navigation/navigation_item.dart';
@@ -13,6 +14,7 @@ import '../navigation/notification_navigation_resolver.dart';
 import '../utils/auth_provider.dart';
 import '../utils/chat_provider.dart';
 import '../utils/notification_provider.dart';
+import '../utils/update_provider.dart';
 import '../widgets/navigation/mobile_dashboard_app_bar.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/navigation/side_navigation.dart';
@@ -57,6 +59,12 @@ class _MainScreenState extends State<MainScreen> {
     _pages = List<Widget?>.filled(MainTabs.count, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
     _bindNotificationClicks();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        context.read<UpdateProvider>().checkForUpdate(context, manual: false);
+      }
+    });
   }
 
   void _bindNotificationClicks() {
@@ -75,6 +83,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _handleNotificationClick(AppNotification item) {
+    if (item.type == 'APP_UPDATE') {
+      context.read<UpdateProvider>().checkForUpdate(context, manual: true);
+      return;
+    }
+
     final auth = context.read<AuthProvider>();
     final target = resolveNotificationNavigation(item, auth: auth);
     if (target == null) return;
@@ -308,9 +321,9 @@ class _MainScreenState extends State<MainScreen> {
           appBar: DashboardMobileAppBar(
             isDark: isDark,
             notificationBadge: notificationBadge,
-            onLogout: _logout,
             onToggleTheme: themeProvider.toggleTheme,
             onToggleNotifications: _toggleNotifications,
+            showNotification: auth.can(AppPermission.viewNotifications),
           ),
           body: body,
           bottomNavigationBar: MobileNavigationBar(

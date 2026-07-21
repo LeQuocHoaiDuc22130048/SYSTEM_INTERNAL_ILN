@@ -2,7 +2,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/attendance.dart';
 import '../models/board.dart';
+import '../models/repair_device.dart';
 import '../models/repair_order.dart';
+import '../models/board_history_item.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 
@@ -92,20 +94,40 @@ class BackendDataProvider extends ChangeNotifier {
 
   Future<RepairOrder> createRepairOrder({
     required String customerName,
-    required String customerPhone,
-    required String deviceName,
-    required String description,
+    String? customerPhone,
+    required List<RepairDevice> devices,
   }) async {
     final data = await api.post(
       '/api/v1/repair-orders',
       body: {
         'customerName': customerName,
-        'customerPhone': customerPhone,
-        'deviceName': deviceName,
-        'description': description,
+        if (customerPhone != null && customerPhone.isNotEmpty)
+          'customerPhone': customerPhone,
+        'devices': devices.map((d) => d.toRequestJson()).toList(),
       },
     );
     return RepairOrder.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> updateRepairOrder(
+    String orderId, {
+    required String customerName,
+    String? customerPhone,
+    required List<RepairDevice> devices,
+    String? note,
+    bool reload = true,
+  }) async {
+    await api.put(
+      '/api/v1/repair-orders/$orderId',
+      body: {
+        'customerName': customerName,
+        if (customerPhone != null && customerPhone.isNotEmpty)
+          'customerPhone': customerPhone,
+        'devices': devices.map((d) => d.toRequestJson()).toList(),
+        'note': note,
+      },
+    );
+    if (reload) await loadRepairOrders();
   }
 
   Future<void> uploadRepairMedia(
@@ -120,6 +142,15 @@ class BackendDataProvider extends ChangeNotifier {
       filename: filename,
       bytes: bytes,
     );
+  }
+
+  Future<void> deleteRepairMedia(
+    String orderId, {
+    required String mediaId,
+    bool reload = true,
+  }) async {
+    await api.delete('/api/v1/repair-orders/media/$mediaId');
+    if (reload) await loadRepairOrders();
   }
 
   Future<void> assignRepairOrder(
@@ -222,6 +253,35 @@ class BackendDataProvider extends ChangeNotifier {
   Future<void> deleteBoard(Board board) async {
     await api.delete('/api/v1/boards/${board.id}');
     await loadBoards();
+  }
+
+  Future<void> deleteRepairOrder(String orderId) async {
+    await api.delete('/api/v1/repair-orders/$orderId');
+    await loadRepairOrders();
+  }
+
+  Future<void> checkoutBoard(String boardId, {String? repairOrderId, String? note, bool reload = true}) async {
+    await api.post(
+      '/api/v1/boards/$boardId/checkout',
+      body: {
+        'repairOrderId': repairOrderId,
+        'note': note,
+      },
+    );
+    if (reload) await loadBoards();
+  }
+
+  Future<void> returnBoard(String boardId, {String? notes, bool reload = true}) async {
+    await api.patch(
+      '/api/v1/boards/$boardId/return',
+      body: notes != null ? {'notes': notes} : null,
+    );
+    if (reload) await loadBoards();
+  }
+
+  Future<List<BoardHistoryItem>> getBoardHistory(String boardId) async {
+    final data = await api.get('/api/v1/boards/$boardId/history');
+    return _content(data).map(BoardHistoryItem.fromJson).toList();
   }
 
   List<Map<String, dynamic>> _content(dynamic data) {

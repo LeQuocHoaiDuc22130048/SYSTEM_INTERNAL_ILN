@@ -56,14 +56,17 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
           ? AppColors.backgroundDark
           : const Color(0xFFF8FAFC),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            wide ? 20 : 22,
-            wide ? 22 : 16,
-            wide ? 20 : 22,
-            12,
-          ),
-          child: Center(
+        child: RefreshIndicator(
+          onRefresh: () => context.read<BackendDataProvider>().loadPendingUsers(),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              wide ? 20 : 22,
+              wide ? 22 : 16,
+              wide ? 20 : 22,
+              12,
+            ),
+            child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 800),
               child: Column(
@@ -141,6 +144,7 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
             ),
           ),
         ),
+      ),
       ),
     );
   }

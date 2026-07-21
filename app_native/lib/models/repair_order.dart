@@ -1,16 +1,20 @@
-enum RepairOrderStatus { pending, inProgress, completed, delivered, cancelled }
+import 'repair_device.dart';
+
+enum RepairOrderStatus { pending, waitingForCheck, checking, checked, inProgress, completed, delivered, cancelled }
 
 class RepairMedia {
+  final String id;
   final String url;
   final String type;
   final String? caption;
 
-  const RepairMedia({required this.url, required this.type, this.caption});
+  const RepairMedia({required this.id, required this.url, required this.type, this.caption});
 
   bool get isVideo => type == 'VIDEO';
 
   factory RepairMedia.fromJson(Map<String, dynamic> json) {
     return RepairMedia(
+      id: json['id']?.toString() ?? '',
       url: json['imageUrl']?.toString() ?? '',
       type: json['mediaType']?.toString() ?? 'IMAGE',
       caption: json['caption']?.toString(),
@@ -29,11 +33,14 @@ class RepairOrder {
   final String? assignedToName;
   final List<String> assigneeIds;
   final List<String> assigneeNames;
+  final String? serialNumber;
+  final bool underWarranty;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? description;
   final String? notes;
   final List<RepairMedia> media;
+  final List<RepairDevice> devices;
 
   RepairOrder({
     required this.id,
@@ -46,11 +53,14 @@ class RepairOrder {
     this.assignedToName,
     this.assigneeIds = const [],
     this.assigneeNames = const [],
+    this.serialNumber,
+    this.underWarranty = false,
     required this.createdAt,
     this.updatedAt,
     this.description,
     this.notes,
     this.media = const [],
+    this.devices = const [],
   });
 
   String? get imagePath {
@@ -63,7 +73,13 @@ class RepairOrder {
   String get statusLabel {
     switch (status) {
       case RepairOrderStatus.pending:
-        return 'Chờ xử lý';
+        return 'Chưa kiểm tra';
+      case RepairOrderStatus.waitingForCheck:
+        return 'Chờ kiểm tra';
+      case RepairOrderStatus.checking:
+        return 'Đang kiểm tra';
+      case RepairOrderStatus.checked:
+        return 'Đã kiểm tra';
       case RepairOrderStatus.inProgress:
         return 'Đang sửa';
       case RepairOrderStatus.completed:
@@ -118,10 +134,12 @@ class RepairOrder {
       assignedToName: assignedToName,
       assigneeIds: assigneeIds,
       assigneeNames: assigneeNames,
+      serialNumber: json['serialNumber']?.toString(),
+      underWarranty: json['underWarranty'] == true,
       createdAt: _dateFromJson(json['createdAt']) ?? DateTime.now(),
       updatedAt: _dateFromJson(json['updatedAt']),
       description: json['description']?.toString(),
-      notes: json['deviceType']?.toString(),
+      notes: json['notes']?.toString(),
       media: images is List
           ? images
               .whereType<Map<String, dynamic>>()
@@ -129,21 +147,28 @@ class RepairOrder {
               .where((attachment) => attachment.url.isNotEmpty)
               .toList()
           : const [],
+      devices: (json['devices'] is List)
+          ? (json['devices'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(RepairDevice.fromJson)
+              .toList()
+          : const [],
     );
   }
 
   static RepairOrderStatus _statusFromBackend(String? status) {
     switch (status) {
-      case 'RECEIVED':
       case 'PENDING':
         return RepairOrderStatus.pending;
-      case 'ASSIGNED':
-      case 'IN_PROGRESS':
+      case 'WAITING_FOR_CHECK':
+        return RepairOrderStatus.waitingForCheck;
       case 'CHECKING':
-      case 'REPAIRING':
+        return RepairOrderStatus.checking;
+      case 'CHECKED':
+        return RepairOrderStatus.checked;
+      case 'IN_PROGRESS':
         return RepairOrderStatus.inProgress;
       case 'COMPLETED':
-      case 'DONE':
         return RepairOrderStatus.completed;
       case 'DELIVERED':
         return RepairOrderStatus.delivered;

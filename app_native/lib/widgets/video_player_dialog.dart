@@ -116,110 +116,115 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
               ),
             ),
             // Video Area
-            AspectRatio(
-              aspectRatio: _initialized ? _controller.value.aspectRatio : 16 / 9,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  if (_initialized)
-                    GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _showControls = !_showControls;
-                        });
-                      },
-                      child: VideoPlayer(_controller),
-                    )
-                  else if (_errorMessage != null)
-                    Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Icon(
-                            Icons.error_outline,
-                            color: Colors.redAccent,
-                            size: 40,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _errorMessage!,
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(color: Colors.white70, fontSize: 13),
-                          ),
-                        ],
-                      ),
-                    )
-                  else
-                    const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
-                        ),
-                        SizedBox(height: 12),
-                        Text(
-                          'Đang tải video...',
-                          style: TextStyle(color: Colors.white70, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  // Controls Overlay
-                  if (_initialized && _showControls)
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.black.withOpacity(0.3),
-                        child: Stack(
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.7,
+              ),
+              child: AspectRatio(
+                aspectRatio: _initialized ? _controller.value.aspectRatio : 16 / 9,
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    if (_initialized)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _showControls = !_showControls;
+                          });
+                        },
+                        child: VideoPlayer(_controller),
+                      )
+                    else if (_errorMessage != null)
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Play/Pause Center button
-                            Center(
-                              child: GestureDetector(
-                                onTap: _togglePlay,
-                                child: Container(
-                                  padding: const EdgeInsets.all(12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black54,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white24),
-                                  ),
-                                  child: Icon(
-                                    _controller.value.isPlaying
-                                        ? Icons.pause
-                                        : Icons.play_arrow,
-                                    color: Colors.white,
-                                    size: 32,
-                                  ),
-                                ),
-                              ),
+                            const Icon(
+                              Icons.error_outline,
+                              color: Colors.redAccent,
+                              size: 40,
                             ),
-                            // Bottom Progress indicator
-                            Positioned(
-                              bottom: 0,
-                              left: 0,
-                              right: 0,
-                              child: Column(
-                                children: [
-                                  VideoProgressIndicator(
-                                    _controller,
-                                    allowScrubbing: true,
-                                    colors: const VideoProgressColors(
-                                      playedColor: AppColors.primary,
-                                      bufferedColor: Colors.white24,
-                                      backgroundColor: Colors.white10,
-                                    ),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
-                                    ),
-                                  ),
-                                ],
-                              ),
+                            const SizedBox(height: 8),
+                            Text(
+                              _errorMessage!,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(color: Colors.white70, fontSize: 13),
                             ),
                           ],
                         ),
+                      )
+                    else
+                      const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                          ),
+                          SizedBox(height: 12),
+                          Text(
+                            'Đang tải video...',
+                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                          ),
+                        ],
                       ),
-                    ),
-                ],
+                    // Controls Overlay
+                    if (_initialized && _showControls)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black.withOpacity(0.3),
+                          child: Stack(
+                            children: [
+                              // Play/Pause Center button
+                              Center(
+                                child: GestureDetector(
+                                  onTap: _togglePlay,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white24),
+                                    ),
+                                    child: Icon(
+                                      _controller.value.isPlaying
+                                          ? Icons.pause
+                                          : Icons.play_arrow,
+                                      color: Colors.white,
+                                      size: 32,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              // Bottom Progress indicator
+                              Positioned(
+                                bottom: 0,
+                                left: 0,
+                                right: 0,
+                                child: Column(
+                                  children: [
+                                    VideoProgressIndicator(
+                                      _controller,
+                                      allowScrubbing: true,
+                                      colors: const VideoProgressColors(
+                                        playedColor: AppColors.primary,
+                                        bufferedColor: Colors.white24,
+                                        backgroundColor: Colors.white10,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 8),

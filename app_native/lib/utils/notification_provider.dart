@@ -38,6 +38,7 @@ class NotificationProvider extends ChangeNotifier {
   bool _suppressTokenUpload = false;
   String? _lastSyncToken;
 
+  AppNotification? _updateNotification;
   AppNotification? pendingNotificationClick;
 
   final StreamController<Map<String, dynamic>> _messageStreamController =
@@ -127,6 +128,65 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> showLocalNotification({
+    required int id,
+    required String title,
+    required String body,
+    String? payload,
+  }) async {
+    if (!_localNotificationsReady || kIsWeb) return;
+    try {
+      await _localNotifications.show(
+        id,
+        title,
+        body,
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'system_internal_notifications',
+            'System Internal Notifications',
+            channelDescription: 'In-app and push notifications',
+            importance: Importance.high,
+            priority: Priority.high,
+          ),
+        ),
+        payload: payload,
+      );
+    } catch (e) {
+      _log('Failed to show local notification: $e');
+    }
+  }
+
+  void setUpdateNotification({
+    required String latestVersion,
+    required String changelog,
+  }) {
+    _updateNotification = AppNotification(
+      id: 'app_update_notification',
+      recipientId: '',
+      type: 'APP_UPDATE',
+      title: 'Có bản cập nhật mới (v$latestVersion)',
+      body: changelog.isNotEmpty
+          ? changelog.replaceAll('\\n', '\n')
+          : 'Sửa lỗi và cải thiện hiệu năng.',
+      isRead: false,
+      createdAt: DateTime.now(),
+    );
+    // Insert or update in list
+    notifications.removeWhere((n) => n.id == 'app_update_notification');
+    notifications.insert(0, _updateNotification!);
+    unreadCount = notifications.where((item) => !item.isRead).length;
+    notifyListeners();
+  }
+
+  void clearUpdateNotification() {
+    if (_updateNotification != null) {
+      _updateNotification = null;
+      notifications.removeWhere((n) => n.id == 'app_update_notification');
+      unreadCount = notifications.where((item) => !item.isRead).length;
+      notifyListeners();
+    }
+  }
+
   void bindAuth(AuthProvider auth) {
     _auth = auth;
     Future.microtask(_syncForAuthState);
@@ -144,6 +204,10 @@ class NotificationProvider extends ChangeNotifier {
         queryParameters: {'size': 50},
       );
       notifications = _content(data).map(AppNotification.fromJson).toList();
+      if (_updateNotification != null) {
+        notifications.removeWhere((n) => n.id == 'app_update_notification');
+        notifications.insert(0, _updateNotification!);
+      }
       unreadCount = notifications.where((item) => !item.isRead).length;
     } on ApiException catch (e) {
       error = e.message;
@@ -170,7 +234,24 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> markAsRead(AppNotification notification) async {
-    if (notification.isRead || !apiHasToken) return;
+    if (notification.isRead) return;
+
+    if (notification.id == 'app_update_notification') {
+      if (_updateNotification != null) {
+        _updateNotification = _updateNotification!.copyWith(isRead: true);
+        notifications = notifications
+            .map(
+              (item) =>
+                  item.id == notification.id ? item.copyWith(isRead: true) : item,
+            )
+            .toList();
+        unreadCount = notifications.where((item) => !item.isRead).length;
+        notifyListeners();
+      }
+      return;
+    }
+
+    if (!apiHasToken) return;
 
     await api.put('/api/v1/notifications/${notification.id}/read');
     notifications = notifications
@@ -184,9 +265,16 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   Future<void> markAllAsRead() async {
-    if (!apiHasToken || unreadCount == 0) return;
+    if (unreadCount == 0) return;
 
-    await api.put('/api/v1/notifications/read-all');
+    if (apiHasToken) {
+      await api.put('/api/v1/notifications/read-all');
+    }
+
+    if (_updateNotification != null) {
+      _updateNotification = _updateNotification!.copyWith(isRead: true);
+    }
+
     notifications = notifications
         .map((item) => item.copyWith(isRead: true))
         .toList();

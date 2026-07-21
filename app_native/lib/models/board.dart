@@ -110,19 +110,19 @@ extension BoardStatusMetadata on BoardStatus {
   String get label {
     switch (this) {
       case BoardStatus.available:
-        return 'San sang';
+        return 'Sẵn sàng';
       case BoardStatus.checkedOut:
-        return 'Dang dung';
+        return 'Đang dùng';
       case BoardStatus.inRepair:
-        return 'Dang sua';
+        return 'Đang sửa';
       case BoardStatus.damaged:
-        return 'Hong';
+        return 'Hỏng';
       case BoardStatus.lost:
-        return 'That lac';
+        return 'Mất';
       case BoardStatus.archived:
-        return 'Luu tru';
+        return 'Lưu trữ';
       case BoardStatus.maintenance:
-        return 'Bao tri';
+        return 'Bảo trì';
     }
   }
 

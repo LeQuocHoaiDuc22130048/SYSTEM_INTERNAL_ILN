@@ -1,0 +1,109 @@
+package com.suachuabientan.system_internal.modules.update.controller;
+
+import com.suachuabientan.system_internal.common.dto.ApiResponse;
+import com.suachuabientan.system_internal.modules.update.dto.AppUpdateInfo;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+
+@Tag(name = "App Update", description = "Quản lý cập nhật tự động cho ứng dụng client")
+@RestController
+@RequestMapping("/api/v1/app-updates")
+@RequiredArgsConstructor
+public class AppUpdateController {
+
+    private static final Logger log = LoggerFactory.getLogger(AppUpdateController.class);
+
+    @Value("${app.update.latest-version:1.1.3}")
+    private String latestVersion;
+
+    @Value("${app.update.changelog:- Cập nhật giao diện mới\n- Sửa lỗi kết nối mạng}")
+    private String changelog;
+
+    @Value("${app.update.download-url:/api/v1/app-updates/download/system_internal_v1.1.3.apk}")
+    private String downloadUrl;
+
+    @Value("${app.update.mandatory:false}")
+    private boolean mandatory;
+
+    @Value("${app.update.release-dir:./releases}")
+    private String releaseDir;
+
+    @Operation(summary = "Kiểm tra phiên bản cập nhật")
+    @GetMapping("/check")
+    public ResponseEntity<ApiResponse<AppUpdateInfo>> checkUpdate(@RequestParam String version) {
+        boolean updateAvailable = isVersionNewer(latestVersion, version);
+        String formattedChangelog = changelog != null ? changelog.replace("\\n", "\n") : "";
+        AppUpdateInfo updateInfo = new AppUpdateInfo(
+            updateAvailable,
+            latestVersion,
+            downloadUrl,
+            mandatory,
+            formattedChangelog
+        );
+        return ResponseEntity.ok(ApiResponse.success(updateInfo));
+    }
+
+    @Operation(summary = "Tải file cài đặt client")
+    @GetMapping("/download/{filename:.+}")
+    public ResponseEntity<Resource> downloadFile(@PathVariable String filename) {
+        try {
+            Path filePath = Paths.get(releaseDir).resolve(filename).normalize();
+            // Prevent path traversal attacks
+            if (!filePath.startsWith(Paths.get(releaseDir).normalize())) {
+                log.warn("Path traversal attempt blocked: {}", filename);
+                return ResponseEntity.status(403).build();
+            }
+
+            Resource resource = new UrlResource(filePath.toUri());
+
+            if (resource.exists() && resource.isReadable()) {
+                log.info("Downloading release file: {}", filename);
+                return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                    .body(resource);
+            } else {
+                log.warn("Release file not found or not readable: {}", filename);
+                return ResponseEntity.notFound().build();
+            }
+        } catch (MalformedURLException e) {
+            log.error("Error path format: {}", filename, e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    private boolean isVersionNewer(String latest, String current) {
+        if (latest == null || current == null) return false;
+        
+        // Clean version strings
+        String l = latest.trim().replaceAll("[^0-9.]", "");
+        String c = current.trim().replaceAll("[^0-9.]", "");
+        
+        String[] latestParts = l.split("\\.");
+        String[] currentParts = c.split("\\.");
+        
+        int length = Math.max(latestParts.length, currentParts.length);
+        for (int i = 0; i < length; i++) {
+            int lPart = i < latestParts.length && !latestParts[i].isEmpty() ? Integer.parseInt(latestParts[i]) : 0;
+            int cPart = i < currentParts.length && !currentParts[i].isEmpty() ? Integer.parseInt(currentParts[i]) : 0;
+            
+            if (lPart > cPart) return true;
+            if (lPart < cPart) return false;
+        }
+        return false;
+    }
+}

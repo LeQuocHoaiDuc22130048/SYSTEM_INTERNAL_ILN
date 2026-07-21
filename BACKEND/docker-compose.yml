@@ -22,6 +22,7 @@ services:
       - "8080:8080"
     volumes:
       - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+      - ./releases:/app/releases
     depends_on:
       - postgres
       - redis

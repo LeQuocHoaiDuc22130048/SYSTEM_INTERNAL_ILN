@@ -6,23 +6,22 @@ import jakarta.validation.constraints.Size;
 import java.util.UUID;
 
 public record UpdateBoardItemRequest(
-        @Size(max = 200)
         String name,
 
-        @Size(max = 100)
+        @Size(max = 255, message = "Danh mục tối đa 255 ký tự")
         String category,
 
         String description,
 
-        @Size(max = 100)
+        @Size(max = 255, message = "Vị trí tối đa 255 ký tự")
         String location,
 
         @Size(max = 100)
         String serialNumber,
 
-        UUID partId,
+        String partId,
 
-        UUID currentLocationId,
+        String currentLocationId,
 
         BoardStatus status
 ) {

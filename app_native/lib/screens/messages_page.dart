@@ -7,6 +7,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:video_player/video_player.dart';
 
 import '../theme/app_colors.dart';
 import '../models/conversation.dart';
@@ -16,6 +17,7 @@ import '../utils/chat_provider.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../services/giphy_service.dart';
+import '../widgets/video_player_dialog.dart';
 
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key});
@@ -501,7 +503,20 @@ class _ConversationTile extends StatelessWidget {
   }
 }
 
+class _MentionSuggestion {
+  final String userId;
+  final String displayName;
+  final String? subtitle;
+
+  const _MentionSuggestion({
+    required this.userId,
+    required this.displayName,
+    this.subtitle,
+  });
+}
+
 class _ChatDetailPage extends StatefulWidget {
+
   final ChatConversation conversation;
   final bool isDark;
   final VoidCallback onBack;
@@ -522,6 +537,10 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
   final ImagePicker _imagePicker = ImagePicker();
   bool _isUploading = false;
   bool _isTyping = false;
+  ChatMessage? _replyingToMessage;
+
+  // Mention autocomplete state
+  String? _mentionQuery; // non-null when user is typing @...
 
   @override
   void initState() {
@@ -550,16 +569,47 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
         _isTyping = isTyping;
       });
     }
+
+    // Only show mention suggestions in group chats
+    if (widget.conversation.type != 'GROUP') return;
+
+    final text = _controller.text;
+    final cursorPos = _controller.selection.baseOffset;
+    if (cursorPos < 0) return;
+
+    // Find the last '@' before the cursor
+    final textBeforeCursor = text.substring(0, cursorPos.clamp(0, text.length));
+    final atIndex = textBeforeCursor.lastIndexOf('@');
+    if (atIndex != -1) {
+      // Ensure there is no space between '@' and cursor
+      final query = textBeforeCursor.substring(atIndex + 1);
+      if (!query.contains(' ')) {
+        if (_mentionQuery != query) {
+          setState(() => _mentionQuery = query);
+        }
+        return;
+      }
+    }
+    if (_mentionQuery != null) {
+      setState(() => _mentionQuery = null);
+    }
   }
 
   void _handleSend() {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
     _controller.clear();
+    final parentId = _replyingToMessage?.id;
+    if (parentId != null) {
+      setState(() {
+        _replyingToMessage = null;
+      });
+    }
     context.read<ChatProvider>().sendMessage(
       widget.conversation.id,
       text,
       mentionUserIds: _mentionUserIdsFor(text),
+      parentMessageId: parentId,
     );
   }
 
@@ -582,8 +632,17 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
 
   List<String> _mentionUserIdsFor(String text) {
     final normalizedText = text.toLowerCase();
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    // @All mentions every member except the sender
+    if (normalizedText.contains('@all') || normalizedText.contains('@tất cả')) {
+      return widget.conversation.members
+          .where((m) => m.userId != currentUserId)
+          .map((m) => m.userId)
+          .toList();
+    }
     final ids = <String>{};
     for (final member in widget.conversation.members) {
+      if (member.userId == currentUserId) continue;
       final names = <String>[
         member.fullName,
         if (member.employeeCode != null) member.employeeCode!,
@@ -598,21 +657,288 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
     return ids.toList();
   }
 
-  Future<void> _pickImage() async {
-    final file = await _imagePicker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 85,
+  /// Called when user taps a mention suggestion.
+  void _handleMentionSelected(String displayName) {
+    final text = _controller.text;
+    final cursorPos = _controller.selection.baseOffset.clamp(0, text.length);
+    final textBeforeCursor = text.substring(0, cursorPos);
+    final atIndex = textBeforeCursor.lastIndexOf('@');
+    if (atIndex == -1) return;
+
+    final before = text.substring(0, atIndex);
+    final after = text.substring(cursorPos);
+    final inserted = '@$displayName ';
+    final newText = '$before$inserted$after';
+    _controller.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: before.length + inserted.length),
     );
-    if (file != null) {
-      await _uploadMedia(await file.readAsBytes(), file.name, 'IMAGE');
+    setState(() => _mentionQuery = null);
+  }
+
+  /// Builds the mention suggestion list shown above the input bar.
+  Widget _buildMentionSuggestions() {
+    if (_mentionQuery == null || widget.conversation.type != 'GROUP') {
+      return const SizedBox.shrink();
+    }
+    final query = _mentionQuery!.toLowerCase();
+    final isDark = widget.isDark;
+
+    // Build suggestion entries: first "All", then members (excluding self)
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    final List<_MentionSuggestion> suggestions = [];
+    if ('all'.startsWith(query) || 'tất cả'.contains(query)) {
+      suggestions.add(const _MentionSuggestion(userId: '__all__', displayName: 'All', subtitle: 'Nhắc tất cả thành viên'));
+    }
+    for (final member in widget.conversation.members) {
+      if (member.userId == currentUserId) continue; // skip self
+      if (member.fullName.toLowerCase().contains(query) ||
+          (member.employeeCode?.toLowerCase().contains(query) ?? false)) {
+        suggestions.add(_MentionSuggestion(
+          userId: member.userId,
+          displayName: member.fullName,
+          subtitle: member.employeeCode,
+        ));
+      }
+    }
+    if (suggestions.isEmpty) return const SizedBox.shrink();
+
+    final surfaceColor = isDark ? AppColors.surfaceDark : Colors.white;
+    final borderColor = isDark ? AppColors.borderDark : AppColors.borderLight;
+
+    return Container(
+      constraints: const BoxConstraints(maxHeight: 220),
+      decoration: BoxDecoration(
+        color: surfaceColor,
+        border: Border(
+          top: BorderSide(color: borderColor),
+          left: BorderSide(color: borderColor),
+          right: BorderSide(color: borderColor),
+        ),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, -2),
+          ),
+        ],
+      ),
+      child: ListView.separated(
+        shrinkWrap: true,
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        itemCount: suggestions.length,
+        separatorBuilder: (context, idx) => Divider(
+          height: 1,
+          color: borderColor,
+          indent: 52,
+        ),
+        itemBuilder: (context, index) {
+          final s = suggestions[index];
+          final isAll = s.userId == '__all__';
+          return InkWell(
+            onTap: () => _handleMentionSelected(s.displayName),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 16,
+                    backgroundColor: isAll
+                        ? AppColors.primary
+                        : Colors.primaries[
+                            s.displayName.hashCode.abs() % Colors.primaries.length],
+                    child: isAll
+                        ? const Icon(Icons.people, color: Colors.white, size: 16)
+                        : Text(
+                            s.displayName.isNotEmpty ? s.displayName[0].toUpperCase() : '?',
+                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                          ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '@${s.displayName}',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          ),
+                        ),
+                        if (s.subtitle != null && s.subtitle!.isNotEmpty) ...
+                          [
+                            const SizedBox(height: 1),
+                            Text(
+                              s.subtitle!,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Future<void> _pickMedia() async {
+    try {
+      final List<XFile> pickedFiles = await _imagePicker.pickMultipleMedia();
+      if (pickedFiles.isNotEmpty) {
+        await _uploadMultipleMedia(pickedFiles);
+      }
+    } catch (e) {
+      debugPrint('[CHAT] Error picking media: $e');
     }
   }
 
-  Future<void> _pickVideo() async {
-    final file = await _imagePicker.pickVideo(source: ImageSource.gallery);
-    if (file != null) {
-      await _uploadMedia(await file.readAsBytes(), file.name, 'VIDEO');
+  Future<void> _uploadMultipleMedia(List<XFile> files) async {
+    if (_isUploading) return;
+    setState(() => _isUploading = true);
+    try {
+      final chatProvider = context.read<ChatProvider>();
+      String caption = _controller.text.trim();
+      bool isFirst = true;
+
+      final parentId = _replyingToMessage?.id;
+      if (parentId != null) {
+        setState(() {
+          _replyingToMessage = null;
+        });
+      }
+
+      for (final file in files) {
+        final bytes = await file.readAsBytes();
+        final type = _getMediaType(file);
+
+        await chatProvider.sendMediaMessage(
+          widget.conversation.id,
+          bytes: Uint8List.fromList(bytes),
+          filename: file.name,
+          messageType: type,
+          content: isFirst ? caption : '',
+          parentMessageId: isFirst ? parentId : null,
+        );
+
+        if (isFirst && caption.isNotEmpty) {
+          _controller.clear();
+          caption = '';
+        }
+        isFirst = false;
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Không thể gửi tệp: $error')));
+      }
+    } finally {
+      if (mounted) setState(() => _isUploading = false);
     }
+  }
+
+  String _getMediaType(XFile file) {
+    final mime = file.mimeType;
+    if (mime != null) {
+      if (mime.startsWith('video/')) return 'VIDEO';
+      if (mime.startsWith('image/')) return 'IMAGE';
+    }
+    final path = file.path.toLowerCase();
+    if (path.endsWith('.mp4') ||
+        path.endsWith('.mov') ||
+        path.endsWith('.avi') ||
+        path.endsWith('.mkv') ||
+        path.endsWith('.3gp') ||
+        path.endsWith('.webm') ||
+        path.endsWith('.flv') ||
+        path.endsWith('.wmv')) {
+      return 'VIDEO';
+    }
+    return 'IMAGE';
+  }
+
+  Widget _buildReplyPreviewBar() {
+    final msg = _replyingToMessage!;
+    final isDark = widget.isDark;
+    
+    String displayContent = msg.isRecalled ? 'Tin nhắn đã bị thu hồi' : msg.content;
+    if (!msg.isRecalled && displayContent.isEmpty) {
+      if (msg.messageType == 'IMAGE') {
+        displayContent = 'Đã gửi một hình ảnh';
+      } else if (msg.messageType == 'VIDEO') {
+        displayContent = 'Đã gửi một video';
+      } else if (msg.messageType == 'FILE') {
+        displayContent = 'Đã gửi một tệp đính kèm';
+      } else {
+        displayContent = 'Tin nhắn đính kèm';
+      }
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.grey.shade100,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.borderDark : Colors.grey.shade300,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.reply_outlined, size: 18, color: AppColors.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Đang trả lời ${msg.sender.fullName}',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 11,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  displayContent,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    fontStyle: msg.isRecalled ? FontStyle.italic : FontStyle.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            constraints: const BoxConstraints(),
+            padding: EdgeInsets.zero,
+            icon: const Icon(Icons.close, size: 16),
+            onPressed: () {
+              setState(() {
+                _replyingToMessage = null;
+              });
+            },
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _pickFile() async {
@@ -632,12 +958,19 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
     setState(() => _isUploading = true);
     try {
       final caption = type == 'FILE' ? '' : _controller.text.trim();
+      final parentId = _replyingToMessage?.id;
+      if (parentId != null) {
+        setState(() {
+          _replyingToMessage = null;
+        });
+      }
       await context.read<ChatProvider>().sendMediaMessage(
         widget.conversation.id,
         bytes: Uint8List.fromList(bytes),
         filename: fileName,
         messageType: type,
         content: caption,
+        parentMessageId: parentId,
       );
       if (caption.isNotEmpty) {
         _controller.clear();
@@ -651,137 +984,6 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
     } finally {
       if (mounted) setState(() => _isUploading = false);
     }
-  }
-
-  void _showAttachmentOptions() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.video_file_outlined),
-              title: const Text('Gửi video'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _pickVideo();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.attach_file),
-              title: const Text('Đính kèm tệp'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _pickFile();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.emoji_emotions_outlined),
-              title: const Text('Tim sticker Giphy'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showGiphyPicker('STICKER');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.gif_box_outlined),
-              title: const Text('Tim GIF Giphy'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showGiphyPicker('GIF');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Future<void> _showRichMediaDialog(String type) async {
-    final urlController = TextEditingController();
-    final captionController = TextEditingController(text: _controller.text);
-    try {
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(type == 'GIF' ? 'Gui GIF' : 'Gui sticker'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: urlController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'URL anh/GIF',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 10),
-              TextField(
-                controller: captionController,
-                decoration: const InputDecoration(
-                  labelText: 'Chu thich (tuy chon)',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                FocusScope.of(dialogContext).unfocus();
-                Navigator.pop(dialogContext);
-              },
-              child: const Text('Huy'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                final url = urlController.text.trim();
-                if (url.isEmpty) return;
-                await context.read<ChatProvider>().sendRichMediaUrl(
-                  widget.conversation.id,
-                  mediaUrl: url,
-                  messageType: type,
-                  content: captionController.text.trim(),
-                );
-                if (dialogContext.mounted) Navigator.pop(dialogContext);
-                if (mounted) _controller.clear();
-              },
-              child: const Text('Gui'),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      // Delay disposal to prevent text fields from accessing disposed controllers during transition
-      Future.delayed(const Duration(milliseconds: 500), () {
-        urlController.dispose();
-        captionController.dispose();
-      });
-    }
-  }
-
-  Future<void> _showGiphyPicker(String type) async {
-    final picked = await showModalBottomSheet<GiphyItem>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => _GiphyPickerSheet(
-        type: type,
-        onManualUrl: () {
-          Navigator.pop(sheetContext);
-          _showRichMediaDialog(type);
-        },
-      ),
-    );
-    if (picked == null || !mounted) return;
-
-    await context.read<ChatProvider>().sendRichMediaUrl(
-      widget.conversation.id,
-      mediaUrl: picked.mediaUrl,
-      messageType: type,
-      content: picked.title,
-    );
   }
 
   void _showConversationSearch() {
@@ -988,6 +1190,11 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                             child: _OutgoingMessage(
                               message: message,
                               isDark: widget.isDark,
+                              onReply: () {
+                                setState(() {
+                                  _replyingToMessage = message;
+                                });
+                              },
                             ),
                           );
                         }
@@ -997,11 +1204,17 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                           child: _IncomingMessage(
                             message: message,
                             isDark: widget.isDark,
+                            onReply: () {
+                              setState(() {
+                                _replyingToMessage = message;
+                              });
+                            },
                           ),
                         );
                       },
                     ),
             ),
+            _buildMentionSuggestions(),
             Container(
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
               decoration: BoxDecoration(
@@ -1014,120 +1227,144 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                   ),
                 ),
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  if (!_isTyping) ...[
-                    IconButton(
-                      onPressed: _isUploading ? null : _showAttachmentOptions,
-                      icon: const Icon(Icons.add_circle, size: 24),
-                      color: AppColors.primary,
-                    ),
-                    IconButton(
-                      onPressed: _isUploading ? null : _pickCamera,
-                      icon: const Icon(Icons.camera_alt, size: 24),
-                      color: AppColors.primary,
-                    ),
-                    IconButton(
-                      onPressed: _isUploading ? null : _pickImage,
-                      icon: const Icon(Icons.image, size: 24),
-                      color: AppColors.primary,
-                    ),
-                  ] else ...[
-                    IconButton(
-                      onPressed: () {
-                        FocusScope.of(context).unfocus();
-                        setState(() {
-                          _isTyping = false;
-                        });
-                      },
-                      icon: const Icon(Icons.chevron_right, size: 24),
-                      color: AppColors.primary,
-                    ),
+                  if (_replyingToMessage != null) ...[
+                    _buildReplyPreviewBar(),
+                    const SizedBox(height: 8),
                   ],
-                  Expanded(
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: widget.isDark
-                            ? AppColors.borderDark
-                            : const Color(0xFFF1F5F9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: TextField(
-                              controller: _controller,
-                              onSubmitted: (_) => _handleSend(),
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: widget.isDark
-                                    ? AppColors.textPrimaryDark
-                                    : AppColors.textPrimaryLight,
-                              ),
-                              decoration: const InputDecoration(
-                                hintText: 'Nhập tin nhắn...',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondaryLight,
-                                ),
-                                contentPadding: EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                border: InputBorder.none,
-                                enabledBorder: InputBorder.none,
-                                focusedBorder: InputBorder.none,
-                                errorBorder: InputBorder.none,
-                                disabledBorder: InputBorder.none,
-                                isDense: true,
-                              ),
+                  Row(
+                    children: [
+                      Visibility(
+                        visible: !_isTyping,
+                        maintainSize: false,
+                        maintainAnimation: false,
+                        maintainState: false,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              onPressed: _isUploading ? null : _pickFile,
+                              icon: const Icon(Icons.attach_file, size: 24),
+                              color: AppColors.primary,
                             ),
-                          ),
-                          IconButton(
-                            onPressed: () {
-                              _showGiphyPicker('STICKER');
-                            },
-                            icon: const Icon(Icons.emoji_emotions_outlined, size: 22),
-                            color: AppColors.primary,
-                            padding: EdgeInsets.zero,
-                            constraints: const BoxConstraints(),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
+                            IconButton(
+                              onPressed: _isUploading ? null : _pickCamera,
+                              icon: const Icon(Icons.camera_alt, size: 24),
+                              color: AppColors.primary,
+                            ),
+                            IconButton(
+                              onPressed: _isUploading ? null : _pickMedia,
+                              icon: const Icon(Icons.photo_library, size: 24),
+                              color: AppColors.primary,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  if (_isTyping)
-                    InkWell(
-                      onTap: _isUploading ? null : _handleSend,
-                      borderRadius: BorderRadius.circular(18),
-                      child: Container(
-                        width: 36,
-                        height: 36,
-                        alignment: Alignment.center,
-                        child: _isUploading
-                            ? const SizedBox(
-                                width: 20,
-                                height: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.primary,
+                      Visibility(
+                        visible: _isTyping,
+                        maintainSize: false,
+                        maintainAnimation: false,
+                        maintainState: false,
+                        child: IconButton(
+                          onPressed: () {
+                            FocusScope.of(context).unfocus();
+                            setState(() {
+                              _isTyping = false;
+                            });
+                          },
+                          icon: const Icon(Icons.chevron_right, size: 24),
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: widget.isDark
+                                ? AppColors.borderDark
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _controller,
+                                  onSubmitted: (_) => _handleSend(),
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: widget.isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight,
+                                  ),
+                                  decoration: const InputDecoration(
+                                    hintText: 'Nhập tin nhắn...',
+                                    hintStyle: TextStyle(
+                                      fontSize: 14,
+                                      color: AppColors.textSecondaryLight,
+                                    ),
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16,
+                                      vertical: 8,
+                                    ),
+                                    border: InputBorder.none,
+                                    enabledBorder: InputBorder.none,
+                                    focusedBorder: InputBorder.none,
+                                    errorBorder: InputBorder.none,
+                                    disabledBorder: InputBorder.none,
+                                    isDense: true,
+                                  ),
                                 ),
-                              )
-                            : const Icon(
-                                Icons.send,
-                                size: 22,
-                                color: AppColors.primary,
                               ),
+                              const SizedBox(width: 8),
+                            ],
+                          ),
+                        ),
                       ),
-                    )
-                  else
-                    IconButton(
-                      onPressed: _sendLike,
-                      icon: const Icon(Icons.thumb_up, size: 22),
-                      color: AppColors.primary,
-                    ),
+                      const SizedBox(width: 4),
+                      Visibility(
+                        visible: _isTyping,
+                        maintainSize: false,
+                        maintainAnimation: false,
+                        maintainState: false,
+                        child: InkWell(
+                          onTap: _isUploading ? null : _handleSend,
+                          borderRadius: BorderRadius.circular(18),
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            alignment: Alignment.center,
+                            child: _isUploading
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.primary,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.send,
+                                    size: 22,
+                                    color: AppColors.primary,
+                                  ),
+                          ),
+                        ),
+                      ),
+                      Visibility(
+                        visible: !_isTyping,
+                        maintainSize: false,
+                        maintainAnimation: false,
+                        maintainState: false,
+                        child: IconButton(
+                          onPressed: _sendLike,
+                          icon: const Icon(Icons.thumb_up, size: 22),
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -1182,9 +1419,16 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
       setState(() => _items = items);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = error is GiphyMissingApiKeyException
-          ? 'Chua cau hinh GIPHY_API_KEY khi chay/build app.'
-          : 'Khong the tim tren Giphy. Kiem tra mang hoac key.');
+      String errorMsg = 'Không thể tìm trên Giphy. Kiểm tra mạng hoặc key.';
+      if (error is GiphyMissingApiKeyException) {
+        errorMsg = 'Chưa cấu hình GIPHY_API_KEY khi chạy/build app.';
+      } else if (error is GiphyException) {
+        errorMsg = 'Lỗi Giphy: ${error.message}';
+        if (error.message.contains('401')) {
+          errorMsg = 'Lỗi Giphy (401 Unauthorized): API Key không hợp lệ hoặc đã hết hạn.';
+        }
+      }
+      setState(() => _error = errorMsg);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1849,8 +2093,13 @@ class _PinnedMessageBanner extends StatelessWidget {
 class _IncomingMessage extends StatelessWidget {
   final ChatMessage message;
   final bool isDark;
+  final VoidCallback onReply;
 
-  const _IncomingMessage({required this.message, required this.isDark});
+  const _IncomingMessage({
+    required this.message,
+    required this.isDark,
+    required this.onReply,
+  });
 
   String get _avatarText {
     final name = message.sender.fullName;
@@ -1905,35 +2154,62 @@ class _IncomingMessage extends StatelessWidget {
                   ),
                 ),
               ),
-              GestureDetector(
-                onLongPress: () => _showIncomingActions(context),
-                child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 11,
-                ),
-                decoration: BoxDecoration(
-                  color: isDark ? AppColors.surfaceDark : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.borderDark
-                        : AppColors.borderLight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
-                      blurRadius: 4,
-                      offset: const Offset(0, 1),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Flexible(
+                    child: GestureDetector(
+                      onLongPress: () => _showIncomingActions(context),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 11,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isDark ? AppColors.surfaceDark : Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: isDark
+                                ? AppColors.borderDark
+                                : AppColors.borderLight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            if (message.parentMessage != null)
+                              _ReplyPreviewWidget(
+                                parentMessage: message.parentMessage!,
+                                isOutgoing: false,
+                                isDark: isDark,
+                              ),
+                            _MessageContent(
+                              message: message,
+                              isOutgoing: false,
+                              isDark: isDark,
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
-                  ],
-                ),
-                child: _MessageContent(
-                  message: message,
-                  isOutgoing: false,
-                  isDark: isDark,
-                ),
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.more_vert, size: 20),
+                    onPressed: () => _showIncomingActions(context),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    color: isDark ? Colors.white54 : Colors.black45,
+                  ),
+                ],
               ),
               if (message.reactions.isNotEmpty) ...[
                 const SizedBox(height: 4),
@@ -1965,6 +2241,7 @@ class _IncomingMessage extends StatelessWidget {
       message: message,
       canEdit: false,
       canRecall: false,
+      onReply: onReply,
     );
   }
 }
@@ -1972,8 +2249,13 @@ class _IncomingMessage extends StatelessWidget {
 class _OutgoingMessage extends StatelessWidget {
   final ChatMessage message;
   final bool isDark;
+  final VoidCallback onReply;
 
-  const _OutgoingMessage({required this.message, required this.isDark});
+  const _OutgoingMessage({
+    required this.message,
+    required this.isDark,
+    required this.onReply,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1982,20 +2264,48 @@ class _OutgoingMessage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        GestureDetector(
-          onLongPress: () => _showOutgoingActions(context),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(12),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.more_vert, size: 20),
+              onPressed: () => _showOutgoingActions(context),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(),
+              color: isDark ? Colors.white54 : Colors.black45,
             ),
-            child: _MessageContent(
-              message: message,
-              isOutgoing: true,
-              isDark: isDark,
+            const SizedBox(width: 8),
+            Flexible(
+              child: GestureDetector(
+                onLongPress: () => _showOutgoingActions(context),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (message.parentMessage != null)
+                        _ReplyPreviewWidget(
+                          parentMessage: message.parentMessage!,
+                          isOutgoing: true,
+                          isDark: isDark,
+                        ),
+                      _MessageContent(
+                        message: message,
+                        isOutgoing: true,
+                        isDark: isDark,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
-          ),
+          ],
         ),
         if (message.reactions.isNotEmpty) ...[
           const SizedBox(height: 4),
@@ -2028,6 +2338,7 @@ class _OutgoingMessage extends StatelessWidget {
       message: message,
       canEdit: message.messageType == 'TEXT' && !message.isRecalled,
       canRecall: !message.isRecalled,
+      onReply: onReply,
     );
   }
 }
@@ -2039,6 +2350,7 @@ void _showMessageActionSheet(
   required ChatMessage message,
   required bool canEdit,
   required bool canRecall,
+  required VoidCallback onReply,
 }) {
   showModalBottomSheet<void>(
     context: context,
@@ -2066,6 +2378,14 @@ void _showMessageActionSheet(
                   )
                   .toList(),
             ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.reply_outlined),
+            title: const Text('Trả lời'),
+            onTap: () {
+              Navigator.pop(sheetContext);
+              onReply();
+            },
           ),
           if (canEdit)
             ListTile(
@@ -2186,7 +2506,11 @@ class _MessageContent extends StatelessWidget {
       fontWeight: isOutgoing ? FontWeight.w600 : FontWeight.normal,
     );
 
-    if (message.isRecalled || message.messageType == 'SYSTEM') {
+    if (message.isRecalled) {
+      return Text('Tin nhắn đã bị thu hồi', style: textStyle);
+    }
+
+    if (message.messageType == 'SYSTEM') {
       return Text(message.content, style: textStyle);
     }
 
@@ -2231,6 +2555,19 @@ class _MessageContent extends StatelessWidget {
               ),
             ),
           ),
+          if (message.content.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(message.content, style: textStyle),
+          ],
+        ],
+      );
+    }
+
+    if (message.messageType == 'VIDEO') {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _VideoMessageWidget(videoUrl: mediaUrl),
           if (message.content.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(message.content, style: textStyle),
@@ -2901,6 +3238,237 @@ class _ChatDetailInfoPage extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _VideoMessageWidget extends StatefulWidget {
+  final String videoUrl;
+
+  const _VideoMessageWidget({required this.videoUrl});
+
+  @override
+  State<_VideoMessageWidget> createState() => _VideoMessageWidgetState();
+}
+
+class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
+  VideoPlayerController? _controller;
+  bool _initialized = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeController();
+  }
+
+  void _initializeController() {
+    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
+      ..initialize().then((_) {
+        if (mounted) {
+          setState(() {
+            _initialized = true;
+          });
+        }
+      }).catchError((error) {
+        debugPrint('Error initializing video player: $error');
+        if (mounted) {
+          setState(() {
+            _hasError = true;
+          });
+        }
+      });
+  }
+
+  @override
+  void dispose() {
+    _controller?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    if (_hasError) {
+      return Container(
+        width: 220,
+        height: 150,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, color: Colors.redAccent, size: 32),
+              SizedBox(height: 8),
+              Text(
+                'Lỗi tải video',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (!_initialized) {
+      return Container(
+        width: 220,
+        height: 150,
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.grey[200],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: GestureDetector(
+        onTap: () {
+          showDialog(
+            context: context,
+            builder: (context) => VideoPlayerDialog(
+              videoUrl: widget.videoUrl,
+              title: 'Video',
+            ),
+          );
+        },
+        child: Container(
+          width: 220,
+          height: 150,
+          color: Colors.black,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox.expand(
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox(
+                    width: _controller!.value.size.width,
+                    height: _controller!.value.size.height,
+                    child: VideoPlayer(_controller!),
+                  ),
+                ),
+              ),
+              // Play Button Overlay
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                ),
+                child: const Icon(
+                  Icons.play_arrow_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ReplyPreviewWidget extends StatelessWidget {
+  final ParentMessageInfo parentMessage;
+  final bool isOutgoing;
+  final bool isDark;
+
+  const _ReplyPreviewWidget({
+    required this.parentMessage,
+    required this.isOutgoing,
+    required this.isDark,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final barColor = isOutgoing ? Colors.white70 : AppColors.primary;
+    final senderColor = isOutgoing ? Colors.white : AppColors.primary;
+    final textColor = isOutgoing
+        ? Colors.white.withValues(alpha: 0.9)
+        : (isDark ? Colors.white70 : Colors.black87);
+
+    String displayContent = parentMessage.isRecalled ? 'Tin nhắn đã bị thu hồi' : parentMessage.content;
+    if (!parentMessage.isRecalled && displayContent.isEmpty) {
+      if (parentMessage.messageType == 'IMAGE') {
+        displayContent = 'Đã gửi một hình ảnh';
+      } else if (parentMessage.messageType == 'VIDEO') {
+        displayContent = 'Đã gửi một video';
+      } else if (parentMessage.messageType == 'FILE') {
+        displayContent = 'Đã gửi một tệp đính kèm';
+      } else {
+        displayContent = 'Tin nhắn đính kèm';
+      }
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: isOutgoing
+            ? Colors.black.withValues(alpha: 0.1)
+            : (isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.03)),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 3,
+              color: barColor,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    parentMessage.senderName,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: senderColor,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    displayContent,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: textColor,
+                      fontStyle: parentMessage.isRecalled ? FontStyle.italic : FontStyle.normal,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

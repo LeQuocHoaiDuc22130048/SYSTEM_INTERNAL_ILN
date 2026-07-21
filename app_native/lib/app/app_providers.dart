@@ -7,6 +7,7 @@ import '../utils/chat_provider.dart';
 import '../utils/network_provider.dart';
 import '../utils/notification_provider.dart';
 import '../utils/pending_sync_provider.dart';
+import '../utils/update_provider.dart';
 import 'theme_provider.dart';
 
 class AppProviders extends StatelessWidget {
@@ -20,6 +21,12 @@ class AppProviders extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AuthProvider()),
+        ChangeNotifierProxyProvider<AuthProvider, UpdateProvider>(
+          create: (context) =>
+              UpdateProvider(api: context.read<AuthProvider>().api),
+          update: (_, auth, previous) =>
+              previous ?? UpdateProvider(api: auth.api),
+        ),
         ChangeNotifierProxyProvider<AuthProvider, BackendDataProvider>(
           create: (context) =>
               BackendDataProvider(api: context.read<AuthProvider>().api),

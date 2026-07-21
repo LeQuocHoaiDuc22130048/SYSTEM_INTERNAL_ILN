@@ -8,9 +8,10 @@ public record RepairOrderResponse(
         UUID id,
         String orderCode,
 
-        // Thiết bị
+        // Thông tin thiết bị đầu tiên (backward compat)
         String deviceName,
         String deviceType,
+        String serialNumber,
 
         // Khách hàng
         String customerName,
@@ -33,10 +34,16 @@ public record RepairOrderResponse(
         Instant completedAt,
         Instant deliveredAt,
 
+        Boolean underWarranty,
+
         // Đính kèm
         List<ImageInfo> images,
 
-        Instant createdAt
+        Instant createdAt,
+
+        // Danh sách thiết bị trong đơn
+        List<RepairDeviceResponse> devices,
+        String notes
 ) {
     public record UserSummary(
             UUID id,

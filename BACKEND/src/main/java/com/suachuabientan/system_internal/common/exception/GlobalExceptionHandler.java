@@ -69,6 +69,8 @@ public class GlobalExceptionHandler {
                 })
                 .toList();
 
+        log.warn("Validation failed: {}", errors);
+
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.validationError("Dữ liệu đầu vào không hợp lệ", errors));
     }

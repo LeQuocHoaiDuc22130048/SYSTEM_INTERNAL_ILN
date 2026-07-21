@@ -21,7 +21,7 @@ public class EmployeeCodeGenerator {
 
         String code = String.format("%s-%d-%03d", deptCode, year, nextSeq);
 
-        while(userRepository.existsByEmployeeCodeAndIsDeletedFalse(code)) {
+        while(userRepository.existsByEmployeeCode(code)) {
             log.warn("Employee code collision: {} - thử sequence tiếp theo", code);
             nextSeq++;
             code = String.format("%s-%d-%03d", deptCode, year, nextSeq);

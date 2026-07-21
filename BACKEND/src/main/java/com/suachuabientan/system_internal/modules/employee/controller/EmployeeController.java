@@ -36,7 +36,7 @@ public class EmployeeController {
 
     @Operation(summary = "Tìm kiếm danh sách nhân viên")
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN', 'WAREHOUSE')")
     public ResponseEntity<ApiResponse<Page<EmployeeDetailResponse>>> search(
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20) Pageable pageable) {

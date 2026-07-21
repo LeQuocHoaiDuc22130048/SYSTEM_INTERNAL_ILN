@@ -168,56 +168,71 @@ class _EmployeesPageState extends State<EmployeesPage> {
                       builder: (context, _) {
                         final filtered = _filteredEmployees;
                         if (filtered.isEmpty) {
-                          return Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                          return RefreshIndicator(
+                            onRefresh: () => context.read<BackendDataProvider>().loadEmployees(),
+                            child: ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
                               children: [
-                                const Text(
-                                  '👥',
-                                  style: TextStyle(fontSize: 48),
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  'Không tìm thấy nhân viên',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w600,
-                                    color: isDark
-                                        ? AppColors.textPrimaryDark
-                                        : AppColors.textPrimaryLight,
+                                SizedBox(
+                                  height: MediaQuery.sizeOf(context).height - 250,
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Text(
+                                          '👥',
+                                          style: TextStyle(fontSize: 48),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Không tìm thấy nhân viên',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark
+                                                ? AppColors.textPrimaryDark
+                                                : AppColors.textPrimaryLight,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
                             ),
                           );
                         }
-                        return GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate:
-                              SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount:
-                                    MediaQuery.sizeOf(context).width > 760
-                                    ? 3
-                                    : 2,
-                                mainAxisSpacing: 12,
-                                crossAxisSpacing: 12,
-                                mainAxisExtent: 245,
-                              ),
-                          itemCount: filtered.length,
-                          itemBuilder: (context, index) {
-                            return _buildEmployeeCard(filtered[index])
-                                .animate(target: 1)
-                                .fadeIn(
-                                  duration: 400.ms,
-                                  delay: (50 * index).ms,
-                                )
-                                .slideY(
-                                  begin: 0.2,
-                                  end: 0,
-                                  duration: 400.ms,
-                                  delay: (50 * index).ms,
-                                );
-                          },
+                        return RefreshIndicator(
+                          onRefresh: () => context.read<BackendDataProvider>().loadEmployees(),
+                          child: GridView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            gridDelegate:
+                                SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount:
+                                      MediaQuery.sizeOf(context).width > 760
+                                      ? 3
+                                      : 2,
+                                  mainAxisSpacing: 12,
+                                  crossAxisSpacing: 12,
+                                  mainAxisExtent: 245,
+                                ),
+                            itemCount: filtered.length,
+                            itemBuilder: (context, index) {
+                              return _buildEmployeeCard(filtered[index])
+                                  .animate(target: 1)
+                                  .fadeIn(
+                                    duration: 400.ms,
+                                    delay: (50 * index).ms,
+                                  )
+                                  .slideY(
+                                    begin: 0.2,
+                                    end: 0,
+                                    duration: 400.ms,
+                                    delay: (50 * index).ms,
+                                  );
+                            },
+                          ),
                         );
                       },
                     ),

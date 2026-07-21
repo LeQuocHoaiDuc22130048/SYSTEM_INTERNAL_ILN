@@ -314,14 +314,14 @@ function App() {
   }, [activeEmployees, dailyReportMap, selectedDate]);
 
   const monthlyStats = useMemo(() => {
-    const count = filteredEmployees.length;
-    const totalPresent = filteredEmployees.reduce((sum, emp) => sum + emp.workDays, 0);
+    const count = activeEmployees.length;
+    const totalPresent = activeEmployees.reduce((sum, emp) => sum + emp.workDays, 0);
     return {
       averagePresent: count > 0 ? Math.round((totalPresent / count) * 10) / 10 : 0,
-      totalLateCount: filteredEmployees.reduce((sum, emp) => sum + emp.lateCount, 0),
-      totalAbsentDays: filteredEmployees.reduce((sum, emp) => sum + emp.absentDays, 0),
+      totalLateCount: activeEmployees.reduce((sum, emp) => sum + emp.lateCount, 0),
+      totalAbsentDays: activeEmployees.reduce((sum, emp) => sum + emp.absentDays, 0),
     };
-  }, [filteredEmployees]);
+  }, [activeEmployees]);
 
   if (!isAuthenticated) {
     return (

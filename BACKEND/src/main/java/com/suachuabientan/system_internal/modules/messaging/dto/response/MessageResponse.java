@@ -16,8 +16,19 @@ public record MessageResponse(
         Instant deletedForEveryoneAt,
         List<UUID> readByUserIds,
         List<UUID> mentionUserIds,
-        List<ReactionInfo> reactions
+        List<ReactionInfo> reactions,
+        UUID parentMessageId,
+        ParentMessageInfo parentMessage
 ) {
+    public record ParentMessageInfo(
+            UUID id,
+            String senderName,
+            String content,
+            String messageType,
+            Instant deletedForEveryoneAt
+    ) {
+    }
+
     public String contentPreview() {
         if (content != null && !content.isBlank()) {
             return content.length() <= 120 ? content : content.substring(0, 117) + "...";

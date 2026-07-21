@@ -21,7 +21,7 @@ public class OrderCodeGenerator {
         int nextSeq = 1;
         String candidate = prefix + String.format("%03d", nextSeq);
 
-        while (repairOrderRepository.existsByOrderCodeAndIsDeletedFalse(candidate)) {
+        while (repairOrderRepository.existsByOrderCode(candidate)) {
             nextSeq++;
             candidate = prefix + String.format("%03d", nextSeq);
         }

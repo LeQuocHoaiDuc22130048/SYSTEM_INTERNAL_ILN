@@ -116,6 +116,7 @@ public class MessagingController {
             @RequestPart("file") MultipartFile file,
             @RequestParam(required = false) String content,
             @RequestParam String messageType,
+            @RequestParam(required = false) UUID parentMessageId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(201).body(ApiResponse.created(
                 messagingService.sendMediaMessage(
@@ -123,6 +124,7 @@ public class MessagingController {
                         file,
                         content,
                         messageType,
+                        parentMessageId,
                         userDetails.getUserId())));
     }
 

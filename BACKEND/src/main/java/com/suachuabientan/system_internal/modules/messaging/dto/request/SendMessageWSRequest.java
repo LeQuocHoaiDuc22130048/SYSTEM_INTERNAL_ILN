@@ -11,6 +11,7 @@ public record SendMessageWSRequest(
         String content,
         String mediaUrl,
         @NotBlank(message = "Loại tin nhắn không được để trống")
-        String messageType
+        String messageType,
+        UUID parentMessageId
 ) {
 }

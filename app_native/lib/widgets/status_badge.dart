@@ -16,15 +16,33 @@ class StatusBadge extends StatelessWidget {
       switch (status as RepairOrderStatus) {
         case RepairOrderStatus.pending:
           return {
-            'label': 'Chờ xử lý',
-            'bgColor': AppColors.warningLight,
-            'textColor': AppColors.warning,
+            'label': 'Chưa kiểm tra',
+            'bgColor': const Color(0xFFF1F5F9),
+            'textColor': const Color(0xFF64748B),
+          };
+        case RepairOrderStatus.waitingForCheck:
+          return {
+            'label': 'Chờ kiểm tra',
+            'bgColor': const Color(0xFFFFEDD5),
+            'textColor': const Color(0xFFD97706),
+          };
+        case RepairOrderStatus.checking:
+          return {
+            'label': 'Đang kiểm tra',
+            'bgColor': const Color(0xFFE0F2FE),
+            'textColor': const Color(0xFF0284C7),
+          };
+        case RepairOrderStatus.checked:
+          return {
+            'label': 'Đã kiểm tra',
+            'bgColor': const Color(0xFFF3E8FF),
+            'textColor': const Color(0xFF7E22CE),
           };
         case RepairOrderStatus.inProgress:
           return {
             'label': 'Đang sửa',
-            'bgColor': AppColors.infoLight,
-            'textColor': AppColors.info,
+            'bgColor': const Color(0xFFFEF3C7),
+            'textColor': const Color(0xFFD97706),
           };
         case RepairOrderStatus.completed:
           return {
@@ -35,8 +53,8 @@ class StatusBadge extends StatelessWidget {
         case RepairOrderStatus.delivered:
           return {
             'label': 'Đã giao',
-            'bgColor': const Color(0xFFF1F5F9),
-            'textColor': const Color(0xFF64748B),
+            'bgColor': const Color(0xFFE2E8F0),
+            'textColor': const Color(0xFF475569),
           };
         case RepairOrderStatus.cancelled:
           return {

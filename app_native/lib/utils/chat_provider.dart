@@ -151,16 +151,22 @@ class ChatProvider extends ChangeNotifier {
     String? mediaUrl,
     String messageType = 'TEXT',
     List<String> mentionUserIds = const [],
+    String? parentMessageId,
   }) async {
     try {
+      final Map<String, dynamic> body = {
+        'content': content,
+        'mediaUrl': mediaUrl,
+        'messageType': messageType,
+        if (mentionUserIds.isNotEmpty) 'mentionUserIds': mentionUserIds,
+      };
+      if (parentMessageId != null) {
+        body['parentMessageId'] = parentMessageId;
+      }
+
       final data = await api.post(
         '/api/v1/conversations/$conversationId/messages',
-        body: {
-          'content': content,
-          'mediaUrl': mediaUrl,
-          'messageType': messageType,
-          if (mentionUserIds.isNotEmpty) 'mentionUserIds': mentionUserIds,
-        },
+        body: body,
       );
       _consumeSentMessage(conversationId, data);
     } catch (e) {
@@ -175,14 +181,20 @@ class ChatProvider extends ChangeNotifier {
     required String filename,
     required String messageType,
     String content = '',
+    String? parentMessageId,
   }) async {
     try {
+      final Map<String, String> fields = {
+        'messageType': messageType,
+        if (content.trim().isNotEmpty) 'content': content.trim(),
+      };
+      if (parentMessageId != null) {
+        fields['parentMessageId'] = parentMessageId;
+      }
+
       final data = await api.postMultipart(
         '/api/v1/conversations/$conversationId/messages/media',
-        fields: {
-          'messageType': messageType,
-          if (content.trim().isNotEmpty) 'content': content.trim(),
-        },
+        fields: fields,
         filename: filename,
         bytes: bytes,
       );

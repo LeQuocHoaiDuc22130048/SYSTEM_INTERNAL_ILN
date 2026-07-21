@@ -44,8 +44,11 @@ class _AttendancePageState extends State<AttendancePage>
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: SafeArea(
-        child: CustomScrollView(
-          slivers: [
+        child: RefreshIndicator(
+          onRefresh: () => context.read<BackendDataProvider>().loadAttendance(),
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
             // Header
             SliverToBoxAdapter(
               child: Padding(
@@ -248,6 +251,7 @@ class _AttendancePageState extends State<AttendancePage>
             ),
           ],
         ),
+      ),
       ),
     );
   }

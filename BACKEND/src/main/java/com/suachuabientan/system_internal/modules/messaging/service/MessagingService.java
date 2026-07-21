@@ -162,6 +162,15 @@ public class MessagingService {
         MessageType messageType = requestValidator.parseMessageType(request.messageType());
         requestValidator.validateMessageBody(request.content(), request.mediaUrl(), messageType);
 
+        UUID parentMessageId = request.parentMessageId();
+        if (parentMessageId != null) {
+            Message parent = messageRepository.findById(parentMessageId)
+                    .orElseThrow(() -> new com.suachuabientan.system_internal.common.exception.BusinessException("Khong tim thay tin nhan nguoi dung muon tra loi", 404));
+            if (!parent.getConversationId().equals(conversationId)) {
+                throw new com.suachuabientan.system_internal.common.exception.BusinessException("Tin nhan duoc tra loi phai thuoc cung cuoc tro chuyen", 400);
+            }
+        }
+
         Message message = Message.builder()
                 .conversationId(conversationId)
                 .senderId(senderId)
@@ -169,6 +178,7 @@ public class MessagingService {
                 .mediaUrl(request.mediaUrl())
                 .messageType(messageType)
                 .sentAt(Instant.now())
+                .parentMessageId(parentMessageId)
                 .build();
 
         Message saved = messageRepository.save(message);
@@ -189,6 +199,7 @@ public class MessagingService {
             MultipartFile file,
             String content,
             String type,
+            UUID parentMessageId,
             UUID senderId) {
         ensureMember(conversationId, senderId);
         MessageType messageType = requestValidator.parseMessageType(type);
@@ -200,7 +211,7 @@ public class MessagingService {
                 : (messageType == MessageType.FILE ? stored.originalFileName() : null);
         return sendMessage(
                 conversationId,
-                new SendMessageRequest(effectiveContent, stored.publicUrl(), messageType.name(), null),
+                new SendMessageRequest(effectiveContent, stored.publicUrl(), messageType.name(), null, parentMessageId),
                 senderId);
     }
 
@@ -210,7 +221,8 @@ public class MessagingService {
                 request.content(),
                 request.mediaUrl(),
                 request.messageType(),
-                null);
+                null,
+                request.parentMessageId());
         return sendMessage(request.conversationId(), restRequest, senderId);
     }
 

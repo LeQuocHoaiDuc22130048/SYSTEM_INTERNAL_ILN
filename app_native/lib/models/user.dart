@@ -226,7 +226,6 @@ extension UserRolePermissions on UserRole {
       AppPermission.viewWarehouse,
       AppPermission.manageWarehouse,
       AppPermission.useMessages,
-      AppPermission.viewNotifications,
       AppPermission.viewAttendance,
       AppPermission.viewProfile,
       AppPermission.updateOwnProfile,
@@ -242,6 +241,7 @@ extension UserRolePermissions on UserRole {
 
     const managerPermissions = {
       ...employeePermissions,
+      AppPermission.viewNotifications,
       AppPermission.assignRepairOrders,
       AppPermission.manageAttendance,
       AppPermission.manageEmployees,
@@ -265,6 +265,10 @@ extension UserRolePermissions on UserRole {
       case UserRole.technician:
         return technicianPermissions;
       case UserRole.warehouse:
+        return {
+          ...employeePermissions,
+          AppPermission.viewNotifications,
+        };
       case UserRole.employee:
         return employeePermissions;
       case UserRole.attendance:

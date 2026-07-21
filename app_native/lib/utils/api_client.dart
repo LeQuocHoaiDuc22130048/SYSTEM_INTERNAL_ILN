@@ -388,19 +388,24 @@ class ApiClient {
   String? _messageFrom(dynamic decoded) {
     if (decoded is! Map<String, dynamic>) return null;
 
-    final message = decoded['message'];
-    if (message is String && message.isNotEmpty) return message;
-
     final errors = decoded['errors'];
     if (errors is List && errors.isNotEmpty) {
-      final firstError = errors.first;
-      if (firstError is Map<String, dynamic>) {
-        final errorMessage = firstError['message'];
-        if (errorMessage is String && errorMessage.isNotEmpty) {
-          return errorMessage;
+      final messages = <String>[];
+      for (final err in errors) {
+        if (err is Map<String, dynamic>) {
+          final errorMessage = err['message'];
+          if (errorMessage is String && errorMessage.isNotEmpty) {
+            messages.add(errorMessage);
+          }
         }
       }
+      if (messages.isNotEmpty) {
+        return messages.join('\n');
+      }
     }
+
+    final message = decoded['message'];
+    if (message is String && message.isNotEmpty) return message;
 
     return null;
   }

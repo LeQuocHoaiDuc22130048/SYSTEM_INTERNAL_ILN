@@ -4,6 +4,7 @@ import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CheckoutRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreateBoardItemRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdateBoardItemRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.ReturnBoardRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.BoardItemResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.CheckoutResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.QrScanResponse;
@@ -112,11 +113,13 @@ public class WarehouseController {
     @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
     public ResponseEntity<ApiResponse<CheckoutResponse>> returnBoard(
             @PathVariable UUID id,
+            @RequestBody(required = false) ReturnBoardRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
         UUID userId = extractUserId(userDetails);
         boolean isManager = ((CustomUserDetails) userDetails).isManagerOrAbove();
+        String notes = request != null ? request.notes() : null;
         return ResponseEntity.ok(ApiResponse.success(
-                warehouseService.returnBoard(id, userId, isManager),
+                warehouseService.returnBoard(id, userId, isManager, notes),
                 "Trả bo mạch thành công"));
     }
 
@@ -134,4 +137,3 @@ public class WarehouseController {
         return ((CustomUserDetails) userDetails).getUserId();
     }
 }
-

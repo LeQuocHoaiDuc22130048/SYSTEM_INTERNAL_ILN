@@ -389,6 +389,7 @@ void main() {
       expect(UserRole.employee.can(AppPermission.viewWarehouse), isTrue);
       expect(UserRole.employee.can(AppPermission.manageEmployees), isFalse);
       expect(UserRole.employee.can(AppPermission.viewDashboard), isTrue);
+      expect(UserRole.employee.can(AppPermission.viewNotifications), isFalse);
     });
 
     test('technician can only access orders and has full permissions on them', () {

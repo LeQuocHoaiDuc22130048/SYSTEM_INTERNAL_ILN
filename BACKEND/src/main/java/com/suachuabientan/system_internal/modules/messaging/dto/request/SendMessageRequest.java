@@ -12,6 +12,7 @@ public record SendMessageRequest(
         @NotBlank(message = "Loai tin nhan khong duoc de trong")
         String messageType,
 
-        List<UUID> mentionUserIds
+        List<UUID> mentionUserIds,
+        UUID parentMessageId
 ) {
 }

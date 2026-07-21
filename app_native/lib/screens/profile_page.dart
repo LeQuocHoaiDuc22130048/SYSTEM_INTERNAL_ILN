@@ -6,6 +6,8 @@ import '../models/user.dart';
 import '../theme/app_colors.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
+import '../utils/notification_provider.dart';
+import '../utils/update_provider.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -187,6 +189,68 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
             onTap: _showChangePassword,
           ),
+          Divider(
+            height: 1,
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+          ListTile(
+            leading: Icon(
+              LucideIcons.refreshCw,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
+            ),
+            title: Text(
+              'Kiểm tra cập nhật',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
+              ),
+            ),
+            subtitle: Text(
+              'Phiên bản hiện tại: v${UpdateProvider.currentVersion}',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+            trailing: Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+            onTap: () {
+              context.read<UpdateProvider>().checkForUpdate(context, manual: true);
+            },
+          ),
+          Divider(
+            height: 1,
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+          ListTile(
+            leading: const Icon(
+              LucideIcons.logOut,
+              color: Colors.redAccent,
+            ),
+            title: const Text(
+              'Đăng xuất',
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            trailing: const Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: Colors.redAccent,
+            ),
+            onTap: _handleLogout,
+          ),
         ],
       ),
     );
@@ -234,6 +298,41 @@ class _ProfilePageState extends State<ProfilePage> {
         ],
       ),
     );
+  }
+
+  Future<void> _handleLogout() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: const Text('Đăng xuất'),
+          content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Đăng xuất'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed == true && mounted) {
+      try {
+        await context.read<NotificationProvider>().prepareForLogout();
+        await context.read<AuthProvider>().logout();
+      } catch (_) {
+        _showSnackBar('Không thể đăng xuất. Vui lòng thử lại.', isError: true);
+      }
+    }
   }
 
   Future<void> _showAccountSettings(User user) async {

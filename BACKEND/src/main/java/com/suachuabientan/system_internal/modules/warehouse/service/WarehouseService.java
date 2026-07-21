@@ -28,6 +28,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,6 +49,7 @@ public class WarehouseService {
     private final PartRepository partRepository;
     private final StoreLocationRepository storeLocationRepository;
     private final StockMovementRepository stockMovementRepository;
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public BoardItemResponse create(CreateBoardItemRequest request, UUID createdByUserId) {
@@ -217,7 +219,7 @@ public class WarehouseService {
      * Chỉ có người đang giữ bo mạch hoặc admin mới được trả về
      */
     @Transactional
-    public CheckoutResponse returnBoard(UUID boardItemId, UUID userId, boolean isAdmin) {
+    public CheckoutResponse returnBoard(UUID boardItemId, UUID userId, boolean isAdmin, String returnNotes) {
         BoardItem item = findBoardById(boardItemId);
         if (!item.isCheckedOut())
             throw new BusinessException("Bo mạch không đang được mượn");
@@ -233,6 +235,14 @@ public class WarehouseService {
         // Ghi nhận trả
         activeCheckout.setReturnedAt(Instant.now());
         activeCheckout.setCheckoutStatus(CheckoutStatus.RETURNED);
+        if (returnNotes != null && !returnNotes.trim().isEmpty()) {
+            String existingNotes = activeCheckout.getNotes();
+            if (existingNotes != null && !existingNotes.trim().isEmpty()) {
+                activeCheckout.setNotes(existingNotes + " | Sửa chữa: " + returnNotes.trim());
+            } else {
+                activeCheckout.setNotes("Sửa chữa: " + returnNotes.trim());
+            }
+        }
         boardCheckoutRepository.save(activeCheckout);
 
         // Trả về AVAILABLE
@@ -325,23 +335,98 @@ public class WarehouseService {
                 activeCheckout);
     }
 
-    private UUID resolvePartId(UUID partId) {
-        if (partId == null) return null;
-        return partRepository.findByIdAndIsDeletedFalse(partId)
-                .orElseThrow(() -> new ResourceNotFoundException(STR."KhÃ´ng tÃ¬m tháº¥y linh kiá»‡n: \{partId}"))
-                .getId();
-    }
-
-    private UUID resolveLocationId(UUID locationId, String legacyLocation) {
-        if (locationId != null) {
-            return storeLocationRepository.findByIdAndIsDeletedFalse(locationId)
-                    .orElseThrow(() -> new ResourceNotFoundException(STR."KhÃ´ng tÃ¬m tháº¥y vá»‹ trÃ­ kho: \{locationId}"))
+    private UUID resolvePartId(String partIdStr) {
+        if (!StringUtils.hasText(partIdStr)) return null;
+        String trimmed = partIdStr.trim();
+        try {
+            UUID partId = UUID.fromString(trimmed);
+            return partRepository.findByIdAndIsDeletedFalse(partId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy linh kiện: " + partId))
+                    .getId();
+        } catch (IllegalArgumentException e) {
+            return partRepository.findByIpnAndIsDeletedFalse(trimmed)
+                    .orElseGet(() -> {
+                        UUID categoryId = getOrCreateUncategorizedCategory();
+                        Part newPart = Part.builder()
+                                .ipn(trimmed)
+                                .name(trimmed)
+                                .description("Tự động tạo từ liên kết bo mạch")
+                                .categoryId(categoryId)
+                                .minAmount(BigDecimal.ZERO)
+                                .manufacturingStatus("ACTIVE")
+                                .build();
+                        Part saved = partRepository.save(newPart);
+                        log.info("Tự động tạo linh kiện mới từ bo mạch: ipn={}, id={}", trimmed, saved.getId());
+                        return saved;
+                    })
                     .getId();
         }
+    }
+
+    private UUID getOrCreateUncategorizedCategory() {
+        try {
+            return jdbcTemplate.queryForObject(
+                    "SELECT id FROM categories WHERE name = 'Uncategorized' AND is_deleted = false LIMIT 1",
+                    UUID.class
+            );
+        } catch (Exception e) {
+            try {
+                return jdbcTemplate.queryForObject(
+                        "SELECT id FROM categories WHERE is_deleted = false LIMIT 1",
+                        UUID.class
+                );
+            } catch (Exception ex) {
+                UUID newCategoryId = UUID.randomUUID();
+                jdbcTemplate.update(
+                        "INSERT INTO categories (id, name, description, not_selectable, is_deleted) VALUES (?, ?, ?, ?, ?)",
+                        newCategoryId, "Uncategorized", "Default category for imported or board-linked parts", false, false
+                );
+                return newCategoryId;
+            }
+        }
+    }
+
+    private UUID resolveLocationId(String locationIdStr, String legacyLocation) {
+        if (StringUtils.hasText(locationIdStr)) {
+            String trimmed = locationIdStr.trim();
+            try {
+                UUID locationId = UUID.fromString(trimmed);
+                return storeLocationRepository.findByIdAndIsDeletedFalse(locationId)
+                        .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy vị trí kho: " + locationId))
+                        .getId();
+            } catch (IllegalArgumentException e) {
+                return storeLocationRepository.findByCodeAndIsDeletedFalse(trimmed)
+                        .orElseGet(() -> {
+                            StoreLocation newLocation = StoreLocation.builder()
+                                    .code(trimmed)
+                                    .name(trimmed)
+                                    .description("Tự động tạo từ liên kết bo mạch")
+                                    .isFull(false)
+                                    .onlySinglePart(false)
+                                    .build();
+                            StoreLocation saved = storeLocationRepository.save(newLocation);
+                            log.info("Tự động tạo vị trí kho mới: code={}, id={}", trimmed, saved.getId());
+                            return saved;
+                        })
+                        .getId();
+            }
+        }
         if (!StringUtils.hasText(legacyLocation)) return null;
-        return storeLocationRepository.findByCodeAndIsDeletedFalse(legacyLocation.trim())
+        String legacyTrimmed = legacyLocation.trim();
+        return storeLocationRepository.findByCodeAndIsDeletedFalse(legacyTrimmed)
                 .map(StoreLocation::getId)
-                .orElse(null);
+                .orElseGet(() -> {
+                    StoreLocation newLocation = StoreLocation.builder()
+                            .code(legacyTrimmed)
+                            .name(legacyTrimmed)
+                            .description("Tự động tạo từ vị trí bo mạch")
+                            .isFull(false)
+                            .onlySinglePart(false)
+                            .build();
+                    StoreLocation saved = storeLocationRepository.save(newLocation);
+                    log.info("Tự động tạo vị trí kho mới từ legacy location: code={}, id={}", legacyTrimmed, saved.getId());
+                    return saved.getId();
+                });
     }
 
     private void saveBoardMovement(

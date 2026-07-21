@@ -6,7 +6,9 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -34,15 +36,21 @@ public class RepairOrder extends BaseEntity {
     @Column(name = "device_type", length = 100)
     private String deviceType;
 
+    @Column(name = "serial_number", length = 100)
+    private String serialNumber;
+
+    @Column(name = "under_warranty")
+    private Boolean underWarranty = false;
+
     // ── Thông tin khách hàng ──────────────────────────────────
 
     @Column(name = "customer_name", nullable = false, length = 100)
     private String customerName;
 
-    @Column(name = "customer_phone", nullable = false, length = 20)
+    @Column(name = "customer_phone", length = 20)
     private String customerPhone;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     // ── Vòng đời đơn ─────────────────────────────────────────
@@ -78,6 +86,11 @@ public class RepairOrder extends BaseEntity {
     @Builder.Default
     private Set<UUID> assignees = new HashSet<>();
 
+    /** Danh sách thiết bị trong đơn — cascade ALL, orphanRemoval */
+    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @Builder.Default
+    private List<RepairDevice> devices = new ArrayList<>();
+
     // ── Mốc thời gian ─────────────────────────────────────────
 
     @Column(name = "received_at", nullable = false)
@@ -98,17 +111,10 @@ public class RepairOrder extends BaseEntity {
     // ── Helper methods ────────────────────────────────────────
 
     public boolean isActive() {
-        return status == RepairStatus.PENDING || status == RepairStatus.IN_PROGRESS;
+        return status != RepairStatus.DELIVERED && status != RepairStatus.CANCELLED;
     }
 
     public boolean canTransitionTo(RepairStatus newStatus) {
-        return switch (this.status) {
-            case PENDING     -> newStatus == RepairStatus.IN_PROGRESS
-                    || newStatus == RepairStatus.CANCELLED;
-            case IN_PROGRESS -> newStatus == RepairStatus.COMPLETED
-                    || newStatus == RepairStatus.CANCELLED;
-            case COMPLETED   -> newStatus == RepairStatus.DELIVERED;
-            case DELIVERED, CANCELLED -> false; // Trạng thái cuối
-        };
+        return true;
     }
 }

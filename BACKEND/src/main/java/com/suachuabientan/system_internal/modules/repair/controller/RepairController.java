@@ -3,6 +3,7 @@ package com.suachuabientan.system_internal.modules.repair.controller;
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.repair.dto.request.AssignRequest;
 import com.suachuabientan.system_internal.modules.repair.dto.request.CreateRepairOrderRequest;
+import com.suachuabientan.system_internal.modules.repair.dto.request.UpdateRepairOrderRequest;
 import com.suachuabientan.system_internal.modules.repair.dto.request.ReorderRequest;
 import com.suachuabientan.system_internal.modules.repair.dto.request.UpdateStatusRequest;
 import com.suachuabientan.system_internal.modules.repair.dto.response.RepairOrderResponse;
@@ -39,12 +40,23 @@ public class RepairController {
 
     @Operation(summary = "Tạo đơn sửa chữa mới")
     @PostMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> create(
             @Valid @RequestBody CreateRepairOrderRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(201)
                 .body(ApiResponse.created(repairService.create(request, userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Chỉnh sửa thông tin đơn sửa chữa")
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN')")
+    public ResponseEntity<ApiResponse<RepairOrderResponse>> update(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateRepairOrderRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                repairService.update(id, request, userDetails)));
     }
 
     @Operation(summary = "Danh sách đơn — filter theo status, keyword, kỹ thuật viên")
@@ -71,7 +83,7 @@ public class RepairController {
 
     @Operation(summary = "Phân công kỹ thuật viên cho đơn")
     @PutMapping("/{id}/assign")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> assign(
             @PathVariable UUID id,
             @Valid @RequestBody AssignRequest request,
@@ -84,7 +96,7 @@ public class RepairController {
 
     @Operation(summary = "Cập nhật trạng thái đơn")
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse>> updateStatus(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateStatusRequest request,
@@ -132,7 +144,7 @@ public class RepairController {
 
     @Operation(summary = "Thêm ảnh vào đơn sửa chữa")
     @PostMapping("/{id}/images")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse.ImageInfo>> addImage(
             @PathVariable UUID id,
             @RequestParam String imageUrl,
@@ -144,7 +156,7 @@ public class RepairController {
 
     @Operation(summary = "Upload anh hoac video vao don sua chua")
     @PostMapping(value = "/{id}/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
     public ResponseEntity<ApiResponse<RepairOrderResponse.ImageInfo>> uploadMedia(
             @PathVariable UUID id,
             @RequestPart("file") MultipartFile file,
@@ -153,5 +165,25 @@ public class RepairController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.status(201).body(ApiResponse.created(
                 repairService.addMedia(id, file, type, caption, userDetails)));
+    }
+
+    @Operation(summary = "Xóa đơn sửa chữa")
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN')")
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        repairService.delete(id, userDetails);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
+    @Operation(summary = "Xóa hình ảnh hoặc video khỏi đơn sửa chữa")
+    @DeleteMapping("/media/{mediaId}")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN')")
+    public ResponseEntity<ApiResponse<Void>> deleteMedia(
+            @PathVariable UUID mediaId,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        repairService.deleteMedia(mediaId, userDetails);
+        return ResponseEntity.ok(ApiResponse.success(null));
     }
 }

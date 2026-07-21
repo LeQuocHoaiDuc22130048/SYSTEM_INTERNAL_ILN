@@ -53,6 +53,8 @@ class ChatMessage {
   final List<String> readByUserIds;
   final List<String> mentionUserIds;
   final List<MessageReactionInfo> reactions;
+  final String? parentMessageId;
+  final ParentMessageInfo? parentMessage;
 
   ChatMessage({
     required this.id,
@@ -67,6 +69,8 @@ class ChatMessage {
     required this.readByUserIds,
     this.mentionUserIds = const [],
     this.reactions = const [],
+    this.parentMessageId,
+    this.parentMessage,
   });
 
   bool get isEdited => editedAt != null;
@@ -99,6 +103,40 @@ class ChatMessage {
           .whereType<Map<String, dynamic>>()
           .map(MessageReactionInfo.fromJson)
           .toList(),
+      parentMessageId: json['parentMessageId']?.toString(),
+      parentMessage: json['parentMessage'] != null
+          ? ParentMessageInfo.fromJson(json['parentMessage'] as Map<String, dynamic>)
+          : null,
+    );
+  }
+}
+
+class ParentMessageInfo {
+  final String id;
+  final String senderName;
+  final String content;
+  final String messageType;
+  final DateTime? deletedForEveryoneAt;
+
+  ParentMessageInfo({
+    required this.id,
+    required this.senderName,
+    required this.content,
+    required this.messageType,
+    this.deletedForEveryoneAt,
+  });
+
+  bool get isRecalled => deletedForEveryoneAt != null;
+
+  factory ParentMessageInfo.fromJson(Map<String, dynamic> json) {
+    return ParentMessageInfo(
+      id: json['id']?.toString() ?? '',
+      senderName: json['senderName']?.toString() ?? '',
+      content: json['content']?.toString() ?? '',
+      messageType: json['messageType']?.toString() ?? 'TEXT',
+      deletedForEveryoneAt: json['deletedForEveryoneAt'] != null
+          ? DateTime.tryParse(json['deletedForEveryoneAt'].toString())
+          : null,
     );
   }
 }

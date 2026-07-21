@@ -20,6 +20,8 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
 
     boolean existsByOrderCodeAndIsDeletedFalse(String orderCode);
 
+    boolean existsByOrderCode(String orderCode);
+
     /**
      * Danh sách đơn theo status - sort theo priority ASC
      */
@@ -47,6 +49,7 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
                   OR LOWER(r.customer_name)  LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                   OR LOWER(r.customer_phone) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                   OR LOWER(r.order_code)     LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(r.serial_number)  LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
               )
             ORDER BY r.priority ASC, r.received_at DESC
             """,
@@ -63,6 +66,7 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
                           OR LOWER(r.customer_name)  LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                           OR LOWER(r.customer_phone) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                           OR LOWER(r.order_code)     LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                          OR LOWER(r.serial_number)  LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                       )
                     """,
             nativeQuery = true)

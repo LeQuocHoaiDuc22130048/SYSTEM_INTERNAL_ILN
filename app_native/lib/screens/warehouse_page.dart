@@ -9,7 +9,9 @@ import '../utils/network_provider.dart';
 import '../utils/pending_sync_provider.dart';
 import '../widgets/status_badge.dart';
 import '../models/board.dart';
+import '../models/board_history_item.dart';
 import 'scanner_page.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class WarehousePage extends StatefulWidget {
   const WarehousePage({super.key});
@@ -19,14 +21,9 @@ class WarehousePage extends StatefulWidget {
 }
 
 class _WarehousePageState extends State<WarehousePage> {
-  static final RegExp _uuidPattern = RegExp(
-    r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-  );
-
   final TextEditingController _searchController = TextEditingController();
   final ValueNotifier<BoardStatus?> _filter = ValueNotifier(null);
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
-  bool _isGridView = true;
 
   @override
   void initState() {
@@ -78,10 +75,6 @@ class _WarehousePageState extends State<WarehousePage> {
   String? _optionalText(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
-  }
-
-  bool _isUuidOrEmpty(String? value) {
-    return value == null || _uuidPattern.hasMatch(value);
   }
 
   @override
@@ -169,8 +162,27 @@ class _WarehousePageState extends State<WarehousePage> {
                                     ),
                                   );
                                   if (result != null && mounted) {
-                                    _searchQuery.value = result as String;
-                                    _searchController.text = _searchQuery.value;
+                                    final qrCode = (result as String).trim();
+                                    final backend = context.read<BackendDataProvider>();
+                                    Board? matchedBoard;
+                                    for (final b in backend.boards) {
+                                      if (b.qrCode.toLowerCase() == qrCode.toLowerCase()) {
+                                        matchedBoard = b;
+                                        break;
+                                      }
+                                    }
+
+                                    if (matchedBoard != null) {
+                                      _showBoardDetail(matchedBoard, fromScan: true);
+                                    } else {
+                                      _searchQuery.value = qrCode;
+                                      _searchController.text = qrCode;
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text('Không tìm thấy bo mạch có mã QR: $qrCode'),
+                                        ),
+                                      );
+                                    }
                                   }
                                 },
                                 icon: const Icon(
@@ -239,9 +251,9 @@ class _WarehousePageState extends State<WarehousePage> {
                           crossAxisCount: 2,
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 6,
-                          crossAxisSpacing: 8,
-                          childAspectRatio: 3.0,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          mainAxisExtent: 98,
                           children: [
                             _buildCompactStatCard(
                               '${boards.length}',
@@ -321,89 +333,6 @@ class _WarehousePageState extends State<WarehousePage> {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Container(
-                            height: 36,
-                            decoration: BoxDecoration(
-                              color: isDark
-                                  ? AppColors.surfaceDark
-                                  : Colors.white,
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isDark
-                                    ? AppColors.borderDark
-                                    : AppColors.borderLight,
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _isGridView = !_isGridView;
-                                    });
-                                  },
-                                  constraints: const BoxConstraints(
-                                    minWidth: 48,
-                                    minHeight: 36,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  icon: Icon(
-                                    Icons.grid_view,
-                                    size: 18,
-                                    color: _isGridView
-                                        ? Colors.white
-                                        : (isDark
-                                              ? AppColors.textSecondaryDark
-                                              : AppColors.textSecondaryLight),
-                                  ),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: _isGridView
-                                        ? AppColors.primary
-                                        : Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.only(
-                                        topLeft: Radius.circular(10),
-                                        bottomLeft: Radius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  onPressed: () {
-                                    setState(() {
-                                      _isGridView = false;
-                                    });
-                                  },
-                                  constraints: const BoxConstraints(
-                                    minWidth: 48,
-                                    minHeight: 36,
-                                  ),
-                                  padding: EdgeInsets.zero,
-                                  icon: Icon(
-                                    Icons.view_list,
-                                    size: 18,
-                                    color: !_isGridView
-                                        ? Colors.white
-                                        : (isDark
-                                              ? AppColors.textSecondaryDark
-                                              : AppColors.textSecondaryLight),
-                                  ),
-                                  style: IconButton.styleFrom(
-                                    backgroundColor: !_isGridView
-                                        ? AppColors.primary
-                                        : Colors.transparent,
-                                    shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.only(
-                                        topRight: Radius.circular(10),
-                                        bottomRight: Radius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -463,30 +392,41 @@ class _WarehousePageState extends State<WarehousePage> {
                     builder: (context, _) {
                       final filtered = _filteredBoards;
                       if (filtered.isEmpty) {
-                        return Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        return RefreshIndicator(
+                          onRefresh: () => context.read<BackendDataProvider>().loadBoards(),
+                          child: ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
                             children: [
-                              const Text('🔌', style: TextStyle(fontSize: 48)),
-                              const SizedBox(height: 16),
-                              Text(
-                                'Không tìm thấy bo mạch',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w600,
-                                  color: isDark
-                                      ? AppColors.textPrimaryDark
-                                      : AppColors.textPrimaryLight,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                'Thử thay đổi bộ lọc',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isDark
-                                      ? AppColors.textSecondaryDark
-                                      : AppColors.textSecondaryLight,
+                              SizedBox(
+                                height: constraints.maxHeight - 220,
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Text('🔌', style: TextStyle(fontSize: 48)),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        'Không tìm thấy bo mạch',
+                                        style: TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: isDark
+                                              ? AppColors.textPrimaryDark
+                                              : AppColors.textPrimaryLight,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Thử thay đổi bộ lọc',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: isDark
+                                              ? AppColors.textSecondaryDark
+                                              : AppColors.textSecondaryLight,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -494,55 +434,33 @@ class _WarehousePageState extends State<WarehousePage> {
                         );
                       }
 
-                      return _isGridView
-                          ? GridView.builder(
-                              padding: const EdgeInsets.all(16),
-                              gridDelegate:
-                                  SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: wide ? 4 : 2,
-                                    mainAxisSpacing: 8,
-                                    crossAxisSpacing: 8,
-                                    childAspectRatio: wide ? 0.75 : 0.7,
-                                  ),
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                return _buildBoardGridCard(filtered[index])
-                                    .animate(target: 1)
-                                    .fadeIn(
-                                      duration: 400.ms,
-                                      delay: (50 * index).ms,
-                                    )
-                                    .slideY(
-                                      begin: 0.2,
-                                      end: 0,
-                                      duration: 400.ms,
-                                      delay: (50 * index).ms,
-                                    );
-                              },
-                            )
-                          : ListView.builder(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: filtered.length,
-                              itemBuilder: (context, index) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildBoardListCard(filtered[index])
-                                      .animate(target: 1)
-                                      .fadeIn(
-                                        duration: 400.ms,
-                                        delay: (50 * index).ms,
-                                      )
-                                      .slideX(
-                                        begin: -0.2,
-                                        end: 0,
-                                        duration: 400.ms,
-                                        delay: (50 * index).ms,
-                                      ),
-                                );
-                              },
-                            );
-                    },
-                  ),
+                      return RefreshIndicator(
+                        onRefresh: () => context.read<BackendDataProvider>().loadBoards(),
+                        child: ListView.builder(
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.all(16),
+                          itemCount: filtered.length,
+                          itemBuilder: (context, index) {
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: _buildBoardListCard(filtered[index])
+                                .animate(target: 1)
+                                .fadeIn(
+                                  duration: 400.ms,
+                                  delay: (50 * index).ms,
+                                )
+                                .slideX(
+                                  begin: -0.2,
+                                  end: 0,
+                                  duration: 400.ms,
+                                  delay: (50 * index).ms,
+                                ),
+                          );
+                        },
+                      ),
+                    );
+                  },
+                ),
                 ),
               ],
             );
@@ -559,48 +477,62 @@ class _WarehousePageState extends State<WarehousePage> {
     Color color,
     bool isDark,
   ) {
+    final background = color.withOpacity(0.12);
     return Container(
       width: 180,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      height: 98,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark ? AppColors.borderDark : AppColors.borderLight,
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 8),
           Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.2,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(height: 5),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
+                    fontSize: 23,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
                     color: isDark
                         ? AppColors.textPrimaryDark
                         : AppColors.textPrimaryLight,
                   ),
                 ),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
               ],
             ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: color),
           ),
         ],
       ),
@@ -669,57 +601,67 @@ class _WarehousePageState extends State<WarehousePage> {
     Color color,
     bool isDark,
   ) {
+    final background = color.withOpacity(0.12);
     return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    height: 1.2,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 23,
+                    height: 1,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ],
             ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 10),
-              Flexible(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      value,
-                      style: TextStyle(
-                        fontSize: 16,
-                        height: 1,
-                        fontWeight: FontWeight.bold,
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimaryLight,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      label,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          const SizedBox(width: 8),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: background,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: color),
           ),
-        )
-        .animate(target: 1)
-        .fadeIn(duration: 300.ms, delay: 100.ms)
-        .slideY(begin: 0.2, end: 0, duration: 300.ms, delay: 100.ms);
+        ],
+      ),
+    )
+    .animate(target: 1)
+    .fadeIn(duration: 300.ms, delay: 100.ms)
+    .slideY(begin: 0.2, end: 0, duration: 300.ms, delay: 100.ms);
   }
 
   Widget _buildBoardGridCard(Board board) {
@@ -737,7 +679,7 @@ class _WarehousePageState extends State<WarehousePage> {
       },
       borderRadius: BorderRadius.circular(10),
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(10),
@@ -752,8 +694,8 @@ class _WarehousePageState extends State<WarehousePage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Container(
-                  width: 32,
-                  height: 32,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: isDark
                         ? const Color(0xFF334155)
@@ -765,7 +707,7 @@ class _WarehousePageState extends State<WarehousePage> {
                       const Center(
                         child: Icon(
                           LucideIcons.cpu,
-                          size: 16,
+                          size: 18,
                           color: Color(0xFF64748B),
                         ),
                       ),
@@ -773,8 +715,8 @@ class _WarehousePageState extends State<WarehousePage> {
                         top: -1,
                         right: -1,
                         child: Container(
-                          width: 8,
-                          height: 8,
+                          width: 10,
+                          height: 10,
                           decoration: BoxDecoration(
                             color: statusColor,
                             shape: BoxShape.circle,
@@ -791,8 +733,8 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                 ),
                 Container(
-                  width: 22,
-                  height: 22,
+                  width: 26,
+                  height: 26,
                   decoration: BoxDecoration(
                     color: isDark
                         ? const Color(0xFF334155)
@@ -801,13 +743,13 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                   child: const Icon(
                     Icons.qr_code,
-                    size: 12,
+                    size: 14,
                     color: Color(0xFF64748B),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             Expanded(
               child: SingleChildScrollView(
                 physics: const NeverScrollableScrollPhysics(),
@@ -817,8 +759,8 @@ class _WarehousePageState extends State<WarehousePage> {
                     Text(
                       board.name,
                       style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                         color: isDark
                             ? AppColors.textPrimaryDark
                             : AppColors.textPrimaryLight,
@@ -826,11 +768,11 @@ class _WarehousePageState extends State<WarehousePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 3),
                     Text(
                       _qrCodeLabel(board),
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: 13,
                         fontFamily: 'monospace',
                         color: isDark
                             ? AppColors.textSecondaryDark
@@ -839,11 +781,11 @@ class _WarehousePageState extends State<WarehousePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 1),
+                    const SizedBox(height: 3),
                     Text(
                       board.model,
                       style: TextStyle(
-                        fontSize: 9,
+                        fontSize: 13,
                         color: isDark
                             ? AppColors.textSecondaryDark
                             : AppColors.textSecondaryLight,
@@ -852,11 +794,11 @@ class _WarehousePageState extends State<WarehousePage> {
                       overflow: TextOverflow.ellipsis,
                     ),
                     if (inventoryLine.isNotEmpty) ...[
-                      const SizedBox(height: 1),
+                      const SizedBox(height: 3),
                       Text(
                         inventoryLine,
                         style: TextStyle(
-                          fontSize: 8,
+                          fontSize: 12,
                           color: isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
@@ -865,12 +807,12 @@ class _WarehousePageState extends State<WarehousePage> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ],
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         const Icon(
                           Icons.location_on_outlined,
-                          size: 9,
+                          size: 13,
                           color: Color(0xFF94A3B8),
                         ),
                         const SizedBox(width: 2),
@@ -878,7 +820,7 @@ class _WarehousePageState extends State<WarehousePage> {
                           child: Text(
                             board.location,
                             style: const TextStyle(
-                              fontSize: 8,
+                              fontSize: 12,
                               color: Color(0xFF94A3B8),
                             ),
                             maxLines: 1,
@@ -891,7 +833,7 @@ class _WarehousePageState extends State<WarehousePage> {
                 ),
               ),
             ),
-            const Divider(height: 8),
+            const Divider(height: 12),
             StatusBadge(status: board.status, size: 'sm'),
           ],
         ),
@@ -969,30 +911,30 @@ class _WarehousePageState extends State<WarehousePage> {
                   Text(
                     board.name,
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
                       color: isDark
                           ? AppColors.textPrimaryDark
                           : AppColors.textPrimaryLight,
                     ),
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Row(
                     children: [
                       Text(
                         _qrCodeLabel(board),
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 14,
                           fontFamily: 'monospace',
                           color: isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
                         ),
                       ),
-                      const Text(' · ', style: TextStyle(fontSize: 12)),
+                      const Text(' · ', style: TextStyle(fontSize: 14)),
                       const Icon(
                         Icons.location_on_outlined,
-                        size: 12,
+                        size: 14,
                         color: Color(0xFF94A3B8),
                       ),
                       const SizedBox(width: 2),
@@ -1000,7 +942,7 @@ class _WarehousePageState extends State<WarehousePage> {
                         child: Text(
                           board.location,
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 14,
                             color: Color(0xFF94A3B8),
                           ),
                           maxLines: 1,
@@ -1010,11 +952,11 @@ class _WarehousePageState extends State<WarehousePage> {
                     ],
                   ),
                   if (inventoryLine.isNotEmpty) ...[
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
                       inventoryLine,
                       style: TextStyle(
-                        fontSize: 11,
+                        fontSize: 13,
                         color: isDark
                             ? AppColors.textSecondaryDark
                             : AppColors.textSecondaryLight,
@@ -1036,13 +978,14 @@ class _WarehousePageState extends State<WarehousePage> {
     );
   }
 
-  void _showBoardDetail(Board board) {
+  void _showBoardDetail(Board board, {bool fromScan = false}) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _BoardDetailSheet(
         board: board,
+        fromScan: fromScan,
         onEdit: () {
           Navigator.pop(context);
           _showAddEditBoardDialog(board: board);
@@ -1090,7 +1033,8 @@ class _WarehousePageState extends State<WarehousePage> {
     final locationCtrl = TextEditingController(text: board?.location ?? '');
     final serialCtrl = TextEditingController(text: board?.serialNumber ?? '');
     final partIdCtrl = TextEditingController(text: board?.partId ?? '');
-    final currentLocationIdCtrl = TextEditingController();
+    final currentLocationIdCtrl =
+        TextEditingController(text: board?.currentLocationId ?? '');
     final descCtrl = TextEditingController(text: board?.description ?? '');
     BoardStatus selectedStatus = board?.status ?? BoardStatus.available;
 
@@ -1175,14 +1119,16 @@ class _WarehousePageState extends State<WarehousePage> {
                               TextField(
                                 controller: partIdCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'Part ID',
+                                  labelText: 'Part ID / IPN',
+                                  helperText: 'Nhập ID (UUID) hoặc mã IPN (ví dụ: IPN-001)',
                                 ),
                               ),
                               const SizedBox(height: 12),
                               TextField(
                                 controller: currentLocationIdCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'Location ID',
+                                  labelText: 'Location ID / Code',
+                                  helperText: 'Nhập ID (UUID) hoặc mã vị trí kho (ví dụ: DEFAULT)',
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -1243,17 +1189,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               final currentLocationId = _optionalText(
                                 currentLocationIdCtrl.text,
                               );
-                              if (!_isUuidOrEmpty(partId) ||
-                                  !_isUuidOrEmpty(currentLocationId)) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'ID phai dung dinh dang UUID',
-                                    ),
-                                  ),
-                                );
-                                return;
-                              }
+
 
                               final backend = context
                                   .read<BackendDataProvider>();
@@ -1320,11 +1256,15 @@ class _BoardDetailSheet extends StatefulWidget {
   final Board board;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  /// Nếu true: mở từ quét QR → cho phép thao tác Lấy/Trả.
+  /// Nếu false: mở từ click thẻ danh sách → chỉ xem/sửa/xóa.
+  final bool fromScan;
 
   const _BoardDetailSheet({
     required this.board,
     required this.onEdit,
     required this.onDelete,
+    this.fromScan = false,
   });
 
   @override
@@ -1334,25 +1274,216 @@ class _BoardDetailSheet extends StatefulWidget {
 class _BoardDetailSheetState extends State<_BoardDetailSheet> {
   bool _isLoading = false;
   bool _isDone = false;
+  List<BoardHistoryItem>? _history;
+  bool _isLoadingHistory = false;
 
-  Future<void> _handleAction() async {
+  @override
+  void initState() {
+    super.initState();
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory() async {
+    setState(() {
+      _isLoadingHistory = true;
+    });
+    try {
+      final history = await context.read<BackendDataProvider>().getBoardHistory(widget.board.id);
+      if (mounted) {
+        setState(() {
+          _history = history;
+          _isLoadingHistory = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingHistory = false;
+        });
+      }
+    }
+  }
+
+  Future<String?> _showReturnNotesDialog() async {
+    final controller = TextEditingController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Trả bo mạch'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Nếu có sửa chữa hãy điền thông tin sửa chữa:',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: controller,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Nhập thông tin sửa chữa (nếu có)...',
+                  hintStyle: TextStyle(
+                    fontSize: 13,
+                    color: isDark ? Colors.white38 : Colors.black38,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                ),
+                style: TextStyle(
+                  fontSize: 14,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, controller.text),
+              child: const Text('Xác nhận'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showHistoryDetailDialog(BoardHistoryItem item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final takenAtStr = item.takenAt != null
+        ? "${item.takenAt!.day}/${item.takenAt!.month}/${item.takenAt!.year} ${item.takenAt!.hour.toString().padLeft(2, '0')}:${item.takenAt!.minute.toString().padLeft(2, '0')}"
+        : "Không rõ";
+    final returnedAtStr = item.returnedAt != null
+        ? "${item.returnedAt!.day}/${item.returnedAt!.month}/${item.returnedAt!.year} ${item.returnedAt!.hour.toString().padLeft(2, '0')}:${item.returnedAt!.minute.toString().padLeft(2, '0')}"
+        : "Chưa trả (Đang mượn)";
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(
+                Icons.history,
+                color: isDark ? Colors.blueAccent : Colors.blue.shade700,
+              ),
+              const SizedBox(width: 8),
+              const Text('Chi tiết mượn/trả'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildModalDetailRow('Người mượn', item.takenByName, isDark),
+                _buildModalDetailRow('Thời gian lấy', takenAtStr, isDark),
+                _buildModalDetailRow('Lý do lấy', item.checkoutReason, isDark),
+                const Divider(height: 24),
+                _buildModalDetailRow('Trạng thái trả', item.returnedAt != null ? 'Đã trả' : 'Đang mượn', isDark,
+                  valueColor: item.returnedAt != null ? Colors.green : Colors.orange,
+                  valueBold: true,
+                ),
+                _buildModalDetailRow('Thời gian trả', returnedAtStr, isDark),
+                _buildModalDetailRow('Thông tin sửa chữa/Lý do trả', item.returnReason, isDark),
+                if (item.repairOrderId != null && item.repairOrderId!.isNotEmpty) ...[
+                  const Divider(height: 24),
+                  _buildModalDetailRow('Đơn sửa chữa (ID)', item.repairOrderId!, isDark),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Đóng'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildModalDetailRow(String label, String value, bool isDark, {Color? valueColor, bool valueBold = false}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: valueBold ? FontWeight.bold : FontWeight.normal,
+              color: valueColor ?? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleAction({String? returnNotes}) async {
     setState(() {
       _isLoading = true;
     });
 
     final isOnline = await context.read<NetworkProvider>().checkNow();
-    if (!isOnline && mounted) {
-      final isReturn = widget.board.status == BoardStatus.checkedOut;
-      context.read<PendingSyncProvider>().addAction(
-        type: isReturn
-            ? PendingSyncType.boardReturn
-            : PendingSyncType.boardCheckout,
-        title: isReturn ? 'Trả bo mạch' : 'Lấy bo mạch',
-        description: '${widget.board.name} - ${widget.board.qrCode}',
-      );
+    final isReturn = widget.board.status == BoardStatus.checkedOut;
+
+    try {
+      if (isOnline) {
+        if (isReturn) {
+          await context.read<BackendDataProvider>().returnBoard(widget.board.id, notes: returnNotes);
+        } else {
+          await context.read<BackendDataProvider>().checkoutBoard(widget.board.id);
+        }
+      } else if (mounted) {
+        context.read<PendingSyncProvider>().addAction(
+          type: isReturn
+              ? PendingSyncType.boardReturn
+              : PendingSyncType.boardCheckout,
+          title: isReturn ? 'Trả bo mạch' : 'Lấy bo mạch',
+          description: '${widget.board.name} - ${widget.board.qrCode}${returnNotes != null && returnNotes.isNotEmpty ? " (Sửa chữa: $returnNotes)" : ""}',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Thao tác thất bại: $e'),
+          ),
+        );
+      }
+      setState(() {
+        _isLoading = false;
+      });
+      return;
     }
 
-    await Future.delayed(Duration(milliseconds: isOnline ? 1200 : 250));
     if (!mounted) return;
 
     setState(() {
@@ -1397,7 +1528,12 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
               ),
               const SizedBox(height: 24),
 
-              // Icon and Title
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Icon and Title
               Row(
                 children: [
                   Container(
@@ -1465,6 +1601,202 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
               ),
               const SizedBox(height: 24),
 
+              // QR Code Visualizer Card
+              if (widget.board.qrCode.isNotEmpty) ...[
+                GestureDetector(
+                  onTap: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => Dialog(
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.board.name,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Model: ${widget.board.model}',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 24),
+                              Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: Colors.grey.shade300,
+                                  ),
+                                ),
+                                child: QrImageView(
+                                  data: widget.board.qrCode,
+                                  version: QrVersions.auto,
+                                  size: 220.0,
+                                  eyeStyle: const QrEyeStyle(
+                                    eyeShape: QrEyeShape.square,
+                                    color: Colors.black,
+                                  ),
+                                  dataModuleStyle: const QrDataModuleStyle(
+                                    dataModuleShape: QrDataModuleShape.square,
+                                    color: Colors.black,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                widget.board.qrCode,
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: 1.5,
+                                  fontFamily: 'monospace',
+                                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                ),
+                              ),
+                              const SizedBox(height: 24),
+                              SizedBox(
+                                width: double.infinity,
+                                child: ElevatedButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  child: const Text('Đóng'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                  child: Tooltip(
+                    message: 'Nhấn để phóng to',
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          QrImageView(
+                            data: widget.board.qrCode,
+                            version: QrVersions.auto,
+                            size: 90.0,
+                            eyeStyle: QrEyeStyle(
+                              eyeShape: QrEyeShape.square,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                            dataModuleStyle: QrDataModuleStyle(
+                              dataModuleShape: QrDataModuleShape.square,
+                              color: isDark ? Colors.white : Colors.black87,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Text(
+                                      'Mã QR linh kiện',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    Icon(
+                                      Icons.fullscreen,
+                                      size: 14,
+                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  widget.board.qrCode,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 1.0,
+                                    fontFamily: 'monospace',
+                                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            height: 45,
+                            child: OutlinedButton(
+                              onPressed: () {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Đang kết nối máy in và gửi lệnh in mã: ${widget.board.qrCode}'),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(horizontal: 10),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                side: BorderSide(
+                                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                ),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.print,
+                                    size: 16,
+                                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'In tem',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
               // Info
               _buildInfoRow(
                 'Trạng thái',
@@ -1494,6 +1826,167 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                   ),
                 ),
               ],
+
+              // Lịch sử lấy/trả
+              const SizedBox(height: 16),
+              const Divider(),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.history, size: 18),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Lịch sử mượn/trả',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (_isLoadingHistory)
+                const Center(
+                  child: Padding(
+                    padding: EdgeInsets.all(16.0),
+                    child: CircularProgressIndicator(),
+                  ),
+                )
+              else if (_history == null || _history!.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Chưa có lịch sử mượn/trả.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    ),
+                  ),
+                )
+              else
+                ..._history!.map((item) {
+                  final takenAtStr = item.takenAt != null
+                      ? "${item.takenAt!.day}/${item.takenAt!.month}/${item.takenAt!.year} ${item.takenAt!.hour.toString().padLeft(2, '0')}:${item.takenAt!.minute.toString().padLeft(2, '0')}"
+                      : "Không rõ";
+                  final returnedAtStr = item.returnedAt != null
+                      ? "${item.returnedAt!.day}/${item.returnedAt!.month}/${item.returnedAt!.year} ${item.returnedAt!.hour.toString().padLeft(2, '0')}:${item.returnedAt!.minute.toString().padLeft(2, '0')}"
+                      : "Đang mượn";
+
+                  return GestureDetector(
+                    onTap: () => _showHistoryDetailDialog(item),
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: isDark ? Colors.white.withOpacity(0.02) : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                item.takenByName,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: item.returnedAt != null
+                                      ? (isDark ? Colors.green.withOpacity(0.15) : const Color(0xFFDCFCE7))
+                                      : (isDark ? Colors.orange.withOpacity(0.15) : const Color(0xFFFFEDD5)),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  item.returnedAt != null ? 'Đã trả' : 'Đang mượn',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: item.returnedAt != null
+                                        ? (isDark ? Colors.greenAccent : const Color(0xFF15803D))
+                                        : (isDark ? Colors.orangeAccent : const Color(0xFFC2410C)),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.play_arrow_outlined,
+                                size: 14,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Lấy: $takenAtStr',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.stop_circle_outlined,
+                                size: 14,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Trả: $returnedAtStr',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (item.notes != null && item.notes!.isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            const Divider(height: 8),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Ghi chú/Sửa chữa:',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              item.notes!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  );
+                }),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 24),
 
               // Actions
@@ -1522,6 +2015,55 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                 )
               else if (_isLoading)
                 const Center(child: CircularProgressIndicator())
+              else if (!widget.fromScan)
+                // Mở từ click thẻ danh sách → chỉ hiện nút Đóng
+                // Gợi ý người dùng cần quét mã để thao tác
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? Colors.amber.withOpacity(0.12)
+                            : const Color(0xFFFFFBEB),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: isDark
+                              ? Colors.amber.withOpacity(0.3)
+                              : const Color(0xFFFDE68A),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            Icons.qr_code_scanner,
+                            size: 18,
+                            color: isDark ? Colors.amber : const Color(0xFFD97706),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Quét mã QR linh kiện để thực hiện thao tác Lấy / Trả bo mạch.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? Colors.amber.shade200 : const Color(0xFF92400E),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    OutlinedButton(
+                      onPressed: () => Navigator.pop(context),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: const Text('Đóng'),
+                    ),
+                  ],
+                )
               else
                 Row(
                   children: [
@@ -1550,7 +2092,11 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _handleAction,
+                          onPressed: () async {
+                            final notes = await _showReturnNotesDialog();
+                            if (notes == null) return;
+                            await _handleAction(returnNotes: notes);
+                          },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.success,
                             padding: const EdgeInsets.symmetric(vertical: 16),

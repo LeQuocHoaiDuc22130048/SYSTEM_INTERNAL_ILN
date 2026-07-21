@@ -91,6 +91,22 @@ public class MessagingResponseMapper {
         List<MessageResponse.ReactionInfo> reactions = reactionInfo(message.getId());
         boolean deletedForEveryone = message.getDeletedForEveryoneAt() != null;
 
+        MessageResponse.ParentMessageInfo parentMessageInfo = null;
+        if (message.getParentMessageId() != null) {
+            Message parent = messageRepository.findById(message.getParentMessageId()).orElse(null);
+            if (parent != null && !Boolean.TRUE.equals(parent.getIsDeleted())) {
+                UserEntity parentSender = findUser(parent.getSenderId());
+                boolean parentRecalled = parent.getDeletedForEveryoneAt() != null;
+                parentMessageInfo = new MessageResponse.ParentMessageInfo(
+                        parent.getId(),
+                        parentSender.getFullName(),
+                        parentRecalled ? "Tin nhan da duoc thu hoi" : parent.getContent(),
+                        parentRecalled ? MessageType.SYSTEM.name() : parent.getMessageType().name(),
+                        parent.getDeletedForEveryoneAt()
+                );
+            }
+        }
+
         return new MessageResponse(
                 message.getId(),
                 message.getConversationId(),
@@ -103,7 +119,9 @@ public class MessagingResponseMapper {
                 message.getDeletedForEveryoneAt(),
                 readByUserIds,
                 mentionUserIds,
-                reactions
+                reactions,
+                message.getParentMessageId(),
+                parentMessageInfo
         );
     }
 

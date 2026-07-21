@@ -32,68 +32,77 @@ class DashboardPage extends StatelessWidget {
                 ? 980.0
                 : constraints.maxWidth;
 
-            return SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(
-                wide ? 20 : 16,
-                wide ? 22 : 16,
-                wide ? 20 : 16,
-                24,
-              ),
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(maxWidth: contentWidth),
-                  child: isEmployee
-                      ? _buildEmployeeDashboard(context, isDark, wide)
-                      : Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _DashboardHeader(isDark: isDark, wide: wide),
-                            const SizedBox(height: 24),
-                            Builder(
-                              builder: (context) {
-                                final stats = _buildDashboardStats(context);
-                                return GridView.builder(
-                                  itemCount: stats.length,
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  gridDelegate:
-                                      SliverGridDelegateWithFixedCrossAxisCount(
-                                    crossAxisCount: wide ? 4 : 2,
-                                    mainAxisSpacing: wide ? 20 : 10,
-                                    crossAxisSpacing: wide ? 12 : 10,
-                                    mainAxisExtent: wide ? 112 : 98,
-                                  ),
-                                  itemBuilder: (context, index) {
-                                    final stat = stats[index];
-                                    return _DashboardStatCard(
-                                      stat: stat,
-                                      isDark: isDark,
-                                    )
-                                        .animate(target: 1)
-                                        .fadeIn(
-                                          duration: 260.ms,
-                                          delay: (index * 35).ms,
-                                        )
-                                        .slideY(
-                                          begin: 0.08,
-                                          end: 0,
-                                          duration: 260.ms,
-                                          delay: (index * 35).ms,
-                                        );
-                                  },
-                                );
-                              },
-                            ),
-                            const SizedBox(height: 20),
-                            _WeeklyOrdersChart(isDark: isDark),
-                            const SizedBox(height: 20),
-                            _StatusRatioCard(isDark: isDark, wide: wide),
-                            const SizedBox(height: 20),
-                            _TodayAttendanceCard(isDark: isDark),
-                            const SizedBox(height: 20),
-                            _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
-                          ],
-                        ),
+            return RefreshIndicator(
+              onRefresh: () async {
+                final auth = Provider.of<AuthProvider>(context, listen: false);
+                await context.read<BackendDataProvider>().loadAll(
+                      isManagerOrAbove: auth.isManagerOrAbove,
+                    );
+              },
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(
+                  wide ? 20 : 16,
+                  wide ? 22 : 16,
+                  wide ? 20 : 16,
+                  24,
+                ),
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: contentWidth),
+                    child: isEmployee
+                        ? _buildEmployeeDashboard(context, isDark, wide)
+                        : Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _DashboardHeader(isDark: isDark, wide: wide),
+                              const SizedBox(height: 24),
+                              Builder(
+                                builder: (context) {
+                                  final stats = _buildDashboardStats(context);
+                                  return GridView.builder(
+                                    itemCount: stats.length,
+                                    shrinkWrap: true,
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    gridDelegate:
+                                        SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: wide ? 4 : 2,
+                                      mainAxisSpacing: wide ? 20 : 10,
+                                      crossAxisSpacing: wide ? 12 : 10,
+                                      mainAxisExtent: wide ? 112 : 98,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      final stat = stats[index];
+                                      return _DashboardStatCard(
+                                        stat: stat,
+                                        isDark: isDark,
+                                      )
+                                          .animate(target: 1)
+                                          .fadeIn(
+                                            duration: 260.ms,
+                                            delay: (index * 35).ms,
+                                          )
+                                          .slideY(
+                                            begin: 0.08,
+                                            end: 0,
+                                            duration: 260.ms,
+                                            delay: (index * 35).ms,
+                                          );
+                                    },
+                                  );
+                                },
+                              ),
+                              const SizedBox(height: 20),
+                              _WeeklyOrdersChart(isDark: isDark),
+                              const SizedBox(height: 20),
+                              _StatusRatioCard(isDark: isDark, wide: wide),
+                              const SizedBox(height: 20),
+                              _TodayAttendanceCard(isDark: isDark),
+                              const SizedBox(height: 20),
+                              _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
+                            ],
+                          ),
+                  ),
                 ),
               ),
             );
@@ -191,7 +200,7 @@ class _DashboardHeader extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                'Xin chào, Minh 👋',
+                'Xin chào, ${Provider.of<AuthProvider>(context).currentUser?.name ?? 'Người dùng'}',
                 style: TextStyle(
                   fontSize: wide ? 24 : 22,
                   height: 1.2,
