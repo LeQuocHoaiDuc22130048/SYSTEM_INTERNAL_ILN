@@ -281,6 +281,23 @@
   color: var(--color-ot);
 }
 
+.device-avatar.admin,
+.device-avatar.super_admin {
+  background: rgba(239, 68, 68, 0.12);
+  color: #dc2626;
+}
+
+.device-avatar.manager {
+  background: rgba(245, 158, 11, 0.12);
+  color: #d97706;
+}
+
+.device-avatar.employee,
+.device-avatar.receptionist {
+  background: rgba(14, 165, 233, 0.12);
+  color: #0284c7;
+}
+
 .device-title-info {
   display: flex;
   flex-direction: column;
@@ -427,17 +444,25 @@
 }
 
 .action-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 8px;
   border: 1px solid #cbd5e1;
   background: #ffffff;
   color: var(--color-text);
   cursor: pointer;
   transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.action-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2.2;
 }
 
 .action-btn:hover {
@@ -458,22 +483,31 @@
 
 .action-btn.toggle-sim {
   background: #fffbeb;
-  color: var(--color-late);
-  border-color: transparent;
+  color: #b45309;
+  border: 1px solid #fde68a;
   width: auto;
-  padding: 0 10px;
-  font-size: 0.75rem;
+  height: 36px;
+  padding: 0 14px;
+  font-size: 0.85rem;
   font-weight: 700;
-  gap: 4px;
+  gap: 6px;
+  border-radius: 8px;
+}
+
+.action-btn.toggle-sim svg {
+  width: 18px;
+  height: 18px;
 }
 
 .action-btn.toggle-sim:hover {
   background: #fef3c7;
+  border-color: #fcd34d;
 }
 
 .action-btn.edit:hover {
   color: var(--color-leave);
   border-color: var(--color-leave);
+  background: rgba(55, 138, 221, 0.08);
 }
 
 .action-btn.delete:hover {

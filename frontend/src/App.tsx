@@ -17,6 +17,7 @@ import { Sidebar } from './components/Sidebar';
 import { OrdersTab } from './components/OrdersTab';
 import { WarehouseTab } from './components/WarehouseTab';
 import { AccountsTab } from './components/AccountsTab';
+import { DashboardTab } from './components/DashboardTab';
 
 import { getAuthHeaders, getJsonAuthHeaders, createTimeoutController, STANDARD_WORK_DAYS } from './utils/auth';
 import { getDailyStatusFromPattern } from './utils/employee';
@@ -27,7 +28,7 @@ import { exportAttendanceExcel } from './utils/excel';
 type DataSource = 'api' | 'error' | 'loading';
 
 /** Tab đang hiển thị */
-type ActiveTab = 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
+type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
 
 /** Dữ liệu target để mở EditModal */
 interface EditModalTarget {
@@ -62,7 +63,7 @@ function App() {
 
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('monthly');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -374,7 +375,13 @@ function App() {
         />
 
         <div className="main-content-inner">
-          {activeTab === 'monthly' ? (
+          {activeTab === 'dashboard' ? (
+            <DashboardTab
+              setActiveTab={setActiveTab}
+              showToast={showToast}
+              currentUser={currentUser}
+            />
+          ) : activeTab === 'monthly' ? (
             <>
               <MonthlyStatsGrid
                 totalStandardDays={STANDARD_WORK_DAYS}

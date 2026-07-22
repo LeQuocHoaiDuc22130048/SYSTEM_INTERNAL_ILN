@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -33,4 +34,10 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     @Query("SELECT COUNT(r) FROM RefreshToken r WHERE r.userId = :userId AND r.revoked = false AND r.expiresAt > :now")
     long countActiveSessionsByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+
+    @Query("SELECT DISTINCT r.userId FROM RefreshToken r")
+    List<UUID> findDistinctUserIds();
+
+    @Query("SELECT r FROM RefreshToken r WHERE r.revoked = false AND r.expiresAt > :now")
+    List<RefreshToken> findAllActiveTokens(@Param("now") Instant now);
 }

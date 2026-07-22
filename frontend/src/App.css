@@ -2458,6 +2458,40 @@
   overflow-y: auto;
 }
 
+.menu-item-direct {
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  color: #94a3b8;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-family: inherit;
+}
+
+.menu-item-direct:hover {
+  background-color: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
+}
+
+.menu-item-direct.active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+}
+
+.menu-item-direct.active .item-icon {
+  color: #ffffff;
+}
+
 .menu-group {
   display: flex;
   flex-direction: column;

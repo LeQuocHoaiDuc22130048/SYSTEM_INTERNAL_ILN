@@ -16,13 +16,14 @@ import {
   Boxes,
   Users,
   ShieldCheck,
+  LayoutDashboard,
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { isAdminOrAbove, isManagerOrAbove as _isManagerOrAbove, getRoleLabel } from '../utils/permissions';
 
 interface SidebarProps {
-  activeTab: 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
-  setActiveTab: (tab: 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => void;
+  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
+  setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => void;
   currentUser: UserInfo | null;
   isOpen: boolean;
   onClose: () => void;
@@ -45,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isManagerOrAbove = React.useMemo(() => _isManagerOrAbove(currentUser), [currentUser]);
   const showAccountsTab = React.useMemo(() => isAdminOrAbove(currentUser), [currentUser]);
 
-  const handleTabClick = (tab: 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => {
+  const handleTabClick = (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => {
     setActiveTab(tab);
     if (window.innerWidth <= 1024) {
       onClose(); // Đóng sidebar trên mobile sau khi click
@@ -63,8 +64,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="brand">
             <img src="/app_logo.png" alt="Logo" className="brand-logo" />
             <div className="brand-info">
-              <span className="brand-name">INTERNAL ILN</span>
-              <span className="brand-sub">Quản lý Chấm công</span>
+              <span className="brand-name">INVERTER LIKE NEW</span>
+              <span className="brand-sub">Quản lý hệ thống</span>
             </div>
           </div>
           <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
@@ -77,6 +78,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Menu Items */}
         <nav className="sidebar-nav">
+          {/* DASHBOARD */}
+          <div className="menu-group">
+            <button
+              className={`menu-item-direct ${activeTab === 'dashboard' ? 'active' : ''}`}
+              onClick={() => handleTabClick('dashboard')}
+              id="sidebar-dashboard-btn"
+            >
+              <LayoutDashboard size={18} className="item-icon" />
+              <span>Dashboard</span>
+            </button>
+          </div>
+
           {/* NHÓM 1: QUẢN LÝ CHẤM CÔNG */}
           <div className="menu-group">
             <button

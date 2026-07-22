@@ -1752,10 +1752,119 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                             height: 45,
                             child: OutlinedButton(
                               onPressed: () {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('Đang kết nối máy in và gửi lệnh in mã: ${widget.board.qrCode}'),
-                                    duration: const Duration(seconds: 2),
+                                final qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${Uri.encodeComponent(widget.board.qrCode)}';
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                                  ),
+                                  builder: (ctx) => Padding(
+                                    padding: const EdgeInsets.all(24),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Container(
+                                          width: 40,
+                                          height: 4,
+                                          decoration: BoxDecoration(
+                                            color: Colors.grey.shade300,
+                                            borderRadius: BorderRadius.circular(2),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          'TEM PDF QR ĐỊNH DANH',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 0.5,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Container(
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(color: Colors.blue.shade200, width: 2),
+                                          ),
+                                          child: Column(
+                                            children: [
+                                              QrImageView(
+                                                data: widget.board.qrCode,
+                                                version: QrVersions.auto,
+                                                size: 160.0,
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                                decoration: BoxDecoration(
+                                                  color: Colors.grey.shade100,
+                                                  borderRadius: BorderRadius.circular(8),
+                                                  border: Border.all(color: Colors.grey.shade300),
+                                                ),
+                                                child: Column(
+                                                  children: [
+                                                    const Text(
+                                                      'MÃ CODE QR:',
+                                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
+                                                    ),
+                                                    Text(
+                                                      widget.board.qrCode,
+                                                      style: const TextStyle(
+                                                        fontSize: 16,
+                                                        fontWeight: FontWeight.bold,
+                                                        fontFamily: 'monospace',
+                                                        letterSpacing: 1.2,
+                                                        color: Colors.black,
+                                                      ),
+                                                    ),
+                                                  ],
+                                                ),
+                                              ),
+                                              const SizedBox(height: 12),
+                                              Text(
+                                                widget.board.name,
+                                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
+                                                textAlign: TextAlign.center,
+                                              ),
+                                              if (widget.board.model.isNotEmpty)
+                                                Text(
+                                                  'Model: ${widget.board.model}',
+                                                  style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
+                                                ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        SizedBox(
+                                          width: double.infinity,
+                                          height: 48,
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.print),
+                                            label: const Text('Mở mẫu in PDF (Browser)'),
+                                            style: ElevatedButton.styleFrom(
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                            ),
+                                            onPressed: () async {
+                                              Navigator.pop(ctx);
+                                              final uri = Uri.parse(qrUrl);
+                                              if (await canLaunchUrl(uri)) {
+                                                await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                              } else {
+                                                if (context.mounted) {
+                                                  ScaffoldMessenger.of(context).showSnackBar(
+                                                    SnackBar(content: Text('Không thể mở URL in: $qrUrl')),
+                                                  );
+                                                }
+                                              }
+                                            },
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 );
                               },
@@ -1772,13 +1881,13 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
                                   Icon(
-                                    Icons.print,
+                                    Icons.picture_as_pdf,
                                     size: 16,
                                     color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
                                   ),
                                   const SizedBox(height: 2),
                                   Text(
-                                    'In tem',
+                                    'Xuất PDF',
                                     style: TextStyle(
                                       fontSize: 10,
                                       fontWeight: FontWeight.w600,

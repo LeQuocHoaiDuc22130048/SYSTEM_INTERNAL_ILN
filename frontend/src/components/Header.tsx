@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
+  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
   currentMonth: number;
   currentYear: number;
   prevMonth: () => void;
@@ -67,7 +67,9 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
           <h1 className="title">
-            {activeTab === 'monthly'
+            {activeTab === 'dashboard'
+              ? 'Dashboard tổng hợp'
+              : activeTab === 'monthly'
               ? 'Chấm công theo tháng'
               : activeTab === 'daily'
               ? 'Chấm công theo ngày'
@@ -100,7 +102,12 @@ export const Header: React.FC<HeaderProps> = ({
             )}
           </div>
 
-          {activeTab === 'monthly' ? (
+          {activeTab === 'dashboard' ? (
+            <div className="month-navigator real-time-indicator" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0' }}>
+              <span className="real-time-dot" style={{ backgroundColor: '#10b981', boxShadow: '0 0 0 0.15rem rgba(16, 185, 129, 0.4)' }} />
+              <span className="real-time-text" style={{ color: '#047857' }}>Hệ thống bình thường</span>
+            </div>
+          ) : activeTab === 'monthly' ? (
             <div className="month-navigator">
               <button id="btn-prev-month" className="nav-btn" onClick={prevMonth}>
                 <ChevronLeft size={18} />

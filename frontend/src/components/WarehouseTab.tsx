@@ -12,8 +12,11 @@ import {
   Layers,
   MapPin,
   Tag,
+  Printer,
+  FileText,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
+import { exportBoardQrPdf, exportBoardQrPdfList } from '../utils/pdf';
 import './WarehouseTab.css';
 
 interface Board {
@@ -540,6 +543,15 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                 <option value="MAINTENANCE">Bảo trì</option>
               </select>
 
+              <button
+                className="btn-export-pdf-all"
+                onClick={() => exportBoardQrPdfList(filteredBoards)}
+                title="Xuất PDF mã QR cho tất cả bo mạch đang hiển thị"
+              >
+                <FileText size={16} />
+                <span>Xuất PDF Mã QR</span>
+              </button>
+
               <button className="btn-add-board" onClick={() => openAddEditModal(null)}>
                 <Plus size={16} />
                 <span>Thêm bo mạch</span>
@@ -717,12 +729,29 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
               {/* QR Code Section */}
               <div className="detail-content-section align-center">
-                <h4 className="section-title text-left width-full">QR Code định danh</h4>
+                <div className="qrcode-section-header">
+                  <h4 className="section-title text-left margin-0">QR Code định danh</h4>
+                  <button
+                    className="btn-export-qr-pdf"
+                    onClick={() => exportBoardQrPdf(selectedBoard)}
+                    title="Xuất PDF mã QR và mã code của linh kiện bo mạch này"
+                  >
+                    <Printer size={15} />
+                    <span>Xuất PDF QR</span>
+                  </button>
+                </div>
                 <div className="qrcode-container-card">
                   <img src={getQRCodeUrl(selectedBoard.qrCode)} alt="QR Code" className="qrcode-img" />
                   <div className="qrcode-meta">
                     <span className="qr-value">{selectedBoard.qrCode}</span>
                     <span className="qr-desc">Dùng ứng dụng di động quét mã QR này để nhanh chóng kiểm tra thông tin hoặc thay đổi vị trí.</span>
+                    <button
+                      className="btn-export-qr-pdf-outline"
+                      onClick={() => exportBoardQrPdf(selectedBoard)}
+                    >
+                      <Printer size={14} />
+                      <span>Xuất tem PDF</span>
+                    </button>
                   </div>
                 </div>
               </div>

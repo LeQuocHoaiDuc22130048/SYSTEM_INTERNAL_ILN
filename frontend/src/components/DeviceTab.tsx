@@ -14,7 +14,10 @@ import {
   WifiOff,
   Clock,
   Settings,
-  X
+  X,
+  ShieldCheck,
+  UserCheck,
+  User
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import type { UserInfo } from '../mockData';
@@ -25,7 +28,7 @@ export interface DeviceInfo {
   id: string; // UUID
   deviceId: string; // User-facing ID, e.g. ATT-FREAD-01
   name: string;
-  type: 'TECHNICIAN' | 'WAREHOUSE' | 'ATTENDANCE';
+  type: string;
   status: 'ONLINE' | 'OFFLINE';
   ipAddress: string;
   lastActiveAt: string | null;
@@ -261,20 +264,28 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
   };
 
   // Helper render device type icon
-  const getDeviceIcon = (type: DeviceInfo['type']) => {
+  const getDeviceIcon = (type: string) => {
     switch (type) {
       case 'ATTENDANCE':
-        return <Fingerprint size={20} />;
+        return <Fingerprint size={24} />;
       case 'WAREHOUSE':
-        return <Barcode size={20} />;
+        return <Barcode size={24} />;
       case 'TECHNICIAN':
-        return <Smartphone size={20} />;
+        return <Smartphone size={24} />;
+      case 'SUPER_ADMIN':
+      case 'ADMIN':
+        return <ShieldCheck size={24} />;
+      case 'MANAGER':
+        return <UserCheck size={24} />;
+      case 'EMPLOYEE':
+      case 'RECEPTIONIST':
+        return <User size={24} />;
       default:
-        return <Cpu size={20} />;
+        return <Cpu size={24} />;
     }
   };
 
-  const getTypeName = (type: DeviceInfo['type']) => {
+  const getTypeName = (type: string) => {
     switch (type) {
       case 'ATTENDANCE':
         return 'Chấm công';
@@ -282,6 +293,16 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
         return 'Kho bãi';
       case 'TECHNICIAN':
         return 'Kỹ thuật';
+      case 'SUPER_ADMIN':
+        return 'Super Admin';
+      case 'ADMIN':
+        return 'Quản trị viên';
+      case 'MANAGER':
+        return 'Quản lý';
+      case 'EMPLOYEE':
+        return 'Nhân viên';
+      case 'RECEPTIONIST':
+        return 'Lễ tân';
       default:
         return type;
     }
@@ -464,7 +485,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">
-                    <Clock size={12} /> Hoạt động cuối
+                    <Clock size={14} /> Hoạt động cuối
                   </span>
                   <span className="detail-value">
                     {formatActiveTime(device.lastActiveAt)}
@@ -472,7 +493,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">
-                    <Activity size={12} /> Độ trễ ping
+                    <Activity size={14} /> Độ trễ ping
                   </span>
                   <span className={`detail-value ping ${device.pingMs > 30 ? 'high' : ''}`}>
                     {device.status === 'ONLINE' ? `${device.pingMs} ms` : 'N/A'}
@@ -491,7 +512,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                   onClick={(e) => handlePing(device.id, e)}
                   title="Gửi tín hiệu Ping"
                 >
-                  <Wifi size={14} />
+                  <Wifi size={20} />
                 </button>
 
                 {/* Toggle simulated status (Only managers/admins) */}
@@ -501,7 +522,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                     onClick={(e) => handleToggleStatus(device.id, e)}
                     title="Bật/Tắt Giả lập"
                   >
-                    <Settings size={12} />
+                    <Settings size={18} />
                     <span>{device.status === 'ONLINE' ? 'Tắt' : 'Bật'}</span>
                   </button>
                 )}
@@ -514,7 +535,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                       onClick={(e) => handleOpenEditModal(device, e)}
                       title="Chỉnh sửa"
                     >
-                      <Edit size={14} />
+                      <Edit size={20} />
                     </button>
                     <button
                       className="action-btn delete"
@@ -524,7 +545,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                       }}
                       title="Xóa thiết bị"
                     >
-                      <Trash2 size={14} />
+                      <Trash2 size={20} />
                     </button>
                   </>
                 )}

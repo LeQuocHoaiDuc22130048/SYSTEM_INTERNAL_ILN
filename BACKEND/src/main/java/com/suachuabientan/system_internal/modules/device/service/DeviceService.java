@@ -32,8 +32,28 @@ public class DeviceService {
         List<UserEntity> deviceUsers = userRepository.findByRoleInAndStatusAndIsDeletedFalse(
                 deviceRoles, UserStatus.ACTIVE);
 
-        return deviceUsers.stream()
-                .map(this::toResponseWithFlicker)
+        // Query users who have logged in (have refresh token entries)
+        List<UUID> loggedInUserIds = refreshTokenRepository.findDistinctUserIds();
+        List<UserEntity> loggedInUsers = userRepository.findAllById(loggedInUserIds).stream()
+                .filter(u -> u.getStatus() == UserStatus.ACTIVE && !Boolean.TRUE.equals(u.getIsDeleted()))
+                .collect(Collectors.toList());
+
+        // Merge users while preserving uniqueness
+        Map<UUID, UserEntity> userMap = new LinkedHashMap<>();
+        for (UserEntity user : deviceUsers) {
+            userMap.put(user.getId(), user);
+        }
+        for (UserEntity user : loggedInUsers) {
+            userMap.put(user.getId(), user);
+        }
+
+        // Pre-fetch active tokens for fast lookups
+        List<RefreshToken> activeTokens = refreshTokenRepository.findAllActiveTokens(Instant.now());
+        Map<UUID, List<RefreshToken>> activeTokensMap = activeTokens.stream()
+                .collect(Collectors.groupingBy(RefreshToken::getUserId));
+
+        return userMap.values().stream()
+                .map(user -> toResponseWithFlicker(user, activeTokensMap.getOrDefault(user.getId(), Collections.emptyList())))
                 .collect(Collectors.toList());
     }
 
@@ -170,9 +190,15 @@ public class DeviceService {
     }
 
     private DeviceResponse toResponse(UserEntity user) {
-        // Query active sessions from refresh_tokens table
-        List<RefreshToken> activeTokens = refreshTokenRepository.findAll().stream()
-                .filter(t -> t.getUserId().equals(user.getId()) && t.isValid())
+        List<RefreshToken> activeTokens = refreshTokenRepository.findAllActiveTokens(Instant.now()).stream()
+                .filter(t -> t.getUserId().equals(user.getId()))
+                .collect(Collectors.toList());
+        return toResponse(user, activeTokens);
+    }
+
+    private DeviceResponse toResponse(UserEntity user, List<RefreshToken> userActiveTokens) {
+        List<RefreshToken> activeTokens = userActiveTokens.stream()
+                .filter(RefreshToken::isValid)
                 .sorted(Comparator.comparing(RefreshToken::getCreatedAt).reversed())
                 .collect(Collectors.toList());
 
@@ -185,7 +211,7 @@ public class DeviceService {
 
         if (isOnline) {
             RefreshToken latestToken = activeTokens.get(0);
-            if (latestToken.getDeviceInfo() != null) {
+            if (latestToken.getDeviceInfo() != null && !latestToken.getDeviceInfo().isBlank()) {
                 ipAddress = latestToken.getDeviceInfo().replace("Simulated Device IP: ", "").replace("Physical Heartbeat IP: ", "");
             } else {
                 ipAddress = "192.168.1.50";
@@ -208,7 +234,11 @@ public class DeviceService {
     }
 
     private DeviceResponse toResponseWithFlicker(UserEntity user) {
-        DeviceResponse response = toResponse(user);
+        return toResponseWithFlicker(user, Collections.emptyList());
+    }
+
+    private DeviceResponse toResponseWithFlicker(UserEntity user, List<RefreshToken> userActiveTokens) {
+        DeviceResponse response = toResponse(user, userActiveTokens);
         if ("ONLINE".equals(response.status())) {
             int ping = Math.max(2, response.pingMs() + (random.nextInt(7) - 3));
             return new DeviceResponse(
