@@ -98,7 +98,7 @@ class RepairServiceTest {
     }
 
     @Test
-    void employeeCanGetOrderNotAssignedToThem() {
+    void nonManagerCannotGetOrderNotAssignedToThem() {
         UUID orderId = UUID.randomUUID();
         UUID employeeId = UUID.randomUUID();
         
@@ -123,9 +123,7 @@ class RepairServiceTest {
         
         CustomUserDetails userDetails = new CustomUserDetails(employee);
         
-        var response = repairService.getById(orderId, userDetails);
-        org.junit.jupiter.api.Assertions.assertNotNull(response);
-        org.junit.jupiter.api.Assertions.assertEquals(orderId, response.id());
+        assertThrows(BusinessException.class, () -> repairService.getById(orderId, userDetails));
     }
 
     @Test

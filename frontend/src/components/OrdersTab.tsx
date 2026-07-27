@@ -15,14 +15,19 @@ import {
   ShieldCheck,
   AlertTriangle,
   Play,
+  Maximize2,
+  FileText,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
+import type { UserInfo } from '../mockData';
+import { isManagerOrAbove as _isManagerOrAbove } from '../utils/permissions';
+import { MediaPreviewModal } from './MediaPreviewModal';
 import './OrdersTab.css';
 
 interface RepairMedia {
   id: string;
   imageUrl: string;
-  mediaType: 'IMAGE' | 'VIDEO';
+  mediaType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | string;
   caption?: string;
 }
 
@@ -75,9 +80,11 @@ interface TimelineEvent {
 
 interface OrdersTabProps {
   showToast: (msg: string) => void;
+  currentUser?: UserInfo | null;
 }
 
-export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
+export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) => {
+  const isManager = React.useMemo(() => _isManagerOrAbove(currentUser ?? null), [currentUser]);
   // State
   const [orders, setOrders] = useState<RepairOrder[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -87,9 +94,9 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
   const [warrantyFilter, setWarrantyFilter] = useState<string>('ALL');
   const [dateFilter, setDateFilter] = useState<string>('');
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState<number>(1);
-  const pageSize = 10;
+  // Infinite scroll / Lazy loading
+  const [visibleCount, setVisibleCount] = useState<number>(20);
+  const listWrapperRef = React.useRef<HTMLDivElement | null>(null);
 
   // Selected Order details
   const [selectedOrder, setSelectedOrder] = useState<RepairOrder | null>(null);
@@ -115,8 +122,15 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
   const [selectedTechs, setSelectedTechs] = useState<string[]>([]);
   const [assignNote, setAssignNote] = useState<string>('');
 
-  // Media upload progress/loading
+  // Media upload progress/loading & preview modal
   const [uploadingMedia, setUploadingMedia] = useState<boolean>(false);
+  const [isPreviewModalOpen, setIsPreviewModalOpen] = useState<boolean>(false);
+  const [previewMediaIndex, setPreviewMediaIndex] = useState<number>(0);
+
+  const handleOpenMediaPreview = (index: number) => {
+    setPreviewMediaIndex(index);
+    setIsPreviewModalOpen(true);
+  };
 
   // Fetch orders
   const fetchOrders = useCallback(async () => {
@@ -242,12 +256,18 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
     return matchesSearch && matchesStatus && matchesWarranty && matchesDate;
   });
 
-  // Paginated orders
-  const paginatedOrders = filteredOrders.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-  const totalPages = Math.ceil(filteredOrders.length / pageSize);
+  // Displayed orders sliced by visibleCount for infinite scrolling
+  const displayedOrders = filteredOrders.slice(0, visibleCount);
+
+  // Handle infinite scroll event on orders list container
+  const handleScrollList = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollTop + clientHeight >= scrollHeight - 60) {
+      if (visibleCount < filteredOrders.length) {
+        setVisibleCount((prev) => Math.min(prev + 20, filteredOrders.length));
+      }
+    }
+  };
 
   // Form device list handlers
   const handleAddFormDevice = () => {
@@ -522,20 +542,25 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
   const handleUploadMedia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!selectedOrder || !e.target.files || e.target.files.length === 0) return;
     const file = e.target.files[0];
-    const isVideo = file.type.startsWith('video/');
-    const isImage = file.type.startsWith('image/');
+    const isVideo = file.type.startsWith('video/') || /\.(mp4|mov|webm|avi|mkv|3gp)$/i.test(file.name);
+    const isImage = file.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|heic|heif)$/i.test(file.name);
+    const isDoc = file.type.startsWith('application/') || file.type.startsWith('text/') || /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|zip|rar|7z|csv)$/i.test(file.name);
 
-    if (!isImage && !isVideo) {
-      showToast('Chỉ hỗ trợ file ảnh hoặc video');
+    if (!isImage && !isVideo && !isDoc) {
+      showToast('Chỉ hỗ trợ file hình ảnh, video hoặc tài liệu hợp lệ');
       return;
     }
+
+    let mediaType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' = 'IMAGE';
+    if (isVideo) mediaType = 'VIDEO';
+    else if (isDoc && !isImage) mediaType = 'DOCUMENT';
 
     setUploadingMedia(true);
     try {
       const formData = new FormData();
       formData.append('file', file);
 
-      const response = await fetch(`/api/v1/repair-orders/${selectedOrder.id}/media?type=${isVideo ? 'VIDEO' : 'IMAGE'}&caption=${encodeURIComponent(file.name)}`, {
+      const response = await fetch(`/api/v1/repair-orders/${selectedOrder.id}/media?type=${mediaType}&caption=${encodeURIComponent(file.name)}`, {
         method: 'POST',
         headers: getAuthHeaders(), // Note: fetch multipart requires NO Content-Type header so browser inserts it with boundary
         body: formData,
@@ -635,7 +660,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
-                    setCurrentPage(1);
+                    setVisibleCount(20);
                   }}
                   className="orders-search-input"
                 />
@@ -653,7 +678,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
                   value={statusFilter}
                   onChange={(e) => {
                     setStatusFilter(e.target.value);
-                    setCurrentPage(1);
+                    setVisibleCount(20);
                   }}
                 >
                   <option value="ALL">Mọi trạng thái</option>
@@ -674,7 +699,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
                   value={warrantyFilter}
                   onChange={(e) => {
                     setWarrantyFilter(e.target.value);
-                    setCurrentPage(1);
+                    setVisibleCount(20);
                   }}
                 >
                   <option value="ALL">Mọi bảo hành</option>
@@ -690,12 +715,12 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
                   value={dateFilter}
                   onChange={(e) => {
                     setDateFilter(e.target.value);
-                    setCurrentPage(1);
+                    setVisibleCount(20);
                   }}
                   className="filter-date-input"
                 />
                 {dateFilter && (
-                  <button className="clear-date-btn" onClick={() => setDateFilter('')}>
+                  <button className="clear-date-btn" onClick={() => { setDateFilter(''); setVisibleCount(20); }}>
                     <X size={12} />
                   </button>
                 )}
@@ -704,91 +729,89 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
           </div>
 
           {/* List display */}
-          <div className="orders-list-wrapper">
+          <div
+            className="orders-list-wrapper"
+            ref={listWrapperRef}
+            onScroll={handleScrollList}
+          >
             {loading ? (
               <div className="list-status-msg">Đang tải danh sách đơn hàng...</div>
-            ) : paginatedOrders.length === 0 ? (
+            ) : displayedOrders.length === 0 ? (
               <div className="list-status-msg">Không tìm thấy đơn hàng nào.</div>
             ) : (
-              <div className="orders-cards-list">
-                {paginatedOrders.map((order) => {
-                  const statusMeta = getStatusMeta(order.status);
-                  const isSelected = selectedOrder?.id === order.id;
+              <>
+                <div className="orders-cards-list">
+                  {displayedOrders.map((order) => {
+                    const statusMeta = getStatusMeta(order.status);
+                    const isSelected = selectedOrder?.id === order.id;
 
-                  return (
-                    <div
-                      key={order.id}
-                      className={`order-list-card ${isSelected ? 'selected' : ''}`}
-                      onClick={() => handleSelectOrder(order)}
-                    >
-                      <div className="card-header-row">
-                        <span className="order-code-tag">{order.orderCode}</span>
-                        <span className={`status-badge ${statusMeta.color}`}>
-                          {statusMeta.label}
-                        </span>
-                      </div>
-
-                      <h3 className="card-device-name" title={order.deviceName}>
-                        {order.deviceName}
-                      </h3>
-
-                      <div className="card-info-grid">
-                        <div className="info-item">
-                          <User size={13} />
-                          <span>{order.customerName}</span>
+                    return (
+                      <div
+                        key={order.id}
+                        className={`order-list-card ${isSelected ? 'selected' : ''}`}
+                        onClick={() => handleSelectOrder(order)}
+                      >
+                        <div className="card-header-row">
+                          <span className="order-code-tag">{order.orderCode}</span>
+                          <span className={`status-badge ${statusMeta.color}`}>
+                            {statusMeta.label}
+                          </span>
                         </div>
-                        {order.customerPhone && (
-                          <div className="info-item">
-                            <Phone size={13} />
-                            <span>{order.customerPhone}</span>
-                          </div>
-                        )}
-                      </div>
 
-                      <div className="card-footer-row">
-                        <span className="card-date">
-                          {new Date(order.createdAt).toLocaleDateString('vi-VN', {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })}
-                        </span>
-                        <div className="card-assignees">
-                          {order.assignees.length > 0 ? (
-                            <span className="assignees-badge" title={order.assignees.map((a) => a.fullName).join(', ')}>
-                              {order.assignees.length} kỹ thuật viên
-                            </span>
-                          ) : (
-                            <span className="unassigned-badge">Chưa phân công</span>
+                        <h3 className="card-device-name" title={order.deviceName}>
+                          {order.deviceName}
+                        </h3>
+
+                        <div className="card-info-grid">
+                          <div className="info-item">
+                            <User size={13} />
+                            <span>{order.customerName}</span>
+                          </div>
+                          {order.customerPhone && (
+                            <div className="info-item">
+                              <Phone size={13} />
+                              <span>{order.customerPhone}</span>
+                            </div>
                           )}
                         </div>
+
+                        <div className="card-footer-row">
+                          <span className="card-date">
+                            {new Date(order.createdAt).toLocaleDateString('vi-VN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                            })}
+                          </span>
+                          <div className="card-assignees">
+                            {order.assignees.length > 0 ? (
+                              <span className="assignees-badge" title={order.assignees.map((a) => a.fullName).join(', ')}>
+                                {order.assignees.length} kỹ thuật viên
+                              </span>
+                            ) : (
+                              <span className="unassigned-badge">Chưa phân công</span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+
+                {/* Infinite Scroll Footer */}
+                <div className="infinite-scroll-footer">
+                  {visibleCount < filteredOrders.length ? (
+                    <span className="loading-more-text">
+                      Cuộn xuống để nạp thêm... ({displayedOrders.length}/{filteredOrders.length})
+                    </span>
+                  ) : (
+                    <span className="end-list-text">
+                      Đã hiển thị tất cả {filteredOrders.length} đơn hàng
+                    </span>
+                  )}
+                </div>
+              </>
             )}
           </div>
-
-          {/* Pagination Controls */}
-          {totalPages > 1 && (
-            <div className="pagination-bar">
-              <button
-                disabled={currentPage === 1}
-                onClick={() => setCurrentPage((c) => Math.max(1, c - 1))}
-              >
-                Trước
-              </button>
-              <span>
-                Trang {currentPage} / {totalPages}
-              </span>
-              <button
-                disabled={currentPage === totalPages}
-                onClick={() => setCurrentPage((c) => Math.min(totalPages, c + 1))}
-              >
-                Sau
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Right Column: Detail Pane */}
@@ -806,10 +829,12 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
                       <Edit2 size={14} />
                       Sửa
                     </button>
-                    <button className="btn-action-outline danger" onClick={handleDeleteOrder}>
-                      <Trash2 size={14} />
-                      Xóa
-                    </button>
+                    {isManager && (
+                      <button className="btn-action-outline danger" onClick={handleDeleteOrder}>
+                        <Trash2 size={14} />
+                        Xóa
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -927,37 +952,65 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
                       <Paperclip size={14} />
                       Đính kèm file
                     </button>
-                    <input type="file" accept="image/*,video/*" onChange={handleUploadMedia} />
+                    <input
+                      type="file"
+                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv"
+                      onChange={handleUploadMedia}
+                    />
                   </div>
                 </div>
                 <div className="media-attachments-card">
-                  {uploadingMedia && <div className="media-uploading">Đang tải lên phương tiện...</div>}
+                  {uploadingMedia && <div className="media-uploading">Đang tải lên tệp đính kèm...</div>}
                   {selectedOrder.images && selectedOrder.images.length > 0 ? (
                     <div className="media-grid">
-                      {selectedOrder.images.map((media) => {
-                        const isVideo = media.mediaType === 'VIDEO';
+                      {selectedOrder.images.map((media, idx) => {
+                        const isVid = media.mediaType === 'VIDEO' || /\.(mp4|mov|webm|avi|mkv|3gp)$/i.test(media.imageUrl);
+                        const isDoc = media.mediaType === 'DOCUMENT' || /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|zip|rar|7z|csv)$/i.test(media.imageUrl);
                         return (
-                          <div key={media.id} className="media-item-wrapper">
-                            <button className="delete-media-btn" onClick={() => handleDeleteMedia(media.id)}>
+                          <div
+                            key={media.id || idx}
+                            className="media-item-wrapper"
+                            onClick={() => handleOpenMediaPreview(idx)}
+                            title="Click để xem chi tiết / phát video / phóng to ảnh"
+                          >
+                            <button
+                              className="delete-media-btn"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteMedia(media.id);
+                              }}
+                              title="Xóa tệp đính kèm"
+                            >
                               <X size={12} />
                             </button>
-                            {isVideo ? (
+                            {isVid ? (
                               <div className="media-video-placeholder">
-                                <Play size={20} className="play-icon" />
+                                <div className="media-overlay-icon">
+                                  <Play size={24} className="play-icon" />
+                                </div>
+                                <span className="media-type-badge vid">VIDEO</span>
                                 <video src={media.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                               </div>
+                            ) : isDoc ? (
+                              <div className="media-doc-placeholder">
+                                <FileText size={32} className="doc-grid-icon" />
+                                <span className="media-type-badge doc">DOC</span>
+                              </div>
                             ) : (
-                              <a href={media.imageUrl} target="_blank" rel="noreferrer">
+                              <div className="media-image-placeholder">
+                                <div className="media-overlay-icon">
+                                  <Maximize2 size={20} className="zoom-icon" />
+                                </div>
                                 <img src={media.imageUrl} alt={media.caption || 'attachment'} />
-                              </a>
+                              </div>
                             )}
-                            <span className="media-caption">{media.caption || (isVideo ? 'Video' : 'Hình ảnh')}</span>
+                            <span className="media-caption">{media.caption || (isVid ? 'Video' : isDoc ? 'Tài liệu' : 'Hình ảnh')}</span>
                           </div>
                         );
                       })}
                     </div>
                   ) : (
-                    <p className="no-data-text">Chưa có hình ảnh hoặc video đính kèm nào.</p>
+                    <p className="no-data-text">Chưa có hình ảnh, video hoặc tài liệu đính kèm nào.</p>
                   )}
                 </div>
               </div>
@@ -1385,6 +1438,21 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast }) => {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Media Preview Lightbox & Video Player Modal */}
+      {selectedOrder && selectedOrder.images && selectedOrder.images.length > 0 && (
+        <MediaPreviewModal
+          isOpen={isPreviewModalOpen}
+          onClose={() => setIsPreviewModalOpen(false)}
+          mediaList={selectedOrder.images}
+          currentIndex={previewMediaIndex}
+          onIndexChange={setPreviewMediaIndex}
+          onDelete={(id) => {
+            handleDeleteMedia(id);
+            setIsPreviewModalOpen(false);
+          }}
+        />
       )}
     </div>
   );

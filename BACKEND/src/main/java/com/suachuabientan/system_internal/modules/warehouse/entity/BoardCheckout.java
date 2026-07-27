@@ -47,6 +47,13 @@ public class BoardCheckout extends BaseEntity {
     @Column(columnDefinition = "TEXT")
     private String notes;
 
+    @Column(name = "quantity", nullable = false)
+    @Builder.Default
+    private Integer quantity = 1;
+
+    @Column(name = "repair_brand")
+    private String repairBrand;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "checkout_status", nullable = false, length = 20)
     @Builder.Default

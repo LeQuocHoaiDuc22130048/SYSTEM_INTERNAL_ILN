@@ -4,6 +4,8 @@ import java.util.UUID;
 
 public record CheckoutRequest(
         UUID repairOrderId,
-        String note
+        String note,
+        Integer quantity,
+        String repairBrand
 ) {
 }

@@ -13,6 +13,8 @@ public record CheckoutResponse(
         Instant takenAt,
         Instant returnAt,
         UUID repairOrderId,
-        String note
+        String note,
+        Integer quantity,
+        String repairBrand
 ) {
 }

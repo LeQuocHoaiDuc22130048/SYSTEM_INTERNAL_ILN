@@ -17,6 +17,7 @@ public record BoardItemResponse(
         UUID currentLocationId,
         String currentLocationCode,
         Instant createdAt,
+        Integer quantity,
 
         ActiveCheckoutInfo activeCheckoutInfo
 ) {
@@ -27,7 +28,9 @@ public record BoardItemResponse(
             String takenByEmployeeCode,
             Instant takenAt,
             UUID repairOrderId,
-            String orderCode
+            String orderCode,
+            Integer quantity,
+            String repairBrand
     ) {
     }
 }

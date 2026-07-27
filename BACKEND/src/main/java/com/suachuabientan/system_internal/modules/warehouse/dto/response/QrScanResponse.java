@@ -15,6 +15,7 @@ public record QrScanResponse(
         UUID currentLocationId,
         String currentLocationCode,
         String status,
+        Integer quantity,
 
         HolderInfo holder
 ) {
@@ -24,7 +25,9 @@ public record QrScanResponse(
             String employeeCode,
             String avatarUrl,
             Instant takenAt,
-            String orderCode
+            String orderCode,
+            Integer quantityTaken,
+            String repairBrand
     ) {
     }
 }

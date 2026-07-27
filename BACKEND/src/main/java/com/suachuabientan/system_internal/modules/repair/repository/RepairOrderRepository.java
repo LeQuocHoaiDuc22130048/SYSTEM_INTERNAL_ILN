@@ -41,8 +41,8 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
             LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
             WHERE r.is_deleted = false
               AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
-              AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid))
-              AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
+              AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid) OR r.assigned_to = CAST(:assignedTo AS uuid))
+              AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.assigned_to = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
               AND (
                   CAST(:keyword AS TEXT) IS NULL
                   OR LOWER(r.device_name)    LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
@@ -58,8 +58,8 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
                     LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
                     WHERE r.is_deleted = false
                       AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
-                      AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid))
-                      AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
+                      AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid) OR r.assigned_to = CAST(:assignedTo AS uuid))
+                      AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.assigned_to = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
                       AND (
                           CAST(:keyword AS TEXT) IS NULL
                           OR LOWER(r.device_name)    LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))

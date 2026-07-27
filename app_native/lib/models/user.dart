@@ -233,6 +233,7 @@ extension UserRolePermissions on UserRole {
     };
 
     const technicianPermissions = {
+      AppPermission.viewDashboard,
       AppPermission.viewRepairOrders,
       AppPermission.manageRepairOrders,
       AppPermission.updateRepairOrderStatus,

@@ -15,6 +15,7 @@ class Board {
   final String model;
   final String location;
   final BoardStatus status;
+  final String? checkoutId;
   final String? checkedOutBy;
   final DateTime? checkedOutAt;
   final String? currentRepairOrder;
@@ -24,6 +25,7 @@ class Board {
   final String? partIpn;
   final String? currentLocationId;
   final String? currentLocationCode;
+  final int quantity;
 
   Board({
     required this.id,
@@ -32,6 +34,8 @@ class Board {
     required this.model,
     required this.location,
     required this.status,
+    required this.quantity,
+    this.checkoutId,
     this.checkedOutBy,
     this.checkedOutAt,
     this.currentRepairOrder,
@@ -59,6 +63,9 @@ class Board {
           json['location']?.toString() ??
           '',
       status: _statusFromBackend(json['status']?.toString()),
+      checkoutId: checkout is Map<String, dynamic>
+          ? (checkout['checkoutId'] ?? checkout['id'])?.toString()
+          : null,
       checkedOutBy: checkout is Map<String, dynamic>
           ? checkout['takenByName']?.toString()
           : null,
@@ -74,6 +81,7 @@ class Board {
       partIpn: json['partIpn']?.toString(),
       currentLocationId: json['currentLocationId']?.toString(),
       currentLocationCode: json['currentLocationCode']?.toString(),
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
     );
   }
 

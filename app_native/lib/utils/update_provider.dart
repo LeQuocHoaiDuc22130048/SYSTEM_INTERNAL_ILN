@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -41,7 +42,14 @@ class UpdateProvider with ChangeNotifier {
 
   UpdateProvider({required this.api});
 
-  static const String currentVersion = '1.1.3';
+  String _currentVersion = '';
+  String get currentVersion => _currentVersion;
+
+  Future<void> _loadCurrentVersion() async {
+    if (_currentVersion.isNotEmpty) return;
+    final info = await PackageInfo.fromPlatform();
+    _currentVersion = info.version;
+  }
 
   bool _isChecking = false;
   bool get isChecking => _isChecking;
@@ -69,9 +77,10 @@ class UpdateProvider with ChangeNotifier {
     }
 
     try {
+      await _loadCurrentVersion();
       final response = await api.get(
         '/api/v1/app-updates/check',
-        queryParameters: {'version': currentVersion},
+        queryParameters: {'version': _currentVersion},
       );
 
       if (manual && context.mounted && Navigator.canPop(context)) {

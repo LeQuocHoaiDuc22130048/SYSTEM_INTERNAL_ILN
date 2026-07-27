@@ -36,6 +36,10 @@ public class BoardItem extends BaseEntity {
     @Column(length = 255)
     private String location;
 
+    @Column(name = "quantity", nullable = false)
+    @Builder.Default
+    private Integer quantity = 1;
+
     @Column(name = "serial_number", unique = true, length = 100)
     private String serialNumber;
 
@@ -47,6 +51,10 @@ public class BoardItem extends BaseEntity {
 
     public boolean isAvailable() {
         return BoardStatus.AVAILABLE.equals(this.status) && !Boolean.TRUE.equals(this.getIsDeleted());
+    }
+
+    public boolean hasStock() {
+        return this.quantity != null && this.quantity > 0;
     }
 
     public boolean isCheckedOut() {

@@ -20,6 +20,8 @@ public record CreateBoardItemRequest(
 
         String partId,
 
-        String currentLocationId
+        String currentLocationId,
+
+        Integer quantity
 ) {
 }

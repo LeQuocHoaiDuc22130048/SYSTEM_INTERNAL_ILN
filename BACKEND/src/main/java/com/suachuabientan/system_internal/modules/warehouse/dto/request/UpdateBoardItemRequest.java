@@ -23,6 +23,8 @@ public record UpdateBoardItemRequest(
 
         String currentLocationId,
 
-        BoardStatus status
+        BoardStatus status,
+
+        Integer quantity
 ) {
 }

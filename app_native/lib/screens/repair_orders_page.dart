@@ -30,11 +30,23 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
   final ValueNotifier<DateTime?> _dateFilter = ValueNotifier(null);
   final ValueNotifier<bool?> _warrantyFilter = ValueNotifier(null);
-  final ValueNotifier<int> _currentPage = ValueNotifier(1);
-  static const int _pageSize = 10;
+  final ValueNotifier<int> _visibleCount = ValueNotifier(20);
+  final ScrollController _scrollController = ScrollController();
 
   void _resetPage() {
-    _currentPage.value = 1;
+    _visibleCount.value = 20;
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients) {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent - 200) {
+        final totalItems = _filteredOrders.length;
+        if (_visibleCount.value < totalItems) {
+          _visibleCount.value = (_visibleCount.value + 20).clamp(0, totalItems);
+        }
+      }
+    }
   }
 
   @override
@@ -44,6 +56,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     _searchQuery.addListener(_resetPage);
     _dateFilter.addListener(_resetPage);
     _warrantyFilter.addListener(_resetPage);
+
+    _scrollController.addListener(_onScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await context.read<BackendDataProvider>().loadRepairOrders();
@@ -77,6 +91,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
     _filter.removeListener(_resetPage);
     _searchQuery.removeListener(_resetPage);
     _dateFilter.removeListener(_resetPage);
@@ -86,7 +102,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     _filter.dispose();
     _dateFilter.dispose();
     _warrantyFilter.dispose();
-    _currentPage.dispose();
+    _visibleCount.dispose();
     super.dispose();
   }
 
@@ -375,23 +391,16 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                             _filter,
                             _dateFilter,
                             _warrantyFilter,
-                            _currentPage,
+                            _visibleCount,
                           ]),
                           builder: (context, _) {
                             final filtered = _filteredOrders;
                             final totalItems = filtered.length;
-                            final totalPages = (totalItems / _pageSize).ceil();
-                            final currentPageVal = _currentPage.value;
-                            
-                            final validPage = currentPageVal > totalPages
-                                ? (totalPages > 0 ? totalPages : 1)
-                                : currentPageVal;
+                            final currentVisible = _visibleCount.value.clamp(0, totalItems);
 
-                            final startIndex = (validPage - 1) * _pageSize;
-                            final endIndex = startIndex + _pageSize;
                             final pageItems = filtered.sublist(
-                              startIndex,
-                              endIndex > totalItems ? totalItems : endIndex,
+                              0,
+                              currentVisible > totalItems ? totalItems : currentVisible,
                             );
 
                             if (filtered.isEmpty) {
@@ -415,6 +424,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   .read<BackendDataProvider>()
                                   .loadRepairOrders(),
                               child: ListView.builder(
+                                controller: _scrollController,
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 padding: EdgeInsets.fromLTRB(
                                   wide ? 20 : 22,
@@ -422,12 +432,12 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   wide ? 20 : 22,
                                   24,
                                 ),
-                                itemCount: pageItems.length + (totalPages > 1 ? 1 : 0),
+                                itemCount: pageItems.length + 1,
                                 itemBuilder: (context, index) {
                                   if (index == pageItems.length) {
-                                    return _buildPaginationControl(
-                                      validPage,
-                                      totalPages,
+                                    return _buildInfiniteScrollFooter(
+                                      pageItems.length,
+                                      totalItems,
                                       isDark,
                                       wide,
                                     );
@@ -576,182 +586,32 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     );
   }
 
-  List<dynamic> _getPageNumbers(int current, int total) {
-    if (total <= 5) {
-      return List.generate(total, (i) => i + 1);
-    }
-    final List<dynamic> pages = [];
-    pages.add(1);
-    
-    int start = current - 1;
-    int end = current + 1;
-    
-    if (start <= 2) {
-      start = 2;
-      end = 4;
-    } else if (end >= total - 1) {
-      start = total - 3;
-      end = total - 1;
-    }
-    
-    if (start > 2) {
-      pages.add(null); // ellipsis
-    }
-    
-    for (int i = start; i <= end; i++) {
-      pages.add(i);
-    }
-    
-    if (end < total - 1) {
-      pages.add(null); // ellipsis
-    }
-    
-    pages.add(total);
-    return pages;
-  }
-
-  Widget _buildPaginationControl(int currentPage, int totalPages, bool isDark, bool wide) {
-    final pageNumbers = _getPageNumbers(currentPage, totalPages);
-
+  Widget _buildInfiniteScrollFooter(
+      int loadedCount, int totalCount, bool isDark, bool wide) {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 980),
         child: Container(
-          margin: const EdgeInsets.only(top: 8, bottom: 20),
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+          margin: const EdgeInsets.only(top: 8, bottom: 24),
+          padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: isDark ? AppColors.surfaceDark : Colors.white,
+            color: (isDark ? AppColors.surfaceDark : Colors.white).withValues(alpha: 0.7),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isDark ? AppColors.borderDark : AppColors.borderLight,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.06),
-                blurRadius: 7,
-                offset: const Offset(0, 2),
-              ),
-            ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Nút Previous
-              OutlinedButton(
-                onPressed: currentPage > 1
-                    ? () => _currentPage.value = currentPage - 1
-                    : null,
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: wide ? 16 : 8,
-                    vertical: 8,
-                  ),
-                  foregroundColor: AppColors.primary,
-                  side: BorderSide(
-                    color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.chevron_left, size: 18),
-                    if (wide) ...[
-                      const SizedBox(width: 4),
-                      const Text('Trước'),
-                    ],
-                  ],
-                ),
-              ),
-              
-              // Các số trang
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: pageNumbers.map((p) {
-                  if (p == null) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4.0),
-                      child: Text(
-                        '...',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    );
-                  }
-                  
-                  final isCurrent = p == currentPage;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
-                    child: SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: TextButton(
-                        onPressed: isCurrent ? null : () => _currentPage.value = p,
-                        style: TextButton.styleFrom(
-                          padding: EdgeInsets.zero,
-                          backgroundColor: isCurrent
-                              ? AppColors.primary
-                              : Colors.transparent,
-                          foregroundColor: isCurrent
-                              ? Colors.white
-                              : (isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(18),
-                            side: BorderSide(
-                              color: isCurrent
-                                  ? AppColors.primary
-                                  : (isDark
-                                      ? AppColors.borderDark
-                                      : AppColors.borderLight),
-                            ),
-                          ),
-                        ),
-                        child: Text(
-                          '$p',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: isCurrent
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }).toList(),
-              ),
-
-              // Nút Next
-              OutlinedButton(
-                onPressed: currentPage < totalPages
-                    ? () => _currentPage.value = currentPage + 1
-                    : null,
-                style: OutlinedButton.styleFrom(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: wide ? 16 : 8,
-                    vertical: 8,
-                  ),
-                  foregroundColor: AppColors.primary,
-                  side: BorderSide(
-                    color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (wide) ...[
-                      const Text('Sau'),
-                      const SizedBox(width: 4),
-                    ],
-                    const Icon(Icons.chevron_right, size: 18),
-                  ],
-                ),
-              ),
-            ],
+          child: Text(
+            loadedCount < totalCount
+                ? 'Cuộn xuống để nạp thêm... ($loadedCount/$totalCount đơn hàng)'
+                : 'Đã hiển thị tất cả $totalCount đơn hàng',
+            style: TextStyle(
+              fontSize: 13,
+              fontStyle: FontStyle.italic,
+              fontWeight: FontWeight.w500,
+              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+            ),
           ),
         ),
       ),
@@ -1086,7 +946,7 @@ class _OrderDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canDelete = context.watch<AuthProvider>().can(AppPermission.manageRepairOrders);
+    final canDelete = context.watch<AuthProvider>().isManagerOrAbove;
 
     return Container(
       decoration: BoxDecoration(

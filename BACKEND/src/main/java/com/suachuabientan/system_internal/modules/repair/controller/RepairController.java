@@ -89,7 +89,7 @@ public class RepairController {
             @Valid @RequestBody AssignRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
-                repairService.assign(id, request, userDetails.getUserId())));
+                repairService.assign(id, request, userDetails)));
     }
 
     // ── Cập nhật trạng thái ───────────────────────────────────
@@ -169,7 +169,7 @@ public class RepairController {
 
     @Operation(summary = "Xóa đơn sửa chữa")
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN')")
+    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

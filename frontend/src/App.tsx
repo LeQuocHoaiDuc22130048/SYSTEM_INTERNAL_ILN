@@ -121,9 +121,15 @@ function App() {
       );
       clear();
       if (!response.ok) {
-        if (response.status === 401 || response.status === 403) {
+        if (response.status === 401) {
           handleLogout();
           throw new Error('Phiên đăng nhập đã hết hạn.');
+        }
+        if (response.status === 403) {
+          setDataSource('api');
+          setConnectionError(null);
+          setEmployees([]);
+          return;
         }
         throw new Error(`Server trả về lỗi: ${response.status}`);
       }
@@ -433,6 +439,7 @@ function App() {
           ) : activeTab === 'orders' ? (
             <OrdersTab
               showToast={showToast}
+              currentUser={currentUser}
             />
           ) : activeTab === 'accounts' ? (
             <AccountsTab

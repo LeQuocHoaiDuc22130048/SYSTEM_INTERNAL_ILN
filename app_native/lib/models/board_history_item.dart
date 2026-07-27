@@ -9,6 +9,8 @@ class BoardHistoryItem {
   final DateTime? returnedAt;
   final String? repairOrderId;
   final String? notes;
+  final int quantity;
+  final String? repairBrand;
 
   BoardHistoryItem({
     required this.id,
@@ -21,6 +23,8 @@ class BoardHistoryItem {
     this.returnedAt,
     this.repairOrderId,
     this.notes,
+    this.quantity = 1,
+    this.repairBrand,
   });
 
   String get checkoutReason {
@@ -57,6 +61,8 @@ class BoardHistoryItem {
       returnedAt: _dateFromJson(json['returnAt']),
       repairOrderId: json['repairOrderId']?.toString(),
       notes: json['note']?.toString(),
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      repairBrand: json['repairBrand']?.toString(),
     );
   }
 

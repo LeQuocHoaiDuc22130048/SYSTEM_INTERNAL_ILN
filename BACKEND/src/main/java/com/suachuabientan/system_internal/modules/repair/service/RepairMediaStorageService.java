@@ -25,6 +25,7 @@ public class RepairMediaStorageService {
     private static final long MAX_IMAGE_BYTES = 10L * 1024 * 1024;
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "gif", "webp", "heic", "heif");
     private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov", "m4v", "webm", "avi", "mkv", "3gp");
+    private static final Set<String> DOCUMENT_EXTENSIONS = Set.of("pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "zip", "rar", "7z", "csv");
 
     private final MinioClient minioClient;
     private final String bucket;
@@ -47,7 +48,8 @@ public class RepairMediaStorageService {
                 || (mediaType == RepairMediaType.IMAGE && file.getSize() > MAX_IMAGE_BYTES)) {
             throw new BusinessException(mediaType == RepairMediaType.IMAGE
                     ? "Anh khong duoc vuot qua 10 MB"
-                    : "Video khong duoc vuot qua 50 MB");
+                    : mediaType == RepairMediaType.VIDEO ? "Video khong duoc vuot qua 50 MB"
+                    : "Tai lieu khong duoc vuot qua 50 MB");
         }
 
         String originalName = StringUtils.cleanPath(
@@ -119,6 +121,12 @@ public class RepairMediaStorageService {
                 && !normalizedContentType.startsWith("video/")
                 && !VIDEO_EXTENSIONS.contains(extension)) {
             throw new BusinessException("Tep duoc chon khong phai video");
+        }
+        if (mediaType == RepairMediaType.DOCUMENT
+                && !normalizedContentType.startsWith("application/")
+                && !normalizedContentType.startsWith("text/")
+                && !DOCUMENT_EXTENSIONS.contains(extension)) {
+            throw new BusinessException("Tep duoc chon khong phai tai lieu hop le");
         }
     }
 

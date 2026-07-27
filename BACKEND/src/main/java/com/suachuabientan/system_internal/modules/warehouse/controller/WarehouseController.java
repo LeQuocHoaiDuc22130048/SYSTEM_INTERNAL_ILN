@@ -102,7 +102,7 @@ public class WarehouseController {
             @RequestBody(required = false) CheckoutRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
         UUID userId = extractUserId(userDetails);
-        CheckoutRequest req = request != null ? request : new CheckoutRequest(null, null);
+        CheckoutRequest req = request != null ? request : new CheckoutRequest(null, null, 1, null);
         return ResponseEntity.ok(ApiResponse.success(
                 warehouseService.checkout(id, req, userId),
                 "Lấy bo mạch thành công"));
@@ -117,9 +117,9 @@ public class WarehouseController {
             @AuthenticationPrincipal UserDetails userDetails) {
         UUID userId = extractUserId(userDetails);
         boolean isManager = ((CustomUserDetails) userDetails).isManagerOrAbove();
-        String notes = request != null ? request.notes() : null;
+        ReturnBoardRequest req = request != null ? request : new ReturnBoardRequest(null, null, null, null, null);
         return ResponseEntity.ok(ApiResponse.success(
-                warehouseService.returnBoard(id, userId, isManager, notes),
+                warehouseService.returnBoard(id, userId, isManager, req),
                 "Trả bo mạch thành công"));
     }
 

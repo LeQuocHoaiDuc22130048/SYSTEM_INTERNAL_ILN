@@ -20,7 +20,7 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isEmployee = Provider.of<AuthProvider>(context).isEmployee;
+    final isNonManager = !Provider.of<AuthProvider>(context).isManagerOrAbove;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
@@ -50,7 +50,7 @@ class DashboardPage extends StatelessWidget {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: contentWidth),
-                    child: isEmployee
+                    child: isNonManager
                         ? _buildEmployeeDashboard(context, isDark, wide)
                         : Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -114,12 +114,7 @@ class DashboardPage extends StatelessWidget {
 
   Widget _buildEmployeeDashboard(BuildContext context, bool isDark, bool wide) {
     final backend = Provider.of<BackendDataProvider>(context);
-    final currentUser = Provider.of<AuthProvider>(context).currentUser;
-    final myOrders = currentUser == null
-        ? backend.repairOrders
-        : backend.repairOrders
-            .where((order) => order.assignedToName == currentUser.name)
-            .toList();
+    final myOrders = backend.repairOrders;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

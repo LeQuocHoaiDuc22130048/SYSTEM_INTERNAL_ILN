@@ -6,6 +6,7 @@ import '../models/repair_device.dart';
 import '../models/repair_order.dart';
 import '../models/board_history_item.dart';
 import '../models/user.dart';
+import '../models/part.dart';
 import 'api_client.dart';
 
 class BackendDataProvider extends ChangeNotifier {
@@ -17,6 +18,7 @@ class BackendDataProvider extends ChangeNotifier {
   List<User> pendingUsers = [];
   List<RepairOrder> repairOrders = [];
   List<Board> boards = [];
+  List<Part> parts = [];
   List<AttendanceRecord> attendanceRecords = [];
 
   bool isLoading = false;
@@ -31,6 +33,7 @@ class BackendDataProvider extends ChangeNotifier {
       final futures = <Future>[
         loadRepairOrders(notify: false),
         loadBoards(notify: false),
+        loadParts(notify: false),
       ];
 
       if (isManagerOrAbove) {
@@ -260,28 +263,84 @@ class BackendDataProvider extends ChangeNotifier {
     await loadRepairOrders();
   }
 
-  Future<void> checkoutBoard(String boardId, {String? repairOrderId, String? note, bool reload = true}) async {
+  Future<void> checkoutBoard(
+    String boardId, {
+    String? repairOrderId,
+    String? note,
+    int? quantity,
+    String? repairBrand,
+    bool reload = true,
+  }) async {
     await api.post(
       '/api/v1/boards/$boardId/checkout',
       body: {
         'repairOrderId': repairOrderId,
         'note': note,
+        if (quantity != null) 'quantity': quantity,
+        if (repairBrand != null && repairBrand.isNotEmpty)
+          'repairBrand': repairBrand,
       },
     );
     if (reload) await loadBoards();
   }
 
-  Future<void> returnBoard(String boardId, {String? notes, bool reload = true}) async {
-    await api.patch(
-      '/api/v1/boards/$boardId/return',
-      body: notes != null ? {'notes': notes} : null,
-    );
+  Future<void> returnBoard(
+    String boardId, {
+    String? checkoutId,
+    String? notes,
+    String returnType = 'FULL',
+    int? returnQuantity,
+    String? reason,
+    bool reload = true,
+  }) async {
+    final body = <String, dynamic>{'returnType': returnType};
+    if (checkoutId != null && checkoutId.isNotEmpty) {
+      body['checkoutId'] = checkoutId;
+    }
+    if (notes != null && notes.isNotEmpty) body['notes'] = notes;
+    if (reason != null && reason.isNotEmpty) body['reason'] = reason;
+    if (returnType == 'PARTIAL' && returnQuantity != null) {
+      body['returnQuantity'] = returnQuantity;
+    }
+    await api.patch('/api/v1/boards/$boardId/return', body: body);
     if (reload) await loadBoards();
   }
 
   Future<List<BoardHistoryItem>> getBoardHistory(String boardId) async {
     final data = await api.get('/api/v1/boards/$boardId/history');
     return _content(data).map(BoardHistoryItem.fromJson).toList();
+  }
+
+  Future<void> loadParts({bool notify = true}) async {
+    final data = await api.get(
+      '/api/v1/parts',
+      queryParameters: {'size': 200},
+    );
+    parts = _content(data).map(Part.fromJson).toList();
+    if (notify) notifyListeners();
+  }
+
+  Future<void> deletePart(Part part) async {
+    await api.delete('/api/v1/parts/${part.id}');
+    await loadParts();
+  }
+
+  Future<void> adjustPartStock(
+    String partId, {
+    required String locationCode,
+    required double amount,
+    String? note,
+    bool reload = true,
+  }) async {
+    await api.post(
+      '/api/v1/parts/$partId/adjust',
+      body: {
+        'locationCode': locationCode,
+        'amount': amount,
+        if (note != null && note.isNotEmpty) 'note': note,
+      },
+    );
+    if (reload) await loadParts();
   }
 
   List<Map<String, dynamic>> _content(dynamic data) {

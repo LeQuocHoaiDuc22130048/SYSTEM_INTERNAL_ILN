@@ -7,6 +7,7 @@ import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CheckoutRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreateBoardItemRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.ReturnBoardRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdateBoardItemRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.BoardItemResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.CheckoutResponse;
@@ -36,6 +37,7 @@ import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Slf4j
@@ -68,6 +70,7 @@ public class WarehouseService {
                 .serialNumber(request.serialNumber())
                 .partId(resolvePartId(request.partId()))
                 .currentLocationId(resolveLocationId(request.currentLocationId(), request.location()))
+                .quantity(request.quantity() != null ? request.quantity() : 1)
                 .status(BoardStatus.AVAILABLE)
                 .build();
 
@@ -107,6 +110,9 @@ public class WarehouseService {
             item.setPartId(resolvePartId(request.partId()));
         if (request.currentLocationId() != null || request.location() != null) {
             item.setCurrentLocationId(resolveLocationId(request.currentLocationId(), request.location()));
+        }
+        if (request.quantity() != null) {
+            item.setQuantity(request.quantity());
         }
 
         if (request.status() != null) {
@@ -154,7 +160,9 @@ public class WarehouseService {
                                 holder != null ? holder.getEmployeeCode() : null,
                                 holder != null ? holder.getAvatarUrl() : null,
                                 checkout.getTakenAt(),
-                                null // orderCode — TODO: thêm sau khi có RepairOrder module
+                                null, // orderCode — TODO: thêm sau khi có RepairOrder module
+                                checkout.getQuantity(),
+                                checkout.getRepairBrand()
                         );
                     })
                     .orElse(null);
@@ -171,93 +179,200 @@ public class WarehouseService {
                 item.getCurrentLocationId(),
                 locationCode(item.getCurrentLocationId()),
                 item.getStatus().name(),
+                item.getQuantity(),
                 holderInfo);
     }
 
     // Checkout lấy bo mạch
 
     /**
-     * Lấy bo mạch ra khỏi kho để sửa chữa
+     * Lấy bo mạch ra khỏi kho để sửa chữa.
+     * Trừ số lượng vào tồn kho của BoardItem.
+     * Chỉ đổi trạng thái sang CHECKED_OUT khi hết hàng.
      */
     @Transactional
     public CheckoutResponse checkout(UUID boardItemId, CheckoutRequest request, UUID userId) {
         BoardItem item = findBoardById(boardItemId);
 
-        if (!item.isAvailable())
-            throw new BusinessException(STR."Bo mạch không khả dụng. Trạng thái hiện tại: \{item.getStatus().name()}");
+        // Chỉ cho phép lấy khi ở trạng thái AVAILABLE hoặc CHECKED_OUT và còn hàng trong kho
+        if (item.getStatus() != BoardStatus.AVAILABLE && item.getStatus() != BoardStatus.CHECKED_OUT)
+            throw new BusinessException(STR."Bo mạch không ở trạng thái sẵn sàng để mượn. Trạng thái hiện tại: \{item.getStatus().name()}");
+        if (!item.hasStock())
+            throw new BusinessException("Bo mạch không còn số lượng trong kho");
+
+        int qtyTaken = (request.quantity() != null && request.quantity() > 0) ? request.quantity() : 1;
+        int currentQty = item.getQuantity() != null ? item.getQuantity() : 0;
+
+        // Kiểm tra đủ số lượng
+        if (qtyTaken > currentQty)
+            throw new BusinessException(
+                    STR."Không đủ số lượng trong kho. Yêu cầu \{qtyTaken}, tồn kho \{currentQty}.");
+
+        // Trừ số lượng kho
+        int newQty = currentQty - qtyTaken;
+        item.setQuantity(newQty);
+
+        // Chỉ đổi sang CHECKED_OUT khi hết hàng
+        if (newQty == 0) {
+            item.setStatus(BoardStatus.CHECKED_OUT);
+        } else {
+            // Vẫn còn hàng, giữ AVAILABLE để người khác có thể lấy tiếp
+            item.setStatus(BoardStatus.AVAILABLE);
+        }
+
+        boardItemRepository.save(item);
+
         BoardCheckout checkout = BoardCheckout.builder()
                 .boardItemId(boardItemId)
                 .takenBy(userId)
                 .repairOrderId(request.repairOrderId())
                 .takenAt(Instant.now())
                 .notes(request.note())
+                .quantity(qtyTaken)
+                .repairBrand(request.repairBrand())
                 .checkoutStatus(CheckoutStatus.OPEN)
                 .build();
 
         BoardCheckout savedCheckout = boardCheckoutRepository.save(checkout);
 
-        // Cập nhật status bo mạch
-        item.setStatus(BoardStatus.CHECKED_OUT);
-        boardItemRepository.save(item);
         saveBoardMovement(
                 item,
                 request.repairOrderId() != null ? StockMovementType.USE_FOR_REPAIR : StockMovementType.EXPORT,
+                BigDecimal.valueOf(qtyTaken),
                 item.getCurrentLocationId(),
                 null,
                 "BOARD_CHECKOUT",
                 savedCheckout.getId(),
                 request.note());
 
-        log.info("Lấy bo mạch: boardId={}, takenBy={}, repairOrderId={}",
-                boardItemId, userId, request.repairOrderId());
+        log.info("Lấy bo mạch: boardId={}, takenBy={}, qty={}, remainQty={}",
+                boardItemId, userId, qtyTaken, newQty);
 
         return toCheckoutResponse(savedCheckout, item);
     }
 
     /**
-     * Trả bo mạch về kho sau khi sửa chữa xong
-     * Chỉ có người đang giữ bo mạch hoặc admin mới được trả về
+     * Trả bo mạch về kho sau khi sửa chữa xong.
+     * Cộng số lượng trả lại vào tồn kho BoardItem.
+     * Trả về AVAILABLE nếu còn hàng, CHECKED_OUT nếu vẫn còn người đang giữ.
      */
     @Transactional
-    public CheckoutResponse returnBoard(UUID boardItemId, UUID userId, boolean isAdmin, String returnNotes) {
+    public CheckoutResponse returnBoard(UUID boardItemId, UUID userId, boolean isAdmin, ReturnBoardRequest request) {
         BoardItem item = findBoardById(boardItemId);
-        if (!item.isCheckedOut())
-            throw new BusinessException("Bo mạch không đang được mượn");
 
-        BoardCheckout activeCheckout = boardCheckoutRepository
-                .findActiveByBoardItemId(boardItemId)
-                .orElseThrow(() -> new BusinessException("Không tìm thấy thông tin mượn"));
-
-        if (!activeCheckout.getTakenBy().equals(userId) && !isAdmin)
-            throw new BusinessException("Bạn không có quyền trả bo mạch này. " +
-                    "Chỉ người đang giữ hoặc quản lý mới có thể trả.");
-
-        // Ghi nhận trả
-        activeCheckout.setReturnedAt(Instant.now());
-        activeCheckout.setCheckoutStatus(CheckoutStatus.RETURNED);
-        if (returnNotes != null && !returnNotes.trim().isEmpty()) {
-            String existingNotes = activeCheckout.getNotes();
-            if (existingNotes != null && !existingNotes.trim().isEmpty()) {
-                activeCheckout.setNotes(existingNotes + " | Sửa chữa: " + returnNotes.trim());
-            } else {
-                activeCheckout.setNotes("Sửa chữa: " + returnNotes.trim());
+        // Tìm checkout của đúng người đang trả hoặc theo checkoutId cụ thể nếu truyền
+        BoardCheckout activeCheckout;
+        if (request.checkoutId() != null) {
+            activeCheckout = boardCheckoutRepository.findByIdAndIsDeletedFalse(request.checkoutId())
+                    .orElseThrow(() -> new BusinessException("Không tìm thấy thông tin mượn với ID: " + request.checkoutId()));
+            if (!boardItemId.equals(activeCheckout.getBoardItemId())) {
+                throw new BusinessException("Lượt mượn này không thuộc bo mạch được chọn");
             }
+            if (activeCheckout.getCheckoutStatus() != CheckoutStatus.OPEN || activeCheckout.getReturnedAt() != null) {
+                throw new BusinessException("Lượt mượn này đã được trả hoặc không còn mở");
+            }
+            if (!isAdmin && !userId.equals(activeCheckout.getTakenBy())) {
+                throw new BusinessException("Bạn không có quyền trả lượt mượn của người khác");
+            }
+        } else if (isAdmin) {
+            // Admin có thể trả thay người khác — tìm bất kỳ checkout active nào
+            activeCheckout = boardCheckoutRepository
+                    .findActiveByBoardItemId(boardItemId)
+                    .orElseThrow(() -> new BusinessException("Không tìm thấy thông tin mượn cho bo mạch này"));
+        } else {
+            activeCheckout = boardCheckoutRepository
+                    .findActiveByBoardItemIdAndTakenBy(boardItemId, userId)
+                    .orElseThrow(() -> new BusinessException(
+                            "Bạn không có bản ghi mượn nào đang mở cho bo mạch này"));
         }
-        boardCheckoutRepository.save(activeCheckout);
 
-        // Trả về AVAILABLE
-        item.setStatus(BoardStatus.AVAILABLE);
-        boardItemRepository.save(item);
-        saveBoardMovement(
-                item,
-                StockMovementType.RETURN,
-                null,
-                item.getCurrentLocationId(),
-                "BOARD_CHECKOUT",
-                activeCheckout.getId(),
-                activeCheckout.getNotes());
+        int checkedOutQty = activeCheckout.getQuantity() != null ? activeCheckout.getQuantity() : 1;
+        String returnType = request.returnType(); // "FULL" | "PARTIAL" | null (legacy = FULL)
+        String reason = request.reason();
+        String notes = request.notes();
+        int returnQty;
 
-        log.info("Trả bo mạch: boardId={}, returnedBy={}", boardItemId, userId);
+        if ("PARTIAL".equalsIgnoreCase(returnType)) {
+            if (request.returnQuantity() == null || request.returnQuantity() <= 0)
+                throw new BusinessException("Vui lòng nhập số lượng trả lại hợp lệ");
+            returnQty = request.returnQuantity();
+            if (returnQty >= checkedOutQty) {
+                returnQty = checkedOutQty;
+                returnType = "FULL";
+            }
+        } else {
+            returnQty = checkedOutQty;
+        }
+
+        // Xây dựng ghi chú
+        StringBuilder noteBuilder = new StringBuilder();
+        if (notes != null && !notes.trim().isEmpty()) noteBuilder.append(notes.trim());
+        if (reason != null && !reason.trim().isEmpty()) {
+            if (noteBuilder.length() > 0) noteBuilder.append(" | ");
+            noteBuilder.append("Lý do thiếu: ").append(reason.trim());
+        }
+        if ("PARTIAL".equalsIgnoreCase(returnType)) {
+            if (noteBuilder.length() > 0) noteBuilder.append(" | ");
+            noteBuilder.append("Trả một phần: ").append(returnQty).append("/").append(checkedOutQty);
+        }
+        String existingNotes = activeCheckout.getNotes();
+        String finalNotes;
+        if (noteBuilder.length() > 0) {
+            finalNotes = (existingNotes != null && !existingNotes.trim().isEmpty())
+                    ? existingNotes + " | Trả: " + noteBuilder
+                    : noteBuilder.toString();
+        } else {
+            finalNotes = existingNotes;
+        }
+        activeCheckout.setNotes(finalNotes);
+
+        // Cộng số lượng trả lại vào tồn kho
+        int currentQty = item.getQuantity() != null ? item.getQuantity() : 0;
+        int newQty = currentQty + returnQty;
+        item.setQuantity(newQty);
+
+        if ("PARTIAL".equalsIgnoreCase(returnType)) {
+            // Trả một phần: giảm quantity trong checkout record, board cập nhật qty
+            int remainingInCheckout = checkedOutQty - returnQty;
+            activeCheckout.setQuantity(remainingInCheckout);
+            boardCheckoutRepository.save(activeCheckout);
+
+            // Cập nhật trạng thái board: nếu còn stock → AVAILABLE, nếu không → CHECKED_OUT
+            List<BoardCheckout> allActive = boardCheckoutRepository.findAllActiveByBoardItemId(boardItemId);
+            int totalStillOut = allActive.stream().mapToInt(c -> c.getQuantity() != null ? c.getQuantity() : 0).sum();
+            item.setStatus(newQty > 0 ? BoardStatus.AVAILABLE : BoardStatus.CHECKED_OUT);
+            boardItemRepository.save(item);
+
+            saveBoardMovement(
+                    item, StockMovementType.RETURN, BigDecimal.valueOf(returnQty), null, item.getCurrentLocationId(),
+                    "BOARD_PARTIAL_RETURN", activeCheckout.getId(),
+                    "Trả một phần: " + returnQty + "/" + checkedOutQty);
+
+            log.info("Trả một phần bo mạch: boardId={}, by={}, returnQty={}/{}, newStock={}, totalStillOut={}",
+                    boardItemId, userId, returnQty, checkedOutQty, newQty, totalStillOut);
+        } else {
+            // FULL return: đóng checkout
+            activeCheckout.setReturnedAt(Instant.now());
+            activeCheckout.setCheckoutStatus(CheckoutStatus.RETURNED);
+            boardCheckoutRepository.save(activeCheckout);
+
+            // Kiểm tra xem còn checkout nào active không
+            List<BoardCheckout> remainingActive = boardCheckoutRepository.findAllActiveByBoardItemId(boardItemId);
+            if (remainingActive.isEmpty() || newQty > 0) {
+                item.setStatus(BoardStatus.AVAILABLE);
+            } else {
+                item.setStatus(BoardStatus.CHECKED_OUT);
+            }
+            boardItemRepository.save(item);
+
+            saveBoardMovement(
+                    item, StockMovementType.RETURN, BigDecimal.valueOf(returnQty), null, item.getCurrentLocationId(),
+                    "BOARD_CHECKOUT", activeCheckout.getId(), activeCheckout.getNotes());
+
+            log.info("Trả hết bo mạch: boardId={}, by={}, returnQty={}, newStock={}",
+                    boardItemId, userId, returnQty, newQty);
+        }
+
         return toCheckoutResponse(activeCheckout, item);
     }
 
@@ -287,7 +402,9 @@ public class WarehouseService {
                 checkout.getTakenAt(),
                 checkout.getReturnedAt(),
                 checkout.getRepairOrderId(),
-                checkout.getNotes());
+                checkout.getNotes(),
+                checkout.getQuantity(),
+                checkout.getRepairBrand());
     }
 
     private BoardItem findBoardById(UUID id) {
@@ -312,7 +429,9 @@ public class WarehouseService {
                                 holder != null ? holder.getEmployeeCode() : null,
                                 checkout.getTakenAt(),
                                 checkout.getRepairOrderId(),
-                                null // orderCode — TODO
+                                null, // orderCode — TODO
+                                checkout.getQuantity(),
+                                checkout.getRepairBrand()
                         );
                     })
                     .orElse(null);
@@ -332,6 +451,7 @@ public class WarehouseService {
                 item.getCurrentLocationId(),
                 locationCode(item.getCurrentLocationId()),
                 item.getCreatedAt(),
+                item.getQuantity(),
                 activeCheckout);
     }
 
@@ -432,6 +552,7 @@ public class WarehouseService {
     private void saveBoardMovement(
             BoardItem item,
             StockMovementType movementType,
+            BigDecimal quantity,
             UUID fromLocationId,
             UUID toLocationId,
             String refType,
@@ -441,7 +562,7 @@ public class WarehouseService {
                 .boardItemId(item.getId())
                 .partId(item.getPartId())
                 .movementType(movementType)
-                .quantity(BigDecimal.ONE)
+                .quantity(quantity != null ? quantity : BigDecimal.ONE)
                 .fromLocationId(fromLocationId)
                 .toLocationId(toLocationId)
                 .refType(refType)

@@ -107,7 +107,7 @@ public class RepairService {
     public Page<RepairOrderResponse> getAll(
             String keyword, RepairStatus status, UUID assignedTo, Pageable pageable, CustomUserDetails userDetails) {
         String staffIdStr = null;
-        if (userDetails != null && !userDetails.isManagerOrAbove() && !userDetails.hasRole("EMPLOYEE") && !userDetails.hasRole("TECHNICIAN")) {
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
             staffIdStr = userDetails.getUserId().toString();
         }
         String statusStr = status != null ? status.name() : null;
@@ -120,7 +120,7 @@ public class RepairService {
     @Transactional(readOnly = true)
     public RepairOrderResponse getById(UUID id, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(id);
-        if (userDetails != null && !userDetails.isManagerOrAbove() && !userDetails.hasRole("EMPLOYEE") && !userDetails.hasRole("TECHNICIAN")) {
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
             UUID userId = userDetails.getUserId();
             if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
                 (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
@@ -133,9 +133,25 @@ public class RepairService {
     // ── Phân công kỹ thuật viên ───────────────────────────────
 
     @Transactional
+    public RepairOrderResponse assign(UUID orderId, AssignRequest request, CustomUserDetails userDetails) {
+        RepairOrder order = findOrderById(orderId);
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
+            UUID userId = userDetails.getUserId();
+            if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
+                (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
+                throw new BusinessException("Bạn không có quyền phân công lại đơn hàng này", 403);
+            }
+        }
+        return assignInternal(order, request, userDetails != null ? userDetails.getUserId() : null);
+    }
+
+    @Transactional
     public RepairOrderResponse assign(UUID orderId, AssignRequest request, UUID managerId) {
         RepairOrder order = findOrderById(orderId);
+        return assignInternal(order, request, managerId);
+    }
 
+    private RepairOrderResponse assignInternal(RepairOrder order, AssignRequest request, UUID managerId) {
         // Lấy danh sách ID kỹ thuật viên cần phân công
         List<UUID> technicianIds = new ArrayList<>();
         if (request.technicianIds() != null) {
@@ -194,8 +210,8 @@ public class RepairService {
 
         if (request.note() != null) note += STR." — \{request.note()}";
 
-        addTimeline(orderId, "Phân công kỹ thuật viên", note, managerId);
-        log.info("Phân công đơn: orderId={}, technicians={}, by={}", orderId, technicianIds, managerId);
+        addTimeline(order.getId(), "Phân công kỹ thuật viên", note, managerId);
+        log.info("Phân công đơn: orderId={}, technicians={}, by={}", order.getId(), technicianIds, managerId);
 
         RepairOrder saved = repairOrderRepository.save(order);
 
@@ -244,10 +260,10 @@ public class RepairService {
         }
 
         UUID userId = userDetails != null ? userDetails.getUserId() : null;
+        boolean isManager = userDetails != null && userDetails.isManagerOrAbove();
 
-        // Kiểm tra quyền: nhân viên có role/permission quản lý hoặc được phân công/tiếp nhận
-        boolean hasOrderPerm = userDetails != null && (userDetails.isManagerOrAbove() || userDetails.hasRole("TECHNICIAN") || userDetails.hasPermission("REPAIR_MANAGE") || userDetails.hasPermission("REPAIR_STATUS_UPDATE"));
-        if (!hasOrderPerm) {
+        // Kiểm tra quyền: nhân viên phải có quyền quản lý hoặc được phân công/tiếp nhận
+        if (!isManager) {
             if (userId == null || (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
                 (order.getAssignees() == null || !order.getAssignees().contains(userId)))) {
                 throw new BusinessException("Bạn không có quyền cập nhật trạng thái đơn hàng này", 403);
@@ -258,7 +274,7 @@ public class RepairService {
         if ((request.status() == RepairStatus.CHECKING
                 || request.status() == RepairStatus.IN_PROGRESS
                 || request.status() == RepairStatus.COMPLETED)
-                && !hasOrderPerm
+                && !isManager
                 && (userId == null || (!userId.equals(order.getAssignedTo()) && 
                 (order.getAssignees() == null || !order.getAssignees().contains(userId))))) {
             throw new BusinessException("Chỉ kỹ thuật viên được phân công mới có thể cập nhật trạng thái này");
@@ -328,7 +344,7 @@ public class RepairService {
     @Transactional(readOnly = true)
     public List<RepairTimelineResponse> getTimeline(UUID orderId, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(orderId); // Validate tồn tại
-        if (userDetails != null && !userDetails.isManagerOrAbove() && !userDetails.hasRole("EMPLOYEE") && !userDetails.hasRole("TECHNICIAN")) {
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
             UUID userId = userDetails.getUserId();
             if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
                 (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
@@ -345,7 +361,7 @@ public class RepairService {
     public RepairOrderResponse.ImageInfo addImage(
             UUID orderId, String imageUrl, String caption, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(orderId); // Validate tồn tại
-        if (userDetails != null && !userDetails.isManagerOrAbove() && !userDetails.hasRole("TECHNICIAN")) {
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
             UUID userId = userDetails.getUserId();
             if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
                 (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
@@ -375,7 +391,7 @@ public class RepairService {
     public RepairOrderResponse.ImageInfo addMedia(
             UUID orderId, MultipartFile file, RepairMediaType mediaType, String caption, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(orderId);
-        if (userDetails != null && !userDetails.isManagerOrAbove() && !userDetails.hasRole("TECHNICIAN")) {
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
             UUID userId = userDetails.getUserId();
             if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
                 (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
@@ -395,7 +411,7 @@ public class RepairService {
                 .build();
 
         RepairImage saved = repairImageRepository.save(media);
-        String action = mediaType == RepairMediaType.VIDEO ? "Upload video" : "Upload anh";
+        String action = mediaType == RepairMediaType.VIDEO ? "Upload video" : mediaType == RepairMediaType.DOCUMENT ? "Upload tài liệu" : "Upload ảnh";
         addTimeline(orderId, action, caption != null ? caption : storedMedia.originalFileName(), uploadedBy);
 
         return new RepairOrderResponse.ImageInfo(
@@ -405,23 +421,23 @@ public class RepairService {
     @Transactional
     public void deleteMedia(UUID mediaId, CustomUserDetails userDetails) {
         RepairImage image = repairImageRepository.findById(mediaId)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hình ảnh/video: " + mediaId));
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy tệp đính kèm: " + mediaId));
         
         RepairOrder order = repairOrderRepository.findByIdAndIsDeletedFalse(image.getOrderId())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy đơn sửa chữa tương ứng"));
 
         UUID userId = userDetails.getUserId();
-        if (!userDetails.isManagerOrAbove() && !userDetails.hasRole("TECHNICIAN")
+        if (!userDetails.isManagerOrAbove()
                 && !userId.equals(image.getUploadedBy())
                 && !userId.equals(order.getAssignedTo())
                 && (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
-            throw new BusinessException("Bạn không có quyền xóa hình ảnh/video này", 403);
+            throw new BusinessException("Bạn không có quyền xóa tệp đính kèm này", 403);
         }
 
         image.softDelete(userId);
         repairImageRepository.save(image);
         
-        String mediaLabel = image.getMediaType() == RepairMediaType.VIDEO ? "video" : "ảnh";
+        String mediaLabel = image.getMediaType() == RepairMediaType.VIDEO ? "video" : image.getMediaType() == RepairMediaType.DOCUMENT ? "tài liệu" : "ảnh";
         addTimeline(order.getId(), STR."Xóa \{mediaLabel}", image.getCaption(), userId);
     }
 
@@ -662,6 +678,14 @@ public class RepairService {
     public RepairOrderResponse update(UUID id, UpdateRepairOrderRequest request, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(id);
 
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
+            UUID userId = userDetails.getUserId();
+            if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
+                (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
+                throw new BusinessException("Bạn không có quyền chỉnh sửa thông tin đơn hàng này", 403);
+            }
+        }
+
         // Cập nhật thông tin khách hàng
         order.setCustomerName(request.customerName());
         order.setCustomerPhone(request.customerPhone());
@@ -704,6 +728,11 @@ public class RepairService {
     @Transactional
     public void delete(UUID id, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(id);
+
+        if (userDetails != null && !userDetails.isManagerOrAbove()) {
+            throw new BusinessException("Chỉ quản lý mới có quyền xóa đơn hàng", 403);
+        }
+
         UUID performerId = userDetails != null ? userDetails.getUserId() : null;
         order.softDelete(performerId);
         repairOrderRepository.save(order);

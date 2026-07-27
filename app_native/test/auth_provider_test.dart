@@ -398,7 +398,7 @@ void main() {
       expect(UserRole.technician.can(AppPermission.updateRepairOrderStatus), isTrue);
       expect(UserRole.technician.can(AppPermission.assignRepairOrders), isTrue);
       
-      expect(UserRole.technician.can(AppPermission.viewDashboard), isFalse);
+      expect(UserRole.technician.can(AppPermission.viewDashboard), isTrue);
       expect(UserRole.technician.can(AppPermission.viewWarehouse), isFalse);
       expect(UserRole.technician.can(AppPermission.manageWarehouse), isFalse);
       expect(UserRole.technician.can(AppPermission.useMessages), isFalse);

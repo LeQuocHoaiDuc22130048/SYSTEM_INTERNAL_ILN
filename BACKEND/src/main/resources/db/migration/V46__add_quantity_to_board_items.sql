@@ -1,0 +1,1 @@
+ALTER TABLE board_items ADD COLUMN quantity INT NOT NULL DEFAULT 1;

@@ -209,7 +209,7 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
             ),
             subtitle: Text(
-              'Phiên bản hiện tại: v${UpdateProvider.currentVersion}',
+              'Phiên bản hiện tại: v${context.watch<UpdateProvider>().currentVersion}',
               style: TextStyle(
                 fontSize: 12,
                 color: isDark
