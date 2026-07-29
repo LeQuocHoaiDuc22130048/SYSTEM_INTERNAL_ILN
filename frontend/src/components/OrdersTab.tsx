@@ -1,87 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Search,
-  Calendar,
-  Filter,
   Wrench,
   Plus,
-  Trash2,
-  UserPlus,
-  Edit2,
-  Paperclip,
   X,
-  User,
-  Phone,
-  ShieldCheck,
-  AlertTriangle,
-  Play,
-  Maximize2,
-  FileText,
+  Trash2,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
-import type { UserInfo } from '../mockData';
 import { isManagerOrAbove as _isManagerOrAbove } from '../utils/permissions';
 import { MediaPreviewModal } from './MediaPreviewModal';
+import type {
+  RepairDevice,
+  RepairOrder,
+  Employee,
+  TimelineEvent,
+  OrdersTabProps,
+} from '../types/orders';
+import { OrderListPanel } from './orders/OrderListPanel';
+import { OrderDetailPanel } from './orders/OrderDetailPanel';
 import './OrdersTab.css';
 
-interface RepairMedia {
-  id: string;
-  imageUrl: string;
-  mediaType: 'IMAGE' | 'VIDEO' | 'DOCUMENT' | string;
-  caption?: string;
-}
-
-interface RepairDevice {
-  id?: string;
-  deviceName: string;
-  deviceType?: string;
-  serialNumber?: string;
-  underWarranty: boolean;
-  warrantyExpiry?: string;
-  description?: string;
-  status?: string;
-  assignedTo?: {
-    id: string;
-    fullName: string;
-  };
-}
-
-interface RepairOrder {
-  id: string;
-  orderCode: string;
-  deviceName: string;
-  customerName: string;
-  customerPhone?: string;
-  status: string;
-  createdAt: string;
-  updatedAt?: string;
-  description?: string;
-  notes?: string;
-  images: RepairMedia[];
-  devices: RepairDevice[];
-  assignees: { id: string; fullName: string }[];
-}
-
-interface Employee {
-  id: string;
-  username: string;
-  fullName: string;
-  role: string;
-  employeeCode?: string;
-}
-
-interface TimelineEvent {
-  id: string;
-  status: string;
-  note?: string;
-  changedByName: string;
-  changedAt: string;
-}
-
-interface OrdersTabProps {
-  showToast: (msg: string) => void;
-  currentUser?: UserInfo | null;
-}
 
 export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) => {
   const isManager = React.useMemo(() => _isManagerOrAbove(currentUser ?? null), [currentUser]);
@@ -649,419 +586,49 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
             </div>
           </div>
 
-          {/* Filters */}
-          <div className="orders-filter-card">
-            <div className="search-box-row">
-              <div className="search-input-wrapper">
-                <Search size={18} className="search-icon" />
-                <input
-                  type="text"
-                  placeholder="Mã đơn, tên thiết bị, khách hàng..."
-                  value={searchTerm}
-                  onChange={(e) => {
-                    setSearchTerm(e.target.value);
-                    setVisibleCount(20);
-                  }}
-                  className="orders-search-input"
-                />
-              </div>
-              <button className="btn-create-order" onClick={openCreateModal}>
-                <Plus size={16} />
-                <span>Tạo đơn mới</span>
-              </button>
-            </div>
-
-            <div className="filters-row">
-              <div className="filter-item">
-                <Filter size={14} className="filter-icon" />
-                <select
-                  value={statusFilter}
-                  onChange={(e) => {
-                    setStatusFilter(e.target.value);
-                    setVisibleCount(20);
-                  }}
-                >
-                  <option value="ALL">Mọi trạng thái</option>
-                  <option value="PENDING">Chưa kiểm tra</option>
-                  <option value="WAITING_FOR_CHECK">Chờ kiểm tra</option>
-                  <option value="CHECKING">Đang kiểm tra</option>
-                  <option value="CHECKED">Đã kiểm tra</option>
-                  <option value="IN_PROGRESS">Đang sửa</option>
-                  <option value="COMPLETED">Hoàn thành</option>
-                  <option value="DELIVERED">Đã giao</option>
-                  <option value="CANCELLED">Đã trả</option>
-                </select>
-              </div>
-
-              <div className="filter-item">
-                <ShieldCheck size={14} className="filter-icon" />
-                <select
-                  value={warrantyFilter}
-                  onChange={(e) => {
-                    setWarrantyFilter(e.target.value);
-                    setVisibleCount(20);
-                  }}
-                >
-                  <option value="ALL">Mọi bảo hành</option>
-                  <option value="WARRANTY">Có bảo hành</option>
-                  <option value="NO_WARRANTY">Không bảo hành</option>
-                </select>
-              </div>
-
-              <div className="filter-item">
-                <Calendar size={14} className="filter-icon" />
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => {
-                    setDateFilter(e.target.value);
-                    setVisibleCount(20);
-                  }}
-                  className="filter-date-input"
-                />
-                {dateFilter && (
-                  <button className="clear-date-btn" onClick={() => { setDateFilter(''); setVisibleCount(20); }}>
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* List display */}
-          <div
-            className="orders-list-wrapper"
-            ref={listWrapperRef}
-            onScroll={handleScrollList}
-          >
-            {loading ? (
-              <div className="list-status-msg">Đang tải danh sách đơn hàng...</div>
-            ) : displayedOrders.length === 0 ? (
-              <div className="list-status-msg">Không tìm thấy đơn hàng nào.</div>
-            ) : (
-              <>
-                <div className="orders-cards-list">
-                  {displayedOrders.map((order) => {
-                    const statusMeta = getStatusMeta(order.status);
-                    const isSelected = selectedOrder?.id === order.id;
-
-                    return (
-                      <div
-                        key={order.id}
-                        className={`order-list-card ${isSelected ? 'selected' : ''}`}
-                        onClick={() => handleSelectOrder(order)}
-                      >
-                        <div className="card-header-row">
-                          <span className="order-code-tag">{order.orderCode}</span>
-                          <span className={`status-badge ${statusMeta.color}`}>
-                            {statusMeta.label}
-                          </span>
-                        </div>
-
-                        <h3 className="card-device-name" title={order.deviceName}>
-                          {order.deviceName}
-                        </h3>
-
-                        <div className="card-info-grid">
-                          <div className="info-item">
-                            <User size={13} />
-                            <span>{order.customerName}</span>
-                          </div>
-                          {order.customerPhone && (
-                            <div className="info-item">
-                              <Phone size={13} />
-                              <span>{order.customerPhone}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="card-footer-row">
-                          <span className="card-date">
-                            {new Date(order.createdAt).toLocaleDateString('vi-VN', {
-                              hour: '2-digit',
-                              minute: '2-digit',
-                            })}
-                          </span>
-                          <div className="card-assignees">
-                            {order.assignees.length > 0 ? (
-                              <span className="assignees-badge" title={order.assignees.map((a) => a.fullName).join(', ')}>
-                                {order.assignees.length} kỹ thuật viên
-                              </span>
-                            ) : (
-                              <span className="unassigned-badge">Chưa phân công</span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Infinite Scroll Footer */}
-                <div className="infinite-scroll-footer">
-                  {visibleCount < filteredOrders.length ? (
-                    <span className="loading-more-text">
-                      Cuộn xuống để nạp thêm... ({displayedOrders.length}/{filteredOrders.length})
-                    </span>
-                  ) : (
-                    <span className="end-list-text">
-                      Đã hiển thị tất cả {filteredOrders.length} đơn hàng
-                    </span>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+          <OrderListPanel
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            statusFilter={statusFilter}
+            setStatusFilter={setStatusFilter}
+            warrantyFilter={warrantyFilter}
+            setWarrantyFilter={setWarrantyFilter}
+            dateFilter={dateFilter}
+            setDateFilter={setDateFilter}
+            setVisibleCount={setVisibleCount}
+            openCreateModal={openCreateModal}
+            listWrapperRef={listWrapperRef}
+            handleScrollList={handleScrollList}
+            loading={loading}
+            displayedOrders={displayedOrders}
+            filteredOrders={filteredOrders}
+            selectedOrder={selectedOrder}
+            handleSelectOrder={handleSelectOrder}
+            getStatusMeta={getStatusMeta}
+            visibleCount={visibleCount}
+          />
         </div>
 
         {/* Right Column: Detail Pane */}
         <div className="orders-detail-panel">
           {selectedOrder ? (
-            <div className="detail-scroller">
-              <div className="detail-header">
-                <div className="detail-title-row">
-                  <div>
-                    <span className="detail-order-code">{selectedOrder.orderCode}</span>
-                    <h2 className="detail-device-title">{selectedOrder.deviceName}</h2>
-                  </div>
-                  <div className="detail-actions">
-                    <button className="btn-action-outline" onClick={() => openEditModal(selectedOrder)}>
-                      <Edit2 size={14} />
-                      Sửa
-                    </button>
-                    {isManager && (
-                      <button className="btn-action-outline danger" onClick={handleDeleteOrder}>
-                        <Trash2 size={14} />
-                        Xóa
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="status-timeline-bar">
-                  <span className={`status-badge lg ${getStatusMeta(selectedOrder.status).color}`}>
-                    {getStatusMeta(selectedOrder.status).label}
-                  </span>
-                  <button className="btn-update-status" onClick={() => { setNewStatus(selectedOrder.status); setIsStatusModalOpen(true); }}>
-                    Cập nhật trạng thái
-                  </button>
-                </div>
-              </div>
-
-              <div className="detail-content-section">
-                <h4 className="section-title">Thông tin khách hàng</h4>
-                <div className="detail-info-card">
-                  <div className="info-row">
-                    <span className="info-lbl">Khách hàng:</span>
-                    <span className="info-val">{selectedOrder.customerName}</span>
-                  </div>
-                  {selectedOrder.customerPhone && (
-                    <div className="info-row">
-                      <span className="info-lbl">Số điện thoại:</span>
-                      <span className="info-val">{selectedOrder.customerPhone}</span>
-                    </div>
-                  )}
-                  <div className="info-row">
-                    <span className="info-lbl">Ngày tạo:</span>
-                    <span className="info-val">
-                      {new Date(selectedOrder.createdAt).toLocaleDateString('vi-VN', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="detail-content-section">
-                <div className="section-header-row">
-                  <h4 className="section-title">Thiết bị trong đơn ({selectedOrder.devices.length})</h4>
-                </div>
-                <div className="devices-detail-list">
-                  {selectedOrder.devices.map((device, idx) => (
-                    <div key={device.id || idx} className="device-detail-card">
-                      <div className="device-card-header">
-                        <span className="device-name">{device.deviceName}</span>
-                        {device.underWarranty ? (
-                          <span className="warranty-tag true">Bảo hành</span>
-                        ) : (
-                          <span className="warranty-tag false">Hết/Không BH</span>
-                        )}
-                      </div>
-                      <div className="device-card-body">
-                        {device.deviceType && (
-                          <div className="device-body-item">
-                            <span className="lbl">Loại:</span> <span>{device.deviceType}</span>
-                          </div>
-                        )}
-                        {device.serialNumber && (
-                          <div className="device-body-item">
-                            <span className="lbl">Serial:</span> <span>{device.serialNumber}</span>
-                          </div>
-                        )}
-                        {device.underWarranty && device.warrantyExpiry && (
-                          <div className="device-body-item">
-                            <span className="lbl">Hạn bảo hành:</span>{' '}
-                            <span>{new Date(device.warrantyExpiry).toLocaleDateString('vi-VN')}</span>
-                          </div>
-                        )}
-                        {device.description && (
-                          <div className="device-body-item full">
-                            <span className="lbl">Mô tả lỗi:</span> <p>{device.description}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="detail-content-section">
-                <div className="section-header-row">
-                  <h4 className="section-title">Kỹ thuật viên sửa chữa</h4>
-                  <button className="btn-action-outline sm" onClick={openAssignModal}>
-                    <UserPlus size={14} />
-                    Phân công
-                  </button>
-                </div>
-                <div className="detail-assignees-card">
-                  {selectedOrder.assignees.length > 0 ? (
-                    <div className="assignees-list">
-                      {selectedOrder.assignees.map((tech) => (
-                        <div key={tech.id} className="tech-badge-item">
-                          <User size={14} />
-                          <span>{tech.fullName}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="no-data-text">Chưa phân công kỹ thuật viên nào cho đơn hàng này.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Attachments Section */}
-              <div className="detail-content-section">
-                <div className="section-header-row">
-                  <h4 className="section-title">Phương tiện & Tài liệu đính kèm</h4>
-                  <div className="upload-btn-wrapper">
-                    <button className="btn-action-outline sm">
-                      <Paperclip size={14} />
-                      Đính kèm file
-                    </button>
-                    <input
-                      type="file"
-                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.csv"
-                      onChange={handleUploadMedia}
-                    />
-                  </div>
-                </div>
-                <div className="media-attachments-card">
-                  {uploadingMedia && <div className="media-uploading">Đang tải lên tệp đính kèm...</div>}
-                  {selectedOrder.images && selectedOrder.images.length > 0 ? (
-                    <div className="media-grid">
-                      {selectedOrder.images.map((media, idx) => {
-                        const isVid = media.mediaType === 'VIDEO' || /\.(mp4|mov|webm|avi|mkv|3gp)$/i.test(media.imageUrl);
-                        const isDoc = media.mediaType === 'DOCUMENT' || /\.(pdf|doc|docx|xls|xlsx|ppt|pptx|txt|zip|rar|7z|csv)$/i.test(media.imageUrl);
-                        return (
-                          <div
-                            key={media.id || idx}
-                            className="media-item-wrapper"
-                            onClick={() => handleOpenMediaPreview(idx)}
-                            title="Click để xem chi tiết / phát video / phóng to ảnh"
-                          >
-                            <button
-                              className="delete-media-btn"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleDeleteMedia(media.id);
-                              }}
-                              title="Xóa tệp đính kèm"
-                            >
-                              <X size={12} />
-                            </button>
-                            {isVid ? (
-                              <div className="media-video-placeholder">
-                                <div className="media-overlay-icon">
-                                  <Play size={24} className="play-icon" />
-                                </div>
-                                <span className="media-type-badge vid">VIDEO</span>
-                                <video src={media.imageUrl} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                              </div>
-                            ) : isDoc ? (
-                              <div className="media-doc-placeholder">
-                                <FileText size={32} className="doc-grid-icon" />
-                                <span className="media-type-badge doc">DOC</span>
-                              </div>
-                            ) : (
-                              <div className="media-image-placeholder">
-                                <div className="media-overlay-icon">
-                                  <Maximize2 size={20} className="zoom-icon" />
-                                </div>
-                                <img src={media.imageUrl} alt={media.caption || 'attachment'} />
-                              </div>
-                            )}
-                            <span className="media-caption">{media.caption || (isVid ? 'Video' : isDoc ? 'Tài liệu' : 'Hình ảnh')}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="no-data-text">Chưa có hình ảnh, video hoặc tài liệu đính kèm nào.</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Lifecycle/Timeline Timeline */}
-              <div className="detail-content-section">
-                <h4 className="section-title">Vòng đời đơn sửa chữa</h4>
-                <div className="timeline-flow-card">
-                  {loadingTimeline ? (
-                    <p className="no-data-text">Đang tải lịch sử...</p>
-                  ) : timeline.length > 0 ? (
-                    <div className="vertical-timeline">
-                      {timeline.map((evt, idx) => {
-                        const statusMeta = getStatusMeta(evt.status);
-                        return (
-                          <div key={evt.id || idx} className="timeline-node">
-                            <div className="node-marker" />
-                            <div className="node-content">
-                              <div className="node-header">
-                                <span className={`status-badge sm ${statusMeta.color}`}>{statusMeta.label}</span>
-                                <span className="node-time">
-                                  {new Date(evt.changedAt).toLocaleString('vi-VN', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    day: '2-digit',
-                                    month: '2-digit',
-                                  })}
-                                </span>
-                              </div>
-                              <p className="node-author">Thực hiện bởi: {evt.changedByName}</p>
-                              {evt.note && <p className="node-notes">Ghi chú: {evt.note}</p>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="no-data-text">Chưa có lịch sử trạng thái.</p>
-                  )}
-                </div>
-              </div>
-
-              {selectedOrder.status !== 'CANCELLED' && selectedOrder.status !== 'DELIVERED' && (
-                <div className="cancel-order-footer">
-                  <button className="btn-cancel-order" onClick={handleCancelOrder}>
-                    <AlertTriangle size={14} />
-                    Hủy đơn sửa chữa
-                  </button>
-                </div>
-              )}
-            </div>
+            <OrderDetailPanel
+              selectedOrder={selectedOrder}
+              isManager={isManager}
+              openEditModal={openEditModal}
+              handleDeleteOrder={handleDeleteOrder}
+              getStatusMeta={getStatusMeta}
+              setNewStatus={setNewStatus}
+              setIsStatusModalOpen={setIsStatusModalOpen}
+              openAssignModal={openAssignModal}
+              handleUploadMedia={handleUploadMedia}
+              uploadingMedia={uploadingMedia}
+              handleOpenMediaPreview={handleOpenMediaPreview}
+              handleDeleteMedia={handleDeleteMedia}
+              loadingTimeline={loadingTimeline}
+              timeline={timeline}
+              handleCancelOrder={handleCancelOrder}
+            />
           ) : (
             <div className="detail-empty-state">
               <Wrench size={48} className="empty-icon" />

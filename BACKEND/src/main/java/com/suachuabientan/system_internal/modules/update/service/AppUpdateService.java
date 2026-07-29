@@ -44,23 +44,66 @@ public class AppUpdateService {
     @Transactional(readOnly = true)
     public AppUpdate getLatestReleased() {
         List<AppUpdate> released = appUpdateRepository.findLatestReleased();
-        return released.isEmpty() ? null : released.get(0);
+        if (released.isEmpty()) {
+            return null;
+        }
+        AppUpdate highest = released.get(0);
+        for (int i = 1; i < released.size(); i++) {
+            AppUpdate current = released.get(i);
+            if (isVersionNewer(current.getVersion(), highest.getVersion())) {
+                highest = current;
+            }
+        }
+        return highest;
+    }
+
+    public boolean isVersionNewer(String latest, String current) {
+        if (latest == null || current == null) return false;
+        
+        String lClean = latest.split("\\+")[0].trim().replaceAll("[^0-9.]", "");
+        String cClean = current.split("\\+")[0].trim().replaceAll("[^0-9.]", "");
+
+        if (lClean.isEmpty() || cClean.isEmpty()) return false;
+
+        String[] latestParts = lClean.split("\\.");
+        String[] currentParts = cClean.split("\\.");
+
+        int length = Math.max(latestParts.length, currentParts.length);
+        for (int i = 0; i < length; i++) {
+            int lPart = i < latestParts.length && !latestParts[i].isEmpty() ? parsePart(latestParts[i]) : 0;
+            int cPart = i < currentParts.length && !currentParts[i].isEmpty() ? parsePart(currentParts[i]) : 0;
+
+            if (lPart > cPart) return true;
+            if (lPart < cPart) return false;
+        }
+        return false;
+    }
+
+    private int parsePart(String val) {
+        try {
+            return Integer.parseInt(val);
+        } catch (NumberFormatException e) {
+            return 0;
+        }
     }
 
     @Transactional
     public AppUpdate createUpdate(MultipartFile file, String version, String changelog, String downloadUrl, Boolean mandatory, String status) {
-        String resolvedUrl = downloadUrl;
+        String cleanVersion = version.trim().replaceAll("[^0-9.]", "");
+        String defaultUrl = "/api/v1/app-updates/download/system_internal_v" + cleanVersion + ".apk";
+        
+        String resolvedUrl = (downloadUrl != null && !downloadUrl.trim().isEmpty()) ? downloadUrl.trim() : defaultUrl;
         if (file != null && !file.isEmpty()) {
             resolvedUrl = saveReleaseFile(file, version);
         }
 
-        AppUpdate appUpdate = AppUpdate.builder()
-                .version(version)
-                .changelog(changelog)
-                .downloadUrl(resolvedUrl)
-                .mandatory(mandatory != null && mandatory)
-                .status(status != null ? status : "DRAFT")
-                .build();
+        AppUpdate appUpdate = appUpdateRepository.findByVersionAndIsDeletedFalse(version.trim())
+                .orElseGet(() -> AppUpdate.builder().version(version.trim()).build());
+
+        appUpdate.setChangelog(changelog);
+        appUpdate.setDownloadUrl(resolvedUrl);
+        appUpdate.setMandatory(mandatory != null && mandatory);
+        appUpdate.setStatus(status != null ? status : "DRAFT");
         
         if ("RELEASED".equals(status)) {
             appUpdate.setReleasedAt(Instant.now());

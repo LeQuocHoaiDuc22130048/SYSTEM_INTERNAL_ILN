@@ -261,30 +261,27 @@ public class RepairService {
 
         UUID userId = userDetails != null ? userDetails.getUserId() : null;
         boolean isManager = userDetails != null && userDetails.isManagerOrAbove();
+        boolean isReceiver = userId != null && userId.equals(order.getReceivedBy());
+        boolean isAssignee = userId != null && (userId.equals(order.getAssignedTo()) || (order.getAssignees() != null && order.getAssignees().contains(userId)));
 
-        // Kiểm tra quyền: nhân viên phải có quyền quản lý hoặc được phân công/tiếp nhận
-        if (!isManager) {
-            if (userId == null || (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
-                (order.getAssignees() == null || !order.getAssignees().contains(userId)))) {
-                throw new BusinessException("Bạn không có quyền cập nhật trạng thái đơn hàng này", 403);
-            }
+        // Kiểm tra quyền: nhân viên phải có quyền quản lý, được phân công, hoặc là người/máy nhận đơn
+        if (!isManager && !isReceiver && !isAssignee) {
+            throw new BusinessException("Bạn không có quyền cập nhật trạng thái đơn hàng này", 403);
         }
 
-        // Kiểm tra quyền: chỉ người được assign mới có thể cập nhật CHECKING/IN_PROGRESS/COMPLETED (trừ khi có quyền quản lý đơn)
+        // Kiểm tra quyền: kỹ thuật viên được phân công, máy/người nhận đơn, hoặc quản lý có thể cập nhật CHECKING/IN_PROGRESS/COMPLETED
         if ((request.status() == RepairStatus.CHECKING
                 || request.status() == RepairStatus.IN_PROGRESS
                 || request.status() == RepairStatus.COMPLETED)
-                && !isManager
-                && (userId == null || (!userId.equals(order.getAssignedTo()) && 
-                (order.getAssignees() == null || !order.getAssignees().contains(userId))))) {
-            throw new BusinessException("Chỉ kỹ thuật viên được phân công mới có thể cập nhật trạng thái này");
+                && !isManager && !isAssignee && !isReceiver) {
+            throw new BusinessException("Chỉ kỹ thuật viên được phân công hoặc người/máy nhận đơn mới có thể cập nhật trạng thái này");
         }
 
-        // Kiểm tra quyền hủy: ADMIN, SUPER_ADMIN hoặc user có quyền REPAIR_MANAGE / REPAIR_STATUS_UPDATE
+        // Kiểm tra quyền hủy: ADMIN, SUPER_ADMIN, user có quyền REPAIR_MANAGE / REPAIR_STATUS_UPDATE, hoặc người/máy nhận đơn
         if (request.status() == RepairStatus.CANCELLED) {
-            boolean canCancel = userDetails != null && (userDetails.hasRole("SUPER_ADMIN") || userDetails.hasRole("ADMIN") || userDetails.hasPermission("REPAIR_MANAGE") || userDetails.hasPermission("REPAIR_STATUS_UPDATE"));
+            boolean canCancel = isManager || isReceiver || (userDetails != null && (userDetails.hasRole("SUPER_ADMIN") || userDetails.hasRole("ADMIN") || userDetails.hasPermission("REPAIR_MANAGE") || userDetails.hasPermission("REPAIR_STATUS_UPDATE")));
             if (!canCancel) {
-                throw new BusinessException("Chỉ quản trị viên hoặc người có quyền quản lý đơn mới có quyền hủy đơn hàng", 403);
+                throw new BusinessException("Chỉ quản trị viên, người có quyền quản lý đơn hoặc người/máy nhận đơn mới có quyền hủy đơn hàng", 403);
             }
         }
 

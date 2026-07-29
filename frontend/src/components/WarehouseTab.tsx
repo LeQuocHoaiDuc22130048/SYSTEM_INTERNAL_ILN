@@ -1,93 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Search,
-  Plus,
-  Trash2,
-  Edit2,
   X,
   Cpu,
   Boxes,
-  History,
-  CheckCircle,
-  Layers,
-  MapPin,
-  Tag,
-  Printer,
-  FileText,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import { exportBoardQrPdf, exportBoardQrPdfList } from '../utils/pdf';
+import type { Board, BoardHistoryItem, Part, WarehouseTabProps } from '../types/warehouse';
+import { BoardListPanel } from './warehouse/BoardListPanel';
+import { PartListPanel } from './warehouse/PartListPanel';
+import { BoardDetailPanel } from './warehouse/BoardDetailPanel';
+import { PartDetailPanel } from './warehouse/PartDetailPanel';
 import './WarehouseTab.css';
 
-interface Board {
-  id: string;
-  name: string;
-  qrCode: string;
-  model: string;
-  location: string;
-  status: string;
-  checkedOutBy?: string;
-  checkedOutAt?: string;
-  currentRepairOrder?: string;
-  description?: string;
-  serialNumber?: string;
-  partId?: string;
-  partIpn?: string;
-  currentLocationId?: string;
-  currentLocationCode?: string;
-  quantity?: number;
-  activeCheckoutInfo?: {
-    checkoutId?: string;
-    takenBy?: string;
-    takenByName?: string;
-    takenByEmployeeCode?: string;
-    takenAt?: string;
-    repairOrderId?: string;
-    orderCode?: string;
-    quantity?: number;
-    repairBrand?: string;
-  };
-}
-
-interface BoardHistoryItem {
-  id: string;
-  boardId: string;
-  boardName: string;
-  qrCode: string;
-  takenBy: string;
-  takenByName: string;
-  takenAt?: string;
-  returnedAt?: string;
-  repairOrderId?: string;
-  notes?: string;
-}
-
-interface PartLot {
-  id: string;
-  storeLocationId?: string;
-  storeLocationCode: string;
-  storeLocationName: string;
-  amount: number;
-  lotCode: string;
-}
-
-interface Part {
-  id: string;
-  ipn: string;
-  name: string;
-  description?: string;
-  minAmount: number;
-  manufacturingStatus: string;
-  categoryId?: string;
-  categoryName?: string;
-  totalQuantity: number;
-  lots: PartLot[];
-  createdAt?: string;
-}
-
-interface WarehouseTabProps {
-  showToast: (msg: string) => void;
-}
 
 export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [boards, setBoards] = useState<Board[]>([]);
@@ -806,253 +731,32 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
         {/* Left Column: Stats, Filter & Grid */}
         <div className="warehouse-main-panel">
           {warehouseMode === 'BOARDS' ? (
-            <>
-              {/* Stats Bar */}
-              <div className="warehouse-stats-row">
-                <div className="w-stat-card">
-                  <Boxes size={24} className="stat-icon total" />
-                  <div className="stat-text">
-                    <span className="stat-val">{boards.length}</span>
-                    <span className="stat-lbl">Tổng bo mạch</span>
-                  </div>
-                </div>
-                <div className="w-stat-card">
-                  <CheckCircle size={24} className="stat-icon available" />
-                  <div className="stat-text">
-                    <span className="stat-val text-success">
-                      {boards.filter((b) => b.status === 'AVAILABLE').length}
-                    </span>
-                    <span className="stat-lbl">Sẵn có</span>
-                  </div>
-                </div>
-                <div className="w-stat-card">
-                  <Cpu size={24} className="stat-icon checkedout" />
-                  <div className="stat-text">
-                    <span className="stat-val text-warning">
-                      {boards.filter((b) => b.status === 'CHECKED_OUT' || b.status === 'IN_USE').length}
-                    </span>
-                    <span className="stat-lbl">Đang sử dụng</span>
-                  </div>
-                </div>
-                <div className="w-stat-card">
-                  <History size={24} className="stat-icon maintenance" />
-                  <div className="stat-text">
-                    <span className="stat-val text-danger">
-                      {boards.filter((b) => b.status === 'MAINTENANCE' || b.status === 'IN_REPAIR').length}
-                    </span>
-                    <span className="stat-lbl">Bảo trì / Sửa</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Search & Actions Bar */}
-              <div className="warehouse-control-bar">
-                <div className="search-input-wrapper flex-1">
-                  <Search size={18} className="search-icon" />
-                  <input
-                    type="text"
-                    placeholder="Tìm theo tên, serial, model, vị trí kho..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-search-input"
-                  />
-                </div>
-
-                <div className="filters-actions-wrapper">
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                    className="w-status-select"
-                  >
-                    <option value="ALL">Mọi trạng thái</option>
-                    <option value="AVAILABLE">Sẵn sàng</option>
-                    <option value="CHECKED_OUT">Đang dùng</option>
-                    <option value="IN_REPAIR">Đang sửa</option>
-                    <option value="DAMAGED">Hỏng</option>
-                    <option value="LOST">Mất</option>
-                    <option value="ARCHIVED">Lưu trữ</option>
-                    <option value="MAINTENANCE">Bảo trì</option>
-                  </select>
-
-                  <button
-                    className="btn-export-pdf-all"
-                    onClick={() => exportBoardQrPdfList(filteredBoards)}
-                    title="Xuất PDF mã QR cho tất cả bo mạch đang hiển thị"
-                  >
-                    <FileText size={16} />
-                    <span>Xuất PDF Mã QR</span>
-                  </button>
-
-                  <button className="btn-add-board" onClick={() => openAddEditModal(null)}>
-                    <Plus size={16} />
-                    <span>Thêm bo mạch</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Boards Grid Display */}
-              <div className="boards-grid-wrapper">
-                {loading ? (
-                  <div className="list-status-msg">Đang tải danh sách bo mạch...</div>
-                ) : filteredBoards.length === 0 ? (
-                  <div className="list-status-msg">Không tìm thấy bo mạch nào trong kho.</div>
-                ) : (
-                  <div className="boards-grid-list">
-                    {filteredBoards.map((board) => {
-                      const isSelected = selectedBoard?.id === board.id;
-                      const statusLabel = getStatusLabel(board.status);
-                      const colorClass = getStatusColorClass(board.status);
-
-                      return (
-                        <div
-                          key={board.id}
-                          className={`board-grid-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => handleSelectBoard(board)}
-                        >
-                          <div className="board-card-header">
-                            <h4 className="board-card-title" title={board.name}>
-                              {board.name}
-                            </h4>
-                            <span className={`board-status-dot-badge ${colorClass}`}>
-                              {statusLabel}
-                            </span>
-                          </div>
-
-                          <div className="board-card-specs">
-                            <div className="spec-row">
-                              <MapPin size={12} />
-                              <span>Vị trí: {board.location || 'Chưa đặt'}</span>
-                            </div>
-                          </div>
-
-                          {board.checkedOutBy && (
-                            <div className="board-card-borrow-info">
-                              <span>Đang mượn bởi: <strong>{board.checkedOutBy}</strong></span>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
+            <BoardListPanel
+              boards={boards}
+              loading={loading}
+              searchTerm={searchTerm}
+              setSearchTerm={setSearchTerm}
+              statusFilter={statusFilter}
+              setStatusFilter={setStatusFilter}
+              filteredBoards={filteredBoards}
+              selectedBoard={selectedBoard}
+              handleSelectBoard={handleSelectBoard}
+              openAddEditModal={openAddEditModal}
+              getStatusLabel={getStatusLabel}
+              getStatusColorClass={getStatusColorClass}
+              exportBoardQrPdfList={exportBoardQrPdfList}
+            />
           ) : (
-            <>
-              {/* Stats Bar for Parts */}
-              <div className="warehouse-stats-row">
-                <div className="w-stat-card">
-                  <Boxes size={24} className="stat-icon total" />
-                  <div className="stat-text">
-                    <span className="stat-val">{parts.length}</span>
-                    <span className="stat-lbl">Loại linh kiện</span>
-                  </div>
-                </div>
-                <div className="w-stat-card">
-                  <Layers size={24} className="stat-icon available" />
-                  <div className="stat-text">
-                    <span className="stat-val text-success">
-                      {parts.reduce((sum, p) => sum + p.totalQuantity, 0)}
-                    </span>
-                    <span className="stat-lbl">Tổng tồn kho</span>
-                  </div>
-                </div>
-                <div className="w-stat-card">
-                  <CheckCircle size={24} className="stat-icon checkedout" />
-                  <div className="stat-text">
-                    <span className="stat-val text-warning">
-                      {parts.filter((p) => p.totalQuantity < p.minAmount).length}
-                    </span>
-                    <span className="stat-lbl">Dưới định mức</span>
-                  </div>
-                </div>
-                <div className="w-stat-card">
-                  <History size={24} className="stat-icon maintenance" />
-                  <div className="stat-text">
-                    <span className="stat-val text-danger">
-                      {parts.filter((p) => p.totalQuantity === 0).length}
-                    </span>
-                    <span className="stat-lbl">Hết hàng</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Search & Actions Bar for Parts */}
-              <div className="warehouse-control-bar">
-                <div className="search-input-wrapper flex-1">
-                  <Search size={18} className="search-icon" />
-                  <input
-                    type="text"
-                    placeholder="Tìm theo tên, IPN, danh mục linh kiện..."
-                    value={partSearchTerm}
-                    onChange={(e) => setPartSearchTerm(e.target.value)}
-                    className="w-search-input"
-                  />
-                </div>
-
-                <div className="filters-actions-wrapper">
-                  <button className="btn-add-board" onClick={() => openAddEditPartModal(null)}>
-                    <Plus size={16} />
-                    <span>Thêm linh kiện</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Parts Grid Display */}
-              <div className="boards-grid-wrapper">
-                {loadingParts ? (
-                  <div className="list-status-msg">Đang tải danh sách linh kiện...</div>
-                ) : filteredParts.length === 0 ? (
-                  <div className="list-status-msg">Không tìm thấy linh kiện nào trong kho.</div>
-                ) : (
-                  <div className="boards-grid-list">
-                    {filteredParts.map((part) => {
-                      const isSelected = selectedPart?.id === part.id;
-                      const isLowStock = part.totalQuantity < part.minAmount;
-
-                      return (
-                        <div
-                          key={part.id}
-                          className={`board-grid-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => setSelectedPart(part)}
-                        >
-                          <div className="board-card-header">
-                            <h4 className="board-card-title" title={part.name}>
-                              {part.name}
-                            </h4>
-                            <span className={`board-status-dot-badge ${part.totalQuantity === 0 ? 'board-damaged' : isLowStock ? 'board-checkedout' : 'board-available'}`}>
-                              {part.totalQuantity === 0 ? 'Hết hàng' : isLowStock ? 'Sắp hết' : 'Đủ hàng'}
-                            </span>
-                          </div>
-
-                          <div className="board-card-specs">
-                            <div className="spec-row">
-                              <Tag size={12} />
-                              <span>IPN: {part.ipn}</span>
-                            </div>
-                            <div className="spec-row">
-                              <Layers size={12} />
-                              <span>Danh mục: {part.categoryName || 'Chưa rõ'}</span>
-                            </div>
-                            <div className="spec-row">
-                              <MapPin size={12} />
-                              <span>Lưu tại: {part.lots.length > 0 ? part.lots.map(l => `${l.storeLocationCode} (${l.amount})`).join(', ') : 'Chưa nhập kho'}</span>
-                            </div>
-                          </div>
-
-                          <div className="board-card-borrow-info" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <span>Tồn kho: <strong>{part.totalQuantity}</strong></span>
-                            {part.minAmount > 0 && (
-                              <span style={{ fontSize: '0.7rem', color: 'var(--color-text-light)' }}>Min: {part.minAmount}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </>
+            <PartListPanel
+              parts={parts}
+              loadingParts={loadingParts}
+              partSearchTerm={partSearchTerm}
+              setPartSearchTerm={setPartSearchTerm}
+              filteredParts={filteredParts}
+              selectedPart={selectedPart}
+              setSelectedPart={setSelectedPart}
+              openAddEditPartModal={openAddEditPartModal}
+            />
           )}
         </div>
 
@@ -1060,180 +764,19 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
         <div className="warehouse-detail-panel">
           {warehouseMode === 'BOARDS' ? (
             selectedBoard ? (
-              <div className="detail-scroller">
-                <div className="detail-header-row">
-                  <div className="title-wrapper">
-                    <div className="board-badge-icon">
-                      <Cpu size={24} />
-                    </div>
-                    <div>
-                      <h3 className="detail-board-name">{selectedBoard.name}</h3>
-                      <span className={`status-badge ${getStatusColorClass(selectedBoard.status)}`}>
-                        {getStatusLabel(selectedBoard.status)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="actions-wrapper">
-                    <button className="btn-action-outline" onClick={() => openAddEditModal(selectedBoard)}>
-                      <Edit2 size={14} />
-                      Sửa
-                    </button>
-                    <button className="btn-action-outline danger" onClick={handleDeleteBoard}>
-                      <Trash2 size={14} />
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status Action Buttons */}
-                <div className="detail-main-actions-bar">
-                  {selectedBoard.status === 'AVAILABLE' ? (
-                    <button className="btn-checkout-board" onClick={openCheckoutModal}>
-                      Mượn board / Checkout
-                    </button>
-                  ) : (selectedBoard.status === 'CHECKED_OUT' || selectedBoard.status === 'IN_USE') ? (
-                    <button className="btn-return-board" onClick={openReturnModal}>
-                      Trả board về kho
-                    </button>
-                  ) : null}
-                </div>
-
-                {/* Specs Specifications List */}
-                <div className="detail-content-section">
-                  <h4 className="section-title">Thông số kỹ thuật</h4>
-                  <div className="specs-info-grid">
-                    <div className="spec-detail-item">
-                      <span className="label">Vị trí lưu trữ</span>
-                      <span className="value">{selectedBoard.location || 'Chưa cài đặt'}</span>
-                    </div>
-                    <div className="spec-detail-item">
-                    <span className="label">Tồn kho hiện tại</span>
-                    <span className={`value ${(selectedBoard.quantity || 0) > 0 ? 'text-success' : 'text-danger'}`}>
-                      {selectedBoard.quantity || 0}
-                      {(selectedBoard.quantity || 0) === 0 && ' (Hết hàng)'}
-                    </span>
-                  </div>
-                  </div>
-                </div>
-
-                {/* Active Checkout Info */}
-                {selectedBoard.checkedOutBy && (
-                  <div className="detail-content-section">
-                    <h4 className="section-title">Thông tin mượn hiện tại</h4>
-                    <div className="active-borrow-card">
-                      <div className="borrow-row">
-                        <span className="lbl">Người mượn:</span>
-                        <span className="val">{selectedBoard.checkedOutBy}</span>
-                      </div>
-                      {selectedBoard.checkedOutAt && (
-                        <div className="borrow-row">
-                          <span className="lbl">Ngày mượn:</span>
-                          <span className="val">{new Date(selectedBoard.checkedOutAt).toLocaleString('vi-VN')}</span>
-                        </div>
-                      )}
-                      {selectedBoard.currentRepairOrder && (
-                        <div className="borrow-row">
-                          <span className="lbl">Liên kết đơn sửa:</span>
-                          <span className="val link-code">
-                            {selectedBoard.currentRepairOrder}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Description */}
-                {selectedBoard.description && (
-                  <div className="detail-content-section">
-                    <h4 className="section-title">Mô tả bo mạch</h4>
-                    <div className="description-card">
-                      <p>{selectedBoard.description}</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* QR Code Section */}
-                <div className="detail-content-section align-center">
-                  <div className="qrcode-section-header">
-                    <h4 className="section-title text-left margin-0">QR Code định danh</h4>
-                    <button
-                      className="btn-export-qr-pdf"
-                      onClick={() => exportBoardQrPdf(selectedBoard)}
-                      title="Xuất PDF mã QR và mã code của linh kiện bo mạch này"
-                    >
-                      <Printer size={15} />
-                      <span>Xuất PDF QR</span>
-                    </button>
-                  </div>
-                  <div className="qrcode-container-card">
-                    <img src={getQRCodeUrl(selectedBoard.qrCode)} alt="QR Code" className="qrcode-img" />
-                    <div className="qrcode-meta">
-                      <span className="qr-value">{selectedBoard.qrCode}</span>
-                      <span className="qr-desc">Dùng ứng dụng di động quét mã QR này để nhanh chóng kiểm tra thông tin hoặc thay đổi vị trí.</span>
-                      <button
-                        className="btn-export-qr-pdf-outline"
-                        onClick={() => exportBoardQrPdf(selectedBoard)}
-                      >
-                        <Printer size={14} />
-                        <span>Xuất tem PDF</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* History Section */}
-                <div className="detail-content-section">
-                  <h4 className="section-title">Lịch sử di chuyển & mượn trả</h4>
-                  <div className="history-flow-card">
-                    {loadingHistory ? (
-                      <p className="no-data-text">Đang tải lịch sử di chuyển...</p>
-                    ) : boardHistory.length > 0 ? (
-                      <div className="history-nodes-list">
-                        {boardHistory.map((item, idx) => (
-                          <div key={item.id || idx} className="history-node-item">
-                            <div className="node-marker" />
-                            <div className="node-info">
-                              <div className="node-header">
-                                <span className="node-author">Mượn bởi: <strong>{item.takenByName}</strong></span>
-                                {item.takenAt && (
-                                  <span className="node-date">
-                                    {new Date(item.takenAt).toLocaleDateString('vi-VN', {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })}
-                                  </span>
-                                )}
-                              </div>
-                              {item.repairOrderId && (
-                                <p className="node-ref-order">Đơn sửa chữa (ID): {item.repairOrderId}</p>
-                              )}
-                              {item.notes && <p className="node-note">Ghi chú mượn: {item.notes}</p>}
-
-                              {item.returnedAt ? (
-                                <div className="node-return-box">
-                                  <span className="return-indicator">Đã trả về kho vào: </span>
-                                  <span className="node-date">
-                                    {new Date(item.returnedAt).toLocaleDateString('vi-VN', {
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                    })}
-                                  </span>
-                                </div>
-                              ) : (
-                                <div className="node-active-badge">Đang sử dụng</div>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <p className="no-data-text">Chưa có lịch sử dịch chuyển nào được lưu lại.</p>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <BoardDetailPanel
+                selectedBoard={selectedBoard}
+                getStatusLabel={getStatusLabel}
+                getStatusColorClass={getStatusColorClass}
+                openAddEditModal={openAddEditModal}
+                handleDeleteBoard={handleDeleteBoard}
+                openCheckoutModal={openCheckoutModal}
+                openReturnModal={openReturnModal}
+                getQRCodeUrl={getQRCodeUrl}
+                exportBoardQrPdf={exportBoardQrPdf}
+                loadingHistory={loadingHistory}
+                boardHistory={boardHistory}
+              />
             ) : (
               <div className="detail-empty-state">
                 <Cpu size={48} className="empty-icon" />
@@ -1243,91 +786,12 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
             )
           ) : (
             selectedPart ? (
-              <div className="detail-scroller">
-                <div className="detail-header-row">
-                  <div className="title-wrapper">
-                    <div className="board-badge-icon">
-                      <Boxes size={24} />
-                    </div>
-                    <div>
-                      <h3 className="detail-board-name">{selectedPart.name}</h3>
-                      <span className={`status-badge ${selectedPart.totalQuantity === 0 ? 'board-damaged' : selectedPart.totalQuantity < selectedPart.minAmount ? 'board-checkedout' : 'board-available'}`}>
-                        {selectedPart.totalQuantity === 0 ? 'Hết hàng' : selectedPart.totalQuantity < selectedPart.minAmount ? 'Sắp hết' : 'Đủ hàng'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="actions-wrapper">
-                    <button className="btn-action-outline" onClick={() => openAddEditPartModal(selectedPart)}>
-                      <Edit2 size={14} />
-                      Sửa
-                    </button>
-                    <button className="btn-action-outline danger" onClick={handleDeletePart}>
-                      <Trash2 size={14} />
-                      Xóa
-                    </button>
-                  </div>
-                </div>
-
-                {/* Main Action Buttons */}
-                <div className="detail-main-actions-bar">
-                  <button className="btn-checkout-board" onClick={openAdjustStockModal}>
-                    Điều chỉnh số lượng tồn kho
-                  </button>
-                </div>
-
-                {/* Specs Section */}
-                <div className="detail-content-section">
-                  <h4 className="section-title">Thông số kỹ thuật</h4>
-                  <div className="specs-info-grid">
-                    <div className="spec-detail-item">
-                      <span className="label">Mã IPN</span>
-                      <span className="value" style={{ fontFamily: 'monospace', fontWeight: 700 }}>{selectedPart.ipn}</span>
-                    </div>
-                    <div className="spec-detail-item">
-                      <span className="label">Danh mục linh kiện</span>
-                      <span className="value">{selectedPart.categoryName || 'Chưa rõ'}</span>
-                    </div>
-                    <div className="spec-detail-item">
-                      <span className="label">Định mức tối thiểu</span>
-                      <span className="value">{selectedPart.minAmount}</span>
-                    </div>
-                    <div className="spec-detail-item">
-                      <span className="label">Tổng lượng tồn kho</span>
-                      <span className="value text-success" style={{ fontSize: '1rem', fontWeight: 800 }}>{selectedPart.totalQuantity}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Detailed Stock per Location */}
-                <div className="detail-content-section">
-                  <h4 className="section-title">Vị trí lưu kho & Số lượng chi tiết</h4>
-                  <div className="specs-info-grid">
-                    {selectedPart.lots && selectedPart.lots.length > 0 ? (
-                      selectedPart.lots.map((lot) => (
-                        <div key={lot.id} className="spec-detail-item" style={{ borderBottom: '1px dashed var(--color-border)', paddingBottom: '6px' }}>
-                          <div>
-                            <span className="value" style={{ display: 'block' }}>{lot.storeLocationName}</span>
-                          </div>
-                          <span className="value text-success" style={{ fontSize: '0.95rem' }}>{lot.amount}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p className="no-data-text" style={{ margin: 0, padding: '10px 0' }}>Chưa có linh kiện này ở bất kỳ vị trí kho nào. Nhấp "Điều chỉnh số lượng tồn kho" để nhập kho.</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Description */}
-                {selectedPart.description && (
-                  <div className="detail-content-section">
-                    <h4 className="section-title">Mô tả linh kiện</h4>
-                    <div className="description-card">
-                      <p>{selectedPart.description}</p>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <PartDetailPanel
+                selectedPart={selectedPart}
+                openAddEditPartModal={openAddEditPartModal}
+                handleDeletePart={handleDeletePart}
+                openAdjustStockModal={openAdjustStockModal}
+              />
             ) : (
               <div className="detail-empty-state">
                 <Boxes size={48} className="empty-icon" />

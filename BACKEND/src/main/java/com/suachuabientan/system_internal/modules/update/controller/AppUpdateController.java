@@ -62,7 +62,7 @@ public class AppUpdateController {
         boolean currentMandatory = latest != null ? latest.getMandatory() : mandatory;
         String currentChangelog = latest != null ? latest.getChangelog() : changelog;
 
-        boolean updateAvailable = isVersionNewer(currentLatestVersion, version);
+        boolean updateAvailable = appUpdateService.isVersionNewer(currentLatestVersion, version);
         String formattedChangelog = currentChangelog != null ? currentChangelog.replace("\\n", "\n") : "";
         AppUpdateInfo updateInfo = new AppUpdateInfo(
             updateAvailable,
@@ -140,24 +140,7 @@ public class AppUpdateController {
         }
     }
 
-    private boolean isVersionNewer(String latest, String current) {
-        if (latest == null || current == null) return false;
-        
-        // Clean version strings
-        String l = latest.trim().replaceAll("[^0-9.]", "");
-        String c = current.trim().replaceAll("[^0-9.]", "");
-        
-        String[] latestParts = l.split("\\.");
-        String[] currentParts = c.split("\\.");
-        
-        int length = Math.max(latestParts.length, currentParts.length);
-        for (int i = 0; i < length; i++) {
-            int lPart = i < latestParts.length && !latestParts[i].isEmpty() ? Integer.parseInt(latestParts[i]) : 0;
-            int cPart = i < currentParts.length && !currentParts[i].isEmpty() ? Integer.parseInt(currentParts[i]) : 0;
-            
-            if (lPart > cPart) return true;
-            if (lPart < cPart) return false;
-        }
-        return false;
+    boolean isVersionNewer(String latest, String current) {
+        return appUpdateService.isVersionNewer(latest, current);
     }
 }

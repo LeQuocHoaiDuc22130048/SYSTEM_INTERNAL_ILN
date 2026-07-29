@@ -282,4 +282,39 @@ class RepairServiceTest {
         org.junit.jupiter.api.Assertions.assertNotNull(response);
         org.junit.jupiter.api.Assertions.assertEquals("", response.notes());
     }
+
+    @Test
+    void receiverCanUpdateStatusToAnyStatus() {
+        UUID orderId = UUID.randomUUID();
+        UUID receiverId = UUID.randomUUID();
+
+        RepairOrder order = new RepairOrder();
+        order.setId(orderId);
+        order.setOrderCode("RO-20260729-001");
+        order.setStatus(RepairStatus.PENDING);
+        order.setReceivedBy(receiverId);
+
+        when(repairOrderRepository.findByIdAndIsDeletedFalse(orderId))
+                .thenReturn(Optional.of(order));
+        when(repairDeviceRepository.findByOrderIdOrderByCreatedAtAsc(orderId))
+                .thenReturn(java.util.Collections.emptyList());
+
+        UserEntity receiverUser = UserEntity.builder()
+                .role(UserRole.EMPLOYEE)
+                .status(UserStatus.ACTIVE)
+                .build();
+        receiverUser.setId(receiverId);
+
+        CustomUserDetails userDetails = new CustomUserDetails(receiverUser);
+
+        // Test updating to CHECKING
+        var requestChecking = new com.suachuabientan.system_internal.modules.repair.dto.request.UpdateStatusRequest(RepairStatus.CHECKING, "Chuyển sang kiểm tra");
+        var responseChecking = repairService.updateStatus(orderId, requestChecking, userDetails);
+        org.junit.jupiter.api.Assertions.assertEquals(RepairStatus.CHECKING.name(), responseChecking.status());
+
+        // Test updating to CANCELLED
+        var requestCancelled = new com.suachuabientan.system_internal.modules.repair.dto.request.UpdateStatusRequest(RepairStatus.CANCELLED, "Hủy đơn");
+        var responseCancelled = repairService.updateStatus(orderId, requestCancelled, userDetails);
+        org.junit.jupiter.api.Assertions.assertEquals(RepairStatus.CANCELLED.name(), responseCancelled.status());
+    }
 }

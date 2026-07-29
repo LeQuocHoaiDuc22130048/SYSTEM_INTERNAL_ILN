@@ -211,6 +211,11 @@ class UpdateProvider with ChangeNotifier {
       final tempDir = await getTemporaryDirectory();
       final String fileName = url.split('/').last;
       final file = File('${tempDir.path}/$fileName');
+      if (await file.exists()) {
+        try {
+          await file.delete();
+        } catch (_) {}
+      }
       await file.writeAsBytes(bytes);
 
       _downloadStatus = 'Đang kích hoạt trình cài đặt...';

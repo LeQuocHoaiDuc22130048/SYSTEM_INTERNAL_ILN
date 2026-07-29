@@ -13,7 +13,6 @@ import '../models/board_history_item.dart';
 import '../models/part.dart';
 import 'scanner_page.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../utils/qr_share_helper.dart';
 
 enum WarehouseMode { boards, parts }
@@ -2686,7 +2685,7 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                                           height: 48,
                                           child: ElevatedButton.icon(
                                             icon: const Icon(Icons.picture_as_pdf),
-                                            label: const Text('In tem PDF (Khuyên dùng cho OpenLabel)'),
+                                            label: const Text('In tem PDF (Khuyên dùng cho Eleph-label)'),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: AppColors.primary,
                                               foregroundColor: Colors.white,
@@ -2694,7 +2693,9 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                                             ),
                                             onPressed: () async {
                                               Navigator.pop(ctx);
-                                              await QrShareHelper.shareQrPdfToOpenLabel(
+                                              await Future.delayed(const Duration(milliseconds: 150));
+                                              if (!mounted) return;
+                                              await QrShareHelper.shareQrPdfToElephLabel(
                                                 context: context,
                                                 qrData: widget.board.qrCode,
                                                 title: widget.board.name,
@@ -2709,7 +2710,7 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                                           height: 48,
                                           child: ElevatedButton.icon(
                                             icon: const Icon(Icons.label_outline),
-                                            label: const Text('Mở trong OpenLabel'),
+                                            label: const Text('Mở trong Eleph-label'),
                                             style: ElevatedButton.styleFrom(
                                               backgroundColor: Colors.blueAccent,
                                               foregroundColor: Colors.white,
@@ -2717,7 +2718,9 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                                             ),
                                             onPressed: () async {
                                               Navigator.pop(ctx);
-                                              await QrShareHelper.shareQrCodeToOpenLabel(
+                                              await Future.delayed(const Duration(milliseconds: 150));
+                                              if (!mounted) return;
+                                              await QrShareHelper.shareQrCodeToElephLabel(
                                                 context: context,
                                                 qrData: widget.board.qrCode,
                                                 title: widget.board.name,
@@ -2735,7 +2738,9 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                                              label: const Text('Sao chép mã QR vào bộ nhớ tạm'),
                                              onPressed: () async {
                                                Navigator.pop(ctx);
-                                               await QrShareHelper.copyAndLaunchOpenLabel(
+                                               await Future.delayed(const Duration(milliseconds: 150));
+                                               if (!mounted) return;
+                                               await QrShareHelper.copyAndLaunchElephLabel(
                                                  context: context,
                                                  qrData: widget.board.qrCode,
                                                );

@@ -13,6 +13,8 @@ public interface AppUpdateRepository extends JpaRepository<AppUpdate, UUID> {
     
     List<AppUpdate> findByIsDeletedFalseOrderByCreatedAtDesc();
 
+    java.util.Optional<AppUpdate> findByVersionAndIsDeletedFalse(String version);
+
     @Query("SELECT a FROM AppUpdate a WHERE a.status = 'RELEASED' AND a.isDeleted = false ORDER BY a.releasedAt DESC, a.createdAt DESC")
     List<AppUpdate> findLatestReleased();
 }

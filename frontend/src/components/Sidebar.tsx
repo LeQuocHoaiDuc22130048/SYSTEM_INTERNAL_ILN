@@ -6,8 +6,6 @@ import {
   RefreshCw,
   ChevronDown,
   ChevronRight,
-  ChevronLeft,
-  X,
   ClipboardCheck,
   Smartphone,
   LogOut,
@@ -68,12 +66,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <span className="brand-sub">Quản lý hệ thống</span>
             </div>
           </div>
-          <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
+          {/* <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
             <X size={20} />
-          </button>
-          <button className="sidebar-collapse-btn" onClick={onClose} aria-label="Collapse sidebar">
+          </button> */}
+          {/* <button className="sidebar-collapse-btn" onClick={onClose} aria-label="Collapse sidebar">
             <ChevronLeft size={20} />
-          </button>
+          </button> */}
         </div>
 
         {/* Menu Items */}
