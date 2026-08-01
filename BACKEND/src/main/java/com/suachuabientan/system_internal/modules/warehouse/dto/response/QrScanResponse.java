@@ -10,6 +10,12 @@ public record QrScanResponse(
         String category,
         String location,
         String serialNumber,
+        String model,
+        String boardType,
+        String firmware,
+        String removedParts,
+        java.time.LocalDate receivedDate,
+        String note,
         UUID partId,
         String partIpn,
         UUID currentLocationId,
@@ -31,3 +37,4 @@ public record QrScanResponse(
     ) {
     }
 }
+

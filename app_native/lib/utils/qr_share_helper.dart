@@ -140,15 +140,38 @@ class QrShareHelper {
                       textAlign: pw.TextAlign.center,
                       maxLines: 1,
                     ),
-                    pw.SizedBox(height: 1),
+                    pw.SizedBox(height: 2),
                   ],
-                  pw.Text(
-                    'QR: $qrData',
-                    style: pw.TextStyle(
-                      fontSize: 8,
-                      fontWeight: pw.FontWeight.bold,
+                  pw.Container(
+                    width: double.infinity,
+                    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    decoration: pw.BoxDecoration(
+                      color: PdfColors.grey200,
+                      border: pw.Border.all(color: PdfColors.black, width: 0.5),
+                      borderRadius: pw.BorderRadius.circular(3),
                     ),
-                    textAlign: pw.TextAlign.center,
+                    child: pw.Column(
+                      mainAxisSize: pw.MainAxisSize.min,
+                      crossAxisAlignment: pw.CrossAxisAlignment.center,
+                      children: [
+                        pw.Text(
+                          'MÃ CODE QR:',
+                          style: pw.TextStyle(
+                            fontSize: 6,
+                            fontWeight: pw.FontWeight.bold,
+                            color: PdfColors.grey700,
+                          ),
+                        ),
+                        pw.Text(
+                          qrData,
+                          style: pw.TextStyle(
+                            fontSize: 8.5,
+                            fontWeight: pw.FontWeight.bold,
+                          ),
+                          textAlign: pw.TextAlign.center,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),

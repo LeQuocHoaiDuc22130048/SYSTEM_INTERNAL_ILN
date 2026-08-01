@@ -201,11 +201,25 @@ class _WarehousePageState extends State<WarehousePage> {
                                       ),
                                     );
                                     if (result != null && mounted) {
-                                      final qrCode = (result as String).trim();
+                                      String qrCode = (result as String).trim();
+
+                                      // Extract QR code from formatted label block (e.g., "MÃ QR: BM-2026-YAS-001")
+                                      final match = RegExp(r'mã qr:\s*([^\n\r]+)', caseSensitive: false)
+                                          .firstMatch(qrCode);
+                                      if (match != null && match.group(1) != null) {
+                                        qrCode = match.group(1)!.trim();
+                                      }
+
+                                      // Update search query to display matching list
+                                      _searchQuery.value = qrCode;
+                                      _searchController.text = qrCode;
+
                                       final backend = context.read<BackendDataProvider>();
                                       Board? matchedBoard;
                                       for (final b in backend.boards) {
-                                        if (b.qrCode.toLowerCase() == qrCode.toLowerCase()) {
+                                        if (b.qrCode.toLowerCase() == qrCode.toLowerCase() ||
+                                            (b.serialNumber != null &&
+                                                b.serialNumber!.toLowerCase() == qrCode.toLowerCase())) {
                                           matchedBoard = b;
                                           break;
                                         }
@@ -214,13 +228,37 @@ class _WarehousePageState extends State<WarehousePage> {
                                       if (matchedBoard != null) {
                                         _showBoardDetail(matchedBoard, fromScan: true);
                                       } else {
-                                        _searchQuery.value = qrCode;
-                                        _searchController.text = qrCode;
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(
-                                            content: Text('Không tìm thấy bo mạch có mã QR: $qrCode'),
-                                          ),
-                                        );
+                                        // Attempt server scan API lookup if not in local list
+                                        try {
+                                          final res = await backend.api.get('/api/v1/boards/scan/$qrCode');
+                                          if (!mounted) return;
+                                          if (res != null &&
+                                              res is Map<String, dynamic> &&
+                                              res['boardItemId'] != null) {
+                                            await backend.loadBoards();
+                                            if (!mounted) return;
+                                            final updatedBoard = backend.boards.firstWhere(
+                                              (b) =>
+                                                  b.id == res['boardItemId'].toString() ||
+                                                  b.qrCode.toLowerCase() == qrCode.toLowerCase(),
+                                              orElse: () => Board.fromJson(res),
+                                            );
+                                            _showBoardDetail(updatedBoard, fromScan: true);
+                                          } else {
+                                            ScaffoldMessenger.of(context).showSnackBar(
+                                              SnackBar(
+                                                content: Text('Đã lọc danh sách theo mã QR: $qrCode'),
+                                              ),
+                                            );
+                                          }
+                                        } catch (_) {
+                                          if (!mounted) return;
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Đã lọc danh sách theo mã QR: $qrCode'),
+                                            ),
+                                          );
+                                        }
                                       }
                                     }
                                   },
@@ -240,6 +278,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                   ),
                                 ),
                               ],
+
                             ],
                           ),
                         ],
@@ -1620,15 +1659,28 @@ class _WarehousePageState extends State<WarehousePage> {
           ),
           TextButton(
             onPressed: () async {
-              await context.read<BackendDataProvider>().deleteBoard(board);
-              if (!context.mounted) return;
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Đã xóa bo mạch ${board.name}')),
-              );
+              try {
+                await context.read<BackendDataProvider>().deleteBoard(board);
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Đã xóa bo mạch ${board.name}')),
+                );
+              } catch (e) {
+                if (!context.mounted) return;
+                Navigator.pop(context);
+                final msg = e.toString().replaceAll('ApiException: ', '').replaceAll('Exception: ', '');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(msg),
+                    backgroundColor: AppColors.error,
+                  ),
+                );
+              }
             },
             child: const Text('Xóa', style: TextStyle(color: AppColors.error)),
           ),
+
         ],
       ),
     );

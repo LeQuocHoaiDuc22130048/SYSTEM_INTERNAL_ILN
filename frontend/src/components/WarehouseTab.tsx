@@ -5,12 +5,13 @@ import {
   Boxes,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
-import { exportBoardQrPdf, exportBoardQrPdfList } from '../utils/pdf';
+import { exportBoardQrPdfList, type BoardQrExportData, type QrPrintConfig } from '../utils/pdf';
 import type { Board, BoardHistoryItem, Part, WarehouseTabProps } from '../types/warehouse';
 import { BoardListPanel } from './warehouse/BoardListPanel';
 import { PartListPanel } from './warehouse/PartListPanel';
 import { BoardDetailPanel } from './warehouse/BoardDetailPanel';
 import { PartDetailPanel } from './warehouse/PartDetailPanel';
+import { QrPrintConfigModal } from './warehouse/QrPrintConfigModal';
 import './WarehouseTab.css';
 
 
@@ -83,6 +84,20 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [returnQuantity, setReturnQuantity] = useState<number>(1);
   const [returnReason, setReturnReason] = useState<string>('');
 
+  // QR Print Config Modal States
+  const [isQrConfigModalOpen, setIsQrConfigModalOpen] = useState<boolean>(false);
+  const [boardsForQrPrint, setBoardsForQrPrint] = useState<BoardQrExportData[]>([]);
+
+  const handleOpenSingleQrPrint = useCallback((board: Board) => {
+    setBoardsForQrPrint([board]);
+    setIsQrConfigModalOpen(true);
+  }, []);
+
+  const handleOpenListQrPrint = useCallback((boardList: Board[]) => {
+    setBoardsForQrPrint(boardList);
+    setIsQrConfigModalOpen(true);
+  }, []);
+
   // Fetch Boards
   const fetchBoards = useCallback(async () => {
     setLoading(true);
@@ -108,7 +123,12 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
             id: b.id?.toString() || '',
             name: b.name?.toString() || '',
             qrCode: b.qrCode?.toString() || '',
-            model: b.category?.toString() || b.model?.toString() || '',
+            model: b.model?.toString() || b.category?.toString() || '',
+            boardType: b.boardType?.toString() || '',
+            firmware: b.firmware?.toString() || '',
+            removedParts: b.removedParts?.toString() || '',
+            receivedDate: b.receivedDate?.toString() || '',
+            note: b.note?.toString() || '',
             location: b.currentLocationCode?.toString() || b.location?.toString() || '',
             status: b.status || 'AVAILABLE',
             checkedOutBy: checkout ? checkout.takenByName : undefined,
@@ -121,6 +141,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
             currentLocationId: b.currentLocationId,
             currentLocationCode: b.currentLocationCode,
             quantity: b.quantity || 1,
+
             activeCheckoutInfo: checkout ? {
               checkoutId: checkout.checkoutId || checkout.id,
               takenBy: checkout.takenBy,
@@ -331,7 +352,14 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
   // Filters
   const filteredBoards = boards.filter((board) => {
-    const term = searchTerm.toLowerCase();
+    let term = searchTerm.trim().toLowerCase();
+    
+    // Extract QR code if user pasted a formatted block like "MÃ QR: BM-2026-YAS-001"
+    const qrMatch = term.match(/mã qr:\s*([^\n\r]+)/i);
+    if (qrMatch && qrMatch[1]) {
+      term = qrMatch[1].trim().toLowerCase();
+    }
+
     const matchesSearch =
       board.name.toLowerCase().includes(term) ||
       board.qrCode.toLowerCase().includes(term) ||
@@ -744,7 +772,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
               openAddEditModal={openAddEditModal}
               getStatusLabel={getStatusLabel}
               getStatusColorClass={getStatusColorClass}
-              exportBoardQrPdfList={exportBoardQrPdfList}
+              exportBoardQrPdfList={handleOpenListQrPrint}
             />
           ) : (
             <PartListPanel
@@ -773,7 +801,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                 openCheckoutModal={openCheckoutModal}
                 openReturnModal={openReturnModal}
                 getQRCodeUrl={getQRCodeUrl}
-                exportBoardQrPdf={exportBoardQrPdf}
+                exportBoardQrPdf={handleOpenSingleQrPrint}
                 loadingHistory={loadingHistory}
                 boardHistory={boardHistory}
               />
@@ -1197,6 +1225,19 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           </div>
         </div>
       )}
+      {/* QR Print Config & Live Preview Modal */}
+      <QrPrintConfigModal
+        isOpen={isQrConfigModalOpen}
+        boards={boardsForQrPrint}
+        onClose={() => setIsQrConfigModalOpen(false)}
+        onConfirmPrint={(config: QrPrintConfig) => {
+          setIsQrConfigModalOpen(false);
+          const filename = boardsForQrPrint.length === 1
+            ? `Tem_QR_${boardsForQrPrint[0].qrCode || boardsForQrPrint[0].name}`
+            : 'Danh_sach_tem_QR_bo_mach';
+          exportBoardQrPdfList(boardsForQrPrint, filename, config);
+        }}
+      />
     </div>
   );
 };

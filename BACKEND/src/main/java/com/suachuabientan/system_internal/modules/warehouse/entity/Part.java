@@ -34,6 +34,28 @@ public class Part extends BaseEntity {
     @Builder.Default
     private BigDecimal minAmount = BigDecimal.ZERO;
 
+    @Column(name = "max_amount", precision = 18, scale = 4)
+    @Builder.Default
+    private BigDecimal maxAmount = BigDecimal.ZERO;
+
+    @Column(name = "purchase_price", precision = 15, scale = 2)
+    private BigDecimal purchasePrice;
+
+    @Column(name = "sale_price", precision = 15, scale = 2)
+    private BigDecimal salePrice;
+
+    @Column(columnDefinition = "JSONB")
+    private String parameters;
+
+    @Column(name = "datasheet_url", columnDefinition = "TEXT")
+    private String datasheetUrl;
+
+    @Column(name = "image_url", columnDefinition = "TEXT")
+    private String imageUrl;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
     @Column(name = "manufacturing_status", nullable = false, length = 30)
     @Builder.Default
     private String manufacturingStatus = "ACTIVE";
@@ -50,3 +72,4 @@ public class Part extends BaseEntity {
     @Column(name = "measurement_unit_id")
     private UUID measurementUnitId;
 }
+

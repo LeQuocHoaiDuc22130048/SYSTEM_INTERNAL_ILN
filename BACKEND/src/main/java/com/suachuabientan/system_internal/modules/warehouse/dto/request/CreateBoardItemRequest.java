@@ -18,6 +18,21 @@ public record CreateBoardItemRequest(
         @Size(max = 100)
         String serialNumber,
 
+        @Size(max = 100)
+        String model,
+
+        @Size(max = 100)
+        String boardType,
+
+        @Size(max = 50)
+        String firmware,
+
+        String removedParts,
+
+        java.time.LocalDate receivedDate,
+
+        String note,
+
         String partId,
 
         String currentLocationId,
@@ -25,3 +40,4 @@ public record CreateBoardItemRequest(
         Integer quantity
 ) {
 }
+

@@ -31,9 +31,13 @@ public interface BoardItemRepository extends JpaRepository<BoardItem, UUID> {
             WHERE b.is_deleted = false
               AND (
                   CAST(:keyword AS TEXT) IS NULL
-                  OR LOWER(b.name)     LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
-                  OR LOWER(b.category) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
-                  OR LOWER(b.location) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.name)          LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.category)      LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.location)      LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.qr_code)       LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.serial_number) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.model)         LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.board_type)    LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
               )
               AND (
                   CAST(:status AS TEXT) IS NULL
@@ -46,9 +50,13 @@ public interface BoardItemRepository extends JpaRepository<BoardItem, UUID> {
             WHERE b.is_deleted = false
               AND (
                   CAST(:keyword AS TEXT) IS NULL
-                  OR LOWER(b.name)     LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
-                  OR LOWER(b.category) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
-                  OR LOWER(b.location) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.name)          LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.category)      LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.location)      LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.qr_code)       LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.serial_number) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.model)         LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(b.board_type)    LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
               )
               AND (
                   CAST(:status AS TEXT) IS NULL
@@ -57,6 +65,7 @@ public interface BoardItemRepository extends JpaRepository<BoardItem, UUID> {
             """,
             nativeQuery = true)
     Page<BoardItem> searchBoards(
+
             @Param("keyword") String keyword,
             @Param("status") String status,
             Pageable pageable);

@@ -134,6 +134,12 @@ public class WarehouseController {
     }
 
     private UUID extractUserId(UserDetails userDetails) {
-        return ((CustomUserDetails) userDetails).getUserId();
+        if (userDetails instanceof CustomUserDetails customUserDetails) {
+            return customUserDetails.getUserId();
+        }
+        throw new com.suachuabientan.system_internal.common.exception.BusinessException(
+                "Người dùng chưa được xác thực hợp lệ", 401);
     }
+
+
 }

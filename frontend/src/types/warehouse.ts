@@ -15,6 +15,11 @@ export interface Board {
   name: string;
   qrCode: string;
   model: string;
+  boardType?: string;
+  firmware?: string;
+  removedParts?: string;
+  receivedDate?: string;
+  note?: string;
   location: string;
   status: string;
   checkedOutBy?: string;
@@ -50,6 +55,10 @@ export interface PartLot {
   storeLocationName: string;
   amount: number;
   lotCode: string;
+  origin?: string;
+  condition?: string;
+  expirationDate?: string;
+  receivedDate?: string;
 }
 
 export interface Part {
@@ -58,13 +67,24 @@ export interface Part {
   name: string;
   description?: string;
   minAmount: number;
+  maxAmount?: number;
+  purchasePrice?: number;
+  salePrice?: number;
+  parameters?: string;
+  datasheetUrl?: string;
+  imageUrl?: string;
+  note?: string;
   manufacturingStatus: string;
   categoryId?: string;
   categoryName?: string;
+  footprintId?: string;
+  manufacturerId?: string;
+  measurementUnitId?: string;
   totalQuantity: number;
   lots: PartLot[];
   createdAt?: string;
 }
+
 
 export interface WarehouseTabProps {
   showToast: (msg: string) => void;

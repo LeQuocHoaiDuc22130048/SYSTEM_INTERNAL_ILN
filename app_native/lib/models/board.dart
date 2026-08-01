@@ -13,6 +13,11 @@ class Board {
   final String name;
   final String qrCode;
   final String model;
+  final String? boardType;
+  final String? firmware;
+  final String? removedParts;
+  final DateTime? receivedDate;
+  final String? note;
   final String location;
   final BoardStatus status;
   final String? checkoutId;
@@ -35,6 +40,11 @@ class Board {
     required this.location,
     required this.status,
     required this.quantity,
+    this.boardType,
+    this.firmware,
+    this.removedParts,
+    this.receivedDate,
+    this.note,
     this.checkoutId,
     this.checkedOutBy,
     this.checkedOutAt,
@@ -57,7 +67,12 @@ class Board {
       id: json['id']?.toString() ?? '',
       name: json['name']?.toString() ?? '',
       qrCode: json['qrCode']?.toString() ?? '',
-      model: json['category']?.toString() ?? '',
+      model: json['model']?.toString() ?? json['category']?.toString() ?? '',
+      boardType: json['boardType']?.toString(),
+      firmware: json['firmware']?.toString(),
+      removedParts: json['removedParts']?.toString(),
+      receivedDate: _dateFromJson(json['receivedDate']),
+      note: json['note']?.toString(),
       location:
           json['currentLocationCode']?.toString() ??
           json['location']?.toString() ??
@@ -84,6 +99,7 @@ class Board {
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
     );
   }
+
 
   static BoardStatus _statusFromBackend(String? status) {
     switch (status) {

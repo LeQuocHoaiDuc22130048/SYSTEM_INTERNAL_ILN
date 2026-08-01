@@ -43,6 +43,24 @@ public class BoardItem extends BaseEntity {
     @Column(name = "serial_number", unique = true, length = 100)
     private String serialNumber;
 
+    @Column(length = 100)
+    private String model;
+
+    @Column(name = "board_type", length = 100)
+    private String boardType;
+
+    @Column(length = 50)
+    private String firmware;
+
+    @Column(name = "removed_parts", columnDefinition = "JSONB")
+    private String removedParts;
+
+    @Column(name = "received_date")
+    private java.time.LocalDate receivedDate;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
     @Column(name = "part_id")
     private UUID partId;
 
@@ -61,3 +79,4 @@ public class BoardItem extends BaseEntity {
         return BoardStatus.CHECKED_OUT.equals(this.status);
     }
 }
+

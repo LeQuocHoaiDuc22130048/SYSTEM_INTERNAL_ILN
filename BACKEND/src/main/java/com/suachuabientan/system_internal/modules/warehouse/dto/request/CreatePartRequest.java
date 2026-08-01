@@ -15,8 +15,31 @@ public record CreatePartRequest(
 
         BigDecimal minAmount,
 
+        BigDecimal maxAmount,
+
+        BigDecimal purchasePrice,
+
+        BigDecimal salePrice,
+
+        String manufacturingStatus,
+
+        String parameters,
+
+        String datasheetUrl,
+
+        String imageUrl,
+
+        String note,
+
         String categoryName,
 
-        UUID categoryId
+        UUID categoryId,
+
+        UUID footprintId,
+
+        UUID manufacturerId,
+
+        UUID measurementUnitId
 ) {
 }
+

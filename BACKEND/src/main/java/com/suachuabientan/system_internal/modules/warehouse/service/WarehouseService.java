@@ -68,6 +68,12 @@ public class WarehouseService {
                 .description(request.description())
                 .location(request.location())
                 .serialNumber(request.serialNumber())
+                .model(request.model())
+                .boardType(request.boardType())
+                .firmware(request.firmware())
+                .removedParts(request.removedParts())
+                .receivedDate(request.receivedDate())
+                .note(request.note())
                 .partId(resolvePartId(request.partId()))
                 .currentLocationId(resolveLocationId(request.currentLocationId(), request.location()))
                 .quantity(request.quantity() != null ? request.quantity() : 1)
@@ -106,6 +112,18 @@ public class WarehouseService {
             item.setLocation(request.location());
         if (request.serialNumber() != null)
             item.setSerialNumber(request.serialNumber());
+        if (request.model() != null)
+            item.setModel(request.model());
+        if (request.boardType() != null)
+            item.setBoardType(request.boardType());
+        if (request.firmware() != null)
+            item.setFirmware(request.firmware());
+        if (request.removedParts() != null)
+            item.setRemovedParts(request.removedParts());
+        if (request.receivedDate() != null)
+            item.setReceivedDate(request.receivedDate());
+        if (request.note() != null)
+            item.setNote(request.note());
         if (request.partId() != null)
             item.setPartId(resolvePartId(request.partId()));
         if (request.currentLocationId() != null || request.location() != null) {
@@ -174,6 +192,12 @@ public class WarehouseService {
                 item.getCategory(),
                 item.getLocation(),
                 item.getSerialNumber(),
+                item.getModel(),
+                item.getBoardType(),
+                item.getFirmware(),
+                item.getRemovedParts(),
+                item.getReceivedDate(),
+                item.getNote(),
                 item.getPartId(),
                 partIpn(item.getPartId()),
                 item.getCurrentLocationId(),
@@ -182,6 +206,7 @@ public class WarehouseService {
                 item.getQuantity(),
                 holderInfo);
     }
+
 
     // Checkout lấy bo mạch
 
@@ -446,6 +471,12 @@ public class WarehouseService {
                 item.getStatus().name(),
                 item.getLocation(),
                 item.getSerialNumber(),
+                item.getModel(),
+                item.getBoardType(),
+                item.getFirmware(),
+                item.getRemovedParts(),
+                item.getReceivedDate(),
+                item.getNote(),
                 item.getPartId(),
                 partIpn(item.getPartId()),
                 item.getCurrentLocationId(),
@@ -454,6 +485,7 @@ public class WarehouseService {
                 item.getQuantity(),
                 activeCheckout);
     }
+
 
     private UUID resolvePartId(String partIdStr) {
         if (!StringUtils.hasText(partIdStr)) return null;

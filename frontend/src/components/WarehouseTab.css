@@ -481,6 +481,16 @@
   background: var(--color-primary-light);
 }
 
+.btn-export-qr-pdf.copied-success {
+  background: #16a34a !important;
+}
+
+.btn-export-qr-pdf-outline.copied-success {
+  background: #dcfce7 !important;
+  color: #15803d !important;
+  border-color: #86efac !important;
+}
+
 /* QR Code Section */
 .align-center {
   align-items: center;

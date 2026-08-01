@@ -74,8 +74,18 @@ public class PartService {
                 .name(request.name().trim())
                 .description(request.description())
                 .minAmount(request.minAmount() != null ? request.minAmount() : BigDecimal.ZERO)
-                .manufacturingStatus("ACTIVE")
+                .maxAmount(request.maxAmount() != null ? request.maxAmount() : BigDecimal.ZERO)
+                .purchasePrice(request.purchasePrice())
+                .salePrice(request.salePrice())
+                .manufacturingStatus(request.manufacturingStatus() != null ? request.manufacturingStatus() : "ACTIVE")
+                .parameters(request.parameters())
+                .datasheetUrl(request.datasheetUrl())
+                .imageUrl(request.imageUrl())
+                .note(request.note())
                 .categoryId(categoryId)
+                .footprintId(request.footprintId())
+                .manufacturerId(request.manufacturerId())
+                .measurementUnitId(request.measurementUnitId())
                 .build();
 
         part.setCreatedBy(createdByUserId);
@@ -108,6 +118,39 @@ public class PartService {
         }
         if (request.minAmount() != null) {
             part.setMinAmount(request.minAmount());
+        }
+        if (request.maxAmount() != null) {
+            part.setMaxAmount(request.maxAmount());
+        }
+        if (request.purchasePrice() != null) {
+            part.setPurchasePrice(request.purchasePrice());
+        }
+        if (request.salePrice() != null) {
+            part.setSalePrice(request.salePrice());
+        }
+        if (request.manufacturingStatus() != null) {
+            part.setManufacturingStatus(request.manufacturingStatus());
+        }
+        if (request.parameters() != null) {
+            part.setParameters(request.parameters());
+        }
+        if (request.datasheetUrl() != null) {
+            part.setDatasheetUrl(request.datasheetUrl());
+        }
+        if (request.imageUrl() != null) {
+            part.setImageUrl(request.imageUrl());
+        }
+        if (request.note() != null) {
+            part.setNote(request.note());
+        }
+        if (request.footprintId() != null) {
+            part.setFootprintId(request.footprintId());
+        }
+        if (request.manufacturerId() != null) {
+            part.setManufacturerId(request.manufacturerId());
+        }
+        if (request.measurementUnitId() != null) {
+            part.setMeasurementUnitId(request.measurementUnitId());
         }
 
         if (request.categoryId() != null) {
@@ -244,14 +287,25 @@ public class PartService {
                 part.getName(),
                 part.getDescription(),
                 part.getMinAmount(),
+                part.getMaxAmount(),
+                part.getPurchasePrice(),
+                part.getSalePrice(),
+                part.getParameters(),
+                part.getDatasheetUrl(),
+                part.getImageUrl(),
+                part.getNote(),
                 part.getManufacturingStatus(),
                 part.getCategoryId(),
                 getCategoryName(part.getCategoryId()),
+                part.getFootprintId(),
+                part.getManufacturerId(),
+                part.getMeasurementUnitId(),
                 totalQuantity,
                 lotResponses,
                 part.getCreatedAt()
         );
     }
+
 
     private PartLotResponse toLotResponse(PartLot lot) {
         StoreLocation loc = lot.getStoreLocationId() != null

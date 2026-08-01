@@ -39,4 +39,8 @@ public class StoreLocation extends BaseEntity {
     @Column(name = "only_single_part", nullable = false)
     @Builder.Default
     private Boolean onlySinglePart = false;
+
+    @Column(name = "qr_code", columnDefinition = "TEXT")
+    private String qrCode;
 }
+

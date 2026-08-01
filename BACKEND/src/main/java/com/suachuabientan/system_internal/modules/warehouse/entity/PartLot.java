@@ -43,6 +43,16 @@ public class PartLot extends BaseEntity {
     @Builder.Default
     private Boolean needsRefill = false;
 
+    @Column(length = 50)
+    private String origin;
+
+    @Column(length = 50)
+    private String condition;
+
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
+
+    @Column(name = "received_date")
+    private LocalDate receivedDate;
 }
+
