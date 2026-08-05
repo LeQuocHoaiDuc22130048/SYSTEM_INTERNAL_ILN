@@ -189,4 +189,13 @@ public class AppUpdateService {
             log.error("Lỗi khi gửi thông báo phát hành hàng loạt: {}", e.getMessage(), e);
         }
     }
+
+    @Transactional
+    public void deleteUpdate(UUID id) {
+        AppUpdate appUpdate = appUpdateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy bản cập nhật: " + id));
+        appUpdate.setIsDeleted(true);
+        appUpdateRepository.save(appUpdate);
+        log.info("Đã xóa bản cập nhật v{} (ID: {})", appUpdate.getVersion(), id);
+    }
 }

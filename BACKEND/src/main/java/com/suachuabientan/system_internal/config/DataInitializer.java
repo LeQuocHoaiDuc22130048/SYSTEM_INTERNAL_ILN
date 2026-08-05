@@ -18,30 +18,29 @@ import org.springframework.util.StringUtils;
 @Component
 @RequiredArgsConstructor
 public class DataInitializer implements ApplicationRunner {
-    private final UserRepository  userRepository;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RbacService rbacService;
 
-    @Value("${app.init.super-admin.username}")
+    @Value("${app.init.super-admin.username:superadmin}")
     private String superAdminUsername;
 
-    @Value("${app.init.super-admin.password}")
+    @Value("${app.init.super-admin.password:Admin@123456}")
     private String superAdminPassword;
 
-    @Value("${app.init.super-admin.full-name}")
+    @Value("${app.init.super-admin.full-name:Super Admin}")
     private String superAdminFullName;
 
     // ── ADMIN (tuỳ chọn) ───────────────────────────────────────────
 
-    @Value("${app.init.admin.username}")
+    @Value("${app.init.admin.username:admin}")
     private String adminUsername;
 
-    @Value("${app.init.admin.password}")
+    @Value("${app.init.admin.password:Admin@123456}")
     private String adminPassword;
 
-    @Value("${app.init.admin.full-name}")
+    @Value("${app.init.admin.full-name:Admin}")
     private String adminFullName;
-
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
@@ -84,12 +83,10 @@ public class DataInitializer implements ApplicationRunner {
 
         UserEntity saved = userRepository.saveAndFlush(admin);
         rbacService.ensurePrimaryRoleAssigned(saved.getId(), saved.getRole());
-        log.info("✓ Đã tạo tài khoản ADMIN: username='{}'",
-                adminUsername);
+        log.info("✓ Đã tạo tài khoản ADMIN: username='{}'", adminUsername);
     }
 
     private void initSuperAdmin() {
-        // Dọn dẹp tài khoản lỗi có username trống
         userRepository.findByUsernameAndIsDeletedFalse("").ifPresent(user -> {
             user.softDelete(null);
             userRepository.save(user);
@@ -113,7 +110,6 @@ public class DataInitializer implements ApplicationRunner {
             return;
         }
 
-        // Cảnh báo nếu đang dùng mật khẩu mặc định
         warnIfDefaultPassword(superAdminPassword, "SUPER_ADMIN", "SUPER_ADMIN_PASSWORD");
 
         UserEntity superAdmin = UserEntity.builder()
@@ -127,10 +123,8 @@ public class DataInitializer implements ApplicationRunner {
 
         UserEntity saved = userRepository.saveAndFlush(superAdmin);
         rbacService.ensurePrimaryRoleAssigned(saved.getId(), saved.getRole());
-        log.info("✓ Đã tạo tài khoản SUPER_ADMIN: username='{}'",
-                superAdminUsername);
+        log.info("✓ Đã tạo tài khoản SUPER_ADMIN: username='{}'", superAdminUsername);
     }
-
 
     private void warnIfDefaultPassword(String password, String role, String envVarName) {
         if ("Admin@123456".equals(password) || "admin123".equals(password)) {

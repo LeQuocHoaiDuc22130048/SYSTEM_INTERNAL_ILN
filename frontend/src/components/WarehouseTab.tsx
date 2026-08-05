@@ -643,12 +643,17 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
   // Filtered Parts
   const filteredParts = parts.filter((part) => {
-    const term = partSearchTerm.toLowerCase();
+    const term = partSearchTerm.toLowerCase().trim();
+    if (!term) return true;
     return (
       part.name.toLowerCase().includes(term) ||
       part.ipn.toLowerCase().includes(term) ||
       (part.categoryName && part.categoryName.toLowerCase().includes(term)) ||
-      (part.description && part.description.toLowerCase().includes(term))
+      (part.description && part.description.toLowerCase().includes(term)) ||
+      (part.lots && part.lots.some(l =>
+        (l.storeLocationCode && l.storeLocationCode.toLowerCase().includes(term)) ||
+        (l.storeLocationName && l.storeLocationName.toLowerCase().includes(term))
+      ))
     );
   });
 

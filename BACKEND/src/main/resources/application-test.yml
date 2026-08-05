@@ -1,0 +1,65 @@
+server:
+  ssl:
+    enabled: ${SERVER_SSL_ENABLED:false}
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5433/system_internal_test_db}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:admin}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6380}
+      password: ${REDIS_PASSWORD:}
+
+app:
+  face-recognition:
+    base-url: ${FACE_RECOGNITION_BASE_URL:http://127.0.0.1:5001}
+    health-path: ${FACE_RECOGNITION_HEALTH_PATH:/health}
+    skip-duplicate-check: ${FACE_RECOGNITION_SKIP_DUPLICATE_CHECK:true}
+  init:
+    super-admin:
+      username: ${SUPER_ADMIN_USERNAME:superadmin}
+      password: ${SUPER_ADMIN_PASSWORD:Admin@123456}
+      full-name: ${SUPER_ADMIN_FULL_NAME:Super Admin}
+    admin:
+      username: ${ADMIN_USERNAME:admin}
+      password: ${ADMIN_PASSWORD:Admin@123456}
+      full-name: ${ADMIN_FULL_NAME:Admin}
+  cors:
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:*}
+  security:
+    require-https: ${APP_REQUIRE_HTTPS:false}
+    http-redirect:
+      enabled: ${APP_HTTP_REDIRECT_ENABLED:false}
+  attendance:
+    face:
+      match-threshold: ${ATTENDANCE_FACE_MATCH_THRESHOLD:${ATTENDANCE_ARCFACE_MATCH_THRESHOLD:0.57}}
+      ambiguous-margin: ${ATTENDANCE_FACE_AMBIGUOUS_MARGIN:0.03}
+      calibration:
+        far: ${ATTENDANCE_FACE_CALIBRATION_FAR:${ATTENDANCE_ARCFACE_CALIBRATION_FAR:0.0}}
+        frr: ${ATTENDANCE_FACE_CALIBRATION_FRR:${ATTENDANCE_ARCFACE_CALIBRATION_FRR:0.02}}
+        dataset-version: ${ATTENDANCE_FACE_CALIBRATION_DATASET_VERSION:${ATTENDANCE_ARCFACE_CALIBRATION_DATASET_VERSION:test-placeholder}}
+        calibrated-at: ${ATTENDANCE_FACE_CALIBRATED_AT:${ATTENDANCE_ARCFACE_CALIBRATED_AT:2026-05-30T00:00:00Z}}
+        report-path: ${ATTENDANCE_FACE_CALIBRATION_REPORT_PATH:${ATTENDANCE_ARCFACE_CALIBRATION_REPORT_PATH:test-placeholder}}
+    ai-smoke-test:
+      enabled: ${ATTENDANCE_AI_SMOKE_TEST_ENABLED:false}
+      fail-fast: ${ATTENDANCE_AI_SMOKE_TEST_FAIL_FAST:false}
+
+application:
+  security:
+    jwt:
+      secret-key: ${JWT_SECRET_KEY:test-only-jwt-secret-key-change-me-32bytes-minimum}
+      expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:86400000}
+      refresh-token:
+        expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:3153600000000}

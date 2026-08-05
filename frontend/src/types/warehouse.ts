@@ -54,7 +54,7 @@ export interface PartLot {
   storeLocationCode: string;
   storeLocationName: string;
   amount: number;
-  lotCode: string;
+  lotCode?: string;
   origin?: string;
   condition?: string;
   expirationDate?: string;
@@ -74,7 +74,7 @@ export interface Part {
   datasheetUrl?: string;
   imageUrl?: string;
   note?: string;
-  manufacturingStatus: string;
+  manufacturingStatus?: string;
   categoryId?: string;
   categoryName?: string;
   footprintId?: string;

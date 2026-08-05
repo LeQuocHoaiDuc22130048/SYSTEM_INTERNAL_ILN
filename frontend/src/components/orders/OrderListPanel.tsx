@@ -53,7 +53,7 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
           <Search size={18} className="search-icon" />
           <input
             type="text"
-            placeholder="Tìm theo mã đơn, thiết bị, tên hoặc SĐT khách hàng..."
+            placeholder="Tìm theo mã đơn, số seri, thiết bị, tên hoặc SĐT khách..."
             value={searchTerm}
             onChange={(e) => {
               setSearchTerm(e.target.value);

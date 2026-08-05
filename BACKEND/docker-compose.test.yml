@@ -1,0 +1,101 @@
+name: si_test
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: dockerfile
+    container_name: SI_test_backend
+    env_file:
+      - .env.test
+    environment:
+      SPRING_PROFILES_ACTIVE: test
+      SERVER_ADDRESS: 0.0.0.0
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME:-system_internal_test_db}
+      DB_USERNAME: ${DB_USERNAME:-admin}
+      DB_PASSWORD: ${DB_PASSWORD:-admin}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MINIO_ENDPOINT: http://minio:9000
+      FACE_RECOGNITION_BASE_URL: http://face-ai:5000
+    ports:
+      - "${TEST_BACKEND_PORT:-8081}:8080"
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
+      - ./releases:/app/releases
+    depends_on:
+      - postgres
+      - redis
+      - minio
+      - face-ai
+    restart: unless-stopped
+
+  postgres:
+    image: pgvector/pgvector:pg15
+    container_name: SI_test_postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-system_internal_test_db}
+      POSTGRES_USER: ${DB_USERNAME:-admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-admin}
+    ports:
+      - "${TEST_DB_PORT:-5433}:5432"
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: SI_test_redis
+    ports:
+      - "${TEST_REDIS_PORT:-6380}:6379"
+    volumes:
+      - test_redis_data:/data
+    restart: unless-stopped
+
+  minio:
+    image: quay.io/minio/minio:latest
+    container_name: SI_test_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-minioadmin}
+    ports:
+      - "${TEST_MINIO_PORT:-9002}:9000"
+      - "${TEST_MINIO_CONSOLE_PORT:-9003}:9001"
+    volumes:
+      - test_minio_data:/data
+    command: server /data --address ":9000" --console-address ":9001"
+    restart: unless-stopped
+
+  face-ai:
+    build:
+      context: ./face_ai_service
+      dockerfile: Dockerfile
+    container_name: SI_test_face_ai
+    environment:
+      FACE_AI_HOST: 0.0.0.0
+      FACE_AI_PORT: 5000
+      FACE_AI_MODEL_ROOT: /models
+      FACE_AI_MODEL_NAME: buffalo_l
+      FACE_AI_MATCH_THRESHOLD: ${ATTENDANCE_FACE_MATCH_THRESHOLD:-0.57}
+    ports:
+      - "${TEST_FACE_AI_PORT:-5001}:5000"
+    volumes:
+      - test_face_ai_models:/models
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: SI_test_frontend
+    ports:
+      - "${TEST_FRONTEND_PORT:-5174}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  test_postgres_data:
+  test_redis_data:
+  test_minio_data:
+  test_face_ai_models:

@@ -40,15 +40,20 @@ class AppUpdateInfo {
 class UpdateProvider with ChangeNotifier {
   final ApiClient api;
 
-  UpdateProvider({required this.api});
+  UpdateProvider({required this.api}) {
+    _loadCurrentVersion();
+  }
 
   String _currentVersion = '';
   String get currentVersion => _currentVersion;
 
   Future<void> _loadCurrentVersion() async {
     if (_currentVersion.isNotEmpty) return;
-    final info = await PackageInfo.fromPlatform();
-    _currentVersion = info.version;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _currentVersion = info.version;
+      notifyListeners();
+    } catch (_) {}
   }
 
   bool _isChecking = false;

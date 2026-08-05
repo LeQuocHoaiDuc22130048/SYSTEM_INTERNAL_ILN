@@ -1,6 +1,6 @@
-import React from 'react';
-import { Search, Plus, Boxes, Layers, CheckCircle, History, Tag, MapPin } from 'lucide-react';
-import type { Part } from '../../types/warehouse';
+import React, { useState } from 'react';
+import { Search, Plus, Boxes, Layers, CheckCircle, History, Tag, MapPin, QrCode } from 'lucide-react';
+import type { Part, PartLot } from '../../types/warehouse';
 
 interface PartListPanelProps {
   parts: Part[];
@@ -13,6 +13,18 @@ interface PartListPanelProps {
   openAddEditPartModal: (part: Part | null) => void;
 }
 
+interface LocationGroupItem {
+  part: Part;
+  lot: PartLot;
+}
+
+interface LocationGroup {
+  locationCode: string;
+  locationName: string;
+  items: LocationGroupItem[];
+  totalQty: number;
+}
+
 export const PartListPanel: React.FC<PartListPanelProps> = ({
   parts,
   loadingParts,
@@ -23,6 +35,65 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
   setSelectedPart,
   openAddEditPartModal,
 }) => {
+  const [partSearchMethod, setPartSearchMethod] = useState<'general' | 'locationQr'>('general');
+
+  // Compute location-grouped parts
+  const locationGroups = React.useMemo(() => {
+    const groupMap: Record<string, LocationGroup> = {};
+    const term = partSearchTerm.trim().toLowerCase();
+
+    filteredParts.forEach(part => {
+      if (!part.lots || part.lots.length === 0) {
+        const key = 'UNASSIGNED';
+        if (!groupMap[key]) {
+          groupMap[key] = {
+            locationCode: 'N/A',
+            locationName: 'Chưa xếp vị trí',
+            items: [],
+            totalQty: 0,
+          };
+        }
+        groupMap[key].items.push({
+          part,
+          lot: {
+            id: '',
+            storeLocationId: '',
+            storeLocationCode: 'N/A',
+            storeLocationName: 'Chưa xếp vị trí',
+            amount: part.totalQuantity,
+            lotCode: 'N/A',
+          },
+        });
+        groupMap[key].totalQty += part.totalQuantity;
+      } else {
+        part.lots.forEach(lot => {
+          const locCode = lot.storeLocationCode || 'N/A';
+          const locName = lot.storeLocationName || locCode;
+
+          if (term && partSearchMethod === 'locationQr') {
+            const matchesLoc = locCode.toLowerCase().includes(term) || locName.toLowerCase().includes(term);
+            const matchesPart = part.name.toLowerCase().includes(term) || part.ipn.toLowerCase().includes(term);
+            if (!matchesLoc && !matchesPart) return;
+          }
+
+          const key = lot.storeLocationId || locCode;
+          if (!groupMap[key]) {
+            groupMap[key] = {
+              locationCode: locCode,
+              locationName: locName,
+              items: [],
+              totalQty: 0,
+            };
+          }
+          groupMap[key].items.push({ part, lot });
+          groupMap[key].totalQty += lot.amount;
+        });
+      }
+    });
+
+    return Object.values(groupMap);
+  }, [filteredParts, partSearchTerm, partSearchMethod]);
+
   return (
     <>
       {/* Stats Bar for Parts */}
@@ -64,30 +135,134 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
       </div>
 
       {/* Search & Actions Bar for Parts */}
-      <div className="warehouse-control-bar">
-        <div className="search-input-wrapper flex-1">
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên, IPN, danh mục linh kiện..."
-            value={partSearchTerm}
-            onChange={(e) => setPartSearchTerm(e.target.value)}
-            className="w-search-input"
-          />
+      <div className="warehouse-control-bar" style={{ flexDirection: 'column', alignItems: 'stretch', gap: '10px' }}>
+        <div className="flex-row gap-2" style={{ display: 'flex', gap: '10px', width: '100%' }}>
+          <div className="search-input-wrapper flex-1">
+            {partSearchMethod === 'locationQr' ? (
+              <QrCode size={18} className="search-icon text-primary" />
+            ) : (
+              <Search size={18} className="search-icon" />
+            )}
+            <input
+              type="text"
+              placeholder={
+                partSearchMethod === 'locationQr'
+                  ? 'Nhập hoặc quét mã QR vị trí (VD: LOC-A1, Kệ A1)...'
+                  : 'Tìm theo tên, IPN, danh mục linh kiện...'
+              }
+              value={partSearchTerm}
+              onChange={(e) => setPartSearchTerm(e.target.value)}
+              className="w-search-input"
+            />
+          </div>
+
+          <div className="filters-actions-wrapper">
+            <button className="btn-add-board" onClick={() => openAddEditPartModal(null)}>
+              <Plus size={16} />
+              <span>Thêm linh kiện</span>
+            </button>
+          </div>
         </div>
 
-        <div className="filters-actions-wrapper">
-          <button className="btn-add-board" onClick={() => openAddEditPartModal(null)}>
-            <Plus size={16} />
-            <span>Thêm linh kiện</span>
+        {/* Search Method Toggle */}
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.85rem' }}>
+          <span style={{ color: 'var(--color-text-secondary)', fontWeight: 500 }}>Phương thức tìm:</span>
+          <button
+            type="button"
+            className={`warehouse-mode-btn ${partSearchMethod === 'general' ? 'active' : ''}`}
+            onClick={() => setPartSearchMethod('general')}
+            style={{ padding: '4px 12px', fontSize: '0.8rem', borderRadius: '14px' }}
+          >
+            🔍 Tên / IPN
           </button>
+          <button
+            type="button"
+            className={`warehouse-mode-btn ${partSearchMethod === 'locationQr' ? 'active' : ''}`}
+            onClick={() => setPartSearchMethod('locationQr')}
+            style={{ padding: '4px 12px', fontSize: '0.8rem', borderRadius: '14px' }}
+          >
+            📍 Vị trí / QR Code
+          </button>
+          {partSearchMethod === 'locationQr' && partSearchTerm && (
+            <span style={{ fontSize: '0.75rem', color: '#2563eb', backgroundColor: '#dbeafe', padding: '2px 8px', borderRadius: '10px' }}>
+              Đang lọc vị trí: "{partSearchTerm}"
+            </span>
+          )}
         </div>
       </div>
 
-      {/* Parts Grid Display */}
+      {/* Parts Grid or Location Group Display */}
       <div className="boards-grid-wrapper">
         {loadingParts ? (
           <div className="list-status-msg">Đang tải danh sách linh kiện...</div>
+        ) : partSearchMethod === 'locationQr' ? (
+          locationGroups.length === 0 ? (
+            <div className="list-status-msg">Không tìm thấy linh kiện ở vị trí này.</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {locationGroups.map(group => (
+                <div
+                  key={group.locationCode}
+                  style={{
+                    backgroundColor: 'var(--color-bg-surface, #ffffff)',
+                    border: '1px solid var(--color-border, #e2e8f0)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      backgroundColor: 'rgba(37, 99, 235, 0.08)',
+                      padding: '10px 16px',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      borderBottom: '1px solid var(--color-border, #e2e8f0)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 600, color: '#2563eb' }}>
+                      <MapPin size={18} />
+                      <span>{group.locationName} ({group.locationCode})</span>
+                    </div>
+                    <span style={{ fontSize: '0.8rem', backgroundColor: '#2563eb', color: '#ffffff', padding: '2px 10px', borderRadius: '12px', fontWeight: 500 }}>
+                      {group.items.length} loại · Tổng SL: {group.totalQty}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column' }}>
+                    {group.items.map(({ part, lot }, idx) => (
+                      <div
+                        key={`${part.id}-${idx}`}
+                        onClick={() => setSelectedPart(part)}
+                        style={{
+                          padding: '12px 16px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          borderBottom: idx < group.items.length - 1 ? '1px solid var(--color-border, #e2e8f0)' : 'none',
+                          cursor: 'pointer',
+                          backgroundColor: selectedPart?.id === part.id ? 'rgba(37, 99, 235, 0.05)' : 'transparent',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem' }}>{part.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--color-text-secondary)', display: 'flex', gap: '12px', marginTop: '2px' }}>
+                            <span>IPN: {part.ipn}</span>
+                            <span>Danh mục: {part.categoryName || 'Chưa rõ'}</span>
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 600, color: '#2563eb', backgroundColor: '#f1f5f9', padding: '4px 10px', borderRadius: '6px' }}>
+                            Tại vị trí: {lot.amount}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : filteredParts.length === 0 ? (
           <div className="list-status-msg">Không tìm thấy linh kiện nào trong kho.</div>
         ) : (
@@ -141,3 +316,4 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
     </>
   );
 };
+

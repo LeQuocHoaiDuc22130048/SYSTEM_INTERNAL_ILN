@@ -39,6 +39,7 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
     @Query(value = """
             SELECT DISTINCT r.* FROM repair_orders r
             LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
+            LEFT JOIN repair_devices rd ON rd.order_id = r.id
             WHERE r.is_deleted = false
               AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
               AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid) OR r.assigned_to = CAST(:assignedTo AS uuid))
@@ -50,12 +51,14 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
                   OR LOWER(r.customer_phone) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                   OR LOWER(r.order_code)     LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                   OR LOWER(r.serial_number)  LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                  OR LOWER(rd.serial_number) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
               )
             ORDER BY r.priority ASC, r.received_at DESC
             """,
             countQuery = """
                     SELECT COUNT(DISTINCT r.id) FROM repair_orders r
                     LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
+                    LEFT JOIN repair_devices rd ON rd.order_id = r.id
                     WHERE r.is_deleted = false
                       AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
                       AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid) OR r.assigned_to = CAST(:assignedTo AS uuid))
@@ -67,6 +70,7 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
                           OR LOWER(r.customer_phone) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                           OR LOWER(r.order_code)     LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                           OR LOWER(r.serial_number)  LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
+                          OR LOWER(rd.serial_number) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                       )
                     """,
             nativeQuery = true)

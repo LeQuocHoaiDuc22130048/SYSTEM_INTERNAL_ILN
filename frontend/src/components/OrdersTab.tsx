@@ -175,7 +175,9 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
       order.orderCode.toLowerCase().includes(term) ||
       order.deviceName.toLowerCase().includes(term) ||
       order.customerName.toLowerCase().includes(term) ||
-      (order.customerPhone && order.customerPhone.includes(term));
+      (order.customerPhone && order.customerPhone.includes(term)) ||
+      (order.serialNumber && order.serialNumber.toLowerCase().includes(term)) ||
+      order.devices.some((d) => d.serialNumber && d.serialNumber.toLowerCase().includes(term));
 
     const matchesStatus = statusFilter === 'ALL' || order.status === statusFilter;
 

@@ -17,6 +17,27 @@ import '../utils/qr_share_helper.dart';
 
 enum WarehouseMode { boards, parts }
 enum PartFilterStatus { all, lowStock, outOfStock }
+enum PartSearchMethod { general, locationQr }
+
+class LocationGroupItem {
+  final Part part;
+  final PartLot lot;
+  LocationGroupItem({required this.part, required this.lot});
+}
+
+class LocationGroup {
+  final String locationCode;
+  final String locationName;
+  final List<LocationGroupItem> items;
+
+  LocationGroup({
+    required this.locationCode,
+    required this.locationName,
+    required this.items,
+  });
+
+  double get totalQuantity => items.fold(0.0, (sum, i) => sum + i.lot.amount);
+}
 
 class WarehousePage extends StatefulWidget {
   const WarehousePage({super.key});
@@ -31,6 +52,7 @@ class _WarehousePageState extends State<WarehousePage> {
   final ValueNotifier<PartFilterStatus> _partFilter = ValueNotifier(PartFilterStatus.all);
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
   WarehouseMode _currentMode = WarehouseMode.boards;
+  PartSearchMethod _partSearchMethod = PartSearchMethod.general;
 
   @override
   void initState() {
@@ -71,7 +93,7 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   List<Part> get _filteredParts {
-    final query = _searchQuery.value.toLowerCase();
+    final query = _searchQuery.value.toLowerCase().trim();
     final currentFilter = _partFilter.value;
     final parts = context.read<BackendDataProvider>().parts;
     return parts.where((part) {
@@ -82,9 +104,64 @@ class _WarehousePageState extends State<WarehousePage> {
           part.name.toLowerCase().contains(query) ||
           part.ipn.toLowerCase().contains(query) ||
           (part.categoryName?.toLowerCase().contains(query) ?? false) ||
-          (part.description?.toLowerCase().contains(query) ?? false);
+          (part.description?.toLowerCase().contains(query) ?? false) ||
+          part.lots.any((lot) =>
+              lot.storeLocationCode.toLowerCase().contains(query) ||
+              lot.storeLocationName.toLowerCase().contains(query));
       return matchesFilter && matchesSearch;
     }).toList();
+  }
+
+  List<LocationGroup> get _filteredLocationGroups {
+    final filtered = _filteredParts;
+    final query = _searchQuery.value.toLowerCase().trim();
+    final Map<String, LocationGroup> groupMap = {};
+
+    for (final part in filtered) {
+      if (part.lots.isEmpty) {
+        final key = 'UNASSIGNED';
+        if (!groupMap.containsKey(key)) {
+          groupMap[key] = LocationGroup(
+            locationCode: 'N/A',
+            locationName: 'Chưa xếp vị trí',
+            items: [],
+          );
+        }
+        groupMap[key]!.items.add(LocationGroupItem(
+          part: part,
+          lot: PartLot(
+            id: '',
+            storeLocationId: '',
+            storeLocationCode: 'N/A',
+            storeLocationName: 'Chưa xếp vị trí',
+            amount: part.totalQuantity,
+          ),
+        ));
+      } else {
+        for (final lot in part.lots) {
+          final locCode = lot.storeLocationCode.isNotEmpty ? lot.storeLocationCode : 'N/A';
+          final locName = lot.storeLocationName.isNotEmpty ? lot.storeLocationName : locCode;
+
+          if (query.isNotEmpty && _partSearchMethod == PartSearchMethod.locationQr) {
+            final matchesLoc = locCode.toLowerCase().contains(query) || locName.toLowerCase().contains(query);
+            final matchesPart = part.name.toLowerCase().contains(query) || part.ipn.toLowerCase().contains(query);
+            if (!matchesLoc && !matchesPart) continue;
+          }
+
+          final key = lot.storeLocationId.isNotEmpty ? lot.storeLocationId : locCode;
+          if (!groupMap.containsKey(key)) {
+            groupMap[key] = LocationGroup(
+              locationCode: locCode,
+              locationName: locName,
+              items: [],
+            );
+          }
+          groupMap[key]!.items.add(LocationGroupItem(part: part, lot: lot));
+        }
+      }
+    }
+
+    return groupMap.values.toList();
   }
 
   String _qrCodeLabel(Board board) {
@@ -190,94 +267,107 @@ class _WarehousePageState extends State<WarehousePage> {
                                   ),
                                 ),
                               ),
-                              if (_currentMode == WarehouseMode.boards) ...[
-                                const SizedBox(width: 8),
-                                ElevatedButton.icon(
-                                  onPressed: () async {
-                                    final result = await Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (context) => const ScannerPage(),
-                                      ),
-                                    );
-                                    if (result != null && mounted) {
-                                      String qrCode = (result as String).trim();
+                              const SizedBox(width: 8),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ScannerPage(),
+                                    ),
+                                  );
+                                  if (result != null && mounted) {
+                                    String qrCode = (result as String).trim();
 
-                                      // Extract QR code from formatted label block (e.g., "MÃ QR: BM-2026-YAS-001")
-                                      final match = RegExp(r'mã qr:\s*([^\n\r]+)', caseSensitive: false)
-                                          .firstMatch(qrCode);
-                                      if (match != null && match.group(1) != null) {
-                                        qrCode = match.group(1)!.trim();
+                                    // Extract QR code from formatted label block (e.g., "MÃ QR: BM-2026-YAS-001")
+                                    final match = RegExp(r'mã qr:\s*([^\n\r]+)', caseSensitive: false)
+                                        .firstMatch(qrCode);
+                                    if (match != null && match.group(1) != null) {
+                                      qrCode = match.group(1)!.trim();
+                                    }
+
+                                    // Update search query to display matching list
+                                    _searchQuery.value = qrCode;
+                                    _searchController.text = qrCode;
+
+                                    if (!mounted) return;
+                                    final messenger = ScaffoldMessenger.of(context);
+                                    if (_currentMode == WarehouseMode.parts) {
+                                      setState(() {
+                                        _partSearchMethod = PartSearchMethod.locationQr;
+                                      });
+                                      messenger.showSnackBar(
+                                        SnackBar(
+                                          content: Text('Đã lọc danh sách linh kiện theo vị trí / mã QR: $qrCode'),
+                                          backgroundColor: AppColors.primary,
+                                        ),
+                                      );
+                                      return;
+                                    }
+
+                                    final backend = context.read<BackendDataProvider>();
+                                    Board? matchedBoard;
+                                    for (final b in backend.boards) {
+                                      if (b.qrCode.toLowerCase() == qrCode.toLowerCase() ||
+                                          (b.serialNumber != null &&
+                                              b.serialNumber!.toLowerCase() == qrCode.toLowerCase())) {
+                                        matchedBoard = b;
+                                        break;
                                       }
+                                    }
 
-                                      // Update search query to display matching list
-                                      _searchQuery.value = qrCode;
-                                      _searchController.text = qrCode;
-
-                                      final backend = context.read<BackendDataProvider>();
-                                      Board? matchedBoard;
-                                      for (final b in backend.boards) {
-                                        if (b.qrCode.toLowerCase() == qrCode.toLowerCase() ||
-                                            (b.serialNumber != null &&
-                                                b.serialNumber!.toLowerCase() == qrCode.toLowerCase())) {
-                                          matchedBoard = b;
-                                          break;
-                                        }
-                                      }
-
-                                      if (matchedBoard != null) {
-                                        _showBoardDetail(matchedBoard, fromScan: true);
-                                      } else {
-                                        // Attempt server scan API lookup if not in local list
-                                        try {
-                                          final res = await backend.api.get('/api/v1/boards/scan/$qrCode');
+                                    if (matchedBoard != null) {
+                                      _showBoardDetail(matchedBoard, fromScan: true);
+                                    } else {
+                                      // Attempt server scan API lookup if not in local list
+                                      try {
+                                        final res = await backend.api.get('/api/v1/boards/scan/$qrCode');
+                                        if (!mounted) return;
+                                        if (res != null &&
+                                            res is Map<String, dynamic> &&
+                                            res['boardItemId'] != null) {
+                                          await backend.loadBoards();
                                           if (!mounted) return;
-                                          if (res != null &&
-                                              res is Map<String, dynamic> &&
-                                              res['boardItemId'] != null) {
-                                            await backend.loadBoards();
-                                            if (!mounted) return;
-                                            final updatedBoard = backend.boards.firstWhere(
-                                              (b) =>
-                                                  b.id == res['boardItemId'].toString() ||
-                                                  b.qrCode.toLowerCase() == qrCode.toLowerCase(),
-                                              orElse: () => Board.fromJson(res),
-                                            );
-                                            _showBoardDetail(updatedBoard, fromScan: true);
-                                          } else {
-                                            ScaffoldMessenger.of(context).showSnackBar(
-                                              SnackBar(
-                                                content: Text('Đã lọc danh sách theo mã QR: $qrCode'),
-                                              ),
-                                            );
-                                          }
-                                        } catch (_) {
-                                          if (!mounted) return;
-                                          ScaffoldMessenger.of(context).showSnackBar(
+                                          final updatedBoard = backend.boards.firstWhere(
+                                            (b) =>
+                                                b.id == res['boardItemId'].toString() ||
+                                                b.qrCode.toLowerCase() == qrCode.toLowerCase(),
+                                            orElse: () => Board.fromJson(res),
+                                          );
+                                          _showBoardDetail(updatedBoard, fromScan: true);
+                                        } else {
+                                          messenger.showSnackBar(
                                             SnackBar(
                                               content: Text('Đã lọc danh sách theo mã QR: $qrCode'),
                                             ),
                                           );
                                         }
+                                      } catch (_) {
+                                        if (!mounted) return;
+                                        messenger.showSnackBar(
+                                          SnackBar(
+                                            content: Text('Đã lọc danh sách theo mã QR: $qrCode'),
+                                          ),
+                                        );
                                       }
                                     }
-                                  },
-                                  icon: const Icon(
-                                    Icons.qr_code_scanner,
-                                    size: 16,
-                                  ),
-                                  label: const Text(
-                                    'Quét QR',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                  style: ElevatedButton.styleFrom(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 10,
-                                    ),
+                                  }
+                                },
+                                icon: const Icon(
+                                  Icons.qr_code_scanner,
+                                  size: 16,
+                                ),
+                                label: const Text(
+                                  'Quét QR',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 10,
                                   ),
                                 ),
-                              ],
+                              ),
 
                             ],
                           ),
@@ -528,20 +618,126 @@ class _WarehousePageState extends State<WarehousePage> {
                           ),
                         )
                       else
-                        SizedBox(
-                          height: 32,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _buildPartFilterChip('Tất cả', PartFilterStatus.all, totalParts),
-                                const SizedBox(width: 6),
-                                _buildPartFilterChip('Sắp hết', PartFilterStatus.lowStock, lowStockParts),
-                                const SizedBox(width: 6),
-                                _buildPartFilterChip('Hết hàng', PartFilterStatus.outOfStock, outOfStockParts),
-                              ],
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SizedBox(
+                              height: 32,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    _buildPartFilterChip('Tất cả', PartFilterStatus.all, totalParts),
+                                    const SizedBox(width: 6),
+                                    _buildPartFilterChip('Sắp hết', PartFilterStatus.lowStock, lowStockParts),
+                                    const SizedBox(width: 6),
+                                    _buildPartFilterChip('Hết hàng', PartFilterStatus.outOfStock, outOfStockParts),
+                                  ],
+                                ),
+                              ),
                             ),
-                          ),
+                            const SizedBox(height: 8),
+                            // Search Method Switcher Bar
+                            SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  Text(
+                                    'Phương thức tìm:',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ChoiceChip(
+                                    label: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.search, size: 12),
+                                        SizedBox(width: 4),
+                                        Text('🔍 Tên / IPN', style: TextStyle(fontSize: 11)),
+                                      ],
+                                    ),
+                                    selected: _partSearchMethod == PartSearchMethod.general,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setState(() {
+                                          _partSearchMethod = PartSearchMethod.general;
+                                        });
+                                      }
+                                    },
+                                    selectedColor: AppColors.primary.withOpacity(0.15),
+                                    labelStyle: TextStyle(
+                                      fontSize: 11,
+                                      color: _partSearchMethod == PartSearchMethod.general
+                                          ? AppColors.primary
+                                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                      fontWeight: _partSearchMethod == PartSearchMethod.general ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  ChoiceChip(
+                                    label: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(Icons.location_on, size: 12),
+                                        SizedBox(width: 4),
+                                        Text('📍 Vị trí / Quét QR', style: TextStyle(fontSize: 11)),
+                                      ],
+                                    ),
+                                    selected: _partSearchMethod == PartSearchMethod.locationQr,
+                                    onSelected: (selected) {
+                                      if (selected) {
+                                        setState(() {
+                                          _partSearchMethod = PartSearchMethod.locationQr;
+                                        });
+                                      }
+                                    },
+                                    selectedColor: AppColors.primary.withOpacity(0.15),
+                                    labelStyle: TextStyle(
+                                      fontSize: 11,
+                                      color: _partSearchMethod == PartSearchMethod.locationQr
+                                          ? AppColors.primary
+                                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                      fontWeight: _partSearchMethod == PartSearchMethod.locationQr ? FontWeight.bold : FontWeight.normal,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (_partSearchMethod == PartSearchMethod.locationQr && _searchQuery.value.trim().isNotEmpty) ...[
+                              const SizedBox(height: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.qr_code_scanner, size: 14, color: AppColors.primary),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Đang lọc vị trí: "${_searchQuery.value}"',
+                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: () {
+                                        _searchController.clear();
+                                        _searchQuery.value = '';
+                                      },
+                                      child: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ],
                         ),
                     ],
                   ),
@@ -624,6 +820,64 @@ class _WarehousePageState extends State<WarehousePage> {
                           ),
                         );
                       } else {
+                        if (_partSearchMethod == PartSearchMethod.locationQr) {
+                          final locationGroups = _filteredLocationGroups;
+                          if (locationGroups.isEmpty) {
+                            return RefreshIndicator(
+                              onRefresh: () => context.read<BackendDataProvider>().loadParts(),
+                              child: ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  SizedBox(
+                                    height: constraints.maxHeight - 220,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Text('📍', style: TextStyle(fontSize: 48)),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Không tìm thấy linh kiện ở vị trí này',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark
+                                                  ? AppColors.textPrimaryDark
+                                                  : AppColors.textPrimaryLight,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Thử đổi từ khóa hoặc quét lại mã QR vị trí khác',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: isDark
+                                                  ? AppColors.textSecondaryDark
+                                                  : AppColors.textSecondaryLight,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return RefreshIndicator(
+                            onRefresh: () => context.read<BackendDataProvider>().loadParts(),
+                            child: ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(16),
+                              itemCount: locationGroups.length,
+                              itemBuilder: (context, index) {
+                                return _buildLocationGroupCard(locationGroups[index]);
+                              },
+                            ),
+                          );
+                        }
+
                         final filtered = _filteredParts;
                         if (filtered.isEmpty) {
                           return RefreshIndicator(
@@ -1425,6 +1679,108 @@ class _WarehousePageState extends State<WarehousePage> {
             const Icon(Icons.info_outline, size: 16, color: Color(0xFF94A3B8)),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildLocationGroupCard(LocationGroup group) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.08),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on, size: 18, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '${group.locationName} (${group.locationCode})',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${group.items.length} loại · SL: ${group.totalQuantity.toStringAsFixed(0)}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: group.items.length,
+            separatorBuilder: (context, index) => Divider(
+              height: 1,
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            ),
+            itemBuilder: (context, index) {
+              final item = group.items[index];
+              return ListTile(
+                dense: true,
+                onTap: () => _showPartDetail(item.part),
+                leading: const Icon(Icons.widgets_outlined, size: 18, color: Color(0xFF64748B)),
+                title: Text(
+                  item.part.name,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  ),
+                ),
+                subtitle: Text(
+                  'IPN: ${item.part.ipn} · Danh mục: ${item.part.categoryName ?? "Chưa rõ"}',
+                  style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+                ),
+                trailing: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Text(
+                    'Vị trí này: ${item.lot.amount.toStringAsFixed(0)}',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? AppColors.textPrimaryDark : AppColors.primary,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

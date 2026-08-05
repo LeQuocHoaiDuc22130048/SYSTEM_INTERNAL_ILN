@@ -111,6 +111,14 @@ public class AppUpdateController {
         return ResponseEntity.ok(ApiResponse.success(released));
     }
 
+    @Operation(summary = "Xóa bản cập nhật")
+    @DeleteMapping("/{id}")
+    @PreAuthorize(RoleExpressions.ADMIN_OR_ABOVE)
+    public ResponseEntity<ApiResponse<Void>> deleteUpdate(@PathVariable UUID id) {
+        appUpdateService.deleteUpdate(id);
+        return ResponseEntity.ok(ApiResponse.success(null));
+    }
+
     @Operation(summary = "Tải file cài đặt client")
     @GetMapping("/download/{filename:.+}")
     public ResponseEntity<Resource> downloadFile(@PathVariable String filename) {

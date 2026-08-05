@@ -10,7 +10,8 @@ import {
   FileText,
   Clock,
   ShieldAlert,
-  Loader2
+  Loader2,
+  Trash2
 } from 'lucide-react';
 import { getAuthHeaders } from '../utils/auth';
 import './UpdateTab.css';
@@ -37,6 +38,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
   const [showModal, setShowModal] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [releasingId, setReleasingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Form states
   const [version, setVersion] = useState('');
@@ -207,6 +209,45 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
       showToast('Lỗi kết nối khi phát hành cập nhật.');
     } finally {
       setReleasingId(null);
+    }
+  };
+
+  // Delete an update
+  const handleDelete = async (id: string, versionStr: string) => {
+    if (!window.confirm(`Bạn có chắc chắn muốn xóa bản cập nhật v${versionStr}?\nHành động này không thể hoàn tác.`)) {
+      return;
+    }
+
+    setDeletingId(id);
+    try {
+      const response = await fetch(`/api/v1/app-updates/${id}`, {
+        method: 'DELETE',
+        headers: getAuthHeaders(),
+      });
+
+      if (response.ok) {
+        showToast(`Đã xóa bản cập nhật v${versionStr} thành công!`);
+        fetchUpdates();
+      } else {
+        let errorMessage = 'Có lỗi xảy ra khi xóa bản cập nhật.';
+        try {
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('application/json')) {
+            const errResult = await response.json();
+            errorMessage = errResult?.message || errorMessage;
+          } else if (response.status === 403) {
+            errorMessage = 'Bạn không có quyền xóa bản cập nhật (yêu cầu quyền Admin).';
+          }
+        } catch (e) {
+          // ignore
+        }
+        showToast(errorMessage);
+      }
+    } catch (error) {
+      console.error('Error deleting update:', error);
+      showToast('Lỗi kết nối khi xóa bản cập nhật.');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -392,25 +433,41 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
                     </div>
                   </td>
                   <td className="col-actions">
-                    {update.status === 'DRAFT' ? (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      {update.status === 'DRAFT' ? (
+                        <button
+                          className="action-btn release-btn"
+                          onClick={() => handleRelease(update.id, update.version)}
+                          disabled={releasingId === update.id || deletingId === update.id}
+                        >
+                          {releasingId === update.id ? (
+                            <Loader2 size={14} className="spin" />
+                          ) : (
+                            <Rocket size={14} />
+                          )}
+                          <span>Phát hành</span>
+                        </button>
+                      ) : (
+                        <span className="action-done" title="Bản cập nhật đã được áp dụng hàng loạt">
+                          <CheckCircle2 size={16} className="text-success" />
+                          <span>Đã phát hành</span>
+                        </span>
+                      )}
+
                       <button
-                        className="action-btn release-btn"
-                        onClick={() => handleRelease(update.id, update.version)}
-                        disabled={releasingId === update.id}
+                        className="icon-action-btn delete-action-btn"
+                        onClick={() => handleDelete(update.id, update.version)}
+                        disabled={deletingId === update.id || releasingId === update.id}
+                        title="Xóa bản cập nhật"
+                        style={{ color: '#ef4444' }}
                       >
-                        {releasingId === update.id ? (
+                        {deletingId === update.id ? (
                           <Loader2 size={14} className="spin" />
                         ) : (
-                          <Rocket size={14} />
+                          <Trash2 size={14} />
                         )}
-                        <span>Phát hành</span>
                       </button>
-                    ) : (
-                      <span className="action-done" title="Bản cập nhật đã được áp dụng hàng loạt">
-                        <CheckCircle2 size={16} className="text-success" />
-                        <span>Hoàn tất</span>
-                      </span>
-                    )}
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -160,7 +160,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
           order.orderNumber.toLowerCase().contains(query) ||
           order.deviceName.toLowerCase().contains(query) ||
           order.customerName.toLowerCase().contains(query) ||
-          (order.customerPhone ?? '').contains(query);
+          (order.customerPhone ?? '').contains(query) ||
+          (order.serialNumber?.toLowerCase().contains(query) ?? false) ||
+          order.devices.any((d) => (d.serialNumber?.toLowerCase().contains(query) ?? false));
 
       final matchesDate = selectedDate == null ||
           (order.createdAt.year == selectedDate.year &&
@@ -247,7 +249,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                 _searchQuery.value = value,
                             decoration: InputDecoration(
                               hintText:
-                                  'Tìm theo mã đơn, thiết bị, khách, người sửa...',
+                                  'Tìm theo mã đơn, số seri, thiết bị, khách...',
                               prefixIcon: const Icon(
                                 Icons.search,
                                 size: 20,
