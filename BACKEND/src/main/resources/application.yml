@@ -3,6 +3,11 @@ spring:
     name: system-internal
   profiles:
     active: dev
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    out-of-order: true
   servlet:
     multipart:
       max-file-size: 500MB
@@ -47,16 +52,16 @@ app:
       min-free-ratio: ${HEALTH_DISK_MIN_FREE_RATIO:0.10}
   attendance:
     face:
-      match-threshold: ${ATTENDANCE_FACE_MATCH_THRESHOLD}
+      match-threshold: ${ATTENDANCE_FACE_MATCH_THRESHOLD:0.57}
       ambiguous-margin: ${ATTENDANCE_FACE_AMBIGUOUS_MARGIN:0.03}
       frr-alert-threshold: ${ATTENDANCE_FACE_FRR_ALERT_THRESHOLD:0.05}
       frr-monitor-cron: ${ATTENDANCE_FACE_FRR_MONITOR_CRON:0 5 0 * * *}
       calibration:
-        far: ${ATTENDANCE_FACE_CALIBRATION_FAR}
-        frr: ${ATTENDANCE_FACE_CALIBRATION_FRR}
-        dataset-version: ${ATTENDANCE_FACE_CALIBRATION_DATASET_VERSION}
-        calibrated-at: ${ATTENDANCE_FACE_CALIBRATED_AT}
-        report-path: ${ATTENDANCE_FACE_CALIBRATION_REPORT_PATH}
+        far: ${ATTENDANCE_FACE_CALIBRATION_FAR:0.0}
+        frr: ${ATTENDANCE_FACE_CALIBRATION_FRR:0.02}
+        dataset-version: ${ATTENDANCE_FACE_CALIBRATION_DATASET_VERSION:v1.0}
+        calibrated-at: ${ATTENDANCE_FACE_CALIBRATED_AT:2026-01-01T00:00:00Z}
+        report-path: ${ATTENDANCE_FACE_CALIBRATION_REPORT_PATH:reports/calibration}
     biometric-image-audit:
       enabled: ${ATTENDANCE_BIOMETRIC_IMAGE_AUDIT_ENABLED:false}
       retention-days: ${ATTENDANCE_BIOMETRIC_IMAGE_AUDIT_RETENTION_DAYS:30}

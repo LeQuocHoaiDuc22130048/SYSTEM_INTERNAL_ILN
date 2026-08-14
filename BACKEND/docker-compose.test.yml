@@ -24,10 +24,14 @@ services:
       - ./firebase-service-account.json:/app/firebase-service-account.json:ro
       - ./releases:/app/releases
     depends_on:
-      - postgres
-      - redis
-      - minio
-      - face-ai
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_started
+      face-ai:
+        condition: service_started
     restart: unless-stopped
 
   postgres:
@@ -41,6 +45,11 @@ services:
       - "${TEST_DB_PORT:-5433}:5432"
     volumes:
       - test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-admin} -d ${DB_NAME:-system_internal_test_db}"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
     restart: unless-stopped
 
   redis:

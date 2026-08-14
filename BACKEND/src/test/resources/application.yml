@@ -1,0 +1,52 @@
+spring:
+  application:
+    name: system-internal-test
+  profiles:
+    active: test
+  flyway:
+    enabled: false
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE;MODE=PostgreSQL
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    database-platform: org.hibernate.dialect.H2Dialect
+
+server:
+  ssl:
+    enabled: false
+
+app:
+  security:
+    require-https: false
+    http-redirect:
+      enabled: false
+  cors:
+    allowed-origins: "*"
+    allowed-origin-patterns: "*"
+  face-recognition:
+    base-url: http://127.0.0.1:5001
+    health-path: /health
+    skip-duplicate-check: true
+  attendance:
+    face:
+      match-threshold: 0.57
+      ambiguous-margin: 0.03
+      frr-alert-threshold: 0.05
+      frr-monitor-cron: "0 5 0 * * *"
+      calibration:
+        far: 0.0
+        frr: 0.02
+        dataset-version: test-v1
+        calibrated-at: "2026-01-01T00:00:00Z"
+        report-path: test-report
+    biometric-image-audit:
+      enabled: false
+    backup:
+      enabled: false
+    ai-smoke-test:
+      enabled: false

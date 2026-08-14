@@ -61,13 +61,19 @@ public class WarehouseService {
             qrCode = qrCodeGenerator.generateQrCode();
         } while (boardItemRepository.existsByQrCodeAndIsDeletedFalse(qrCode));
 
+        String serialNumber = StringUtils.hasText(request.serialNumber()) ? request.serialNumber().trim() : null;
+        if (serialNumber != null && boardItemRepository.existsBySerialNumberAndIsDeletedFalse(serialNumber)) {
+            throw new com.suachuabientan.system_internal.common.exception.BusinessException(
+                    "Số serial '" + serialNumber + "' đã tồn tại trong hệ thống", 409);
+        }
+
         BoardItem item = BoardItem.builder()
                 .qrCode(qrCode)
                 .name(request.name())
                 .category(request.category())
                 .description(request.description())
                 .location(request.location())
-                .serialNumber(request.serialNumber())
+                .serialNumber(serialNumber)
                 .model(request.model())
                 .boardType(request.boardType())
                 .firmware(request.firmware())
@@ -110,8 +116,14 @@ public class WarehouseService {
             item.setDescription(request.description());
         if (request.location() != null)
             item.setLocation(request.location());
-        if (request.serialNumber() != null)
-            item.setSerialNumber(request.serialNumber());
+        if (request.serialNumber() != null) {
+            String newSerial = StringUtils.hasText(request.serialNumber()) ? request.serialNumber().trim() : null;
+            if (newSerial != null && boardItemRepository.existsBySerialNumberAndIdNotAndIsDeletedFalse(newSerial, id)) {
+                throw new com.suachuabientan.system_internal.common.exception.BusinessException(
+                        "Số serial '" + newSerial + "' đã tồn tại trong hệ thống", 409);
+            }
+            item.setSerialNumber(newSerial);
+        }
         if (request.model() != null)
             item.setModel(request.model());
         if (request.boardType() != null)
@@ -468,7 +480,7 @@ public class WarehouseService {
                 item.getName(),
                 item.getCategory(),
                 item.getDescription(),
-                item.getStatus().name(),
+                item.getStatus() != null ? item.getStatus().name() : "AVAILABLE",
                 item.getLocation(),
                 item.getSerialNumber(),
                 item.getModel(),
@@ -496,11 +508,12 @@ public class WarehouseService {
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy linh kiện: " + partId))
                     .getId();
         } catch (IllegalArgumentException e) {
-            return partRepository.findByIpnAndIsDeletedFalse(trimmed)
+            String ipn100 = trimmed.length() > 100 ? trimmed.substring(0, 100) : trimmed;
+            return partRepository.findByIpnAndIsDeletedFalse(ipn100)
                     .orElseGet(() -> {
                         UUID categoryId = getOrCreateUncategorizedCategory();
                         Part newPart = Part.builder()
-                                .ipn(trimmed)
+                                .ipn(ipn100)
                                 .name(trimmed)
                                 .description("Tự động tạo từ liên kết bo mạch")
                                 .categoryId(categoryId)
@@ -508,7 +521,7 @@ public class WarehouseService {
                                 .manufacturingStatus("ACTIVE")
                                 .build();
                         Part saved = partRepository.save(newPart);
-                        log.info("Tự động tạo linh kiện mới từ bo mạch: ipn={}, id={}", trimmed, saved.getId());
+                        log.info("Tự động tạo linh kiện mới từ bo mạch: ipn={}, id={}", ipn100, saved.getId());
                         return saved;
                     })
                     .getId();
@@ -547,17 +560,18 @@ public class WarehouseService {
                         .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy vị trí kho: " + locationId))
                         .getId();
             } catch (IllegalArgumentException e) {
-                return storeLocationRepository.findByCodeAndIsDeletedFalse(trimmed)
+                String code80 = trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed;
+                return storeLocationRepository.findByCodeAndIsDeletedFalse(code80)
                         .orElseGet(() -> {
                             StoreLocation newLocation = StoreLocation.builder()
-                                    .code(trimmed)
+                                    .code(code80)
                                     .name(trimmed)
                                     .description("Tự động tạo từ liên kết bo mạch")
                                     .isFull(false)
                                     .onlySinglePart(false)
                                     .build();
                             StoreLocation saved = storeLocationRepository.save(newLocation);
-                            log.info("Tự động tạo vị trí kho mới: code={}, id={}", trimmed, saved.getId());
+                            log.info("Tự động tạo vị trí kho mới: code={}, id={}", code80, saved.getId());
                             return saved;
                         })
                         .getId();
@@ -565,18 +579,19 @@ public class WarehouseService {
         }
         if (!StringUtils.hasText(legacyLocation)) return null;
         String legacyTrimmed = legacyLocation.trim();
-        return storeLocationRepository.findByCodeAndIsDeletedFalse(legacyTrimmed)
+        String code80 = legacyTrimmed.length() > 80 ? legacyTrimmed.substring(0, 80) : legacyTrimmed;
+        return storeLocationRepository.findByCodeAndIsDeletedFalse(code80)
                 .map(StoreLocation::getId)
                 .orElseGet(() -> {
                     StoreLocation newLocation = StoreLocation.builder()
-                            .code(legacyTrimmed)
+                            .code(code80)
                             .name(legacyTrimmed)
                             .description("Tự động tạo từ vị trí bo mạch")
                             .isFull(false)
                             .onlySinglePart(false)
                             .build();
                     StoreLocation saved = storeLocationRepository.save(newLocation);
-                    log.info("Tự động tạo vị trí kho mới từ legacy location: code={}, id={}", legacyTrimmed, saved.getId());
+                    log.info("Tự động tạo vị trí kho mới từ legacy location: code={}, id={}", code80, saved.getId());
                     return saved.getId();
                 });
     }

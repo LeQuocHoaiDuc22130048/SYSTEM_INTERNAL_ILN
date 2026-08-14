@@ -219,17 +219,18 @@ class _EmployeesPageState extends State<EmployeesPage> {
                                 ),
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
+                              final animDelay = (50 * (index % 10)).ms;
                               return _buildEmployeeCard(filtered[index])
                                   .animate(target: 1)
                                   .fadeIn(
-                                    duration: 400.ms,
-                                    delay: (50 * index).ms,
+                                    duration: 300.ms,
+                                    delay: animDelay,
                                   )
                                   .slideY(
-                                    begin: 0.2,
+                                    begin: 0.1,
                                     end: 0,
-                                    duration: 400.ms,
-                                    delay: (50 * index).ms,
+                                    duration: 300.ms,
+                                    delay: animDelay,
                                   );
                             },
                           ),

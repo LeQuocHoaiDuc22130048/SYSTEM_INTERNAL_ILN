@@ -5,6 +5,9 @@ import com.suachuabientan.system_internal.modules.warehouse.enums.BoardStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.util.UUID;
 
 @Entity
@@ -46,12 +49,16 @@ public class BoardItem extends BaseEntity {
     @Column(length = 100)
     private String model;
 
+    @Column(name = "repair_brand", length = 100)
+    private String repairBrand;
+
     @Column(name = "board_type", length = 100)
     private String boardType;
 
     @Column(length = 50)
     private String firmware;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "removed_parts", columnDefinition = "JSONB")
     private String removedParts;
 
@@ -79,4 +86,3 @@ public class BoardItem extends BaseEntity {
         return BoardStatus.CHECKED_OUT.equals(this.status);
     }
 }
-

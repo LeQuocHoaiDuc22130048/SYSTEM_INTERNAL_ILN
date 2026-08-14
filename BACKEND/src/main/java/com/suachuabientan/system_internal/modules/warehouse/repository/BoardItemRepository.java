@@ -19,6 +19,10 @@ public interface BoardItemRepository extends JpaRepository<BoardItem, UUID> {
 
     boolean existsByQrCodeAndIsDeletedFalse(String qrCode);
 
+    boolean existsBySerialNumberAndIsDeletedFalse(String serialNumber);
+
+    boolean existsBySerialNumberAndIdNotAndIsDeletedFalse(String serialNumber, UUID id);
+
     Page<BoardItem> findByIsDeletedFalse(Pageable pageable);
 
     Page<BoardItem> findByStatusAndIsDeletedFalse(Pageable pageable, BoardStatus status);

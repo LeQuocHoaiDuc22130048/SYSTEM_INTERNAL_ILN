@@ -38,10 +38,19 @@ jobs:
           cache: 'maven'
 
       - name: Run Maven Unit & Service Tests
-        run: mvn clean test -B
+        run: mvn clean test -B -Dspring.profiles.active=test -Dapp.security.require-https=false
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          APP_REQUIRE_HTTPS: false
+          ATTENDANCE_FACE_MATCH_THRESHOLD: 0.57
+          ATTENDANCE_FACE_CALIBRATION_FAR: 0.0
+          ATTENDANCE_FACE_CALIBRATION_FRR: 0.02
+          ATTENDANCE_FACE_CALIBRATION_DATASET_VERSION: test-v1
+          ATTENDANCE_FACE_CALIBRATED_AT: 2026-01-01T00:00:00Z
+          ATTENDANCE_FACE_CALIBRATION_REPORT_PATH: test-report
 
       - name: Build JAR Package (Verify Compile & Packaging)
-        run: mvn package -DskipTests -B
+        run: mvn package -DskipTests -B -Dspring.profiles.active=test
 
       - name: Upload Backend Test Report (if failed)
         if: failure()

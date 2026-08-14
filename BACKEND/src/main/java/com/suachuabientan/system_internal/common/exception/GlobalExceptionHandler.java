@@ -118,12 +118,16 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(405, message));
     }
 
-    @ExceptionHandler(DataIntegrityViolationException.class)
-    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(DataIntegrityViolationException ex) {
+    @ExceptionHandler({
+            DataIntegrityViolationException.class,
+            org.springframework.transaction.TransactionSystemException.class,
+            org.springframework.orm.jpa.JpaSystemException.class
+    })
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrity(Exception ex) {
         log.warn("Data integrity violation: {}", rootMessage(ex));
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiResponse.error(409,
-                        "Du lieu bi trung hoac vi pham rang buoc trong he thong"));
+                        "Dữ liệu bị trùng hoặc vi phạm ràng buộc trong hệ thống"));
     }
 
     @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)

@@ -3,15 +3,21 @@ import {
   X,
   Cpu,
   Boxes,
+  QrCode,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import { exportBoardQrPdfList, type BoardQrExportData, type QrPrintConfig } from '../utils/pdf';
-import type { Board, BoardHistoryItem, Part, WarehouseTabProps } from '../types/warehouse';
+import type { Board, BoardHistoryItem, Part, PartCheckoutHistoryItem, WarehouseTabProps } from '../types/warehouse';
+
 import { BoardListPanel } from './warehouse/BoardListPanel';
 import { PartListPanel } from './warehouse/PartListPanel';
 import { BoardDetailPanel } from './warehouse/BoardDetailPanel';
 import { PartDetailPanel } from './warehouse/PartDetailPanel';
 import { QrPrintConfigModal } from './warehouse/QrPrintConfigModal';
+import { PartCheckoutHistoryPanel } from './warehouse/PartCheckoutHistoryPanel';
+import { LocationQrScanModal } from './warehouse/LocationQrScanModal';
+import { PartCheckoutModal } from './warehouse/PartCheckoutModal';
+import { PartReturnModal } from './warehouse/PartReturnModal';
 import './WarehouseTab.css';
 
 
@@ -47,8 +53,15 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [checkoutNote, setCheckoutNote] = useState<string>('');
   const [checkoutQuantity, setCheckoutQuantity] = useState<number>(1);
 
-  // Warehouse Mode: BOARDS or PARTS (forced to BOARDS)
-  const warehouseMode = 'BOARDS';
+  // Warehouse Mode: BOARDS, PARTS, or PART_LOGS
+  const [warehouseMode, setWarehouseMode] = useState<'BOARDS' | 'PARTS' | 'PART_LOGS'>('PARTS');
+
+  // New Part Modals & QR Scan states
+  const [isLocationQrScanModalOpen, setIsLocationQrScanModalOpen] = useState<boolean>(false);
+  const [isPartCheckoutModalOpen, setIsPartCheckoutModalOpen] = useState<boolean>(false);
+  const [isPartReturnModalOpen, setIsPartReturnModalOpen] = useState<boolean>(false);
+  const [checkoutHistoryItemToReturn, setCheckoutHistoryItemToReturn] = useState<PartCheckoutHistoryItem | null>(null);
+
 
   // Parts state
   const [parts, setParts] = useState<Part[]>([]);
@@ -760,81 +773,134 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
   return (
     <div className="warehouse-container">
-      <div className="warehouse-layout">
-        {/* Left Column: Stats, Filter & Grid */}
-        <div className="warehouse-main-panel">
-          {warehouseMode === 'BOARDS' ? (
-            <BoardListPanel
-              boards={boards}
-              loading={loading}
-              searchTerm={searchTerm}
-              setSearchTerm={setSearchTerm}
-              statusFilter={statusFilter}
-              setStatusFilter={setStatusFilter}
-              filteredBoards={filteredBoards}
-              selectedBoard={selectedBoard}
-              handleSelectBoard={handleSelectBoard}
-              openAddEditModal={openAddEditModal}
-              getStatusLabel={getStatusLabel}
-              getStatusColorClass={getStatusColorClass}
-              exportBoardQrPdfList={handleOpenListQrPrint}
-            />
-          ) : (
-            <PartListPanel
-              parts={parts}
-              loadingParts={loadingParts}
-              partSearchTerm={partSearchTerm}
-              setPartSearchTerm={setPartSearchTerm}
-              filteredParts={filteredParts}
-              selectedPart={selectedPart}
-              setSelectedPart={setSelectedPart}
-              openAddEditPartModal={openAddEditPartModal}
-            />
-          )}
+      {/* Top Header Mode Switcher & Quick QR Scan Bar */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--color-bg-surface, #ffffff)', padding: '4px', borderRadius: '10px', border: '1px solid var(--color-border, #e2e8f0)' }}>
+          <button
+            type="button"
+            className={`warehouse-mode-btn ${warehouseMode === 'PARTS' ? 'active' : ''}`}
+            onClick={() => setWarehouseMode('PARTS')}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+          >
+            🧱 Kho Linh Kiện (Parts)
+          </button>
+          <button
+            type="button"
+            className={`warehouse-mode-btn ${warehouseMode === 'BOARDS' ? 'active' : ''}`}
+            onClick={() => setWarehouseMode('BOARDS')}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+          >
+            📱 Bo Mạch (Boards)
+          </button>
+          <button
+            type="button"
+            className={`warehouse-mode-btn ${warehouseMode === 'PART_LOGS' ? 'active' : ''}`}
+            onClick={() => setWarehouseMode('PART_LOGS')}
+            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
+          >
+            📜 Nhật Ký Lấy/Trả Linh Kiện
+          </button>
         </div>
 
-        {/* Right Column: Spec Detail Pane */}
-        <div className="warehouse-detail-panel">
-          {warehouseMode === 'BOARDS' ? (
-            selectedBoard ? (
-              <BoardDetailPanel
+        <button
+          type="button"
+          onClick={() => setIsLocationQrScanModalOpen(true)}
+          style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <QrCode size={16} />
+          Quét QR Vị Trí Kho
+        </button>
+      </div>
+
+      {warehouseMode === 'PART_LOGS' ? (
+        <div style={{ flex: 1, minHeight: '550px' }}>
+          <PartCheckoutHistoryPanel
+            showToast={showToast}
+            onReturnClick={(item) => {
+              setCheckoutHistoryItemToReturn(item);
+              setIsPartReturnModalOpen(true);
+            }}
+          />
+        </div>
+      ) : (
+        <div className="warehouse-layout">
+          {/* Left Column: Stats, Filter & Grid */}
+          <div className="warehouse-main-panel">
+            {warehouseMode === 'BOARDS' ? (
+              <BoardListPanel
+                boards={boards}
+                loading={loading}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                statusFilter={statusFilter}
+                setStatusFilter={setStatusFilter}
+                filteredBoards={filteredBoards}
                 selectedBoard={selectedBoard}
+                handleSelectBoard={handleSelectBoard}
+                openAddEditModal={openAddEditModal}
                 getStatusLabel={getStatusLabel}
                 getStatusColorClass={getStatusColorClass}
-                openAddEditModal={openAddEditModal}
-                handleDeleteBoard={handleDeleteBoard}
-                openCheckoutModal={openCheckoutModal}
-                openReturnModal={openReturnModal}
-                getQRCodeUrl={getQRCodeUrl}
-                exportBoardQrPdf={handleOpenSingleQrPrint}
-                loadingHistory={loadingHistory}
-                boardHistory={boardHistory}
+                exportBoardQrPdfList={handleOpenListQrPrint}
               />
             ) : (
-              <div className="detail-empty-state">
-                <Cpu size={48} className="empty-icon" />
-                <h3>Chọn một bo mạch</h3>
-                <p>Chọn bo mạch từ danh sách kho để xem thông số kỹ thuật, lịch sử chuyển dịch và mượn trả.</p>
-              </div>
-            )
-          ) : (
-            selectedPart ? (
-              <PartDetailPanel
+              <PartListPanel
+                parts={parts}
+                loadingParts={loadingParts}
+                partSearchTerm={partSearchTerm}
+                setPartSearchTerm={setPartSearchTerm}
+                filteredParts={filteredParts}
                 selectedPart={selectedPart}
+                setSelectedPart={setSelectedPart}
                 openAddEditPartModal={openAddEditPartModal}
-                handleDeletePart={handleDeletePart}
-                openAdjustStockModal={openAdjustStockModal}
               />
+            )}
+          </div>
+
+          {/* Right Column: Spec Detail Pane */}
+          <div className="warehouse-detail-panel">
+            {warehouseMode === 'BOARDS' ? (
+              selectedBoard ? (
+                <BoardDetailPanel
+                  selectedBoard={selectedBoard}
+                  getStatusLabel={getStatusLabel}
+                  getStatusColorClass={getStatusColorClass}
+                  openAddEditModal={openAddEditModal}
+                  handleDeleteBoard={handleDeleteBoard}
+                  openCheckoutModal={openCheckoutModal}
+                  openReturnModal={openReturnModal}
+                  getQRCodeUrl={getQRCodeUrl}
+                  exportBoardQrPdf={handleOpenSingleQrPrint}
+                  loadingHistory={loadingHistory}
+                  boardHistory={boardHistory}
+                />
+              ) : (
+                <div className="detail-empty-state">
+                  <Cpu size={48} className="empty-icon" />
+                  <h3>Chọn một bo mạch</h3>
+                  <p>Chọn bo mạch từ danh sách kho để xem thông số kỹ thuật, lịch sử chuyển dịch và mượn trả.</p>
+                </div>
+              )
             ) : (
-              <div className="detail-empty-state">
-                <Boxes size={48} className="empty-icon" />
-                <h3>Chọn một linh kiện</h3>
-                <p>Chọn linh kiện từ danh mục để xem định mức, vị trí kho và điều chỉnh số lượng tồn kho.</p>
-              </div>
-            )
-          )}
+              selectedPart ? (
+                <PartDetailPanel
+                  selectedPart={selectedPart}
+                  openAddEditPartModal={openAddEditPartModal}
+                  handleDeletePart={handleDeletePart}
+                  openAdjustStockModal={openAdjustStockModal}
+                  openPartCheckoutModal={() => setIsPartCheckoutModalOpen(true)}
+                />
+              ) : (
+                <div className="detail-empty-state">
+                  <Boxes size={48} className="empty-icon" />
+                  <h3>Chọn một linh kiện</h3>
+                  <p>Chọn linh kiện từ danh mục để xem định mức, vị trí kho, lấy linh kiện out kho và điều chỉnh số lượng tồn kho.</p>
+                </div>
+              )
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
 
       {/* ADD / EDIT BOARD DIALOG */}
       {isAddEditModalOpen && (
@@ -1243,6 +1309,43 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           exportBoardQrPdfList(boardsForQrPrint, filename, config);
         }}
       />
+
+      {/* Location QR Code Scan Modal */}
+      <LocationQrScanModal
+        isOpen={isLocationQrScanModalOpen}
+        onClose={() => setIsLocationQrScanModalOpen(false)}
+        onSelectPartForCheckout={(partItem) => {
+          const matchedPart = parts.find((p) => p.id === partItem.partId);
+          if (matchedPart) {
+            setSelectedPart(matchedPart);
+          }
+          setIsPartCheckoutModalOpen(true);
+        }}
+        showToast={showToast}
+      />
+
+      {/* Part Checkout (Lấy Linh Kiện) Modal */}
+      <PartCheckoutModal
+        isOpen={isPartCheckoutModalOpen}
+        onClose={() => setIsPartCheckoutModalOpen(false)}
+        part={selectedPart}
+        onSuccess={() => {
+          fetchParts();
+        }}
+        showToast={showToast}
+      />
+
+      {/* Part Return (Trả Linh Kiện) Modal */}
+      <PartReturnModal
+        isOpen={isPartReturnModalOpen}
+        onClose={() => setIsPartReturnModalOpen(false)}
+        checkoutItem={checkoutHistoryItemToReturn}
+        onSuccess={() => {
+          fetchParts();
+        }}
+        showToast={showToast}
+      />
     </div>
   );
 };
+

@@ -58,7 +58,22 @@ class Board {
   });
 
   String get statusLabel {
-    return status.label;
+    switch (status) {
+      case BoardStatus.available:
+        return 'Sẵn sàng';
+      case BoardStatus.checkedOut:
+        return 'Đang dùng';
+      case BoardStatus.inRepair:
+        return 'Đang sửa';
+      case BoardStatus.damaged:
+        return 'Hỏng';
+      case BoardStatus.lost:
+        return 'Thất lạc';
+      case BoardStatus.archived:
+        return 'Lưu trữ';
+      case BoardStatus.maintenance:
+        return 'Bảo trì';
+    }
   }
 
   factory Board.fromJson(Map<String, dynamic> json) {
@@ -104,6 +119,8 @@ class Board {
   static BoardStatus _statusFromBackend(String? status) {
     switch (status) {
       case 'AVAILABLE':
+      case 'TESTED_OK':
+      case 'UNTESTED':
         return BoardStatus.available;
       case 'CHECKED_OUT':
       case 'IN_USE':

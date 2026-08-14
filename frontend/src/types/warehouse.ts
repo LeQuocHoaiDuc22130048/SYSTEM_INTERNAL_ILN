@@ -85,6 +85,52 @@ export interface Part {
   createdAt?: string;
 }
 
+export interface PartCheckoutHistoryItem {
+  id: string;
+  partId: string;
+  partIpn?: string;
+  partName?: string;
+  storeLocationId?: string;
+  locationCode?: string;
+  locationName?: string;
+  takenBy: string;
+  takenByName?: string;
+  takenByEmployeeCode?: string;
+  quantity: number;
+  returnedQuantity: number;
+  takenAt: string;
+  returnedAt?: string;
+  purpose?: string;
+  repairOrderId?: string;
+  conditionStatus?: 'GOOD' | 'DAMAGED' | 'REPLACED';
+  checkoutStatus: 'OPEN' | 'RETURNED' | 'LOST' | 'DAMAGED';
+  notes?: string;
+}
+
+export interface LocationPartItem {
+  partId: string;
+  partLotId: string;
+  ipn: string;
+  name: string;
+  description?: string;
+  amount: number;
+  unit?: string;
+  categoryName?: string;
+  imageUrl?: string;
+  condition?: string;
+}
+
+export interface LocationScanData {
+  locationId: string;
+  code: string;
+  name: string;
+  description?: string;
+  qrCode?: string;
+  isFull?: boolean;
+  parts: LocationPartItem[];
+  totalPartTypes: number;
+  totalQuantity: number;
+}
 
 export interface WarehouseTabProps {
   showToast: (msg: string) => void;

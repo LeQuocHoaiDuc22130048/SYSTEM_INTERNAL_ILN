@@ -414,7 +414,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   physics: const AlwaysScrollableScrollPhysics(),
                                   children: [
                                     SizedBox(
-                                      height: constraints.maxHeight - 200,
+                                      height: (constraints.maxHeight.isFinite && constraints.maxHeight < 2000)
+                                          ? (constraints.maxHeight - 200).clamp(150.0, 600.0)
+                                          : 350.0,
                                       child: _EmptyOrders(isDark: isDark),
                                     ),
                                   ],

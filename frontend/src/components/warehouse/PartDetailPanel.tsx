@@ -1,5 +1,5 @@
 import React from 'react';
-import { Boxes, Edit2, Trash2 } from 'lucide-react';
+import { Boxes, Edit2, Trash2, ArrowUpRight } from 'lucide-react';
 import type { Part } from '../../types/warehouse';
 
 interface PartDetailPanelProps {
@@ -7,6 +7,7 @@ interface PartDetailPanelProps {
   openAddEditPartModal: (part: Part) => void;
   handleDeletePart: () => void;
   openAdjustStockModal: () => void;
+  openPartCheckoutModal: () => void;
 }
 
 export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
@@ -14,6 +15,7 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
   openAddEditPartModal,
   handleDeletePart,
   openAdjustStockModal,
+  openPartCheckoutModal,
 }) => {
   const isZeroStock = selectedPart.totalQuantity === 0;
   const isLowStock = selectedPart.totalQuantity < selectedPart.minAmount;
@@ -54,9 +56,18 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
       </div>
 
       {/* Main Action Buttons */}
-      <div className="detail-main-actions-bar">
-        <button className="btn-checkout-board" onClick={openAdjustStockModal}>
-          Điều chỉnh số lượng tồn kho
+      <div className="detail-main-actions-bar" style={{ display: 'flex', gap: '8px' }}>
+        <button
+          className="btn-checkout-board"
+          onClick={openPartCheckoutModal}
+          disabled={isZeroStock}
+          style={{ backgroundColor: isZeroStock ? '#94a3b8' : '#d97706', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+        >
+          <ArrowUpRight size={16} />
+          Lấy linh kiện out kho
+        </button>
+        <button className="btn-action-outline" onClick={openAdjustStockModal} style={{ whiteSpace: 'nowrap' }}>
+          Điều chỉnh kho
         </button>
       </div>
 
@@ -100,7 +111,7 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
               >
                 <div>
                   <span className="value" style={{ display: 'block' }}>
-                    {lot.storeLocationName}
+                    {lot.storeLocationName} ({lot.storeLocationCode})
                   </span>
                 </div>
                 <span className="value text-success" style={{ fontSize: '0.95rem' }}>
@@ -110,7 +121,7 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
             ))
           ) : (
             <p className="no-data-text" style={{ margin: 0, padding: '10px 0' }}>
-              Chưa có linh kiện này ở bất kỳ vị trí kho nào. Nhấp "Điều chỉnh số lượng tồn kho" để nhập kho.
+              Chưa có linh kiện này ở bất kỳ vị trí kho nào. Nhấp "Điều chỉnh kho" để nhập kho.
             </p>
           )}
         </div>

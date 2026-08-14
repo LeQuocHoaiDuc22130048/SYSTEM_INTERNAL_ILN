@@ -296,9 +296,16 @@ class _WarehousePageState extends State<WarehousePage> {
                                       setState(() {
                                         _partSearchMethod = PartSearchMethod.locationQr;
                                       });
+                                      final isLocationCode = qrCode.toUpperCase().startsWith('LOC') ||
+                                          qrCode.toUpperCase().contains('KỆ') ||
+                                          qrCode.toUpperCase().contains('KHAY');
                                       messenger.showSnackBar(
                                         SnackBar(
-                                          content: Text('Đã lọc danh sách linh kiện theo vị trí / mã QR: $qrCode'),
+                                          content: Text(
+                                            isLocationCode
+                                                ? '📍 Đã quét Mã Vị Trí Kho: $qrCode. Đang hiển thị các linh kiện tại vị trí này.'
+                                                : '🔌 Đã quét Mã Linh Kiện / IPN: $qrCode. Đang lọc danh sách linh kiện.',
+                                          ),
                                           backgroundColor: AppColors.primary,
                                         ),
                                       );
@@ -749,6 +756,10 @@ class _WarehousePageState extends State<WarehousePage> {
                   child: AnimatedBuilder(
                     animation: Listenable.merge([_searchQuery, _filter, _partFilter]),
                     builder: (context, _) {
+                      final double emptyViewHeight = (constraints.maxHeight.isFinite && constraints.maxHeight < 2000)
+                          ? (constraints.maxHeight - 220).clamp(150.0, 600.0)
+                          : 350.0;
+
                       if (_currentMode == WarehouseMode.boards) {
                         final filtered = _filteredBoards;
                         if (filtered.isEmpty) {
@@ -758,7 +769,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               physics: const AlwaysScrollableScrollPhysics(),
                               children: [
                                 SizedBox(
-                                  height: constraints.maxHeight - 220,
+                                  height: emptyViewHeight,
                                   child: Center(
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -801,19 +812,20 @@ class _WarehousePageState extends State<WarehousePage> {
                             padding: const EdgeInsets.all(16),
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
+                              final animDelay = (50 * (index % 10)).ms;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: _buildBoardListCard(filtered[index])
                                     .animate(target: 1)
                                     .fadeIn(
-                                      duration: 400.ms,
-                                      delay: (50 * index).ms,
+                                      duration: 300.ms,
+                                      delay: animDelay,
                                     )
                                     .slideX(
-                                      begin: -0.2,
+                                      begin: -0.1,
                                       end: 0,
-                                      duration: 400.ms,
-                                      delay: (50 * index).ms,
+                                      duration: 300.ms,
+                                      delay: animDelay,
                                     ),
                               );
                             },
@@ -829,7 +841,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                 physics: const AlwaysScrollableScrollPhysics(),
                                 children: [
                                   SizedBox(
-                                    height: constraints.maxHeight - 220,
+                                    height: emptyViewHeight,
                                     child: Center(
                                       child: Column(
                                         mainAxisAlignment: MainAxisAlignment.center,
@@ -886,7 +898,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               physics: const AlwaysScrollableScrollPhysics(),
                               children: [
                                 SizedBox(
-                                  height: constraints.maxHeight - 220,
+                                  height: emptyViewHeight,
                                   child: Center(
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -929,19 +941,20 @@ class _WarehousePageState extends State<WarehousePage> {
                             padding: const EdgeInsets.all(16),
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
+                              final animDelay = (50 * (index % 10)).ms;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
                                 child: _buildPartListCard(filtered[index])
                                     .animate(target: 1)
                                     .fadeIn(
-                                      duration: 400.ms,
-                                      delay: (50 * index).ms,
+                                      duration: 300.ms,
+                                      delay: animDelay,
                                     )
                                     .slideX(
-                                      begin: -0.2,
+                                      begin: -0.1,
                                       end: 0,
-                                      duration: 400.ms,
-                                      delay: (50 * index).ms,
+                                      duration: 300.ms,
+                                      delay: animDelay,
                                     ),
                               );
                             },
@@ -2114,6 +2127,20 @@ class _WarehousePageState extends State<WarehousePage> {
                                 const SizedBox(height: 12),
                               ],
                               TextField(
+                                controller: modelCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Model',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
+                                controller: serialCtrl,
+                                decoration: const InputDecoration(
+                                  labelText: 'Số serial',
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              TextField(
                                 controller: locationCtrl,
                                 decoration: const InputDecoration(
                                   labelText: 'Vị trí',
@@ -2134,14 +2161,30 @@ class _WarehousePageState extends State<WarehousePage> {
                                   labelText: 'Trạng thái',
                                 ),
                                 items: BoardStatus.values.map((s) {
-                                  String label = 'Sẵn sàng';
-                                  if (s == BoardStatus.checkedOut) {
-                                    label = 'Đang dùng';
+                                  String label;
+                                  switch (s) {
+                                    case BoardStatus.available:
+                                      label = 'Sẵn sàng';
+                                      break;
+                                    case BoardStatus.checkedOut:
+                                      label = 'Đang dùng';
+                                      break;
+                                    case BoardStatus.inRepair:
+                                      label = 'Đang sửa';
+                                      break;
+                                    case BoardStatus.damaged:
+                                      label = 'Hỏng';
+                                      break;
+                                    case BoardStatus.lost:
+                                      label = 'Thất lạc';
+                                      break;
+                                    case BoardStatus.archived:
+                                      label = 'Lưu trữ';
+                                      break;
+                                    case BoardStatus.maintenance:
+                                      label = 'Bảo trì';
+                                      break;
                                   }
-                                  if (s == BoardStatus.maintenance) {
-                                    label = 'Bảo trì';
-                                  }
-                                  label = s.label;
                                   return DropdownMenuItem(
                                     value: s,
                                     child: Text(label),
@@ -2181,17 +2224,18 @@ class _WarehousePageState extends State<WarehousePage> {
                               final serialNumber = _optionalText(
                                 serialCtrl.text,
                               );
+                              final model = _optionalText(modelCtrl.text);
                               final partId = _optionalText(partIdCtrl.text);
                               final currentLocationId = _optionalText(
                                 currentLocationIdCtrl.text,
                               );
 
-
                               final backend = context
                                   .read<BackendDataProvider>();
                               final body = <String, dynamic>{
                                 'name': nameCtrl.text.trim(),
-                                'category': modelCtrl.text.trim(),
+                                if (model != null) 'model': model,
+                                if (model != null) 'category': model,
                                 'location': locationCtrl.text.trim(),
                                 'description': descCtrl.text.trim(),
                                 'serialNumber': serialNumber,

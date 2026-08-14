@@ -3,10 +3,15 @@ package com.suachuabientan.system_internal.modules.warehouse.controller;
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.AdjustStockRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreatePartRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartCheckoutRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartReturnRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdatePartRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.CategoryInfo;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.LocationInfo;
+import com.suachuabientan.system_internal.modules.warehouse.dto.response.LocationScanResponse;
+import com.suachuabientan.system_internal.modules.warehouse.dto.response.PartCheckoutHistoryResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.PartResponse;
+import com.suachuabientan.system_internal.modules.warehouse.enums.CheckoutStatus;
 import com.suachuabientan.system_internal.modules.warehouse.service.PartService;
 import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
@@ -92,6 +97,55 @@ public class PartController {
         return ResponseEntity.ok(ApiResponse.success(
                 partService.adjustStock(id, request, userId),
                 "Điều chỉnh số lượng tồn kho thành công"
+        ));
+    }
+
+    @Operation(summary = "Quét mã QR / Nhập mã vị trí kho — hiển thị tất cả linh kiện tại vị trí đó")
+    @GetMapping("/locations/scan/{codeOrQr}")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
+    public ResponseEntity<ApiResponse<LocationScanResponse>> scanLocationQr(@PathVariable String codeOrQr) {
+        return ResponseEntity.ok(ApiResponse.success(partService.scanLocationQr(codeOrQr)));
+    }
+
+    @Operation(summary = "Lấy linh kiện ra khỏi vị trí kho (Checkout)")
+    @PostMapping("/{id}/checkout")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    public ResponseEntity<ApiResponse<PartCheckoutHistoryResponse>> checkoutPart(
+            @PathVariable UUID id,
+            @Valid @RequestBody PartCheckoutRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UUID userId = extractUserId(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(
+                partService.checkoutPart(id, request, userId),
+                "Lấy linh kiện thành công"
+        ));
+    }
+
+    @Operation(summary = "Trả linh kiện về vị trí kho (Return)")
+    @PostMapping("/checkouts/{checkoutId}/return")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    public ResponseEntity<ApiResponse<PartCheckoutHistoryResponse>> returnPart(
+            @PathVariable UUID checkoutId,
+            @Valid @RequestBody PartReturnRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UUID userId = extractUserId(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(
+                partService.returnPart(checkoutId, request, userId),
+                "Trả linh kiện thành công"
+        ));
+    }
+
+    @Operation(summary = "Xem nhật ký lấy và trả linh kiện (Part Activity Log)")
+    @GetMapping("/checkouts/history")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
+    public ResponseEntity<ApiResponse<Page<PartCheckoutHistoryResponse>>> getCheckoutHistory(
+            @RequestParam(required = false) UUID partId,
+            @RequestParam(required = false) UUID locationId,
+            @RequestParam(required = false) UUID userId,
+            @RequestParam(required = false) CheckoutStatus status,
+            @PageableDefault(size = 20) Pageable pageable) {
+        return ResponseEntity.ok(ApiResponse.success(
+                partService.getCheckoutHistory(partId, locationId, userId, status, pageable)
         ));
     }
 

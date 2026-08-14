@@ -79,20 +79,25 @@ class StatusBadge extends StatelessWidget {
           };
         case BoardStatus.inRepair:
           return {
-            'label': status.label,
+            'label': 'Đang sửa',
             'bgColor': AppColors.infoLight,
             'textColor': AppColors.info,
           };
         case BoardStatus.damaged:
+          return {
+            'label': 'Hỏng',
+            'bgColor': AppColors.errorLight,
+            'textColor': AppColors.error,
+          };
         case BoardStatus.lost:
           return {
-            'label': status.label,
+            'label': 'Thất lạc',
             'bgColor': AppColors.errorLight,
             'textColor': AppColors.error,
           };
         case BoardStatus.archived:
           return {
-            'label': status.label,
+            'label': 'Lưu trữ',
             'bgColor': const Color(0xFFF1F5F9),
             'textColor': const Color(0xFF64748B),
           };

@@ -8,5 +8,7 @@ public enum BoardStatus {
     LOST,
     ARCHIVED,
     MAINTENANCE,
-    RETIRED
+    RETIRED,
+    UNTESTED,
+    TESTED_OK
 }

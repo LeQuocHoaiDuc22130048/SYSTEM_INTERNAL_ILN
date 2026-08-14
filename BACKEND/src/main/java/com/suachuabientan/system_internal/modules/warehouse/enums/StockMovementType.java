@@ -5,6 +5,7 @@ public enum StockMovementType {
     EXPORT,
     USE_FOR_REPAIR,
     RETURN,
+    RETURN_SCRAP,
     ADJUST,
     TRANSFER,
     DAMAGED

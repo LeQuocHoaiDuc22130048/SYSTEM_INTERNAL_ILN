@@ -49,10 +49,15 @@ public class PartLot extends BaseEntity {
     @Column(length = 50)
     private String condition;
 
+    @Column(name = "supplier_id")
+    private UUID supplierId;
+
+    @Column(name = "purchase_link", length = 255)
+    private String purchaseLink;
+
     @Column(name = "expiration_date")
     private LocalDate expirationDate;
 
     @Column(name = "received_date")
     private LocalDate receivedDate;
 }
-
