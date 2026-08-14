@@ -21,14 +21,27 @@ jobs:
   deploy:
     name: Deploy to Server
     runs-on: ubuntu-latest
-    # Chỉ chạy nếu có thiết lập SSH_HOST trong Secrets (tránh fail nếu chưa config Secrets)
-    if: "${{ vars.ENABLE_CD == 'true' || secrets.SSH_HOST != '' }}"
 
     steps:
+      - name: Check SSH Secrets Availability
+        id: check_ssh
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+        run: |
+          if [ -z "$SSH_HOST" ]; then
+            echo "⚠️ Chưa cấu hình SSH_HOST trong GitHub Secrets. Bỏ qua bước triển khai."
+            echo "configured=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Đã tìm thấy cấu hình SSH_HOST. Tiến hành triển khai."
+            echo "configured=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Checkout repository
+        if: steps.check_ssh.outputs.configured == 'true'
         uses: actions/checkout@v4
 
       - name: Execute Remote Deployment via SSH
+        if: steps.check_ssh.outputs.configured == 'true'
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
