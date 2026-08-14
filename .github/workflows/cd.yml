@@ -1,0 +1,79 @@
+name: CD - Continuous Deployment
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      target_env:
+        description: 'Môi trường muốn triển khai'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - test
+
+jobs:
+  # =======================================================
+  # DEPLOY JOB (Hỗ trợ SSH Remote Deploy cho Máy chủ / VPS)
+  # =======================================================
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    # Chỉ chạy nếu có thiết lập SSH_HOST trong Secrets (tránh fail nếu chưa config Secrets)
+    if: "${{ vars.ENABLE_CD == 'true' || secrets.SSH_HOST != '' }}"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Execute Remote Deployment via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            echo "==> Bắt đầu quy trình triển khai tự động..."
+            
+            # 1. Di chuyển vào thư mục dự án trên máy chủ
+            TARGET_DIR="${{ secrets.SERVER_DEPLOY_PATH || '/opt/system_internal/application' }}"
+            echo "==> Thư mục triển khai: $TARGET_DIR"
+            cd "$TARGET_DIR"
+
+            # 2. Cập nhật mã nguồn mới nhất từ nhánh main
+            echo "==> Kéo mã nguồn mới nhất từ Git..."
+            git fetch origin main
+            git reset --hard origin/main
+
+            # 3. Chọn file docker-compose tương ứng
+            DEPLOY_ENV="${{ github.event.inputs.target_env || 'production' }}"
+            echo "==> Môi trường: $DEPLOY_ENV"
+
+            cd backend
+            if [ "$DEPLOY_ENV" = "production" ]; then
+              COMPOSE_FILE="docker-compose.prod.yml"
+              ENV_FILE=".env"
+            else
+              COMPOSE_FILE="docker-compose.test.yml"
+              ENV_FILE=".env.test"
+            fi
+
+            # 4. Tái xây dựng và khởi chạy các container
+            echo "==> Khởi chạy các container với $COMPOSE_FILE..."
+            if [ -f "$ENV_FILE" ]; then
+              docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+            else
+              docker compose -f "$COMPOSE_FILE" up -d --build
+            fi
+
+            # 5. Dọn dẹp các Docker image cũ không còn sử dụng để tiết kiệm ổ cứng
+            echo "==> Dọn dẹp Docker images rác..."
+            docker image prune -f
+
+            echo "==> Triển khai hoàn tất thành công!"
