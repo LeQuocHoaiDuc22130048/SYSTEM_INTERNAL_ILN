@@ -5,7 +5,7 @@ import 'dart:io';
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import '../services/mock_mlkit_types.dart';
 import 'package:image/image.dart' as image_lib;
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 

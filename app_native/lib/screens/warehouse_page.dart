@@ -1477,14 +1477,18 @@ class _WarehousePageState extends State<WarehousePage> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        _qrCodeLabel(board),
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontFamily: 'monospace',
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                      Flexible(
+                        child: Text(
+                          _qrCodeLabel(board),
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontFamily: 'monospace',
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const Text(' · ', style: TextStyle(fontSize: 14)),
@@ -1621,15 +1625,19 @@ class _WarehousePageState extends State<WarehousePage> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Text(
-                        part.ipn,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontFamily: 'monospace',
-                          fontWeight: FontWeight.bold,
-                          color: isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
+                      Flexible(
+                        child: Text(
+                          part.ipn,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontFamily: 'monospace',
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const Text(' · ', style: TextStyle(fontSize: 14)),
