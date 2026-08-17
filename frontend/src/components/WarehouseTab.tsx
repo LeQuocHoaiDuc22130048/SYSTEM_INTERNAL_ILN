@@ -6,7 +6,7 @@ import {
   QrCode,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
-import { exportBoardQrPdfList, type BoardQrExportData, type QrPrintConfig } from '../utils/pdf';
+import { exportLocationQrPdfList, type LocationQrExportData, type QrPrintConfig } from '../utils/pdf';
 import type { Board, BoardHistoryItem, Part, PartCheckoutHistoryItem, WarehouseTabProps } from '../types/warehouse';
 
 import { BoardListPanel } from './warehouse/BoardListPanel';
@@ -58,6 +58,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
   // New Part Modals & QR Scan states
   const [isLocationQrScanModalOpen, setIsLocationQrScanModalOpen] = useState<boolean>(false);
+  const [locationScanInitialCode, setLocationScanInitialCode] = useState<string>('');
   const [isPartCheckoutModalOpen, setIsPartCheckoutModalOpen] = useState<boolean>(false);
   const [isPartReturnModalOpen, setIsPartReturnModalOpen] = useState<boolean>(false);
   const [checkoutHistoryItemToReturn, setCheckoutHistoryItemToReturn] = useState<PartCheckoutHistoryItem | null>(null);
@@ -68,6 +69,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [selectedPart, setSelectedPart] = useState<Part | null>(null);
   const [loadingParts, setLoadingParts] = useState<boolean>(false);
   const [partSearchTerm, setPartSearchTerm] = useState<string>('');
+  const [partCategoryFilter, setPartCategoryFilter] = useState<string>('ALL');
+  const [partStockFilter, setPartStockFilter] = useState<'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
 
   // Part Modals
   const [isPartAddEditModalOpen, setIsPartAddEditModalOpen] = useState<boolean>(false);
@@ -97,19 +100,25 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [returnQuantity, setReturnQuantity] = useState<number>(1);
   const [returnReason, setReturnReason] = useState<string>('');
 
-  // QR Print Config Modal States
+  // Location QR Print Config Modal States
   const [isQrConfigModalOpen, setIsQrConfigModalOpen] = useState<boolean>(false);
-  const [boardsForQrPrint, setBoardsForQrPrint] = useState<BoardQrExportData[]>([]);
+  const [locationsForQrPrint, setLocationsForQrPrint] = useState<LocationQrExportData[]>([]);
 
-  const handleOpenSingleQrPrint = useCallback((board: Board) => {
-    setBoardsForQrPrint([board]);
+  const handleOpenLocationQrPrint = useCallback((locList?: LocationQrExportData[]) => {
+    if (locList && locList.length > 0) {
+      setLocationsForQrPrint(locList);
+    } else {
+      setLocationsForQrPrint(
+        locations.map((l) => ({
+          id: l.id,
+          code: l.code,
+          name: l.name,
+          qrCode: l.code,
+        }))
+      );
+    }
     setIsQrConfigModalOpen(true);
-  }, []);
-
-  const handleOpenListQrPrint = useCallback((boardList: Board[]) => {
-    setBoardsForQrPrint(boardList);
-    setIsQrConfigModalOpen(true);
-  }, []);
+  }, [locations]);
 
   // Fetch Boards
   const fetchBoards = useCallback(async () => {
@@ -657,8 +666,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   // Filtered Parts
   const filteredParts = parts.filter((part) => {
     const term = partSearchTerm.toLowerCase().trim();
-    if (!term) return true;
-    return (
+    const matchesSearch = !term || (
       part.name.toLowerCase().includes(term) ||
       part.ipn.toLowerCase().includes(term) ||
       (part.categoryName && part.categoryName.toLowerCase().includes(term)) ||
@@ -668,6 +676,21 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
         (l.storeLocationName && l.storeLocationName.toLowerCase().includes(term))
       ))
     );
+
+    const matchesCategory = partCategoryFilter === 'ALL' ||
+      part.categoryName === partCategoryFilter ||
+      part.categoryId === partCategoryFilter;
+
+    let matchesStock = true;
+    if (partStockFilter === 'IN_STOCK') {
+      matchesStock = part.totalQuantity > 0;
+    } else if (partStockFilter === 'LOW_STOCK') {
+      matchesStock = part.totalQuantity < part.minAmount && part.totalQuantity > 0;
+    } else if (partStockFilter === 'OUT_OF_STOCK') {
+      matchesStock = part.totalQuantity === 0;
+    }
+
+    return matchesSearch && matchesCategory && matchesStock;
   });
 
   // Open Checkout Modal
@@ -766,11 +789,6 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
     }
   };
 
-  // QR Code generator URL helper
-  const getQRCodeUrl = (code: string) => {
-    return `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(code)}`;
-  };
-
   return (
     <div className="warehouse-container">
       {/* Top Header Mode Switcher & Quick QR Scan Bar */}
@@ -802,14 +820,27 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           </button>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsLocationQrScanModalOpen(true)}
-          style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <QrCode size={16} />
-          Quét QR Vị Trí Kho
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => {
+              setLocationScanInitialCode('');
+              setIsLocationQrScanModalOpen(true);
+            }}
+            style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+          >
+            <QrCode size={16} />
+            Quét QR Vị Trí Kho
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleOpenLocationQrPrint()}
+            style={{ backgroundColor: 'var(--color-bg-surface, #ffffff)', color: '#2563eb', border: '1px solid #bfdbfe', padding: '8px 14px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
+          >
+            🏷️ In Tem QR Vị Trí
+          </button>
+        </div>
       </div>
 
       {warehouseMode === 'PART_LOGS' ? (
@@ -840,7 +871,6 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                 openAddEditModal={openAddEditModal}
                 getStatusLabel={getStatusLabel}
                 getStatusColorClass={getStatusColorClass}
-                exportBoardQrPdfList={handleOpenListQrPrint}
               />
             ) : (
               <PartListPanel
@@ -851,7 +881,21 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                 filteredParts={filteredParts}
                 selectedPart={selectedPart}
                 setSelectedPart={setSelectedPart}
+                categories={categories}
+                partCategoryFilter={partCategoryFilter}
+                setPartCategoryFilter={setPartCategoryFilter}
+                partStockFilter={partStockFilter}
+                setPartStockFilter={setPartStockFilter}
                 openAddEditPartModal={openAddEditPartModal}
+                openLocationQrScanModal={(code) => {
+                  setLocationScanInitialCode(code || '');
+                  setIsLocationQrScanModalOpen(true);
+                }}
+                openLocationQrPrintModal={handleOpenLocationQrPrint}
+                onQuickCheckoutPart={(part) => {
+                  setSelectedPart(part);
+                  setIsPartCheckoutModalOpen(true);
+                }}
               />
             )}
           </div>
@@ -868,10 +912,12 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                   handleDeleteBoard={handleDeleteBoard}
                   openCheckoutModal={openCheckoutModal}
                   openReturnModal={openReturnModal}
-                  getQRCodeUrl={getQRCodeUrl}
-                  exportBoardQrPdf={handleOpenSingleQrPrint}
                   loadingHistory={loadingHistory}
                   boardHistory={boardHistory}
+                  onOpenLocationScan={(loc) => {
+                    setLocationScanInitialCode(loc);
+                    setIsLocationQrScanModalOpen(true);
+                  }}
                 />
               ) : (
                 <div className="detail-empty-state">
@@ -1296,23 +1342,26 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           </div>
         </div>
       )}
-      {/* QR Print Config & Live Preview Modal */}
+      {/* QR Print Config & Live Preview Modal for Warehouse Locations */}
       <QrPrintConfigModal
         isOpen={isQrConfigModalOpen}
-        boards={boardsForQrPrint}
+        locations={locationsForQrPrint}
         onClose={() => setIsQrConfigModalOpen(false)}
         onConfirmPrint={(config: QrPrintConfig) => {
           setIsQrConfigModalOpen(false);
-          const filename = boardsForQrPrint.length === 1
-            ? `Tem_QR_${boardsForQrPrint[0].qrCode || boardsForQrPrint[0].name}`
-            : 'Danh_sach_tem_QR_bo_mach';
-          exportBoardQrPdfList(boardsForQrPrint, filename, config);
+          const filename =
+            locationsForQrPrint.length === 1
+              ? `Tem_QR_ViTri_${locationsForQrPrint[0].code}`
+              : 'Danh_sach_tem_QR_vi_tri_kho';
+          exportLocationQrPdfList(locationsForQrPrint, filename, config);
         }}
       />
 
       {/* Location QR Code Scan Modal */}
       <LocationQrScanModal
         isOpen={isLocationQrScanModalOpen}
+        initialCode={locationScanInitialCode}
+        availableLocations={locations}
         onClose={() => setIsLocationQrScanModalOpen(false)}
         onSelectPartForCheckout={(partItem) => {
           const matchedPart = parts.find((p) => p.id === partItem.partId);
@@ -1320,6 +1369,20 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
             setSelectedPart(matchedPart);
           }
           setIsPartCheckoutModalOpen(true);
+        }}
+        onPrintLocationQr={(locData) => {
+          setLocationsForQrPrint([
+            {
+              id: locData.locationId || locData.code,
+              code: locData.code,
+              name: locData.name,
+              qrCode: locData.qrCode || locData.code,
+              description: locData.description,
+              totalPartTypes: locData.totalPartTypes,
+              totalQuantity: locData.totalQuantity,
+            },
+          ]);
+          setIsQrConfigModalOpen(true);
         }}
         showToast={showToast}
       />

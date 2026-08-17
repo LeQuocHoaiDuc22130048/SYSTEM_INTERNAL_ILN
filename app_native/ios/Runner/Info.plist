@@ -70,5 +70,10 @@
 	<string>Ứng dụng cần truy cập máy ảnh để quét mã QR và nhận diện khuôn mặt chấm công.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ung dung can truy cap thu vien de gui anh va video trong tin nhan.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
 </dict>
 </plist>

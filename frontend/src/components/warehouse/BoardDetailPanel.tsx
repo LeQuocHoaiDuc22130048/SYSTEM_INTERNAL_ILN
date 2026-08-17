@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Cpu, Edit2, Trash2, Printer, Copy, Check } from 'lucide-react';
+import React from 'react';
+import { Cpu, Edit2, Trash2, MapPin } from 'lucide-react';
 import type { Board, BoardHistoryItem } from '../../types/warehouse';
 
 interface BoardDetailPanelProps {
@@ -10,10 +10,9 @@ interface BoardDetailPanelProps {
   handleDeleteBoard: () => void;
   openCheckoutModal: () => void;
   openReturnModal: () => void;
-  getQRCodeUrl: (code: string) => string;
-  exportBoardQrPdf: (board: Board) => void;
   loadingHistory: boolean;
   boardHistory: BoardHistoryItem[];
+  onOpenLocationScan?: (locationCode: string) => void;
 }
 
 export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
@@ -24,22 +23,10 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
   handleDeleteBoard,
   openCheckoutModal,
   openReturnModal,
-  getQRCodeUrl,
-  exportBoardQrPdf,
   loadingHistory,
   boardHistory,
+  onOpenLocationScan,
 }) => {
-  const [isCopied, setIsCopied] = useState<boolean>(false);
-
-  const handleCopyQr = () => {
-    const rawQrCode = (selectedBoard?.qrCode || '').trim();
-    if (rawQrCode) {
-      navigator.clipboard.writeText(rawQrCode);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2200);
-    }
-  };
-
   return (
     <div className="detail-scroller">
       <div className="detail-header-row">
@@ -86,7 +73,28 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
         <div className="specs-info-grid">
           <div className="spec-detail-item">
             <span className="label">Vị trí lưu trữ</span>
-            <span className="value">{selectedBoard.location || 'Chưa cài đặt'}</span>
+            <span className="value" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <MapPin size={14} className="text-primary" />
+              <strong>{selectedBoard.location || 'Chưa cài đặt'}</strong>
+              {selectedBoard.location && onOpenLocationScan && (
+                <button
+                  type="button"
+                  onClick={() => onOpenLocationScan(selectedBoard.location)}
+                  style={{
+                    marginLeft: '6px',
+                    padding: '2px 8px',
+                    fontSize: '0.75rem',
+                    background: '#eff6ff',
+                    border: '1px solid #bfdbfe',
+                    color: '#2563eb',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Tra cứu vị trí
+                </button>
+              )}
+            </span>
           </div>
           <div className="spec-detail-item">
             <span className="label">Tồn kho hiện tại</span>
@@ -119,7 +127,6 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
           )}
         </div>
       </div>
-
 
       {/* Active Checkout Info */}
       {selectedBoard.checkedOutBy && (
@@ -177,49 +184,6 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
           </div>
         </div>
       )}
-
-
-      {/* QR Code Section */}
-      <div className="detail-content-section align-center">
-        <div className="qrcode-section-header">
-          <h4 className="section-title text-left margin-0">QR Code định danh</h4>
-          <button
-            className={`btn-export-qr-pdf ${isCopied ? 'copied-success' : ''}`}
-            onClick={handleCopyQr}
-            title="Sao chép mã QR này vào bộ nhớ tạm"
-          >
-            {isCopied ? <Check size={15} /> : <Copy size={15} />}
-            <span>{isCopied ? 'Đã sao chép mã!' : 'Sao chép Mã QR'}</span>
-          </button>
-        </div>
-        <div className="qrcode-container-card">
-          <img src={getQRCodeUrl(selectedBoard.qrCode)} alt="QR Code" className="qrcode-img" />
-          <div className="qrcode-meta">
-            <span className="qr-value">{selectedBoard.qrCode}</span>
-            <span className="qr-desc">Sao chép mã QR này hoặc dùng ứng dụng di động quét mã để kiểm tra thông tin nhanh.</span>
-            
-            <div style={{ display: 'flex', gap: '8px', width: '100%', marginTop: '6px' }}>
-              <button
-                className={`btn-export-qr-pdf-outline ${isCopied ? 'copied-success' : ''}`}
-                onClick={handleCopyQr}
-                style={{ flex: 1 }}
-              >
-                {isCopied ? <Check size={14} /> : <Copy size={14} />}
-                <span>{isCopied ? 'Đã sao chép!' : 'Sao chép mã'}</span>
-              </button>
-
-              <button
-                className="btn-export-qr-pdf-outline"
-                onClick={() => exportBoardQrPdf(selectedBoard)}
-                title="Cấu hình cài đặt in tem nhãn bo mạch"
-                style={{ width: 'auto', padding: '0 10px' }}
-              >
-                <Printer size={14} />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* History Section */}
       <div className="detail-content-section">

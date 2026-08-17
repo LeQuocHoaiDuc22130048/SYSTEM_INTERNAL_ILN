@@ -238,4 +238,42 @@ class AttendanceQueryControllerTest {
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].lateCount").value(1))
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].overtimeHours").value(0.5));
     }
+
+    @Test
+    @WithMockUser(roles = "MANAGER")
+    void getMonthlyReturnsUpdateNotesAndReasons() throws Exception {
+        UUID empId = UUID.randomUUID();
+        UserEntity employee = new UserEntity();
+        employee.setId(empId);
+        employee.setUsername("employee2");
+        employee.setFullName("Nguyen Van A");
+        employee.setEmployeeCode("EMP-002");
+        employee.setRole(UserRole.EMPLOYEE);
+        employee.setIsDeleted(false);
+
+        when(userRepository.findAll()).thenReturn(java.util.List.of(employee));
+
+        // Create a manual attendance record with note on 2026-06-05
+        java.time.Instant checkIn = java.time.LocalDateTime.of(2026, 6, 5, 8, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        AttendanceRecord rec = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.IN)
+                .checkTime(checkIn)
+                .note("Quên quẹt thẻ")
+                .isValid(true)
+                .build();
+        rec.setIsDeleted(false);
+
+        when(attendanceRecordRepository.findByCheckTimeBetween(any(), any()))
+                .thenReturn(java.util.List.of(rec));
+        when(workScheduleRepository.findByWorkDateBetween(any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/attendance/monthly")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].updateNotes.5").value("[Vào 08:00] Quên quẹt thẻ"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].notes").value("Ngày 05: [Vào 08:00] Quên quẹt thẻ"));
+    }
 }

@@ -151,13 +151,18 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                       <td className="number-cell">{emp.totalHours}h</td>
                       <td>
                         <div className="mini-bar">
-                          {emp.dailyPattern.split('').map((char, index) => (
-                            <div key={index} className={`mini-day ${char}`}>
-                              <span className="tooltip">
-                                Ngày {index + 1}: {DAILY_STATUS_LABEL_MAP[char as keyof typeof DAILY_STATUS_LABEL_MAP] ?? 'Đủ công'}
-                              </span>
-                            </div>
-                          ))}
+                          {emp.dailyPattern.split('').map((char, index) => {
+                            const dayNum = index + 1;
+                            const updateReason = emp.updateNotes?.[dayNum] || emp.updateNotes?.[String(dayNum)];
+                            return (
+                              <div key={index} className={`mini-day ${char}`}>
+                                <span className="tooltip">
+                                  Ngày {dayNum}: {DAILY_STATUS_LABEL_MAP[char as keyof typeof DAILY_STATUS_LABEL_MAP] ?? 'Đủ công'}
+                                  {updateReason ? ` (Lý do: ${updateReason})` : ''}
+                                </span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </td>
                     </tr>

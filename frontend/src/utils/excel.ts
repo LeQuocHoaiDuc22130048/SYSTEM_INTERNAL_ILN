@@ -30,7 +30,7 @@ export async function exportAttendanceExcel(
   }
 
   columns.push({ key: 'totalWorkDays', width: 14 });
-  columns.push({ key: 'notes', width: 22 });
+  columns.push({ key: 'notes', width: 45 });
 
   worksheet.columns = columns;
 
@@ -64,7 +64,7 @@ export async function exportAttendanceExcel(
   const startDayColIndex = 3; // Cột C (bắt đầu từ ngày 1)
   const endDayColIndex = 2 + daysInMonth; // Cột cuối cùng của ngày
   const totalColIndex = 2 + daysInMonth + 1; // Cột Tổng cộng
-  const notesColIndex = 2 + daysInMonth + 2; // Cột Ghi chú
+  const notesColIndex = 2 + daysInMonth + 2; // Cột Ghi chú / Lý do cập nhật
 
   // 2. TẠO HÀNG TIÊU ĐỀ 1: "Tháng MM" (Gộp từ cột C đến cột cuối cùng của ngày)
   const row1 = worksheet.getRow(1);
@@ -118,7 +118,7 @@ export async function exportAttendanceExcel(
   totalTitleCell.alignment = { vertical: 'middle', horizontal: 'center' };
   totalTitleCell.border = borderAllBlack;
 
-  // 4. TẠO HÀNG TIÊU ĐỀ 3: "Thứ" & Các thứ T2..CN & "NGÀY CÔNG" & "Ghi Chú"
+  // 4. TẠO HÀNG TIÊU ĐỀ 3: "Thứ" & Các thứ T2..CN & "NGÀY CÔNG" & "Lý do cập nhật / Ghi Chú"
   const row3 = worksheet.getRow(3);
   row3.height = 22;
 
@@ -154,10 +154,10 @@ export async function exportAttendanceExcel(
   workdayTitleCell.alignment = { vertical: 'middle', horizontal: 'center' };
   workdayTitleCell.border = borderAllBlack;
 
-  // Gộp cột Ghi chú ở dòng 2 và dòng 3 lại
+  // Gộp cột Lý do cập nhật / Ghi chú ở dòng 2 và dòng 3 lại
   worksheet.mergeCells(2, notesColIndex, 3, notesColIndex);
   const notesTitleCell = row2.getCell(notesColIndex);
-  notesTitleCell.value = 'Ghi Chú';
+  notesTitleCell.value = 'Lý do cập nhật / Ghi chú';
   notesTitleCell.font = { name: 'Arial', size: 10, bold: true };
   notesTitleCell.alignment = { vertical: 'middle', horizontal: 'center' };
   row2.getCell(notesColIndex).border = borderAllBlack;
@@ -245,6 +245,11 @@ export async function exportAttendanceExcel(
         }
       }
 
+      // Thêm ghi chú/comment tại ô ngày tương ứng nếu ngày đó có cập nhật lý do
+      if (emp.updateNotes && emp.updateNotes[d]) {
+        cell.note = `Ngày ${String(d).padStart(2, '0')}/${String(month).padStart(2, '0')}: ${emp.updateNotes[d]}`;
+      }
+
       // Cấu hình định dạng hiển thị cho số ngày công
       if (cell.value === 1.5 || cell.value === 0.5) {
         cell.numFmt = '0.0';
@@ -266,11 +271,30 @@ export async function exportAttendanceExcel(
     totalCell.border = borderAllBlack;
     totalCell.numFmt = '0.0';
 
-    // Cột AI: Ghi Chú
+    // Cột AI: Lý do cập nhật & Ghi Chú
     const notesCell = row.getCell(notesColIndex);
-    notesCell.value = emp.name === 'Nguyễn Kim Thy' ? 'Làm việc Online' : '';
+    let finalNote = '';
+    const noteItems: string[] = [];
+
+    if (emp.name === 'Nguyễn Kim Thy') {
+      noteItems.push('Làm việc Online');
+    }
+
+    if (emp.updateNotes && Object.keys(emp.updateNotes).length > 0) {
+      Object.entries(emp.updateNotes)
+        .sort(([d1], [d2]) => Number(d1) - Number(d2))
+        .forEach(([d, reason]) => {
+          noteItems.push(`Ngày ${String(d).padStart(2, '0')}: ${reason}`);
+        });
+    } else if (emp.notes && emp.notes.trim()) {
+      noteItems.push(emp.notes.trim());
+    }
+
+    finalNote = noteItems.join('\n');
+
+    notesCell.value = finalNote;
     notesCell.font = { name: 'Arial', size: 9 };
-    notesCell.alignment = { vertical: 'middle', horizontal: 'left' };
+    notesCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
     notesCell.border = borderAllBlack;
   });
 
@@ -435,9 +459,25 @@ export async function exportEmployeeHistoryExcel(
     };
     const statusLabel = STATUS_MAP[day.status as keyof typeof STATUS_MAP] || day.status;
 
-    // Lấy ghi chú thủ công/chính
-    const manualEvents = day.events.filter(e => e.source === 'MANUAL');
-    const noteText = manualEvents.map(e => e.note).filter(Boolean).join('; ') || day.events.map(e => e.note).filter(Boolean).join('; ');
+    // Lấy ghi chú thủ công / lý do cập nhật
+    const manualNotes = day.events
+      .filter(e => e.source === 'MANUAL' && e.note)
+      .map(e => e.note.trim());
+    const otherNotes = day.events
+      .filter(e => e.source !== 'MANUAL' && e.note && 
+        !e.note.includes('Chấm công bằng nhận diện khuôn mặt') && 
+        !e.note.includes('Chấm công bằng khuôn mặt'))
+      .map(e => e.note.trim());
+
+    let noteText = '';
+    if (manualNotes.length > 0) {
+      noteText = `Lý do cập nhật: ${Array.from(new Set(manualNotes)).join('; ')}`;
+      if (otherNotes.length > 0) {
+        noteText += ` (${Array.from(new Set(otherNotes)).join('; ')})`;
+      }
+    } else if (otherNotes.length > 0) {
+      noteText = Array.from(new Set(otherNotes)).join('; ');
+    }
 
     row.getCell(1).value = idx + 1;
     row.getCell(2).value = dateFormatted;

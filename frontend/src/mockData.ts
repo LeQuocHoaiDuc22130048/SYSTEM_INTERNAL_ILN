@@ -10,6 +10,8 @@ export interface EmployeeMonthlyStats {
   overtimeHours: number;
   leavedays: number;
   dailyPattern: string; // p=present, l=late, a=absent, v=leave, h=holiday/weekend, o=overtime, f=future
+  updateNotes?: Record<string | number, string>;
+  notes?: string;
 }
 
 export interface EmployeeInfo {

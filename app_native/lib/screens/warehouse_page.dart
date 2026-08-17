@@ -457,72 +457,88 @@ class _WarehousePageState extends State<WarehousePage> {
                           ),
                         )
                       else
-                        GridView.count(
-                          crossAxisCount: 2,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          mainAxisSpacing: 10,
-                          crossAxisSpacing: 10,
-                          mainAxisExtent: 98,
+                        Row(
                           children: _currentMode == WarehouseMode.boards
                               ? [
-                                  _buildCompactStatCard(
-                                    '${boards.length}',
-                                    'Tổng',
-                                    LucideIcons.cpu,
-                                    AppColors.primary,
-                                    isDark,
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      '${boards.length}',
+                                      'Tổng',
+                                      LucideIcons.cpu,
+                                      AppColors.primary,
+                                      isDark,
+                                    ),
                                   ),
-                                  _buildCompactStatCard(
-                                    '${boards.where((b) => b.status == BoardStatus.available).length}',
-                                    'Sẵn sàng',
-                                    Icons.inventory_2_outlined,
-                                    AppColors.success,
-                                    isDark,
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      '${boards.where((b) => b.status == BoardStatus.available).length}',
+                                      'Sẵn sàng',
+                                      Icons.inventory_2_outlined,
+                                      AppColors.success,
+                                      isDark,
+                                    ),
                                   ),
-                                  _buildCompactStatCard(
-                                    '${boards.where((b) => b.status == BoardStatus.checkedOut).length}',
-                                    'Đang dùng',
-                                    LucideIcons.wrench,
-                                    AppColors.warning,
-                                    isDark,
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      '${boards.where((b) => b.status == BoardStatus.checkedOut).length}',
+                                      'Đang dùng',
+                                      LucideIcons.wrench,
+                                      AppColors.warning,
+                                      isDark,
+                                    ),
                                   ),
-                                  _buildCompactStatCard(
-                                    '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
-                                    'Bảo trì',
-                                    Icons.warning_amber,
-                                    AppColors.error,
-                                    isDark,
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
+                                      'Bảo trì',
+                                      Icons.warning_amber,
+                                      AppColors.error,
+                                      isDark,
+                                    ),
                                   ),
                                 ]
                               : [
-                                  _buildCompactStatCard(
-                                    '$totalParts',
-                                    'Tổng loại',
-                                    Icons.widgets,
-                                    AppColors.primary,
-                                    isDark,
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      '$totalParts',
+                                      'Tổng loại',
+                                      Icons.widgets,
+                                      AppColors.primary,
+                                      isDark,
+                                    ),
                                   ),
-                                  _buildCompactStatCard(
-                                    totalPartQty.toStringAsFixed(0),
-                                    'Tổng tồn kho',
-                                    Icons.inventory_2_outlined,
-                                    AppColors.success,
-                                    isDark,
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      totalPartQty.toStringAsFixed(0),
+                                      'Tổng tồn',
+                                      Icons.inventory_2_outlined,
+                                      AppColors.success,
+                                      isDark,
+                                    ),
                                   ),
-                                  _buildCompactStatCard(
-                                    '$lowStockParts',
-                                    'Sắp hết',
-                                    Icons.warning_amber,
-                                    AppColors.warning,
-                                    isDark,
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      '$lowStockParts',
+                                      'Sắp hết',
+                                      Icons.warning_amber,
+                                      AppColors.warning,
+                                      isDark,
+                                    ),
                                   ),
-                                  _buildCompactStatCard(
-                                    '$outOfStockParts',
-                                    'Hết hàng',
-                                    Icons.error_outline,
-                                    AppColors.error,
-                                    isDark,
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: _buildCompactStatCard(
+                                      '$outOfStockParts',
+                                      'Hết hàng',
+                                      Icons.error_outline,
+                                      AppColors.error,
+                                      isDark,
+                                    ),
                                   ),
                                 ],
                         ),
@@ -1183,65 +1199,65 @@ class _WarehousePageState extends State<WarehousePage> {
   ) {
     final background = color.withOpacity(0.12);
     return Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: isDark ? AppColors.borderDark : AppColors.borderLight,
         ),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
                   label,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    fontSize: 12,
-                    height: 1.2,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w500,
                     color: isDark
                         ? AppColors.textSecondaryDark
                         : AppColors.textSecondaryLight,
                   ),
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  value,
-                  style: TextStyle(
-                    fontSize: 23,
-                    height: 1,
-                    fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
-                  ),
+              ),
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: background,
+                  borderRadius: BorderRadius.circular(4),
                 ),
-              ],
-            ),
+                child: Icon(icon, size: 11, color: color),
+              ),
+            ],
           ),
-          const SizedBox(width: 8),
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              color: background,
-              borderRadius: BorderRadius.circular(12),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
             ),
-            child: Icon(icon, size: 18, color: color),
           ),
         ],
       ),
     )
     .animate(target: 1)
-    .fadeIn(duration: 300.ms, delay: 100.ms)
-    .slideY(begin: 0.2, end: 0, duration: 300.ms, delay: 100.ms);
+    .fadeIn(duration: 250.ms)
+    .slideY(begin: 0.1, end: 0, duration: 250.ms);
   }
 
   Widget _buildBoardGridCard(Board board) {

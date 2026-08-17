@@ -85,6 +85,10 @@ public class AttendanceQueryController {
             double overtimeHours = 0.0;
             StringBuilder patternBuilder = new StringBuilder();
 
+            DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZONE);
+            Map<Integer, String> empUpdateNotes = new LinkedHashMap<>();
+            List<String> formattedNoteList = new ArrayList<>();
+
             for (int d = 1; d <= totalDaysInMonth; d++) {
                 LocalDate date = LocalDate.of(year, month, d);
                 DayOfWeek dow = date.getDayOfWeek();
@@ -94,6 +98,60 @@ public class AttendanceQueryController {
                 WorkSchedule schedule = empSchedules.get(date);
                 LocalTime shiftStart = schedule != null ? schedule.getShiftStart() : DEFAULT_SHIFT_START;
                 LocalTime shiftEnd = schedule != null ? schedule.getShiftEnd() : DEFAULT_SHIFT_END;
+
+                // Thu thập lý do cập nhật/ghi chú và giờ vào/ra trong ngày d
+                Set<String> dayReasons = new LinkedHashSet<>();
+                for (AttendanceRecord rec : dayRecords) {
+                    if (rec.getNote() != null && !rec.getNote().isBlank()) {
+                        String n = rec.getNote().trim();
+                        if (!n.equalsIgnoreCase("Chấm công bằng nhận diện khuôn mặt từ tablet") &&
+                            !n.equalsIgnoreCase("Chấm công bằng khuôn mặt từ ứng dụng")) {
+                            if (n.equalsIgnoreCase("update")) {
+                                dayReasons.add("Cập nhật lại giờ");
+                            } else {
+                                dayReasons.add(n);
+                            }
+                        }
+                    } else if (rec.getUpdatedBy() != null || "MANUAL".equalsIgnoreCase(rec.getDeviceId())) {
+                        dayReasons.add("Cập nhật giờ thủ công");
+                    }
+                }
+                if (schedule != null && schedule.getNote() != null && !schedule.getNote().isBlank()) {
+                    dayReasons.add(schedule.getNote().trim());
+                }
+
+                Instant checkIn = null;
+                Instant checkOut = null;
+
+                if (!dayRecords.isEmpty()) {
+                    checkIn = dayRecords.stream()
+                            .filter(r -> r.getType() == AttendanceType.IN)
+                            .map(AttendanceRecord::getCheckTime)
+                            .min(Instant::compareTo)
+                            .orElse(null);
+
+                    checkOut = dayRecords.stream()
+                            .filter(r -> r.getType() == AttendanceType.OUT)
+                            .map(AttendanceRecord::getCheckTime)
+                            .max(Instant::compareTo)
+                            .orElse(null);
+                }
+
+                if (!dayReasons.isEmpty()) {
+                    String timeRangeStr = "";
+                    if (checkIn != null && checkOut != null) {
+                        timeRangeStr = timeFormatter.format(checkIn) + " - " + timeFormatter.format(checkOut);
+                    } else if (checkIn != null) {
+                        timeRangeStr = "Vào " + timeFormatter.format(checkIn);
+                    } else if (checkOut != null) {
+                        timeRangeStr = "Ra " + timeFormatter.format(checkOut);
+                    }
+
+                    String reasonStr = String.join(", ", dayReasons);
+                    String fullEntry = !timeRangeStr.isEmpty() ? String.format("[%s] %s", timeRangeStr, reasonStr) : reasonStr;
+                    empUpdateNotes.put(d, fullEntry);
+                    formattedNoteList.add(String.format("Ngày %02d: %s", d, fullEntry));
+                }
 
                 if (date.isAfter(today)) {
                     patternBuilder.append("f");
@@ -110,19 +168,6 @@ public class AttendanceQueryController {
                             absentDays++;
                         }
                     } else {
-                        // Find earliest check-in and check-out
-                        Instant checkIn = dayRecords.stream()
-                                .filter(r -> r.getType() == AttendanceType.IN)
-                                .map(AttendanceRecord::getCheckTime)
-                                .min(Instant::compareTo)
-                                .orElse(null);
-
-                        Instant checkOut = dayRecords.stream()
-                                .filter(r -> r.getType() == AttendanceType.OUT)
-                                .map(AttendanceRecord::getCheckTime)
-                                .max(Instant::compareTo)
-                                .orElse(null);
-
                         boolean isLate = false;
                         if (checkIn != null) {
                             LocalTime checkInTime = checkIn.atZone(ZONE).toLocalTime();
@@ -165,6 +210,11 @@ public class AttendanceQueryController {
                 }
             }
 
+            if ("Nguyễn Kim Thy".equalsIgnoreCase(employee.getFullName())) {
+                formattedNoteList.add(0, "Làm việc Online");
+            }
+            String consolidatedNotes = String.join("; ", formattedNoteList);
+
             employeeStatsList.add(new EmployeeMonthlyStats(
                     empId,
                     employee.getFullName(),
@@ -176,7 +226,9 @@ public class AttendanceQueryController {
                     Math.round(totalHours * 10.0) / 10.0,
                     Math.round(overtimeHours * 10.0) / 10.0,
                     leaveDays,
-                    patternBuilder.toString()
+                    patternBuilder.toString(),
+                    empUpdateNotes,
+                    consolidatedNotes
             ));
         }
 
@@ -501,7 +553,9 @@ public class AttendanceQueryController {
             double totalHours,
             double overtimeHours,
             int leavedays,
-            String dailyPattern
+            String dailyPattern,
+            Map<Integer, String> updateNotes,
+            String notes
     ) {}
 
     public record EmployeeHistoryResponse(

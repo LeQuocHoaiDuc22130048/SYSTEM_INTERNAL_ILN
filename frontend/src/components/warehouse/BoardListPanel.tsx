@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Boxes, CheckCircle, Cpu, History, MapPin, FileText } from 'lucide-react';
+import { Search, Plus, Boxes, CheckCircle, Cpu, History, MapPin } from 'lucide-react';
 import type { Board } from '../../types/warehouse';
 
 interface BoardListPanelProps {
@@ -15,7 +15,6 @@ interface BoardListPanelProps {
   openAddEditModal: (board: Board | null) => void;
   getStatusLabel: (status: string) => string;
   getStatusColorClass: (status: string) => string;
-  exportBoardQrPdfList: (boards: Board[]) => void;
 }
 
 export const BoardListPanel: React.FC<BoardListPanelProps> = ({
@@ -31,7 +30,6 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
   openAddEditModal,
   getStatusLabel,
   getStatusColorClass,
-  exportBoardQrPdfList,
 }) => {
   return (
     <>
@@ -75,46 +73,39 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
 
       {/* Search & Actions Bar */}
       <div className="warehouse-control-bar">
-        <div className="search-input-wrapper flex-1">
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Tìm theo tên, serial, model, vị trí kho..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-search-input"
-          />
-        </div>
+        <div className="warehouse-control-top-row">
+          <div className="search-input-wrapper">
+            <Search size={18} className="search-icon" />
+            <input
+              type="text"
+              placeholder="Tìm theo tên, serial, model, vị trí kho..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-search-input"
+            />
+          </div>
 
-        <div className="filters-actions-wrapper">
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-status-select"
-          >
-            <option value="ALL">Mọi trạng thái</option>
-            <option value="AVAILABLE">Sẵn sàng</option>
-            <option value="CHECKED_OUT">Đang dùng</option>
-            <option value="IN_REPAIR">Đang sửa</option>
-            <option value="DAMAGED">Hỏng</option>
-            <option value="LOST">Mất</option>
-            <option value="ARCHIVED">Lưu trữ</option>
-            <option value="MAINTENANCE">Bảo trì</option>
-          </select>
+          <div className="filters-actions-wrapper">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="w-status-select"
+            >
+              <option value="ALL">Mọi trạng thái</option>
+              <option value="AVAILABLE">Sẵn sàng</option>
+              <option value="CHECKED_OUT">Đang dùng</option>
+              <option value="IN_REPAIR">Đang sửa</option>
+              <option value="DAMAGED">Hỏng</option>
+              <option value="LOST">Mất</option>
+              <option value="ARCHIVED">Lưu trữ</option>
+              <option value="MAINTENANCE">Bảo trì</option>
+            </select>
 
-          <button
-            className="btn-export-pdf-all"
-            onClick={() => exportBoardQrPdfList(filteredBoards)}
-            title="Xuất PDF mã QR cho tất cả bo mạch đang hiển thị"
-          >
-            <FileText size={16} />
-            <span>Xuất PDF Mã QR</span>
-          </button>
-
-          <button className="btn-add-board" onClick={() => openAddEditModal(null)}>
-            <Plus size={16} />
-            <span>Thêm bo mạch</span>
-          </button>
+            <button className="btn-add-board" onClick={() => openAddEditModal(null)}>
+              <Plus size={16} />
+              <span>Thêm bo mạch</span>
+            </button>
+          </div>
         </div>
       </div>
 
