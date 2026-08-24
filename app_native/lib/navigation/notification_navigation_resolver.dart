@@ -51,5 +51,13 @@ NotificationNavigationTarget? resolveNotificationNavigation(
     return canAccessMainTab(auth, target.tabIndex) ? target : null;
   }
 
+  if (type.startsWith('PART_') || refType == 'PART' || refType == 'WAREHOUSE') {
+    final target = NotificationNavigationTarget(
+      tabIndex: MainTabs.warehouse,
+      refId: refId,
+    );
+    return canAccessMainTab(auth, target.tabIndex) ? target : null;
+  }
+
   return null;
 }

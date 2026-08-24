@@ -23,8 +23,6 @@ interface SidebarProps {
   activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
   setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => void;
   currentUser: UserInfo | null;
-  isOpen: boolean;
-  onClose: () => void;
   handleLogout: () => void;
 }
 
@@ -32,8 +30,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   setActiveTab,
   currentUser,
-  isOpen,
-  onClose,
   handleLogout,
 }) => {
   // Trạng thái mở/đóng của các nhóm mục cha
@@ -46,33 +42,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleTabClick = (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => {
     setActiveTab(tab);
-    if (window.innerWidth <= 1024) {
-      onClose(); // Đóng sidebar trên mobile sau khi click
-    }
   };
 
   return (
-    <>
-      {/* Vùng overlay tối màu khi mở sidebar trên thiết bị di động */}
-      {isOpen && <div className="sidebar-overlay" onClick={onClose} />}
-
-      <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-        {/* Header của Sidebar */}
-        <div className="sidebar-header">
-          <div className="brand">
-            <img src="/app_logo.png" alt="Logo" className="brand-logo" />
-            <div className="brand-info">
-              <span className="brand-name">INVERTER LIKE NEW</span>
-              <span className="brand-sub">Quản lý hệ thống</span>
-            </div>
+    <aside className="sidebar">
+      {/* Header của Sidebar */}
+      <div className="sidebar-header">
+        <div className="brand">
+          <img src="/app_logo.png" alt="Logo" className="brand-logo" />
+          <div className="brand-info">
+            <span className="brand-name">INVERTER LIKE NEW</span>
+            <span className="brand-sub">Quản lý hệ thống</span>
           </div>
-          {/* <button className="sidebar-close-btn" onClick={onClose} aria-label="Close sidebar">
-            <X size={20} />
-          </button> */}
-          {/* <button className="sidebar-collapse-btn" onClick={onClose} aria-label="Collapse sidebar">
-            <ChevronLeft size={20} />
-          </button> */}
         </div>
+      </div>
 
         {/* Menu Items */}
         <nav className="sidebar-nav">
@@ -239,6 +222,5 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <span className="version-tag">Version 1.0.0</span>
         </div>
       </aside>
-    </>
   );
 };

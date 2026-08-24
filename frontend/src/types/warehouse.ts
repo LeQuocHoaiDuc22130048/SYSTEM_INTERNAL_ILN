@@ -132,6 +132,49 @@ export interface LocationScanData {
   totalQuantity: number;
 }
 
+export interface LocationInfo {
+  id: string;
+  code: string;
+  name: string;
+  description?: string;
+  qrCode?: string;
+  totalPartTypes?: number;
+  totalQuantity?: number;
+}
+
 export interface WarehouseTabProps {
   showToast: (msg: string) => void;
 }
+
+export interface BulkImportPartItem {
+  ipn: string;
+  name: string;
+  categoryName?: string;
+  description?: string;
+  storeLocationCode?: string;
+  quantity?: number;
+  minAmount?: number;
+  maxAmount?: number;
+  purchasePrice?: number;
+  salePrice?: number;
+  parameters?: string;
+  footprint?: string;
+  note?: string;
+  condition?: string;
+}
+
+export interface BulkImportErrorItem {
+  rowNumber: number;
+  ipn: string;
+  errorMessage: string;
+}
+
+export interface BulkImportPartResponse {
+  totalRows: number;
+  successCount: number;
+  updatedCount: number;
+  failedCount: number;
+  errors: BulkImportErrorItem[];
+  items: Part[];
+}
+

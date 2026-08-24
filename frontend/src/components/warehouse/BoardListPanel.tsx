@@ -13,6 +13,7 @@ interface BoardListPanelProps {
   selectedBoard: Board | null;
   handleSelectBoard: (board: Board) => void;
   openAddEditModal: (board: Board | null) => void;
+  openAddLocationModal?: () => void;
   getStatusLabel: (status: string) => string;
   getStatusColorClass: (status: string) => string;
 }
@@ -28,6 +29,7 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
   selectedBoard,
   handleSelectBoard,
   openAddEditModal,
+  openAddLocationModal,
   getStatusLabel,
   getStatusColorClass,
 }) => {
@@ -100,6 +102,19 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
               <option value="ARCHIVED">Lưu trữ</option>
               <option value="MAINTENANCE">Bảo trì</option>
             </select>
+
+            {openAddLocationModal && (
+              <button
+                type="button"
+                className="btn-action-outline"
+                onClick={openAddLocationModal}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                title="Tạo vị trí / kệ kho mới với mã QR"
+              >
+                <MapPin size={16} className="text-primary" />
+                <span>Thêm vị trí (QR)</span>
+              </button>
+            )}
 
             <button className="btn-add-board" onClick={() => openAddEditModal(null)}>
               <Plus size={16} />

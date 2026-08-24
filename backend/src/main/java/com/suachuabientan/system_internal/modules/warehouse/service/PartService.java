@@ -3,12 +3,19 @@ package com.suachuabientan.system_internal.modules.warehouse.service;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
+import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.AdjustStockRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.BulkImportPartItemRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.BulkImportPartRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreatePartRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartCheckoutRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartReturnRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdatePartRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreateStoreLocationRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.response.BulkImportPartResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.CategoryInfo;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.LocationInfo;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.LocationScanResponse;
@@ -53,7 +60,15 @@ public class PartService {
     private final StockMovementRepository stockMovementRepository;
     private final PartCheckoutRepository partCheckoutRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
     private final JdbcTemplate jdbcTemplate;
+
+    private static final List<UserRole> WAREHOUSE_ALERT_ROLES = List.of(
+            UserRole.SUPER_ADMIN,
+            UserRole.ADMIN,
+            UserRole.MANAGER,
+            UserRole.WAREHOUSE
+    );
 
     @Transactional(readOnly = true)
     public Page<PartResponse> getAll(String keyword, Pageable pageable) {
@@ -260,7 +275,215 @@ public class PartService {
                     .build());
         }
 
+        checkAndNotifyLowStock(part);
+
         return toResponse(part);
+    }
+
+    // ── Bulk Import Linh Kiện từ Excel/CSV ──────────────────────────────
+    @Transactional
+    public BulkImportPartResponse bulkImport(BulkImportPartRequest request, UUID userId) {
+        if (request.items() == null || request.items().isEmpty()) {
+            throw new BusinessException("Danh sách linh kiện nhập trống");
+        }
+
+        int successCount = 0;
+        int updatedCount = 0;
+        int failedCount = 0;
+        List<BulkImportPartResponse.BulkImportErrorItem> errors = new ArrayList<>();
+        List<PartResponse> importedParts = new ArrayList<>();
+
+        for (int i = 0; i < request.items().size(); i++) {
+            int rowNumber = i + 1;
+            BulkImportPartItemRequest item = request.items().get(i);
+
+            if (item.ipn() == null || item.ipn().trim().isEmpty()) {
+                errors.add(new BulkImportPartResponse.BulkImportErrorItem(rowNumber, "", "Mã IPN không được để trống"));
+                failedCount++;
+                continue;
+            }
+
+            if (item.name() == null || item.name().trim().isEmpty()) {
+                errors.add(new BulkImportPartResponse.BulkImportErrorItem(rowNumber, item.ipn().trim(), "Tên linh kiện không được để trống"));
+                failedCount++;
+                continue;
+            }
+
+            String ipn = item.ipn().trim();
+            var existingOpt = partRepository.findByIpnAndIsDeletedFalse(ipn);
+
+            if (existingOpt.isPresent()) {
+                if (!request.updateIfExists()) {
+                    errors.add(new BulkImportPartResponse.BulkImportErrorItem(rowNumber, ipn, "Mã IPN đã tồn tại trong hệ thống"));
+                    failedCount++;
+                    continue;
+                }
+
+                // Cập nhật thông tin linh kiện đã có
+                Part existingPart = existingOpt.get();
+                if (StringUtils.hasText(item.name())) existingPart.setName(item.name().trim());
+                if (StringUtils.hasText(item.description())) existingPart.setDescription(item.description().trim());
+                if (item.minAmount() != null) existingPart.setMinAmount(item.minAmount());
+                if (item.maxAmount() != null) existingPart.setMaxAmount(item.maxAmount());
+                if (item.purchasePrice() != null) existingPart.setPurchasePrice(item.purchasePrice());
+                if (item.salePrice() != null) existingPart.setSalePrice(item.salePrice());
+                if (StringUtils.hasText(item.parameters())) existingPart.setParameters(item.parameters());
+                if (StringUtils.hasText(item.note())) existingPart.setNote(item.note());
+                if (StringUtils.hasText(item.categoryName())) {
+                    existingPart.setCategoryId(getOrCreateCategory(item.categoryName().trim()));
+                }
+                existingPart.setUpdatedBy(userId);
+                Part savedPart = partRepository.save(existingPart);
+
+                // Nếu có số lượng hoặc vị trí thì cập nhật / cộng dồn kho
+                BigDecimal importQty = item.quantity() != null ? item.quantity() : BigDecimal.ZERO;
+                if (importQty.compareTo(BigDecimal.ZERO) > 0 || StringUtils.hasText(item.storeLocationCode())) {
+                    String locCode = StringUtils.hasText(item.storeLocationCode()) ? item.storeLocationCode().trim() : "DEFAULT";
+                    StoreLocation location = storeLocationRepository.findByCodeAndIsDeletedFalse(locCode)
+                            .orElseGet(() -> {
+                                StoreLocation newLoc = StoreLocation.builder()
+                                        .code(locCode)
+                                        .name(locCode)
+                                        .description("Tự động tạo từ nhập kho hàng loạt")
+                                        .isFull(false)
+                                        .onlySinglePart(false)
+                                        .build();
+                                newLoc.setCreatedBy(userId);
+                                return storeLocationRepository.save(newLoc);
+                            });
+
+                    PartLot lot = partLotRepository.findByPartIdAndStoreLocationIdAndIsDeletedFalse(savedPart.getId(), location.getId())
+                            .orElse(null);
+
+                    if (lot != null) {
+                        lot.setAmount(lot.getAmount().add(importQty));
+                        lot.setUpdatedBy(userId);
+                        partLotRepository.save(lot);
+                    } else {
+                        lot = PartLot.builder()
+                                .partId(savedPart.getId())
+                                .storeLocationId(location.getId())
+                                .amount(importQty)
+                                .origin("NEW")
+                                .condition(StringUtils.hasText(item.condition()) ? item.condition() : "TESTED_OK")
+                                .instockUnknown(false)
+                                .needsRefill(false)
+                                .lotCode("LOT-" + savedPart.getIpn() + "-" + System.currentTimeMillis())
+                                .build();
+                        lot.setCreatedBy(userId);
+                        partLotRepository.save(lot);
+                    }
+
+                    if (importQty.compareTo(BigDecimal.ZERO) > 0) {
+                        String movementCode = "PN-" + java.time.LocalDate.now().toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+                        stockMovementRepository.save(StockMovement.builder()
+                                .movementCode(movementCode)
+                                .partId(savedPart.getId())
+                                .partLotId(lot.getId())
+                                .storageLocationId(location.getId())
+                                .toLocationId(location.getId())
+                                .movementType(StockMovementType.IMPORT)
+                                .quantity(importQty)
+                                .amount(importQty)
+                                .movementStatus("COMPLETED")
+                                .refType("BULK_IMPORT")
+                                .refId(lot.getId())
+                                .purpose("Nhập kho linh kiện hàng loạt từ Excel")
+                                .note("Cộng dồn số lượng: " + importQty)
+                                .build());
+                    }
+                }
+
+                importedParts.add(toResponse(savedPart));
+                updatedCount++;
+            } else {
+                // Tạo mới Part
+                UUID categoryId = StringUtils.hasText(item.categoryName())
+                        ? getOrCreateCategory(item.categoryName().trim())
+                        : getOrCreateUncategorizedCategory();
+
+                Part newPart = Part.builder()
+                        .ipn(ipn)
+                        .name(item.name().trim())
+                        .description(item.description())
+                        .categoryId(categoryId)
+                        .minAmount(item.minAmount() != null ? item.minAmount() : BigDecimal.ZERO)
+                        .maxAmount(item.maxAmount() != null ? item.maxAmount() : BigDecimal.ZERO)
+                        .purchasePrice(item.purchasePrice())
+                        .salePrice(item.salePrice())
+                        .manufacturingStatus("ACTIVE")
+                        .parameters(item.parameters())
+                        .note(item.note())
+                        .build();
+                newPart.setCreatedBy(userId);
+                Part savedPart = partRepository.save(newPart);
+
+                // Khởi tạo Lô và Vị trí nếu có
+                BigDecimal importQty = item.quantity() != null ? item.quantity() : BigDecimal.ZERO;
+                if (importQty.compareTo(BigDecimal.ZERO) > 0 || StringUtils.hasText(item.storeLocationCode())) {
+                    String locCode = StringUtils.hasText(item.storeLocationCode()) ? item.storeLocationCode().trim() : "DEFAULT";
+                    StoreLocation location = storeLocationRepository.findByCodeAndIsDeletedFalse(locCode)
+                            .orElseGet(() -> {
+                                StoreLocation newLoc = StoreLocation.builder()
+                                        .code(locCode)
+                                        .name(locCode)
+                                        .description("Tự động tạo từ nhập kho hàng loạt")
+                                        .isFull(false)
+                                        .onlySinglePart(false)
+                                        .build();
+                                newLoc.setCreatedBy(userId);
+                                return storeLocationRepository.save(newLoc);
+                            });
+
+                    PartLot lot = PartLot.builder()
+                            .partId(savedPart.getId())
+                            .storeLocationId(location.getId())
+                            .amount(importQty)
+                            .origin("NEW")
+                            .condition(StringUtils.hasText(item.condition()) ? item.condition() : "TESTED_OK")
+                            .instockUnknown(false)
+                            .needsRefill(false)
+                            .lotCode("LOT-" + savedPart.getIpn() + "-" + System.currentTimeMillis())
+                            .build();
+                    lot.setCreatedBy(userId);
+                    partLotRepository.save(lot);
+
+                    if (importQty.compareTo(BigDecimal.ZERO) > 0) {
+                        String movementCode = "PN-" + java.time.LocalDate.now().toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+                        stockMovementRepository.save(StockMovement.builder()
+                                .movementCode(movementCode)
+                                .partId(savedPart.getId())
+                                .partLotId(lot.getId())
+                                .storageLocationId(location.getId())
+                                .toLocationId(location.getId())
+                                .movementType(StockMovementType.IMPORT)
+                                .quantity(importQty)
+                                .amount(importQty)
+                                .movementStatus("COMPLETED")
+                                .refType("BULK_IMPORT")
+                                .refId(lot.getId())
+                                .purpose("Nhập kho linh kiện hàng loạt từ Excel")
+                                .note("Nhập ban đầu: " + importQty)
+                                .build());
+                    }
+                }
+
+                importedParts.add(toResponse(savedPart));
+                successCount++;
+            }
+        }
+
+        log.info("Nhập linh kiện hàng loạt: total={}, success={}, updated={}, failed={}, by={}",
+                request.items().size(), successCount, updatedCount, failedCount, userId);
+
+        return new BulkImportPartResponse(
+                request.items().size(),
+                successCount,
+                updatedCount,
+                failedCount,
+                errors,
+                importedParts
+        );
     }
 
     // ── 1. Quét QR Vị trí Kho ──────────────────────────────────────────
@@ -373,6 +596,9 @@ public class PartService {
                 .build());
 
         log.info("Nhân viên {} đã lấy {} linh kiện {} tại vị trí {}", userId, request.quantity(), part.getIpn(), location.getCode());
+
+        checkAndNotifyLowStock(part);
+
         return toCheckoutHistoryResponse(savedCheckout);
     }
 
@@ -461,11 +687,61 @@ public class PartService {
         );
     }
 
+    @Transactional
+    public LocationInfo createLocation(CreateStoreLocationRequest request, UUID userId) {
+        String code = request.code().trim();
+        if (storeLocationRepository.findByCodeAndIsDeletedFalse(code).isPresent()) {
+            throw new BusinessException("Mã vị trí kho " + code + " đã tồn tại trong hệ thống");
+        }
+
+        String qrCode = StringUtils.hasText(request.qrCode()) ? request.qrCode().trim() : code;
+        StoreLocation location = StoreLocation.builder()
+                .code(code)
+                .name(request.name().trim())
+                .description(request.description() != null ? request.description().trim() : null)
+                .qrCode(qrCode)
+                .isFull(false)
+                .onlySinglePart(false)
+                .build();
+        location.setCreatedBy(userId);
+        StoreLocation saved = storeLocationRepository.save(location);
+        log.info("Tạo vị trí kho mới: code={}, qrCode={}, name={}, by={}", saved.getCode(), saved.getQrCode(), saved.getName(), userId);
+        return new LocationInfo(
+                saved.getId(),
+                saved.getCode(),
+                saved.getName(),
+                saved.getDescription(),
+                saved.getQrCode(),
+                0,
+                BigDecimal.ZERO
+        );
+    }
+
     @Transactional(readOnly = true)
     public List<LocationInfo> getLocations() {
         return storeLocationRepository.findAll().stream()
                 .filter(loc -> !Boolean.TRUE.equals(loc.getIsDeleted()))
-                .map(loc -> new LocationInfo(loc.getId(), loc.getCode(), loc.getName()))
+                .map(loc -> {
+                    List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(loc.getId());
+                    int partTypes = (int) lots.stream()
+                            .filter(l -> l.getAmount() != null && l.getAmount().compareTo(BigDecimal.ZERO) > 0)
+                            .map(PartLot::getPartId)
+                            .distinct()
+                            .count();
+                    BigDecimal totalQty = lots.stream()
+                            .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                    return new LocationInfo(
+                            loc.getId(),
+                            loc.getCode(),
+                            loc.getName(),
+                            loc.getDescription(),
+                            loc.getQrCode() != null ? loc.getQrCode() : loc.getCode(),
+                            partTypes,
+                            totalQty
+                    );
+                })
                 .toList();
     }
 
@@ -583,5 +859,64 @@ public class PartService {
 
     private UUID getOrCreateUncategorizedCategory() {
         return getOrCreateCategory("Uncategorized");
+    }
+
+    public void checkAndNotifyLowStock(Part part) {
+        if (part == null || part.getMinAmount() == null || part.getMinAmount().compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        List<PartLot> lots = partLotRepository.findByPartIdAndIsDeletedFalse(part.getId());
+        BigDecimal totalQty = lots.stream()
+                .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        if (totalQty.compareTo(part.getMinAmount()) <= 0) {
+            String unit = StringUtils.hasText(part.getMeasurementUnit()) ? part.getMeasurementUnit() : "cái";
+            String title;
+            String body;
+
+            if (totalQty.compareTo(BigDecimal.ZERO) <= 0) {
+                title = "Hết hàng: " + part.getName();
+                body = "Linh kiện " + part.getIpn() + " (" + part.getName() + ") đã HẾT HÀNG trong kho (Tồn kho: 0 " + unit + ", Định mức Min: " + part.getMinAmount() + " " + unit + "). Vui lòng nhập thêm.";
+            } else {
+                title = "Cảnh báo tồn kho tối thiểu: " + part.getName();
+                body = "Linh kiện " + part.getIpn() + " (" + part.getName() + ") chỉ còn " + totalQty + " " + unit + ", đã đạt/dưới mức tối thiểu (" + part.getMinAmount() + " " + unit + ").";
+            }
+
+            try {
+                notificationService.sendToRoles(
+                        WAREHOUSE_ALERT_ROLES,
+                        NotificationType.PART_LOW_STOCK_ALERT,
+                        title,
+                        body,
+                        "PART",
+                        part.getId().toString(),
+                        true
+                );
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi thông báo cảnh báo tồn kho tối thiểu cho partId={}: {}", part.getId(), e.getMessage());
+            }
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public int scanAndNotifyAllLowStockParts() {
+        List<Part> parts = partRepository.findByIsDeletedFalse();
+        int alertCount = 0;
+        for (Part part : parts) {
+            if (part.getMinAmount() != null && part.getMinAmount().compareTo(BigDecimal.ZERO) > 0) {
+                List<PartLot> lots = partLotRepository.findByPartIdAndIsDeletedFalse(part.getId());
+                BigDecimal totalQty = lots.stream()
+                        .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
+                        .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+                if (totalQty.compareTo(part.getMinAmount()) <= 0) {
+                    checkAndNotifyLowStock(part);
+                    alertCount++;
+                }
+            }
+        }
+        return alertCount;
     }
 }

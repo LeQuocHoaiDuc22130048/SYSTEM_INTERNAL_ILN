@@ -42,6 +42,8 @@ class _NotificationsPageState extends State<NotificationsPage> {
       widget.onNavigateToTab!(1, refId: refId);
     } else if (type.startsWith('ACCOUNT_') || refType == 'USER') {
       widget.onNavigateToTab!(6, subTab: 1); // 1 = Account Approval tab
+    } else if (type.startsWith('PART_') || refType == 'PART' || refType == 'WAREHOUSE') {
+      widget.onNavigateToTab!(2, refId: refId); // 2 = Warehouse tab
     }
   }
 
@@ -356,6 +358,12 @@ class _NotificationVisuals {
           icon: LucideIcons.circleAlert,
           color: AppColors.error,
           background: AppColors.errorLight,
+        );
+      case 'PART_LOW_STOCK_ALERT':
+        return const _NotificationVisuals(
+          icon: LucideIcons.boxes,
+          color: AppColors.warning,
+          background: AppColors.warningLight,
         );
       case 'NEW_MESSAGE':
         return const _NotificationVisuals(

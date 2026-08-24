@@ -12,8 +12,6 @@ import '../models/board.dart';
 import '../models/board_history_item.dart';
 import '../models/part.dart';
 import 'scanner_page.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '../utils/qr_share_helper.dart';
 
 enum WarehouseMode { boards, parts }
 enum PartFilterStatus { all, lowStock, outOfStock }
@@ -164,10 +162,6 @@ class _WarehousePageState extends State<WarehousePage> {
     return groupMap.values.toList();
   }
 
-  String _qrCodeLabel(Board board) {
-    return board.qrCode.isEmpty ? 'QR chờ backend tạo' : board.qrCode;
-  }
-
   String _inventoryLine(Board board) {
     return '';
   }
@@ -279,85 +273,29 @@ class _WarehousePageState extends State<WarehousePage> {
                                   if (result != null && mounted) {
                                     String qrCode = (result as String).trim();
 
-                                    // Extract QR code from formatted label block (e.g., "MÃ QR: BM-2026-YAS-001")
-                                    final match = RegExp(r'mã qr:\s*([^\n\r]+)', caseSensitive: false)
+                                    // Extract QR code from formatted label block (e.g., "MÃ QR: LOC-A1" or "MÃ VỊ TRÍ KHO: LOC-A1")
+                                    final match = RegExp(r'(?:mã qr|mã vị trí kho):\s*([^\n\r]+)', caseSensitive: false)
                                         .firstMatch(qrCode);
                                     if (match != null && match.group(1) != null) {
                                       qrCode = match.group(1)!.trim();
                                     }
 
-                                    // Update search query to display matching list
+                                    // Update search query to display matching location/parts
                                     _searchQuery.value = qrCode;
                                     _searchController.text = qrCode;
 
                                     if (!mounted) return;
                                     final messenger = ScaffoldMessenger.of(context);
-                                    if (_currentMode == WarehouseMode.parts) {
-                                      setState(() {
-                                        _partSearchMethod = PartSearchMethod.locationQr;
-                                      });
-                                      final isLocationCode = qrCode.toUpperCase().startsWith('LOC') ||
-                                          qrCode.toUpperCase().contains('KỆ') ||
-                                          qrCode.toUpperCase().contains('KHAY');
-                                      messenger.showSnackBar(
-                                        SnackBar(
-                                          content: Text(
-                                            isLocationCode
-                                                ? '📍 Đã quét Mã Vị Trí Kho: $qrCode. Đang hiển thị các linh kiện tại vị trí này.'
-                                                : '🔌 Đã quét Mã Linh Kiện / IPN: $qrCode. Đang lọc danh sách linh kiện.',
-                                          ),
-                                          backgroundColor: AppColors.primary,
-                                        ),
-                                      );
-                                      return;
-                                    }
+                                    setState(() {
+                                      _partSearchMethod = PartSearchMethod.locationQr;
+                                    });
 
-                                    final backend = context.read<BackendDataProvider>();
-                                    Board? matchedBoard;
-                                    for (final b in backend.boards) {
-                                      if (b.qrCode.toLowerCase() == qrCode.toLowerCase() ||
-                                          (b.serialNumber != null &&
-                                              b.serialNumber!.toLowerCase() == qrCode.toLowerCase())) {
-                                        matchedBoard = b;
-                                        break;
-                                      }
-                                    }
-
-                                    if (matchedBoard != null) {
-                                      _showBoardDetail(matchedBoard, fromScan: true);
-                                    } else {
-                                      // Attempt server scan API lookup if not in local list
-                                      try {
-                                        final res = await backend.api.get('/api/v1/boards/scan/$qrCode');
-                                        if (!mounted) return;
-                                        if (res != null &&
-                                            res is Map<String, dynamic> &&
-                                            res['boardItemId'] != null) {
-                                          await backend.loadBoards();
-                                          if (!mounted) return;
-                                          final updatedBoard = backend.boards.firstWhere(
-                                            (b) =>
-                                                b.id == res['boardItemId'].toString() ||
-                                                b.qrCode.toLowerCase() == qrCode.toLowerCase(),
-                                            orElse: () => Board.fromJson(res),
-                                          );
-                                          _showBoardDetail(updatedBoard, fromScan: true);
-                                        } else {
-                                          messenger.showSnackBar(
-                                            SnackBar(
-                                              content: Text('Đã lọc danh sách theo mã QR: $qrCode'),
-                                            ),
-                                          );
-                                        }
-                                      } catch (_) {
-                                        if (!mounted) return;
-                                        messenger.showSnackBar(
-                                          SnackBar(
-                                            content: Text('Đã lọc danh sách theo mã QR: $qrCode'),
-                                          ),
-                                        );
-                                      }
-                                    }
+                                    messenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('📍 Đã quét Mã Vị Trí Kho: $qrCode. Đang lọc linh kiện theo vị trí.'),
+                                        backgroundColor: AppColors.primary,
+                                      ),
+                                    );
                                   }
                                 },
                                 icon: const Icon(
@@ -1364,19 +1302,20 @@ class _WarehousePageState extends State<WarehousePage> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    const SizedBox(height: 3),
-                    Text(
-                      _qrCodeLabel(board),
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontFamily: 'monospace',
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : AppColors.textSecondaryLight,
+                    if (board.model.isNotEmpty) ...[
+                      const SizedBox(height: 3),
+                      Text(
+                        'Model: ${board.model}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
+                    ],
 
                     if (inventoryLine.isNotEmpty) ...[
                       const SizedBox(height: 3),
@@ -1507,10 +1446,9 @@ class _WarehousePageState extends State<WarehousePage> {
                   Row(
                     children: [
                       Text(
-                        _qrCodeLabel(board),
+                        board.model.isNotEmpty ? board.model : 'Bo mạch',
                         style: TextStyle(
                           fontSize: 14,
-                          fontFamily: 'monospace',
                           color: isDark
                               ? AppColors.textSecondaryDark
                               : AppColors.textSecondaryLight,
@@ -2074,7 +2012,6 @@ class _WarehousePageState extends State<WarehousePage> {
   void _showAddEditBoardDialog({Board? board}) {
     final isEditing = board != null;
     final nameCtrl = TextEditingController(text: board?.name ?? '');
-    final qrCodeCtrl = TextEditingController(text: board?.qrCode ?? '');
     final modelCtrl = TextEditingController(text: board?.model ?? '');
     final locationCtrl = TextEditingController(text: board?.location ?? '');
     final serialCtrl = TextEditingController(text: board?.serialNumber ?? '');
@@ -2128,20 +2065,6 @@ class _WarehousePageState extends State<WarehousePage> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              if (isEditing) ...[
-                                TextField(
-                                  controller: qrCodeCtrl,
-                                  decoration: InputDecoration(
-                                    labelText: 'Mã QR',
-                                    filled: true,
-                                    fillColor: isDark
-                                        ? Colors.white10
-                                        : Colors.grey.shade200,
-                                  ),
-                                  readOnly: true,
-                                ),
-                                const SizedBox(height: 12),
-                              ],
                               TextField(
                                 controller: modelCtrl,
                                 decoration: const InputDecoration(
@@ -2887,16 +2810,16 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                                 : AppColors.textPrimaryLight,
                           ),
                         ),
-                        Text(
-                          widget.board.qrCode.isEmpty ? 'QR chờ backend tạo' : widget.board.qrCode,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontFamily: 'monospace',
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
+                        if (widget.board.model.isNotEmpty)
+                          Text(
+                            'Model: ${widget.board.model}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
                           ),
-                        ),
                       ],
                     ),
                   ),
@@ -2923,336 +2846,44 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
               ),
               const SizedBox(height: 24),
 
-              // QR Code Visualizer Card
-              if (widget.board.qrCode.isNotEmpty) ...[
-                GestureDetector(
-                  onTap: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => Dialog(
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(24),
-                        ),
-                        backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.board.name,
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                                ),
-                                textAlign: TextAlign.center,
-                              ),
-
-                              const SizedBox(height: 24),
-                              Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: Colors.white,
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: Colors.grey.shade300,
-                                  ),
-                                ),
-                                child: QrImageView(
-                                  data: widget.board.qrCode,
-                                  version: QrVersions.auto,
-                                  size: 220.0,
-                                  eyeStyle: const QrEyeStyle(
-                                    eyeShape: QrEyeShape.square,
-                                    color: Colors.black,
-                                  ),
-                                  dataModuleStyle: const QrDataModuleStyle(
-                                    dataModuleShape: QrDataModuleShape.square,
-                                    color: Colors.black,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                widget.board.qrCode,
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  letterSpacing: 1.5,
-                                  fontFamily: 'monospace',
-                                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                                ),
-                              ),
-                              const SizedBox(height: 24),
-                              SizedBox(
-                                width: double.infinity,
-                                child: ElevatedButton(
-                                  onPressed: () => Navigator.pop(context),
-                                  child: const Text('Đóng'),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                  child: Tooltip(
-                    message: 'Nhấn để phóng to',
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          QrImageView(
-                            data: widget.board.qrCode,
-                            version: QrVersions.auto,
-                            size: 90.0,
-                            eyeStyle: QrEyeStyle(
-                              eyeShape: QrEyeShape.square,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                            dataModuleStyle: QrDataModuleStyle(
-                              dataModuleShape: QrDataModuleShape.square,
-                              color: isDark ? Colors.white : Colors.black87,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Mã QR linh kiện',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Icon(
-                                      Icons.fullscreen,
-                                      size: 14,
-                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  widget.board.qrCode,
-                                  style: TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.0,
-                                    fontFamily: 'monospace',
-                                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          SizedBox(
-                            height: 45,
-                            child: OutlinedButton(
-                              onPressed: () {
-                                final qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=400x400&data=${Uri.encodeComponent(widget.board.qrCode)}';
-                                showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-                                  shape: const RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                                  ),
-                                  builder: (ctx) => Padding(
-                                    padding: const EdgeInsets.all(24),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          width: 40,
-                                          height: 4,
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.shade300,
-                                            borderRadius: BorderRadius.circular(2),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        const Text(
-                                          'TEM PDF QR ĐỊNH DANH',
-                                          style: TextStyle(
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 0.5,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Container(
-                                          padding: const EdgeInsets.all(16),
-                                          decoration: BoxDecoration(
-                                            color: Colors.white,
-                                            borderRadius: BorderRadius.circular(16),
-                                            border: Border.all(color: Colors.blue.shade200, width: 2),
-                                          ),
-                                          child: Column(
-                                            children: [
-                                              QrImageView(
-                                                data: widget.board.qrCode,
-                                                version: QrVersions.auto,
-                                                size: 160.0,
-                                              ),
-                                              const SizedBox(height: 12),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.grey.shade100,
-                                                  borderRadius: BorderRadius.circular(8),
-                                                  border: Border.all(color: Colors.grey.shade300),
-                                                ),
-                                                child: Column(
-                                                  children: [
-                                                    const Text(
-                                                      'MÃ CODE QR:',
-                                                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Colors.grey),
-                                                    ),
-                                                    Text(
-                                                      widget.board.qrCode,
-                                                      style: const TextStyle(
-                                                        fontSize: 16,
-                                                        fontWeight: FontWeight.bold,
-                                                        fontFamily: 'monospace',
-                                                        letterSpacing: 1.2,
-                                                        color: Colors.black,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              ),
-                                              const SizedBox(height: 12),
-                                              Text(
-                                                widget.board.name,
-                                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 48,
-                                          child: ElevatedButton.icon(
-                                            icon: const Icon(Icons.picture_as_pdf),
-                                            label: const Text('In tem PDF (Khuyên dùng cho Eleph-label)'),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: AppColors.primary,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                            ),
-                                            onPressed: () async {
-                                              Navigator.pop(ctx);
-                                              await Future.delayed(const Duration(milliseconds: 150));
-                                              if (!mounted) return;
-                                              await QrShareHelper.shareQrPdfToElephLabel(
-                                                context: context,
-                                                qrData: widget.board.qrCode,
-                                                title: widget.board.name,
-                                                subtitle: widget.board.model.isNotEmpty ? 'Model: ${widget.board.model}' : null,
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 48,
-                                          child: ElevatedButton.icon(
-                                            icon: const Icon(Icons.label_outline),
-                                            label: const Text('Mở trong Eleph-label'),
-                                            style: ElevatedButton.styleFrom(
-                                              backgroundColor: Colors.blueAccent,
-                                              foregroundColor: Colors.white,
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                                            ),
-                                            onPressed: () async {
-                                              Navigator.pop(ctx);
-                                              await Future.delayed(const Duration(milliseconds: 150));
-                                              if (!mounted) return;
-                                              await QrShareHelper.shareQrCodeToElephLabel(
-                                                context: context,
-                                                qrData: widget.board.qrCode,
-                                                title: widget.board.name,
-                                                subtitle: widget.board.model.isNotEmpty ? 'Model: ${widget.board.model}' : null,
-                                              );
-                                            },
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        SizedBox(
-                                          width: double.infinity,
-                                          height: 44,
-                                           child: TextButton.icon(
-                                             icon: const Icon(Icons.copy),
-                                             label: const Text('Sao chép mã QR vào bộ nhớ tạm'),
-                                             onPressed: () async {
-                                               Navigator.pop(ctx);
-                                               await Future.delayed(const Duration(milliseconds: 150));
-                                               if (!mounted) return;
-                                               await QrShareHelper.copyAndLaunchElephLabel(
-                                                 context: context,
-                                                 qrData: widget.board.qrCode,
-                                               );
-                                             },
-                                           ),
-                                         ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
-                              style: OutlinedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(horizontal: 10),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                side: BorderSide(
-                                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    Icons.picture_as_pdf,
-                                    size: 16,
-                                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    'Xuất PDF',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+              if (widget.board.location.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white.withOpacity(0.04) : const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: isDark ? AppColors.borderDark : const Color(0xFFBBF7D0),
                     ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.location_on, color: Color(0xFF16A34A), size: 24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Vị trí lưu kho',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.board.location,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF16A34A),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),

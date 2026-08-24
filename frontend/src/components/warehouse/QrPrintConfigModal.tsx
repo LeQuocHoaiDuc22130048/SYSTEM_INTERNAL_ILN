@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
   Printer,
@@ -12,7 +12,13 @@ import {
   Copy,
   MapPin,
 } from 'lucide-react';
-import type { LocationQrExportData, BoardQrExportData, QrPrintConfig, PrinterDriverType } from '../../utils/pdf';
+import {
+  type LocationQrExportData,
+  type BoardQrExportData,
+  type QrPrintConfig,
+  type PrinterDriverType,
+  generateQrDataUrl,
+} from '../../utils/pdf';
 import './QrPrintConfigModal.css';
 
 const DEFAULT_CONFIG: QrPrintConfig = {
@@ -22,17 +28,17 @@ const DEFAULT_CONFIG: QrPrintConfig = {
   printDarkness: 8,
   printSpeed: 4,
   template: 'mobile_standard',
-  presetSize: '50x40',
-  widthMm: 50,
-  heightMm: 40,
-  qrSizePx: 120,
-  titleFontSize: 12,
-  codeFontSize: 14,
+  presetSize: '40x50',
+  widthMm: 40,
+  heightMm: 50,
+  qrSizePx: 95,
+  titleFontSize: 10,
+  codeFontSize: 12,
   layoutOrder: 'qr_top',
   textAlign: 'center',
-  paddingMm: 4,
+  paddingMm: 1.5,
   borderWidthPx: 1.5,
-  borderRadiusPx: 8,
+  borderRadiusPx: 6,
   showBorder: true,
   showName: true,
   showModel: false,
@@ -72,6 +78,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
   const [isSavedNotice, setIsSavedNotice] = useState<boolean>(false);
   const [testDriverStatus, setTestDriverStatus] = useState<string | null>(null);
   const [isModalQrCopied, setIsModalQrCopied] = useState<boolean>(false);
+  const [previewQrUrl, setPreviewQrUrl] = useState<string>('');
 
   // Normalize items to print
   const printItems: LocationQrExportData[] = useMemo(() => {
@@ -104,10 +111,14 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
     return printItems[Math.min(activeIndex, printItems.length - 1)] || printItems[0];
   }, [printItems, activeIndex]);
 
+  // Generate Base64 QR code for preview
+  useEffect(() => {
+    const qrValue = (activeItem.code || activeItem.qrCode || 'N/A').replace(/_QR$/i, '').trim();
+    generateQrDataUrl(qrValue).then((url) => setPreviewQrUrl(url));
+  }, [activeItem]);
+
   const handleCopyModalQr = () => {
-    const rawQrText = printItems && printItems.length > 1
-      ? printItems.map((item) => (item.qrCode || item.code || '').trim()).filter(Boolean).join('\n')
-      : (activeItem.qrCode || activeItem.code || '').trim();
+    const rawQrText = (activeItem.code || activeItem.qrCode || '').replace(/_QR$/i, '').trim();
 
     if (rawQrText) {
       navigator.clipboard.writeText(rawQrText);
@@ -124,45 +135,73 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
     let q = config.qrSizePx;
     let titleFs = config.titleFontSize;
     let codeFs = config.codeFontSize;
+    let pad = config.paddingMm;
 
     switch (preset) {
-      case '50x40':
+      case '40x50':
+        w = 40;
+        h = 50;
+        t = 'mobile_standard';
+        q = 95;
+        titleFs = 10;
+        codeFs = 12;
+        pad = 1.5;
+        break;
+      case '50x50':
         w = 50;
-        h = 40;
+        h = 50;
         t = 'mobile_standard';
         q = 110;
         titleFs = 11;
         codeFs = 13;
+        pad = 2;
+        break;
+      case '50x40':
+        w = 50;
+        h = 40;
+        t = 'mobile_standard';
+        q = 85;
+        titleFs = 10;
+        codeFs = 11;
+        pad = 1.5;
         break;
       case '60x40':
         w = 60;
         h = 40;
-        q = 120;
-        titleFs = 12;
-        codeFs = 14;
+        t = 'mobile_standard';
+        q = 100;
+        titleFs = 11;
+        codeFs = 13;
+        pad = 2;
         break;
       case '70x50':
         w = 70;
         h = 50;
-        q = 140;
-        titleFs = 13;
-        codeFs = 16;
+        t = 'mobile_standard';
+        q = 120;
+        titleFs = 12;
+        codeFs = 14;
+        pad = 2.5;
         break;
       case '70x30':
         w = 70;
         h = 30;
         t = 'horizontal';
-        q = 90;
-        titleFs = 11;
-        codeFs = 12;
+        q = 80;
+        titleFs = 10;
+        codeFs = 11;
+        pad = 1.5;
         break;
       case 'a4':
         w = 210;
         h = 297;
         t = 'grid';
-        q = 120;
-        titleFs = 12;
-        codeFs = 14;
+        q = 110;
+        titleFs = 11;
+        codeFs = 13;
+        pad = 3;
+        break;
+      case 'custom':
         break;
       default:
         break;
@@ -177,6 +216,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
       qrSizePx: q,
       titleFontSize: titleFs,
       codeFontSize: codeFs,
+      paddingMm: pad,
     }));
   };
 
@@ -248,8 +288,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
 
   if (!isOpen) return null;
 
-  const qrValue = activeItem.qrCode || activeItem.code || 'N/A';
-  const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(qrValue)}`;
+  const qrValue = (activeItem.code || activeItem.qrCode || 'N/A').replace(/_QR$/i, '').trim();
 
   return (
     <div className="qr-print-modal-overlay">
@@ -261,7 +300,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
               <MapPin size={22} color="#0284c7" />
               <span>In Tem Nhãn QR Vị Trí Kho / Kệ Kho</span>
             </h3>
-            <p>Tùy chỉnh driver máy in, kích thước tem nhãn dán kệ kho, ngăn kéo và hộp chứa linh kiện</p>
+            <p>Khổ giấy tem nhãn chuẩn 50x50mm, 50x40mm cho máy in tem nhiệt (TNS_LABEL, Xprinter, Phomemo,...)</p>
           </div>
           <button className="btn-close-modal" onClick={onClose} title="Đóng">
             <X size={20} />
@@ -291,7 +330,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                       }))
                     }
                   >
-                    <option value="system_default">🖨️ Máy in mặc định hệ thống</option>
+                    <option value="system_default">🖨️ Máy in mặc định hệ thống (TNS, Xprinter...)</option>
                     <option value="eleph_phomemo">📱 Eleph-label / Phomemo</option>
                     <option value="xprinter_tspl">🏷️ Xprinter / TSC (TSPL Direct)</option>
                     <option value="godex_ezpl">🏷️ GoDEX / Bixolon (EZPL)</option>
@@ -340,16 +379,30 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
             <div className="control-group">
               <div className="control-group-title">
                 <Sliders size={16} color="#0284c7" />
-                <span>2. Kích Thước Tem Nhãn Kệ Kho</span>
+                <span>2. Kích Thước Khổ Giấy Tem Nhãn</span>
               </div>
 
               <div className="preset-buttons-row">
                 <button
                   type="button"
+                  className={`preset-btn ${config.presetSize === '40x50' ? 'active' : ''}`}
+                  onClick={() => handlePresetChange('40x50')}
+                >
+                  40 x 50 mm (Máy TNS_LABEL)
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${config.presetSize === '50x50' ? 'active' : ''}`}
+                  onClick={() => handlePresetChange('50x50')}
+                >
+                  50 x 50 mm (Vuông)
+                </button>
+                <button
+                  type="button"
                   className={`preset-btn ${config.presetSize === '50x40' ? 'active' : ''}`}
                   onClick={() => handlePresetChange('50x40')}
                 >
-                  50 x 40 mm (Chuẩn)
+                  50 x 40 mm (Ngang)
                 </button>
                 <button
                   type="button"
@@ -363,22 +416,84 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                   className={`preset-btn ${config.presetSize === '70x50' ? 'active' : ''}`}
                   onClick={() => handlePresetChange('70x50')}
                 >
-                  70 x 50 mm (Kệ lớn)
+                  70 x 50 mm
                 </button>
                 <button
                   type="button"
                   className={`preset-btn ${config.presetSize === '70x30' ? 'active' : ''}`}
                   onClick={() => handlePresetChange('70x30')}
                 >
-                  70 x 30 mm (Ngang)
+                  70 x 30 mm
                 </button>
                 <button
                   type="button"
                   className={`preset-btn ${config.presetSize === 'a4' ? 'active' : ''}`}
                   onClick={() => handlePresetChange('a4')}
                 >
-                  Giấy A4 (Lưới nhiều tem)
+                  Giấy A4 (Lưới tem)
                 </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${config.presetSize === 'custom' ? 'active' : ''}`}
+                  onClick={() => handlePresetChange('custom')}
+                >
+                  Tùy chỉnh mm
+                </button>
+              </div>
+
+              {/* Exact Dimensions Inputs */}
+              <div className="dimension-inputs-row" style={{ marginTop: '8px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+                <div>
+                  <label className="control-label">Rộng (mm)</label>
+                  <input
+                    type="number"
+                    min={20}
+                    max={300}
+                    value={config.widthMm}
+                    onChange={(e) =>
+                      setConfig((p) => ({
+                        ...p,
+                        widthMm: Math.max(10, Number(e.target.value) || 10),
+                        presetSize: 'custom',
+                      }))
+                    }
+                    className="control-input"
+                  />
+                </div>
+                <div>
+                  <label className="control-label">Cao (mm)</label>
+                  <input
+                    type="number"
+                    min={15}
+                    max={300}
+                    value={config.heightMm}
+                    onChange={(e) =>
+                      setConfig((p) => ({
+                        ...p,
+                        heightMm: Math.max(10, Number(e.target.value) || 10),
+                        presetSize: 'custom',
+                      }))
+                    }
+                    className="control-input"
+                  />
+                </div>
+                <div>
+                  <label className="control-label">Lề viền (mm)</label>
+                  <input
+                    type="number"
+                    step={0.5}
+                    min={0}
+                    max={15}
+                    value={config.paddingMm}
+                    onChange={(e) =>
+                      setConfig((p) => ({
+                        ...p,
+                        paddingMm: Math.max(0, Number(e.target.value) || 0),
+                      }))
+                    }
+                    className="control-input"
+                  />
+                </div>
               </div>
 
               <div className="control-grid-2" style={{ marginTop: '10px' }}>
@@ -426,8 +541,8 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                 <span>3. Tùy Chỉnh Thông Tin Hiển Thị</span>
               </div>
 
-              <div className="checkboxes-grid">
-                <label className="checkbox-item">
+              <div className="checkbox-options-list">
+                <label className={`custom-toggle-card ${config.showBorder ? 'checked' : ''}`}>
                   <input
                     type="checkbox"
                     checked={config.showBorder}
@@ -435,10 +550,13 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                       setConfig((p) => ({ ...p, showBorder: e.target.checked }))
                     }
                   />
-                  <span>Khung viền tem nhãn</span>
+                  <div className="toggle-card-content">
+                    <span className="toggle-card-title">Khung viền bao tem</span>
+                    <span className="toggle-card-sub">Hiển thị đường viền nét mảnh bao quanh tem</span>
+                  </div>
                 </label>
 
-                <label className="checkbox-item">
+                <label className={`custom-toggle-card ${config.showName ? 'checked' : ''}`}>
                   <input
                     type="checkbox"
                     checked={config.showName}
@@ -446,10 +564,13 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                       setConfig((p) => ({ ...p, showName: e.target.checked }))
                     }
                   />
-                  <span>Tên vị trí / Kệ kho</span>
+                  <div className="toggle-card-content">
+                    <span className="toggle-card-title">Tên vị trí / Kệ kho</span>
+                    <span className="toggle-card-sub">Hiển thị tên mô tả kệ (vd: Kệ A1, Ngăn kéo...)</span>
+                  </div>
                 </label>
 
-                <label className="checkbox-item">
+                <label className={`custom-toggle-card ${config.showCodeText ? 'checked' : ''}`}>
                   <input
                     type="checkbox"
                     checked={config.showCodeText}
@@ -457,7 +578,10 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                       setConfig((p) => ({ ...p, showCodeText: e.target.checked }))
                     }
                   />
-                  <span>Khung hiển thị Mã Vị Trí</span>
+                  <div className="toggle-card-content">
+                    <span className="toggle-card-title">Khung hiển thị Mã Vị Trí</span>
+                    <span className="toggle-card-sub">Hộp nổi bật mã chữ in hoa (vd: LOC-A1)</span>
+                  </div>
                 </label>
               </div>
             </div>
@@ -495,60 +619,106 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
               <div
                 className={`live-qr-card order-${config.layoutOrder}`}
                 style={{
-                  width: config.template === 'grid' ? '180mm' : `${config.widthMm}mm`,
-                  minHeight: config.template === 'grid' ? '240mm' : `${config.heightMm}mm`,
-                  padding: `${config.paddingMm}mm`,
+                  width: config.template === 'grid' ? '280px' : `${Math.round(config.widthMm * 4.2)}px`,
+                  height: config.template === 'grid' ? '360px' : `${Math.round(config.heightMm * 4.2)}px`,
+                  maxWidth: '100%',
+                  padding: `${Math.max(6, Math.round(config.paddingMm * 3.5))}px`,
                   border: config.showBorder
                     ? `${config.borderWidthPx}px solid #1e293b`
-                    : '1px dashed #cbd5e1',
+                    : '1.5px dashed #cbd5e1',
                   borderRadius: `${config.borderRadiusPx}px`,
                   textAlign: config.textAlign,
-                  gap: config.layoutOrder === 'horizontal' ? '14px' : '8px',
+                  display: 'flex',
+                  flexDirection: config.layoutOrder === 'horizontal' ? 'row' : config.layoutOrder === 'title_top' ? 'column-reverse' : 'column',
+                  alignItems: 'center',
+                  justifyContent: config.layoutOrder === 'horizontal' ? 'center' : 'space-between',
+                  gap: config.layoutOrder === 'horizontal' ? '10px' : '4px',
+                  backgroundColor: '#ffffff',
+                  boxShadow: '0 8px 24px rgba(0, 0, 0, 0.12)',
+                  margin: 'auto',
+                  boxSizing: 'border-box',
+                  overflow: 'hidden',
                 }}
               >
                 {/* QR Image Section */}
-                <div className="live-qr-image-wrapper">
-                  <img
-                    src={qrApiUrl}
-                    alt="QR Preview"
-                    className="live-qr-img"
-                    style={{
-                      width: `${config.qrSizePx}px`,
-                      height: `${config.qrSizePx}px`,
-                    }}
-                  />
+                <div
+                  className="live-qr-image-wrapper"
+                  style={{
+                    flex: '1 1 0',
+                    minHeight: 0,
+                    maxHeight: config.layoutOrder === 'horizontal' ? '100%' : `calc(100% - ${(config.showName ? 18 : 0) + (config.showCodeText ? 24 : 0)}px)`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                  }}
+                >
+                  {previewQrUrl ? (
+                    <img
+                      src={previewQrUrl}
+                      alt="QR Preview"
+                      className="live-qr-img"
+                      style={{
+                        maxHeight: '100%',
+                        maxWidth: '100%',
+                        width: 'auto',
+                        height: 'auto',
+                        aspectRatio: '1 / 1',
+                        objectFit: 'contain',
+                      }}
+                    />
+                  ) : (
+                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Đang tạo QR...</div>
+                  )}
                 </div>
 
                 {/* Text Info Section */}
                 <div
                   className="live-qr-meta"
                   style={{
+                    flex: '0 0 auto',
+                    width: '100%',
                     alignItems:
                       config.textAlign === 'center'
                         ? 'center'
                         : config.textAlign === 'right'
                         ? 'flex-end'
                         : 'flex-start',
-                    gap: '4px',
+                    gap: '2px',
                   }}
                 >
                   {config.showName && (
                     <div
                       className="live-qr-title"
-                      style={{ fontSize: `${config.titleFontSize}px` }}
+                      style={{
+                        fontSize: `${config.titleFontSize}px`,
+                        maxHeight: '2.4em',
+                        overflow: 'hidden',
+                        lineHeight: 1.2,
+                        fontWeight: 800,
+                      }}
                     >
                       {activeItem.name}
                     </div>
                   )}
 
                   {activeItem.description && (
-                    <div className="live-qr-subtext" style={{ fontSize: `${config.titleFontSize - 2}px` }}>
+                    <div
+                      className="live-qr-subtext"
+                      style={{
+                        fontSize: `${Math.max(8, config.titleFontSize - 2)}px`,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        width: '100%',
+                      }}
+                    >
                       {activeItem.description}
                     </div>
                   )}
 
                   {activeItem.totalPartTypes !== undefined && (
-                    <div className="live-qr-subtext" style={{ fontSize: '10px', color: '#64748b' }}>
+                    <div className="live-qr-subtext" style={{ fontSize: '9px', color: '#64748b' }}>
                       {activeItem.totalPartTypes} loại linh kiện
                     </div>
                   )}
@@ -557,8 +727,8 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                     <div
                       className="live-qr-code-box"
                       style={{
-                        marginTop: '4px',
-                        padding: '4px 8px',
+                        marginTop: '2px',
+                        padding: '2px 6px',
                       }}
                     >
                       <span className="live-qr-code-label">MÃ VỊ TRÍ KHO:</span>
@@ -620,3 +790,6 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
     </div>
   );
 };
+
+
+

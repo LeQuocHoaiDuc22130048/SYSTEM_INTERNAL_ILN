@@ -18,6 +18,7 @@ import { PartCheckoutHistoryPanel } from './warehouse/PartCheckoutHistoryPanel';
 import { LocationQrScanModal } from './warehouse/LocationQrScanModal';
 import { PartCheckoutModal } from './warehouse/PartCheckoutModal';
 import { PartReturnModal } from './warehouse/PartReturnModal';
+import { PartBulkImportModal } from './warehouse/PartBulkImportModal';
 import './WarehouseTab.css';
 
 
@@ -74,6 +75,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
   // Part Modals
   const [isPartAddEditModalOpen, setIsPartAddEditModalOpen] = useState<boolean>(false);
+  const [isPartBulkImportModalOpen, setIsPartBulkImportModalOpen] = useState<boolean>(false);
   const [isAdjustStockModalOpen, setIsAdjustStockModalOpen] = useState<boolean>(false);
 
   // Part Form states
@@ -84,6 +86,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [partMinAmount, setPartMinAmount] = useState<string>('0');
   const [partCategoryName, setPartCategoryName] = useState<string>('');
   const [partCategoryId, setPartCategoryId] = useState<string>('');
+  const [partInitialLocationCode, setPartInitialLocationCode] = useState<string>('');
+  const [partInitialQuantity, setPartInitialQuantity] = useState<string>('');
 
   // Stock Adjustment Form states
   const [adjustLocationCode, setAdjustLocationCode] = useState<string>('');
@@ -92,7 +96,14 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
   // Autocomplete lists
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string }>>([]);
+  const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string; description?: string; qrCode?: string; totalPartTypes?: number; totalQuantity?: number }>>([]);
+
+  // Add Location Modal States
+  const [isAddLocationModalOpen, setIsAddLocationModalOpen] = useState<boolean>(false);
+  const [newLocationCode, setNewLocationCode] = useState<string>('');
+  const [newLocationName, setNewLocationName] = useState<string>('');
+  const [newLocationDesc, setNewLocationDesc] = useState<string>('');
+  const [newLocationQr, setNewLocationQr] = useState<string>('');
 
   // Return form states
   const [returnNote, setReturnNote] = useState<string>('');
@@ -109,16 +120,61 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       setLocationsForQrPrint(locList);
     } else {
       setLocationsForQrPrint(
-        locations.map((l) => ({
-          id: l.id,
-          code: l.code,
-          name: l.name,
-          qrCode: l.code,
-        }))
+        locations.map((l) => {
+          const cleanCode = (l.code || l.qrCode || '').replace(/_QR$/i, '').trim();
+          return {
+            id: l.id,
+            code: cleanCode,
+            name: l.name,
+            qrCode: cleanCode,
+            description: l.description,
+            totalPartTypes: l.totalPartTypes,
+            totalQuantity: l.totalQuantity,
+          };
+        })
       );
     }
     setIsQrConfigModalOpen(true);
   }, [locations]);
+
+  const handleSaveLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLocationCode.trim() || !newLocationName.trim()) {
+      showToast('Vui lòng nhập đầy đủ mã và tên vị trí kho');
+      return;
+    }
+
+    const createdCode = newLocationCode.trim();
+
+    try {
+      const response = await fetch('/api/v1/parts/locations', {
+        method: 'POST',
+        headers: getJsonAuthHeaders(),
+        body: JSON.stringify({
+          code: createdCode,
+          name: newLocationName.trim(),
+          description: newLocationDesc.trim() || undefined,
+          qrCode: newLocationQr.trim() || createdCode,
+        }),
+      });
+
+      if (response.ok) {
+        showToast(`Đã thêm vị trí kho ${createdCode} thành công!`);
+        setIsAddLocationModalOpen(false);
+        fetchLocations();
+        // Auto select in forms
+        setPartInitialLocationCode(createdCode);
+        setBoardLocation(createdCode);
+        setAdjustLocationCode(createdCode);
+      } else {
+        const err = await response.json().catch(() => ({}));
+        showToast(`Lỗi: ${err.message || 'Không thể tạo vị trí kho'}`);
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Lỗi kết nối khi tạo vị trí kho');
+    }
+  };
 
   // Fetch Boards
   const fetchBoards = useCallback(async () => {
@@ -511,6 +567,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       setPartMinAmount(part.minAmount.toString());
       setPartCategoryName(part.categoryName || '');
       setPartCategoryId(part.categoryId || '');
+      setPartInitialLocationCode(part.lots?.[0]?.storeLocationCode || '');
+      setPartInitialQuantity(part.totalQuantity ? part.totalQuantity.toString() : '');
     } else {
       setPartIpn('');
       setPartName('');
@@ -518,6 +576,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       setPartMinAmount('0');
       setPartCategoryName('');
       setPartCategoryId('');
+      setPartInitialLocationCode(locations.length > 0 ? locations[0].code : '');
+      setPartInitialQuantity('');
     }
     setIsPartAddEditModalOpen(true);
   };
@@ -564,10 +624,31 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       }
 
       if (response.ok) {
+        const resData = await response.json().catch(() => ({}));
+        const createdPart = resData?.data;
+
+        // If creating new part and initial location & quantity are provided, adjust stock immediately
+        if (!editingPart && createdPart?.id && partInitialLocationCode && parseFloat(partInitialQuantity) > 0) {
+          try {
+            await fetch(`/api/v1/parts/${createdPart.id}/adjust-stock`, {
+              method: 'POST',
+              headers: getJsonAuthHeaders(),
+              body: JSON.stringify({
+                locationCode: partInitialLocationCode.trim(),
+                quantity: parseFloat(partInitialQuantity),
+                note: 'Khởi tạo vị trí & số lượng kho ban đầu',
+              }),
+            });
+          } catch (err) {
+            console.error('Error setting initial stock for part:', err);
+          }
+        }
+
         showToast(editingPart ? 'Cập nhật linh kiện thành công!' : 'Thêm linh kiện thành công!');
         setIsPartAddEditModalOpen(false);
         fetchParts();
         fetchCategories();
+        fetchLocations();
         if (editingPart && selectedPart && selectedPart.id === editingPart.id) {
           const updatedResp = await fetch(`/api/v1/parts/${editingPart.id}`, {
             headers: getAuthHeaders(),
@@ -792,13 +873,12 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   return (
     <div className="warehouse-container">
       {/* Top Header Mode Switcher & Quick QR Scan Bar */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
-        <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--color-bg-surface, #ffffff)', padding: '4px', borderRadius: '10px', border: '1px solid var(--color-border, #e2e8f0)' }}>
+      <div className="warehouse-header-bar">
+        <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--color-bg, #f1f5f9)', padding: '4px', borderRadius: '10px', border: '1px solid var(--color-border, #e2e8f0)' }}>
           <button
             type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'PARTS' ? 'active' : ''}`}
             onClick={() => setWarehouseMode('PARTS')}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
           >
             🧱 Kho Linh Kiện (Parts)
           </button>
@@ -806,7 +886,6 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
             type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'BOARDS' ? 'active' : ''}`}
             onClick={() => setWarehouseMode('BOARDS')}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
           >
             📱 Bo Mạch (Boards)
           </button>
@@ -814,13 +893,12 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
             type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'PART_LOGS' ? 'active' : ''}`}
             onClick={() => setWarehouseMode('PART_LOGS')}
-            style={{ padding: '8px 16px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontWeight: 600, fontSize: '0.88rem' }}
           >
             📜 Nhật Ký Lấy/Trả Linh Kiện
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           <button
             type="button"
             onClick={() => {
@@ -836,7 +914,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           <button
             type="button"
             onClick={() => handleOpenLocationQrPrint()}
-            style={{ backgroundColor: 'var(--color-bg-surface, #ffffff)', color: '#2563eb', border: '1px solid #bfdbfe', padding: '8px 14px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
+            style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1.5px solid #bfdbfe', padding: '8px 14px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
           >
             🏷️ In Tem QR Vị Trí
           </button>
@@ -869,6 +947,13 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                 selectedBoard={selectedBoard}
                 handleSelectBoard={handleSelectBoard}
                 openAddEditModal={openAddEditModal}
+                openAddLocationModal={() => {
+                  setNewLocationCode('');
+                  setNewLocationName('');
+                  setNewLocationDesc('');
+                  setNewLocationQr('');
+                  setIsAddLocationModalOpen(true);
+                }}
                 getStatusLabel={getStatusLabel}
                 getStatusColorClass={getStatusColorClass}
               />
@@ -887,6 +972,14 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                 partStockFilter={partStockFilter}
                 setPartStockFilter={setPartStockFilter}
                 openAddEditPartModal={openAddEditPartModal}
+                openBulkImportModal={() => setIsPartBulkImportModalOpen(true)}
+                openAddLocationModal={() => {
+                  setNewLocationCode('');
+                  setNewLocationName('');
+                  setNewLocationDesc('');
+                  setNewLocationQr('');
+                  setIsAddLocationModalOpen(true);
+                }}
                 openLocationQrScanModal={(code) => {
                   setLocationScanInitialCode(code || '');
                   setIsLocationQrScanModalOpen(true);
@@ -934,6 +1027,10 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                   handleDeletePart={handleDeletePart}
                   openAdjustStockModal={openAdjustStockModal}
                   openPartCheckoutModal={() => setIsPartCheckoutModalOpen(true)}
+                  onOpenLocationScan={(loc) => {
+                    setLocationScanInitialCode(loc);
+                    setIsLocationQrScanModalOpen(true);
+                  }}
                 />
               ) : (
                 <div className="detail-empty-state">
@@ -972,13 +1069,35 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
 
               <div className="form-row-grid">
                 <div className="form-group">
-                  <label>Vị trí lưu kho</label>
-                  <input
-                    type="text"
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                    <label style={{ margin: 0 }}>Vị trí lưu kho có sẵn</label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setNewLocationCode('');
+                        setNewLocationName('');
+                        setNewLocationDesc('');
+                        setNewLocationQr('');
+                        setIsAddLocationModalOpen(true);
+                      }}
+                      style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                    >
+                      + Thêm vị trí mới
+                    </button>
+                  </div>
+                  <select
                     value={boardLocation}
                     onChange={(e) => setBoardLocation(e.target.value)}
-                    placeholder="Kệ A - Tầng 2"
-                  />
+                    className="w-status-select"
+                    style={{ width: '100%' }}
+                  >
+                    <option value="">-- Chọn vị trí kho có sẵn --</option>
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.code}>
+                        {loc.code} {loc.name ? `(${loc.name})` : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="form-group">
                   <label>Số lượng *</label>
@@ -1262,9 +1381,56 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                   value={partDescription}
                   onChange={(e) => setPartDescription(e.target.value)}
                   placeholder="Nhập thông số kỹ thuật, hãng sản xuất, ghi chú..."
-                  rows={3}
+                  rows={2}
                 />
               </div>
+
+              {!editingPart && (
+                <div className="form-row-grid" style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <label style={{ margin: 0, fontWeight: 600, color: '#334155' }}>Vị trí lưu kho có sẵn</label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setNewLocationCode('');
+                          setNewLocationName('');
+                          setNewLocationDesc('');
+                          setNewLocationQr('');
+                          setIsAddLocationModalOpen(true);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                      >
+                        + Thêm vị trí mới
+                      </button>
+                    </div>
+                    <select
+                      value={partInitialLocationCode}
+                      onChange={(e) => setPartInitialLocationCode(e.target.value)}
+                      className="w-status-select"
+                      style={{ width: '100%' }}
+                    >
+                      <option value="">-- Chọn vị trí kho có sẵn --</option>
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.code}>
+                          {loc.code} {loc.name ? `(${loc.name})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label style={{ fontWeight: 600, color: '#334155' }}>Số lượng nhập kho ban đầu</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.0001"
+                      value={partInitialQuantity}
+                      onChange={(e) => setPartInitialQuantity(e.target.value)}
+                      placeholder="0 (Nhập số lượng nếu có)"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="modal-actions-footer">
                 <button type="button" className="btn-cancel" onClick={() => setIsPartAddEditModalOpen(false)}>
@@ -1291,20 +1457,36 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
             </div>
             <form onSubmit={handleAdjustStock} className="modal-form">
               <div className="form-group">
-                <label>Vị trí lưu kho *</label>
-                <input
-                  type="text"
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                  <label style={{ margin: 0 }}>Vị trí lưu kho có sẵn *</label>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNewLocationCode('');
+                      setNewLocationName('');
+                      setNewLocationDesc('');
+                      setNewLocationQr('');
+                      setIsAddLocationModalOpen(true);
+                    }}
+                    style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  >
+                    + Thêm vị trí mới
+                  </button>
+                </div>
+                <select
                   required
                   value={adjustLocationCode}
                   onChange={(e) => setAdjustLocationCode(e.target.value)}
-                  placeholder="VD: DEFAULT, Kệ A - Hàng 2..."
-                  list="location-suggestions"
-                />
-                <datalist id="location-suggestions">
+                  className="w-status-select"
+                  style={{ width: '100%' }}
+                >
+                  <option value="">-- Chọn vị trí kho có sẵn --</option>
                   {locations.map((loc) => (
-                    <option key={loc.id} value={loc.code} />
+                    <option key={loc.id} value={loc.code}>
+                      {loc.code} {loc.name ? `(${loc.name})` : ''}
+                    </option>
                   ))}
-                </datalist>
+                </select>
               </div>
 
               <div className="form-group">
@@ -1342,6 +1524,97 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           </div>
         </div>
       )}
+
+      {/* ADD LOCATION MODAL */}
+      {isAddLocationModalOpen && (
+        <div className="w-modal-overlay">
+          <div className="w-modal-card small">
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <QrCode size={20} className="text-primary" />
+                <h3 style={{ margin: 0 }}>Thêm Vị Trí Kho / Kệ Mới</h3>
+              </div>
+              <button className="close-modal-btn" onClick={() => setIsAddLocationModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+            <form onSubmit={handleSaveLocation} className="modal-form">
+              <div className="form-group">
+                <label>Mã vị trí kho (Kệ / Ngăn) *</label>
+                <input
+                  type="text"
+                  required
+                  value={newLocationCode}
+                  onChange={(e) => {
+                    setNewLocationCode(e.target.value);
+                    if (!newLocationQr || newLocationQr === newLocationCode) {
+                      setNewLocationQr(e.target.value);
+                    }
+                  }}
+                  placeholder="VD: LOC-A1, KE-01, KHAY-B2..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Tên mô tả vị trí *</label>
+                <input
+                  type="text"
+                  required
+                  value={newLocationName}
+                  onChange={(e) => setNewLocationName(e.target.value)}
+                  placeholder="VD: Kệ A - Tầng 1 - Hộp 02..."
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Mã QR gán cho vị trí (mặc định = Mã vị trí)</label>
+                <input
+                  type="text"
+                  value={newLocationQr}
+                  onChange={(e) => setNewLocationQr(e.target.value)}
+                  placeholder="Để trống sẽ tự động lấy Mã vị trí làm mã QR"
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Ghi chú chi tiết vị trí</label>
+                <textarea
+                  value={newLocationDesc}
+                  onChange={(e) => setNewLocationDesc(e.target.value)}
+                  placeholder="VD: Chuyên chứa IC nguồn và tụ điện cao áp..."
+                  rows={2}
+                />
+              </div>
+
+              {newLocationCode.trim() && (
+                <div style={{ padding: '12px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '14px' }}>
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(newLocationQr.trim() || newLocationCode.trim())}`}
+                    alt="QR Preview"
+                    style={{ width: '60px', height: '60px', borderRadius: '4px', border: '1px solid #cbd5e1' }}
+                  />
+                  <div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Mã QR sẽ tạo cho vị trí này:</div>
+                    <div style={{ fontWeight: 700, fontFamily: 'monospace', color: '#0f172a', fontSize: '0.95rem' }}>
+                      {newLocationQr.trim() || newLocationCode.trim()}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="modal-actions-footer">
+                <button type="button" className="btn-cancel" onClick={() => setIsAddLocationModalOpen(false)}>
+                  Hủy
+                </button>
+                <button type="submit" className="btn-submit">
+                  Tạo Vị Trí & Cấp QR
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* QR Print Config & Live Preview Modal for Warehouse Locations */}
       <QrPrintConfigModal
         isOpen={isQrConfigModalOpen}
@@ -1371,12 +1644,13 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           setIsPartCheckoutModalOpen(true);
         }}
         onPrintLocationQr={(locData) => {
+          const cleanCode = (locData.code || locData.qrCode || '').replace(/_QR$/i, '').trim();
           setLocationsForQrPrint([
             {
               id: locData.locationId || locData.code,
-              code: locData.code,
+              code: cleanCode,
               name: locData.name,
-              qrCode: locData.qrCode || locData.code,
+              qrCode: cleanCode,
               description: locData.description,
               totalPartTypes: locData.totalPartTypes,
               totalQuantity: locData.totalQuantity,
@@ -1403,6 +1677,17 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
         isOpen={isPartReturnModalOpen}
         onClose={() => setIsPartReturnModalOpen(false)}
         checkoutItem={checkoutHistoryItemToReturn}
+        onSuccess={() => {
+          fetchParts();
+        }}
+        showToast={showToast}
+      />
+
+      {/* Part Bulk Import (Nhập linh kiện Excel/CSV) Modal */}
+      <PartBulkImportModal
+        isOpen={isPartBulkImportModalOpen}
+        onClose={() => setIsPartBulkImportModalOpen(false)}
+        existingParts={parts}
         onSuccess={() => {
           fetchParts();
         }}

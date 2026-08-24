@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -14,6 +15,8 @@ public interface PartRepository extends JpaRepository<Part, UUID> {
     Optional<Part> findByIdAndIsDeletedFalse(UUID id);
 
     Optional<Part> findByIpnAndIsDeletedFalse(String ipn);
+
+    List<Part> findByIsDeletedFalse();
 
     @Query("SELECT p FROM Part p WHERE p.isDeleted = false AND " +
            "(:keyword IS NULL OR :keyword = '' OR " +

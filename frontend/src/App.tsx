@@ -41,7 +41,6 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(() => {
     return !!localStorage.getItem('accessToken');
   });
-  const [sidebarOpen, setSidebarOpen] = useState<boolean>(window.innerWidth > 1024);
   const [currentUser, setCurrentUser] = useState<UserInfo | null>(() => {
     const userStr = localStorage.getItem('currentUser');
     try {
@@ -63,7 +62,38 @@ function App() {
 
   const [searchTerm, setSearchTerm] = useState<string>('');
 
-  const [activeTab, setActiveTab] = useState<ActiveTab>('dashboard');
+  const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'orders', 'warehouse', 'accounts'];
+    const hash = window.location.hash.replace('#', '') as ActiveTab;
+    if (validTabs.includes(hash)) return hash;
+
+    const saved = localStorage.getItem('activeTab') as ActiveTab;
+    if (validTabs.includes(saved)) return saved;
+
+    return 'dashboard';
+  });
+
+  // Tự động lưu tab đang chọn vào localStorage & cập nhật hash URL khi chuyển tab
+  useEffect(() => {
+    localStorage.setItem('activeTab', activeTab);
+    if (window.location.hash !== `#${activeTab}`) {
+      window.location.hash = activeTab;
+    }
+  }, [activeTab]);
+
+  // Lắng nghe sự kiện hashchange khi người dùng bấm nút Back/Forward trên trình duyệt
+  useEffect(() => {
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'orders', 'warehouse', 'accounts'];
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#', '') as ActiveTab;
+      if (validTabs.includes(hash)) {
+        setActiveTab(hash);
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const today = new Date();
     const y = today.getFullYear();
@@ -360,8 +390,6 @@ function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         currentUser={currentUser}
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
         handleLogout={handleLogout}
       />
 
@@ -377,7 +405,6 @@ function App() {
           dataSource={dataSource}
           connectionError={connectionError}
           handleRetryConnection={handleRetryConnection}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
 
         <div className="main-content-inner">

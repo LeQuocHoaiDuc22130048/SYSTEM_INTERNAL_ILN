@@ -2,10 +2,13 @@ package com.suachuabientan.system_internal.modules.warehouse.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.AdjustStockRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.BulkImportPartRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreatePartRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreateStoreLocationRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartCheckoutRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartReturnRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdatePartRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.response.BulkImportPartResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.CategoryInfo;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.LocationInfo;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.LocationScanResponse;
@@ -100,6 +103,19 @@ public class PartController {
         ));
     }
 
+    @Operation(summary = "Nhập danh sách linh kiện hàng loạt từ Excel/CSV")
+    @PostMapping("/bulk-import")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    public ResponseEntity<ApiResponse<BulkImportPartResponse>> bulkImport(
+            @Valid @RequestBody BulkImportPartRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UUID userId = extractUserId(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(
+                partService.bulkImport(request, userId),
+                "Nhập linh kiện hàng loạt thành công"
+        ));
+    }
+
     @Operation(summary = "Quét mã QR / Nhập mã vị trí kho — hiển thị tất cả linh kiện tại vị trí đó")
     @GetMapping("/locations/scan/{codeOrQr}")
     @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
@@ -161,6 +177,17 @@ public class PartController {
     @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
     public ResponseEntity<ApiResponse<List<LocationInfo>>> getLocations() {
         return ResponseEntity.ok(ApiResponse.success(partService.getLocations()));
+    }
+
+    @Operation(summary = "Thêm vị trí kho mới kèm mã QR")
+    @PostMapping("/locations")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    public ResponseEntity<ApiResponse<LocationInfo>> createLocation(
+            @Valid @RequestBody CreateStoreLocationRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UUID userId = extractUserId(userDetails);
+        return ResponseEntity.status(201)
+                .body(ApiResponse.created(partService.createLocation(request, userId)));
     }
 
     private UUID extractUserId(UserDetails userDetails) {

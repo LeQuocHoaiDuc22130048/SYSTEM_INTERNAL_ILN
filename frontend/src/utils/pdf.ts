@@ -1,3 +1,5 @@
+import QRCode from 'qrcode';
+
 export interface LocationQrExportData {
   id: string;
   code: string;
@@ -33,7 +35,7 @@ export interface QrPrintConfig {
   printDarkness: number;
   printSpeed: number;
   template: 'mobile_standard' | 'compact' | 'detailed' | 'horizontal' | 'grid';
-  presetSize: '50x40' | '60x40' | '70x50' | '70x30' | 'a4' | 'custom';
+  presetSize: '50x50' | '50x40' | '40x50' | '40x40' | '60x40' | '70x50' | '70x30' | 'a4' | 'custom';
   widthMm: number;
   heightMm: number;
   qrSizePx: number;
@@ -60,17 +62,17 @@ export const DEFAULT_QR_PRINT_CONFIG: QrPrintConfig = {
   printDarkness: 8,
   printSpeed: 4,
   template: 'mobile_standard',
-  presetSize: '50x40',
-  widthMm: 50,
-  heightMm: 40,
-  qrSizePx: 110,
-  titleFontSize: 11,
-  codeFontSize: 13,
+  presetSize: '40x50',
+  widthMm: 40,
+  heightMm: 50,
+  qrSizePx: 95,
+  titleFontSize: 10,
+  codeFontSize: 12,
   layoutOrder: 'qr_top',
   textAlign: 'center',
-  paddingMm: 3,
+  paddingMm: 1.5,
   borderWidthPx: 1.5,
-  borderRadiusPx: 8,
+  borderRadiusPx: 6,
   showBorder: true,
   showName: true,
   showModel: true,
@@ -112,29 +114,81 @@ function getOrCreatePrintIframe(): HTMLIFrameElement {
 }
 
 /**
+ * Generate QR code as pure Vector SVG string
+ */
+export async function generateQrSvg(value: string): Promise<string> {
+  try {
+    const rawSvg = await QRCode.toString(value, {
+      type: 'svg',
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+    return rawSvg.replace(
+      '<svg ',
+      '<svg class="qr-svg-item" style="width: 100%; height: 100%; max-height: 100%; max-width: 100%; aspect-ratio: 1/1; object-fit: contain;" '
+    );
+  } catch (err) {
+    console.error('Lỗi tạo QR SVG:', err);
+    return `<img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(value)}" class="qr-image" style="max-width: 100%; max-height: 100%; object-fit: contain;" />`;
+  }
+}
+
+/**
+ * Generate QR code as Base64 Data URL (for preview)
+ */
+export async function generateQrDataUrl(value: string): Promise<string> {
+  try {
+    return await QRCode.toDataURL(value, {
+      errorCorrectionLevel: 'M',
+      margin: 1,
+      width: 320,
+      color: {
+        dark: '#000000',
+        light: '#ffffff',
+      },
+    });
+  } catch (err) {
+    console.error('Lỗi tạo QR Data URL:', err);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(value)}`;
+  }
+}
+
+/**
  * Single location QR printing helper
  */
-export function exportLocationQrPdf(location: LocationQrExportData, config?: QrPrintConfig): void {
-  exportLocationQrPdfList([location], `Tem_QR_ViTri_${location.code}`, config);
+export async function exportLocationQrPdf(location: LocationQrExportData, config?: QrPrintConfig): Promise<void> {
+  await exportLocationQrPdfList([location], `Tem_QR_ViTri_${location.code}`, config);
 }
 
 /**
  * Export and print Location QR codes with custom size, template, and formatting.
  */
-export function exportLocationQrPdfList(
+export async function exportLocationQrPdfList(
   locations: LocationQrExportData[],
   filename = 'Danh_sach_tem_QR_vi_tri_kho',
   config: QrPrintConfig = DEFAULT_QR_PRINT_CONFIG
-): void {
+): Promise<void> {
   if (!locations || locations.length === 0) return;
 
   const isGridMode = config.template === 'grid' || config.presetSize === 'a4';
   const isHorizontal = config.layoutOrder === 'horizontal' || config.template === 'horizontal';
 
+  // Generate Vector SVGs with clean location code (no _QR suffix)
+  const qrSvgs = await Promise.all(
+    locations.map((loc) => {
+      const cleanCode = (loc.code || loc.qrCode || 'N/A').replace(/_QR$/i, '').trim();
+      return generateQrSvg(cleanCode);
+    })
+  );
+
   const cardsHtml = locations
-    .map((loc) => {
-      const qrCodeVal = loc.qrCode || loc.code || 'N/A';
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeVal)}`;
+    .map((loc, index) => {
+      const cleanCode = (loc.code || loc.qrCode || 'N/A').replace(/_QR$/i, '').trim();
+      const qrSvg = qrSvgs[index];
 
       const textAlignCss = config.textAlign;
       const alignItemCss =
@@ -147,7 +201,7 @@ export function exportLocationQrPdfList(
       return `
         <div class="qr-card">
           <div class="qr-image-wrapper">
-            <img src="${qrUrl}" alt="QR Code" class="qr-image" />
+            ${qrSvg}
           </div>
           <div class="qr-info-meta" style="align-items: ${alignItemCss}; text-align: ${textAlignCss};">
             ${
@@ -162,7 +216,7 @@ export function exportLocationQrPdfList(
             }
             ${
               loc.totalPartTypes !== undefined
-                ? `<div class="qr-subtext" style="font-size: 9px; color: #64748b;">${loc.totalPartTypes} loại linh kiện</div>`
+                ? `<div class="qr-subtext" style="font-size: 7.5px; color: #64748b;">${loc.totalPartTypes} loại linh kiện</div>`
                 : ''
             }
             ${
@@ -170,7 +224,7 @@ export function exportLocationQrPdfList(
                 ? `
                 <div class="qr-code-box">
                   <span class="qr-code-label">MÃ VỊ TRÍ KHO:</span>
-                  <span class="qr-code-text">${escapeHtml(qrCodeVal)}</span>
+                  <span class="qr-code-text">${escapeHtml(cleanCode)}</span>
                 </div>
               `
                 : ''
@@ -189,39 +243,36 @@ export function exportLocationQrPdfList(
       <title>${escapeHtml(filename)}</title>
       <style>
         @page {
-          ${
-            isGridMode
-              ? `size: A4 portrait; margin: 5mm;`
-              : `size: ${config.widthMm}mm ${config.heightMm}mm; margin: 0mm;`
-          }
+          size: ${isGridMode ? 'A4 portrait' : `${config.widthMm}mm ${config.heightMm}mm`};
+          margin: 0mm !important;
         }
-        * {
-          box-sizing: border-box;
+        *, *::before, *::after {
+          box-sizing: border-box !important;
           margin: 0;
           padding: 0;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-        html, body {
-          background-color: #ffffff;
-          color: #0f172a;
-          padding: 0;
-          margin: 0;
-          width: ${isGridMode ? '210mm' : `${config.widthMm}mm`} !important;
-          height: ${isGridMode ? '297mm' : `${config.heightMm}mm`} !important;
-          overflow: hidden;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
+        html, body {
+          background: #ffffff !important;
+          color: #0f172a !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          overflow: hidden !important;
+        }
         .page-header {
           text-align: center;
-          margin: 12px;
-          padding: 12px;
-          background: #ffffff;
+          margin: 10px;
+          padding: 10px;
+          background: #f8fafc;
           border-radius: 8px;
           border: 1px solid #cbd5e1;
         }
         .page-header h2 {
-          font-size: 16px;
+          font-size: 15px;
           color: #0f172a;
           text-transform: uppercase;
         }
@@ -231,9 +282,9 @@ export function exportLocationQrPdfList(
           margin-top: 4px;
         }
         .action-btns {
-          margin-top: 10px;
+          margin-top: 8px;
           display: flex;
-          gap: 10px;
+          gap: 8px;
           justify-content: center;
         }
         .btn-print {
@@ -262,15 +313,12 @@ export function exportLocationQrPdfList(
               ? `
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(60mm, 1fr));
-                gap: 12px;
-                padding: 10mm;
+                gap: 8px;
+                padding: 8mm;
                 justify-items: center;
               `
               : `
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 0;
+                display: block;
                 padding: 0;
                 margin: 0;
                 width: 100%;
@@ -285,113 +333,131 @@ export function exportLocationQrPdfList(
           max-width: ${isGridMode ? 'none' : `${config.widthMm}mm`} !important;
           max-height: ${isGridMode ? 'none' : `${config.heightMm}mm`} !important;
           padding: ${config.paddingMm}mm !important;
-          background: #ffffff;
+          background: #ffffff !important;
           border: ${
             config.showBorder
               ? `${config.borderWidthPx}px solid #000000`
               : 'none'
-          };
-          border-radius: ${config.borderRadiusPx}px;
-          display: flex;
+          } !important;
+          border-radius: ${config.borderRadiusPx}px !important;
+          display: flex !important;
           flex-direction: ${
             isHorizontal
               ? 'row'
               : config.layoutOrder === 'title_top'
               ? 'column-reverse'
               : 'column'
-          };
-          align-items: center;
-          justify-content: center;
-          gap: ${isHorizontal ? '10px' : '4px'};
+          } !important;
+          align-items: center !important;
+          justify-content: ${isHorizontal ? 'center' : 'space-between'} !important;
+          gap: ${isHorizontal ? '6px' : '2px'} !important;
           page-break-inside: avoid !important;
-          page-break-after: ${locations.length > 1 && !isGridMode ? 'always' : 'auto'} !important;
+          break-inside: avoid !important;
+          page-break-after: avoid !important;
+          break-after: avoid !important;
           box-sizing: border-box !important;
           overflow: hidden !important;
+          margin: 0 auto !important;
+        }
+
+        .qr-card + .qr-card {
+          page-break-before: always !important;
+          break-before: page !important;
         }
 
         .qr-image-wrapper {
-          display: flex;
-          justify-content: center;
-          align-items: center;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          flex: 1 1 0 !important;
+          min-height: 0 !important;
+          min-width: 0 !important;
+          width: 100% !important;
+          height: 0 !important;
+          overflow: hidden !important;
         }
 
-        .qr-image {
-          width: ${config.qrSizePx}px;
-          height: ${config.qrSizePx}px;
-          object-fit: contain;
+        .qr-svg-item {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: 100% !important;
+          max-height: 100% !important;
+          aspect-ratio: 1 / 1 !important;
+          object-fit: contain !important;
+          display: block !important;
         }
 
         .qr-info-meta {
-          display: flex;
-          flex-direction: column;
-          width: 100%;
-          gap: 2px;
+          display: flex !important;
+          flex-direction: column !important;
+          width: 100% !important;
+          flex: 0 0 auto !important;
+          gap: 1px !important;
         }
 
         .qr-title {
-          font-size: ${config.titleFontSize}px;
-          font-weight: 800;
-          color: #0f172a;
-          line-height: 1.2;
-          word-break: break-word;
+          font-size: ${config.titleFontSize}px !important;
+          font-weight: 800 !important;
+          color: #000000 !important;
+          line-height: 1.15 !important;
+          word-break: break-word !important;
+          max-height: 2.3em !important;
+          overflow: hidden !important;
         }
 
         .qr-subtext {
-          font-size: ${Math.max(8, config.titleFontSize - 2)}px;
-          color: #334155;
-          line-height: 1.2;
+          font-size: ${Math.max(7, config.titleFontSize - 3)}px !important;
+          color: #1e293b !important;
+          line-height: 1.1 !important;
+          white-space: nowrap !important;
+          text-overflow: ellipsis !important;
+          overflow: hidden !important;
         }
 
         .qr-code-box {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          background: #f1f5f9 !important;
-          border: 1px solid #000000;
-          border-radius: 4px;
-          padding: 3px 6px;
-          margin-top: 3px;
-          width: 100%;
-          box-sizing: border-box;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          background: #f8fafc !important;
+          border: 1px solid #000000 !important;
+          border-radius: 3px !important;
+          padding: 1px 4px !important;
+          margin-top: 1px !important;
+          width: 100% !important;
+          box-sizing: border-box !important;
         }
 
         .qr-code-label {
-          font-size: 8px;
-          font-weight: 700;
-          color: #475569;
-          letter-spacing: 0.5px;
+          font-size: 7px !important;
+          font-weight: 700 !important;
+          color: #475569 !important;
+          letter-spacing: 0.3px !important;
+          line-height: 1 !important;
         }
 
         .qr-code-text {
-          font-family: "Courier New", Courier, monospace;
-          font-size: ${config.codeFontSize}px;
-          font-weight: 800;
-          color: #0f172a;
-          letter-spacing: 0.8px;
-          word-break: break-all;
-          text-align: center;
+          font-family: "Courier New", Courier, monospace !important;
+          font-size: ${config.codeFontSize}px !important;
+          font-weight: 900 !important;
+          color: #000000 !important;
+          letter-spacing: 0.5px !important;
+          line-height: 1.1 !important;
+          word-break: break-all !important;
+          text-align: center !important;
         }
 
         @media print {
-          @page {
-            size: ${
-              isGridMode
-                ? 'A4 portrait;'
-                : `${config.widthMm}mm ${config.heightMm}mm;`
-            }
-            margin: 0mm;
+          .no-print {
+            display: none !important;
           }
           html, body {
-            background: none !important;
+            background: #ffffff !important;
             padding: 0 !important;
             margin: 0 !important;
             width: ${isGridMode ? '210mm' : `${config.widthMm}mm`} !important;
-            height: ${isGridMode ? '297mm' : `${config.heightMm}mm`} !important;
-          }
-          .no-print {
-            display: none !important;
+            height: ${isGridMode ? 'auto' : `${config.heightMm}mm`} !important;
+            overflow: hidden !important;
           }
           .cards-container {
             padding: 0 !important;
@@ -404,18 +470,24 @@ export function exportLocationQrPdfList(
       </style>
     </head>
     <body>
-      <div class="page-header no-print">
-        <h2>IN TEM NHÃN QR VỊ TRÍ KHO</h2>
-        <p>Kích thước: <strong>${config.widthMm}mm x ${config.heightMm}mm</strong> | Mẫu: <strong>${config.template}</strong></p>
-        <div class="action-btns">
-          <button class="btn-print" onclick="window.print()">
-            🖨️ In Tem / Lưu PDF
-          </button>
-          <button class="btn-close" onclick="window.close()">
-            Đóng
-          </button>
+      ${
+        config.printerDriver === 'pdf_virtual'
+          ? `
+        <div class="page-header no-print">
+          <h2>IN TEM NHÃN QR VỊ TRÍ KHO</h2>
+          <p>Kích thước: <strong>${config.widthMm}mm x ${config.heightMm}mm</strong> | Mẫu: <strong>${config.template}</strong></p>
+          <div class="action-btns">
+            <button class="btn-print" onclick="window.print()">
+              🖨️ In Tem / Lưu PDF
+            </button>
+            <button class="btn-close" onclick="window.close()">
+              Đóng
+            </button>
+          </div>
         </div>
-      </div>
+      `
+          : ''
+      }
 
       <div class="cards-container">
         ${cardsHtml}
@@ -437,7 +509,7 @@ export function exportLocationQrPdfList(
     return;
   }
 
-  // All hardware/device/system drivers: Print directly via hidden iframe without opening new tab
+  // Hardware/device/system drivers: Print directly via hidden iframe without opening new tab
   const iframe = getOrCreatePrintIframe();
   const doc = iframe.contentWindow?.document || iframe.contentDocument;
   if (!doc) return;
@@ -453,33 +525,38 @@ export function exportLocationQrPdfList(
     } catch (e) {
       console.error('Lỗi khi kích hoạt lệnh in trực tiếp:', e);
     }
-  }, 250);
+  }, 300);
 }
 
 /**
  * Single board QR printing helper
  */
-export function exportBoardQrPdf(board: BoardQrExportData, config?: QrPrintConfig): void {
-  exportBoardQrPdfList([board], `Tem_QR_${board.qrCode || board.name}`, config);
+export async function exportBoardQrPdf(board: BoardQrExportData, config?: QrPrintConfig): Promise<void> {
+  await exportBoardQrPdfList([board], `Tem_QR_${board.qrCode || board.name}`, config);
 }
 
 /**
  * Export and print board QR codes (legacy compatibility)
  */
-export function exportBoardQrPdfList(
+export async function exportBoardQrPdfList(
   boards: BoardQrExportData[],
   filename = 'Danh_sach_tem_QR_bo_mach',
   config: QrPrintConfig = DEFAULT_QR_PRINT_CONFIG
-): void {
+): Promise<void> {
   if (!boards || boards.length === 0) return;
 
   const isGridMode = config.template === 'grid' || config.presetSize === 'a4';
   const isHorizontal = config.layoutOrder === 'horizontal' || config.template === 'horizontal';
 
+  // Generate Vector SVGs
+  const qrSvgs = await Promise.all(
+    boards.map((b) => generateQrSvg(b.qrCode || b.id || b.name || 'N/A'))
+  );
+
   const cardsHtml = boards
-    .map((b) => {
+    .map((b, index) => {
       const qrCodeVal = b.qrCode || 'N/A';
-      const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrCodeVal)}`;
+      const qrSvg = qrSvgs[index];
 
       const textAlignCss = config.textAlign;
       const alignItemCss =
@@ -492,7 +569,7 @@ export function exportBoardQrPdfList(
       return `
         <div class="qr-card">
           <div class="qr-image-wrapper">
-            <img src="${qrUrl}" alt="QR Code" class="qr-image" />
+            ${qrSvg}
           </div>
           <div class="qr-info-meta" style="align-items: ${alignItemCss}; text-align: ${textAlignCss};">
             ${
@@ -525,6 +602,7 @@ export function exportBoardQrPdfList(
               `
                 : ''
             }
+          </div>
         </div>
       `;
     })
@@ -538,39 +616,36 @@ export function exportBoardQrPdfList(
       <title>${escapeHtml(filename)}</title>
       <style>
         @page {
-          ${
-            isGridMode
-              ? `size: A4 portrait; margin: 5mm;`
-              : `size: ${config.widthMm}mm ${config.heightMm}mm; margin: 0mm;`
-          }
+          size: ${isGridMode ? 'A4 portrait' : `${config.widthMm}mm ${config.heightMm}mm`};
+          margin: 0mm !important;
         }
-        * {
-          box-sizing: border-box;
+        *, *::before, *::after {
+          box-sizing: border-box !important;
           margin: 0;
           padding: 0;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-        }
-        html, body {
-          background-color: #ffffff;
-          color: #0f172a;
-          padding: 0;
-          margin: 0;
-          width: ${isGridMode ? '210mm' : `${config.widthMm}mm`} !important;
-          height: ${isGridMode ? '297mm' : `${config.heightMm}mm`} !important;
-          overflow: hidden;
           -webkit-print-color-adjust: exact !important;
           print-color-adjust: exact !important;
         }
+        html, body {
+          background: #ffffff !important;
+          color: #0f172a !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+          overflow: hidden !important;
+        }
         .page-header {
           text-align: center;
-          margin: 12px;
-          padding: 12px;
-          background: #ffffff;
+          margin: 10px;
+          padding: 10px;
+          background: #f8fafc;
           border-radius: 8px;
           border: 1px solid #cbd5e1;
         }
         .page-header h2 {
-          font-size: 16px;
+          font-size: 15px;
           color: #0f172a;
           text-transform: uppercase;
         }
@@ -580,9 +655,9 @@ export function exportBoardQrPdfList(
           margin-top: 4px;
         }
         .action-btns {
-          margin-top: 10px;
+          margin-top: 8px;
           display: flex;
-          gap: 10px;
+          gap: 8px;
           justify-content: center;
         }
         .btn-print {
@@ -611,15 +686,12 @@ export function exportBoardQrPdfList(
               ? `
                 display: grid;
                 grid-template-columns: repeat(auto-fill, minmax(60mm, 1fr));
-                gap: 12px;
-                padding: 10mm;
+                gap: 8px;
+                padding: 8mm;
                 justify-items: center;
               `
               : `
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 0;
+                display: block;
                 padding: 0;
                 margin: 0;
                 width: 100%;
@@ -634,113 +706,131 @@ export function exportBoardQrPdfList(
           max-width: ${isGridMode ? 'none' : `${config.widthMm}mm`} !important;
           max-height: ${isGridMode ? 'none' : `${config.heightMm}mm`} !important;
           padding: ${config.paddingMm}mm !important;
-          background: #ffffff;
+          background: #ffffff !important;
           border: ${
             config.showBorder
               ? `${config.borderWidthPx}px solid #000000`
               : 'none'
-          };
-          border-radius: ${config.borderRadiusPx}px;
-          display: flex;
+          } !important;
+          border-radius: ${config.borderRadiusPx}px !important;
+          display: flex !important;
           flex-direction: ${
             isHorizontal
               ? 'row'
               : config.layoutOrder === 'title_top'
               ? 'column-reverse'
               : 'column'
-          };
-          align-items: center;
-          justify-content: center;
-          gap: ${isHorizontal ? '10px' : '4px'};
+          } !important;
+          align-items: center !important;
+          justify-content: ${isHorizontal ? 'center' : 'space-between'} !important;
+          gap: ${isHorizontal ? '6px' : '2px'} !important;
           page-break-inside: avoid !important;
-          page-break-after: ${boards.length > 1 && !isGridMode ? 'always' : 'auto'} !important;
+          break-inside: avoid !important;
+          page-break-after: avoid !important;
+          break-after: avoid !important;
           box-sizing: border-box !important;
           overflow: hidden !important;
+          margin: 0 auto !important;
+        }
+
+        .qr-card + .qr-card {
+          page-break-before: always !important;
+          break-before: page !important;
         }
 
         .qr-image-wrapper {
-          display: flex;
-          justify-content: center;
-          align-items: center;
+          display: flex !important;
+          justify-content: center !important;
+          align-items: center !important;
+          flex: 1 1 0 !important;
+          min-height: 0 !important;
+          min-width: 0 !important;
+          width: 100% !important;
+          height: 0 !important;
+          overflow: hidden !important;
         }
 
-        .qr-image {
-          width: ${config.qrSizePx}px;
-          height: ${config.qrSizePx}px;
-          object-fit: contain;
+        .qr-svg-item {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: 100% !important;
+          max-height: 100% !important;
+          aspect-ratio: 1 / 1 !important;
+          object-fit: contain !important;
+          display: block !important;
         }
 
         .qr-info-meta {
-          display: flex;
-          flex-direction: column;
-          width: 100%;
-          gap: 2px;
+          display: flex !important;
+          flex-direction: column !important;
+          width: 100% !important;
+          flex: 0 0 auto !important;
+          gap: 1px !important;
         }
 
         .qr-title {
-          font-size: ${config.titleFontSize}px;
-          font-weight: 800;
-          color: #0f172a;
-          line-height: 1.2;
-          word-break: break-word;
+          font-size: ${config.titleFontSize}px !important;
+          font-weight: 800 !important;
+          color: #000000 !important;
+          line-height: 1.15 !important;
+          word-break: break-word !important;
+          max-height: 2.3em !important;
+          overflow: hidden !important;
         }
 
         .qr-subtext {
-          font-size: ${Math.max(8, config.titleFontSize - 2)}px;
-          color: #334155;
-          line-height: 1.2;
+          font-size: ${Math.max(7, config.titleFontSize - 3)}px !important;
+          color: #1e293b !important;
+          line-height: 1.1 !important;
+          white-space: nowrap !important;
+          text-overflow: ellipsis !important;
+          overflow: hidden !important;
         }
 
         .qr-code-box {
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          background: #f1f5f9 !important;
-          border: 1px solid #000000;
-          border-radius: 4px;
-          padding: 3px 6px;
-          margin-top: 3px;
-          width: 100%;
-          box-sizing: border-box;
-          -webkit-print-color-adjust: exact !important;
-          print-color-adjust: exact !important;
+          display: flex !important;
+          flex-direction: column !important;
+          align-items: center !important;
+          justify-content: center !important;
+          background: #f8fafc !important;
+          border: 1px solid #000000 !important;
+          border-radius: 3px !important;
+          padding: 1px 4px !important;
+          margin-top: 1px !important;
+          width: 100% !important;
+          box-sizing: border-box !important;
         }
 
         .qr-code-label {
-          font-size: 8px;
-          font-weight: 700;
-          color: #475569;
-          letter-spacing: 0.5px;
+          font-size: 7px !important;
+          font-weight: 700 !important;
+          color: #475569 !important;
+          letter-spacing: 0.3px !important;
+          line-height: 1 !important;
         }
 
         .qr-code-text {
-          font-family: "Courier New", Courier, monospace;
-          font-size: ${config.codeFontSize}px;
-          font-weight: 800;
-          color: #0f172a;
-          letter-spacing: 0.8px;
-          word-break: break-all;
-          text-align: center;
+          font-family: "Courier New", Courier, monospace !important;
+          font-size: ${config.codeFontSize}px !important;
+          font-weight: 900 !important;
+          color: #000000 !important;
+          letter-spacing: 0.5px !important;
+          line-height: 1.1 !important;
+          word-break: break-all !important;
+          text-align: center !important;
         }
 
         @media print {
-          @page {
-            size: ${
-              isGridMode
-                ? 'A4 portrait;'
-                : `${config.widthMm}mm ${config.heightMm}mm;`
-            }
-            margin: 0mm;
+          .no-print {
+            display: none !important;
           }
           html, body {
-            background: none !important;
+            background: #ffffff !important;
             padding: 0 !important;
             margin: 0 !important;
             width: ${isGridMode ? '210mm' : `${config.widthMm}mm`} !important;
-            height: ${isGridMode ? '297mm' : `${config.heightMm}mm`} !important;
-          }
-          .no-print {
-            display: none !important;
+            height: ${isGridMode ? 'auto' : `${config.heightMm}mm`} !important;
+            overflow: hidden !important;
           }
           .cards-container {
             padding: 0 !important;
@@ -753,18 +843,24 @@ export function exportBoardQrPdfList(
       </style>
     </head>
     <body>
-      <div class="page-header no-print">
-        <h2>IN TEM NHÃN KHO BO MẠCH</h2>
-        <p>Kích thước: <strong>${config.widthMm}mm x ${config.heightMm}mm</strong> | Driver: <strong>${escapeHtml(config.printerDriver || 'system_default')} (${config.printerDpi || 203} DPI)</strong> | Mẫu: <strong>${config.template}</strong></p>
-        <div class="action-btns">
-          <button class="btn-print" onclick="window.print()">
-            🖨️ In Tem / Lưu PDF
-          </button>
-          <button class="btn-close" onclick="window.close()">
-            Đóng
-          </button>
+      ${
+        config.printerDriver === 'pdf_virtual'
+          ? `
+        <div class="page-header no-print">
+          <h2>IN TEM NHÃN KHO BO MẠCH</h2>
+          <p>Kích thước: <strong>${config.widthMm}mm x ${config.heightMm}mm</strong> | Mẫu: <strong>${config.template}</strong></p>
+          <div class="action-btns">
+            <button class="btn-print" onclick="window.print()">
+              🖨️ In Tem / Lưu PDF
+            </button>
+            <button class="btn-close" onclick="window.close()">
+              Đóng
+            </button>
+          </div>
         </div>
-      </div>
+      `
+          : ''
+      }
 
       <div class="cards-container">
         ${cardsHtml}
@@ -772,6 +868,7 @@ export function exportBoardQrPdfList(
     </body>
     </html>
   `;
+
 
   // Virtual PDF Driver: Open window if requested
   if (config.printerDriver === 'pdf_virtual') {
@@ -786,7 +883,7 @@ export function exportBoardQrPdfList(
     return;
   }
 
-  // All hardware/device/system drivers: Print directly via hidden iframe without opening new tab
+  // Hardware/device/system drivers: Print directly via hidden iframe without opening new tab
   const iframe = getOrCreatePrintIframe();
   const doc = iframe.contentWindow?.document || iframe.contentDocument;
   if (!doc) return;
@@ -802,7 +899,7 @@ export function exportBoardQrPdfList(
     } catch (e) {
       console.error('Lỗi khi kích hoạt lệnh in trực tiếp:', e);
     }
-  }, 250);
+  }, 300);
 }
 
 function escapeHtml(str: string): string {
@@ -814,3 +911,5 @@ function escapeHtml(str: string): string {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+

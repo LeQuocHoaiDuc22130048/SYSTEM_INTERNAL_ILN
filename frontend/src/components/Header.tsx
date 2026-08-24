@@ -6,7 +6,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
-  Menu,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -20,7 +19,6 @@ interface HeaderProps {
   dataSource: 'api' | 'error' | 'loading';
   connectionError: string | null;
   handleRetryConnection: () => void;
-  onToggleSidebar?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -34,19 +32,19 @@ export const Header: React.FC<HeaderProps> = ({
   dataSource,
   connectionError,
   handleRetryConnection,
-  onToggleSidebar,
 }) => {
 
   return (
     <>
+      {/* Banner cảnh báo ngắt kết nối */}
       {dataSource === 'error' && (
-        <div className="connection-banner warning">
+        <div className="connection-banner error">
           <div className="banner-content">
-            <WifiOff size={18} className="banner-icon--error" />
+            <WifiOff size={20} className="banner-icon" />
             <div className="banner-text">
-              <strong className="banner-text--error">Lỗi kết nối Backend</strong>
+              <strong>Mất kết nối máy chủ!</strong>
               <span>
-                {connectionError || 'Không thể kết nối'}
+                {connectionError || 'Không thể kết nối đến Backend. Vui lòng kiểm tra lại dịch vụ.'}
               </span>
             </div>
           </div>
@@ -61,11 +59,6 @@ export const Header: React.FC<HeaderProps> = ({
 
       <header className="header">
         <div className="header-left">
-          {onToggleSidebar && (
-            <button className="sidebar-toggle-btn" onClick={onToggleSidebar} aria-label="Toggle sidebar">
-              <Menu size={20} />
-            </button>
-          )}
           <h1 className="title">
             {activeTab === 'dashboard'
               ? 'Dashboard tổng hợp'

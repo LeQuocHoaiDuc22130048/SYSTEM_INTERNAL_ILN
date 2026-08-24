@@ -46,30 +46,31 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
   visibleCount,
 }) => {
   return (
-    <div className="orders-main-panel">
-      {/* Top Filter & Action Bar */}
-      <div className="orders-control-bar">
-        <div className="search-box">
-          <Search size={18} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Tìm theo mã đơn, số seri, thiết bị, tên hoặc SĐT khách..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setVisibleCount(20);
-            }}
-          />
+    <>
+      {/* Top Filter Card */}
+      <div className="orders-filter-card">
+        <div className="search-box-row">
+          <div className="search-input-wrapper">
+            <Search size={18} className="search-icon" />
+            <input
+              type="text"
+              className="orders-search-input"
+              placeholder="Tìm theo mã đơn, số seri, thiết bị, tên hoặc SĐT khách..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setVisibleCount(20);
+              }}
+            />
+          </div>
+
+          <button className="btn-create-order" onClick={openCreateModal}>
+            <Plus size={16} />
+            <span>Tạo đơn mới</span>
+          </button>
         </div>
 
-        <button className="btn-create-order" onClick={openCreateModal}>
-          <Plus size={16} />
-          <span>Tạo đơn mới</span>
-        </button>
-      </div>
-
-      <div className="filters-strip">
-        <div className="filter-group">
+        <div className="filters-row">
           <div className="filter-item">
             <Filter size={14} className="filter-icon" />
             <select
@@ -80,14 +81,14 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
               }}
             >
               <option value="ALL">Tất cả trạng thái</option>
-              <option value="RECEIVED">Mới tiếp nhận</option>
-              <option value="DIAGNOSING">Đang kiểm tra</option>
-              <option value="QUOTE_SENT">Đã báo giá</option>
-              <option value="REPAIRING">Đang sửa chữa</option>
-              <option value="TESTING">Đang chạy thử</option>
-              <option value="COMPLETED">Hoàn tất / Sẵn sàng trả</option>
-              <option value="DELIVERED">Đã trả khách</option>
-              <option value="CANCELLED">Hủy đơn</option>
+              <option value="PENDING">Chưa kiểm tra</option>
+              <option value="WAITING_FOR_CHECK">Chờ kiểm tra</option>
+              <option value="CHECKING">Đang kiểm tra</option>
+              <option value="CHECKED">Đã kiểm tra</option>
+              <option value="IN_PROGRESS">Đang sửa</option>
+              <option value="COMPLETED">Hoàn thành</option>
+              <option value="DELIVERED">Đã giao</option>
+              <option value="CANCELLED">Đã trả</option>
             </select>
           </div>
 
@@ -219,7 +220,7 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
           </>
         )}
       </div>
-    </div>
+    </>
   );
 };
 

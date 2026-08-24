@@ -11,6 +11,7 @@ import {
   QrCode,
   Printer,
   ArrowUpRight,
+  FileSpreadsheet,
 } from 'lucide-react';
 import type { Part, PartLot } from '../../types/warehouse';
 
@@ -28,6 +29,8 @@ interface PartListPanelProps {
   partStockFilter?: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK';
   setPartStockFilter?: (val: 'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK') => void;
   openAddEditPartModal: (part: Part | null) => void;
+  openBulkImportModal?: () => void;
+  openAddLocationModal?: () => void;
   openLocationQrScanModal: (locationCode?: string) => void;
   openLocationQrPrintModal?: (locationsToPrint?: any[]) => void;
   onQuickCheckoutPart?: (part: Part, lot?: PartLot) => void;
@@ -60,6 +63,8 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
   partStockFilter = 'ALL',
   setPartStockFilter,
   openAddEditPartModal,
+  openBulkImportModal,
+  openAddLocationModal,
   openLocationQrScanModal,
   openLocationQrPrintModal,
   onQuickCheckoutPart,
@@ -249,6 +254,32 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
               <option value="LOW_STOCK">Dưới định mức</option>
               <option value="OUT_OF_STOCK">Hết hàng (0)</option>
             </select>
+
+            {openAddLocationModal && (
+              <button
+                type="button"
+                className="btn-action-outline"
+                onClick={openAddLocationModal}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                title="Tạo vị trí / kệ kho mới với mã QR"
+              >
+                <MapPin size={16} className="text-primary" />
+                <span>Thêm vị trí (QR)</span>
+              </button>
+            )}
+
+            {openBulkImportModal && (
+              <button
+                type="button"
+                className="btn-action-outline"
+                onClick={openBulkImportModal}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap' }}
+                title="Nhập danh sách linh kiện hàng loạt từ Excel hoặc CSV"
+              >
+                <FileSpreadsheet size={16} className="text-emerald-600 dark:text-emerald-400" />
+                <span>Nhập Excel / CSV</span>
+              </button>
+            )}
 
             <button className="btn-add-board" onClick={() => openAddEditPartModal(null)}>
               <Plus size={16} />

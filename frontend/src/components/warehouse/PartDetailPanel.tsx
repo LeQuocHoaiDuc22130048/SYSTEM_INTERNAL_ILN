@@ -1,5 +1,5 @@
 import React from 'react';
-import { Boxes, Edit2, Trash2, ArrowUpRight } from 'lucide-react';
+import { Boxes, Edit2, Trash2, ArrowUpRight, QrCode } from 'lucide-react';
 import type { Part } from '../../types/warehouse';
 
 interface PartDetailPanelProps {
@@ -8,6 +8,7 @@ interface PartDetailPanelProps {
   handleDeletePart: () => void;
   openAdjustStockModal: () => void;
   openPartCheckoutModal: () => void;
+  onOpenLocationScan?: (locationCode: string) => void;
 }
 
 export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
@@ -16,6 +17,7 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
   handleDeletePart,
   openAdjustStockModal,
   openPartCheckoutModal,
+  onOpenLocationScan,
 }) => {
   const isZeroStock = selectedPart.totalQuantity === 0;
   const isLowStock = selectedPart.totalQuantity < selectedPart.minAmount;
@@ -107,14 +109,36 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
               <div
                 key={lot.id}
                 className="spec-detail-item"
-                style={{ borderBottom: '1px dashed var(--color-border)', paddingBottom: '6px' }}
+                style={{ borderBottom: '1px dashed var(--color-border)', paddingBottom: '6px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
               >
-                <div>
-                  <span className="value" style={{ display: 'block' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="value" style={{ display: 'block', fontWeight: 600 }}>
                     {lot.storeLocationName} ({lot.storeLocationCode})
                   </span>
+                  {lot.storeLocationCode && lot.storeLocationCode !== 'N/A' && onOpenLocationScan && (
+                    <button
+                      type="button"
+                      onClick={() => onOpenLocationScan(lot.storeLocationCode)}
+                      style={{
+                        padding: '2px 8px',
+                        fontSize: '0.72rem',
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        color: '#2563eb',
+                        borderRadius: '4px',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '3px',
+                      }}
+                      title="Xem thông tin & quét QR vị trí này"
+                    >
+                      <QrCode size={11} />
+                      QR Vị trí
+                    </button>
+                  )}
                 </div>
-                <span className="value text-success" style={{ fontSize: '0.95rem' }}>
+                <span className="value text-success" style={{ fontSize: '0.95rem', fontWeight: 700 }}>
                   {lot.amount}
                 </span>
               </div>
