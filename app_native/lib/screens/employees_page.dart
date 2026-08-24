@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../models/user.dart';
@@ -114,10 +113,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                             ),
                           ),
                         ],
-                      )
-                      .animate(target: 1)
-                      .fadeIn(duration: 400.ms)
-                      .slideY(begin: -0.2, end: 0, duration: 400.ms),
+                      ),
                   const SizedBox(height: 16),
 
                   // Search
@@ -219,19 +215,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                                 ),
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
-                              final animDelay = (50 * (index % 10)).ms;
-                              return _buildEmployeeCard(filtered[index])
-                                  .animate(target: 1)
-                                  .fadeIn(
-                                    duration: 300.ms,
-                                    delay: animDelay,
-                                  )
-                                  .slideY(
-                                    begin: 0.1,
-                                    end: 0,
-                                    duration: 300.ms,
-                                    delay: animDelay,
-                                  );
+                              return _buildEmployeeCard(filtered[index]);
                             },
                           ),
                         );

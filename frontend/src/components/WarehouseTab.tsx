@@ -49,6 +49,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [boardDesc, setBoardDesc] = useState<string>('');
   const [boardStatus, setBoardStatus] = useState<string>('AVAILABLE');
   const [boardQuantity, setBoardQuantity] = useState<number>(1);
+  const [boardMinQuantity, setBoardMinQuantity] = useState<number>(0);
+  const [boardRemovedParts, setBoardRemovedParts] = useState<string>('');
 
   // Checkout form states
   const [checkoutNote, setCheckoutNote] = useState<string>('');
@@ -464,6 +466,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       setBoardDesc(board.description || '');
       setBoardStatus(board.status);
       setBoardQuantity(board.quantity || 1);
+      setBoardMinQuantity(board.minQuantity || 0);
+      setBoardRemovedParts(board.removedParts || '');
     } else {
       setBoardName('');
       setBoardModel('');
@@ -474,6 +478,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       setBoardDesc('');
       setBoardStatus('AVAILABLE');
       setBoardQuantity(1);
+      setBoardMinQuantity(0);
+      setBoardRemovedParts('');
     }
     setIsAddEditModalOpen(true);
   };
@@ -494,6 +500,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       serialNumber: boardSerial.trim() || null,
       status: boardStatus,
       quantity: boardQuantity,
+      minQuantity: boardMinQuantity,
+      removedParts: boardRemovedParts.trim() || null,
     };
 
     if (boardPartId.trim()) {
@@ -1110,6 +1118,26 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                     placeholder="1"
                   />
                 </div>
+                <div className="form-group">
+                  <label>Định mức tối thiểu (Min stock)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={boardMinQuantity}
+                    onChange={(e) => setBoardMinQuantity(parseInt(e.target.value) || 0)}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label>Linh kiện đã rã / tháo (Bo xác)</label>
+                <input
+                  type="text"
+                  value={boardRemovedParts}
+                  onChange={(e) => setBoardRemovedParts(e.target.value)}
+                  placeholder="VD: IC nguồn U1, Diode D4, Tụ C12..."
+                />
               </div>
 
               {editingBoard && (

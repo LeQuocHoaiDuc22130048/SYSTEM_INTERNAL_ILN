@@ -40,7 +40,9 @@ public record UpdateBoardItemRequest(
 
         BoardStatus status,
 
-        Integer quantity
+        Integer quantity,
+
+        Integer minQuantity
 ) {
 }
 

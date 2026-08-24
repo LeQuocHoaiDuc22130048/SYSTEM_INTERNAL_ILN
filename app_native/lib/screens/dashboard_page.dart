@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -21,92 +20,75 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isNonManager = !Provider.of<AuthProvider>(context).isManagerOrAbove;
+    final screenSize = MediaQuery.sizeOf(context);
+    final wide = screenSize.width > 760;
+    final contentWidth = screenSize.width > 980 ? 980.0 : screenSize.width;
 
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = MediaQuery.sizeOf(context).width > 760;
-            final contentWidth = constraints.maxWidth > 980
-                ? 980.0
-                : constraints.maxWidth;
-
-            return RefreshIndicator(
-              onRefresh: () async {
-                final auth = Provider.of<AuthProvider>(context, listen: false);
-                await context.read<BackendDataProvider>().loadAll(
-                      isManagerOrAbove: auth.isManagerOrAbove,
-                    );
-              },
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  wide ? 20 : 16,
-                  wide ? 22 : 16,
-                  wide ? 20 : 16,
-                  24,
-                ),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: contentWidth),
-                    child: isNonManager
-                        ? _buildEmployeeDashboard(context, isDark, wide)
-                        : Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              _DashboardHeader(isDark: isDark, wide: wide),
-                              const SizedBox(height: 24),
-                              Builder(
-                                builder: (context) {
-                                  final stats = _buildDashboardStats(context);
-                                  return GridView.builder(
-                                    itemCount: stats.length,
-                                    shrinkWrap: true,
-                                    physics: const NeverScrollableScrollPhysics(),
-                                    gridDelegate:
-                                        SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: wide ? 4 : 2,
-                                      mainAxisSpacing: wide ? 20 : 10,
-                                      crossAxisSpacing: wide ? 12 : 10,
-                                      mainAxisExtent: wide ? 112 : 98,
-                                    ),
-                                    itemBuilder: (context, index) {
-                                      final stat = stats[index];
-                                      return _DashboardStatCard(
-                                        stat: stat,
-                                        isDark: isDark,
-                                      )
-                                          .animate(target: 1)
-                                          .fadeIn(
-                                            duration: 260.ms,
-                                            delay: (index * 35).ms,
-                                          )
-                                          .slideY(
-                                            begin: 0.08,
-                                            end: 0,
-                                            duration: 260.ms,
-                                            delay: (index * 35).ms,
-                                          );
-                                    },
+        child: RefreshIndicator(
+          onRefresh: () async {
+            final auth = Provider.of<AuthProvider>(context, listen: false);
+            await context.read<BackendDataProvider>().loadAll(
+                  isManagerOrAbove: auth.isManagerOrAbove,
+                );
+          },
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.fromLTRB(
+              wide ? 20 : 16,
+              wide ? 22 : 16,
+              wide ? 20 : 16,
+              24,
+            ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: contentWidth),
+                child: isNonManager
+                    ? _buildEmployeeDashboard(context, isDark, wide)
+                    : Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _DashboardHeader(isDark: isDark, wide: wide),
+                          const SizedBox(height: 24),
+                          Builder(
+                            builder: (context) {
+                              final stats = _buildDashboardStats(context);
+                              return GridView.builder(
+                                itemCount: stats.length,
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: wide ? 4 : 2,
+                                  mainAxisSpacing: wide ? 20 : 10,
+                                  crossAxisSpacing: wide ? 12 : 10,
+                                  mainAxisExtent: wide ? 112 : 98,
+                                ),
+                                itemBuilder: (context, index) {
+                                  final stat = stats[index];
+                                  return _DashboardStatCard(
+                                    stat: stat,
+                                    isDark: isDark,
                                   );
                                 },
-                              ),
-                              const SizedBox(height: 20),
-                              _WeeklyOrdersChart(isDark: isDark),
-                              const SizedBox(height: 20),
-                              _StatusRatioCard(isDark: isDark, wide: wide),
-                              const SizedBox(height: 20),
-                              _TodayAttendanceCard(isDark: isDark),
-                              const SizedBox(height: 20),
-                              _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
-                            ],
+                              );
+                            },
                           ),
-                  ),
-                ),
+                          const SizedBox(height: 20),
+                          _WeeklyOrdersChart(isDark: isDark),
+                          const SizedBox(height: 20),
+                          _StatusRatioCard(isDark: isDark, wide: wide),
+                          const SizedBox(height: 20),
+                          _TodayAttendanceCard(isDark: isDark),
+                          const SizedBox(height: 20),
+                          _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
+                        ],
+                      ),
               ),
-            );
-          },
+            ),
+          ),
         ),
       ),
     );
@@ -150,15 +132,7 @@ class DashboardPage extends StatelessWidget {
               ),
             ];
             final stat = stats[index];
-            return _DashboardStatCard(stat: stat, isDark: isDark)
-                .animate(target: 1)
-                .fadeIn(duration: 260.ms, delay: (index * 35).ms)
-                .slideY(
-                  begin: 0.08,
-                  end: 0,
-                  duration: 260.ms,
-                  delay: (index * 35).ms,
-                );
+            return _DashboardStatCard(stat: stat, isDark: isDark);
           },
         ),
         const SizedBox(height: 20),

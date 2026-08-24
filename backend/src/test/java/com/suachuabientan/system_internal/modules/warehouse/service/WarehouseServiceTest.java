@@ -86,7 +86,8 @@ class WarehouseServiceTest {
                 "Ghi chú",
                 null,
                 null,
-                1
+                1,
+                0
         );
 
         when(qrCodeGenerator.generateQrCode()).thenReturn("BOARD-12345678");
@@ -100,6 +101,7 @@ class WarehouseServiceTest {
                 .serialNumber("SN-12345")
                 .model(request.model())
                 .quantity(1)
+                .minQuantity(0)
                 .build();
         savedItem.setId(UUID.randomUUID());
 
@@ -130,7 +132,8 @@ class WarehouseServiceTest {
                 null,
                 null,
                 null,
-                2
+                2,
+                0
         );
 
         when(qrCodeGenerator.generateQrCode()).thenReturn("BOARD-87654321");
@@ -141,6 +144,7 @@ class WarehouseServiceTest {
                 .name(request.name())
                 .serialNumber(null)
                 .quantity(2)
+                .minQuantity(0)
                 .build();
         savedItem.setId(UUID.randomUUID());
 
@@ -172,7 +176,8 @@ class WarehouseServiceTest {
                 null,
                 null,
                 null,
-                1
+                1,
+                0
         );
 
         when(qrCodeGenerator.generateQrCode()).thenReturn("BOARD-12345678");

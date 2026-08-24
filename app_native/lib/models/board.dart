@@ -31,6 +31,7 @@ class Board {
   final String? currentLocationId;
   final String? currentLocationCode;
   final int quantity;
+  final int minQuantity;
 
   Board({
     required this.id,
@@ -40,6 +41,7 @@ class Board {
     required this.location,
     required this.status,
     required this.quantity,
+    this.minQuantity = 0,
     this.boardType,
     this.firmware,
     this.removedParts,
@@ -112,6 +114,7 @@ class Board {
       currentLocationId: json['currentLocationId']?.toString(),
       currentLocationCode: json['currentLocationCode']?.toString(),
       quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      minQuantity: (json['minQuantity'] as num?)?.toInt() ?? 0,
     );
   }
 

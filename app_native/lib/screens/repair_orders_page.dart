@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -184,15 +183,15 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     final orders = backend.repairOrders;
     final isEmployee = auth.role == UserRole.employee;
 
+    final screenSize = MediaQuery.sizeOf(context);
+    final wide = screenSize.width >= 760;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final wide = constraints.maxWidth >= 760;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
                 Padding(
                   padding: EdgeInsets.fromLTRB(
                     wide ? 20 : 22,
@@ -414,9 +413,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   physics: const AlwaysScrollableScrollPhysics(),
                                   children: [
                                     SizedBox(
-                                      height: (constraints.maxHeight.isFinite && constraints.maxHeight < 2000)
-                                          ? (constraints.maxHeight - 200).clamp(150.0, 600.0)
-                                          : 350.0,
+                                      height: (screenSize.height - 200).clamp(150.0, 600.0),
                                       child: _EmptyOrders(isDark: isDark),
                                     ),
                                   ],
@@ -458,17 +455,6 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                         child: _OrderCard(
                                           order: pageItems[index],
                                           isDark: isDark,
-                                        )
-                                        .animate(target: 1)
-                                        .fadeIn(
-                                          duration: 320.ms,
-                                          delay: (index * 45).ms,
-                                        )
-                                        .slideY(
-                                          begin: 0.08,
-                                          end: 0,
-                                          duration: 320.ms,
-                                          delay: (index * 45).ms,
                                         ),
                                       ),
                                     ),
@@ -480,9 +466,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                         ),
                 ),
               ],
-            );
-          },
-        ),
+            ),
       ),
     );
   }
@@ -740,9 +724,11 @@ class _OrderCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final twoColumns = constraints.maxWidth >= 560;
+            Builder(
+              builder: (context) {
+                final screenWidth = MediaQuery.sizeOf(context).width;
+                final twoColumns = screenWidth >= 560;
+                final cardWidth = screenWidth > 980 ? 980.0 : screenWidth;
                 final children = [
                   _InfoLine(
                     icon: Icons.person_outline,
@@ -791,7 +777,7 @@ class _OrderCard extends StatelessWidget {
                   children: children
                       .map(
                         (child) => SizedBox(
-                          width: constraints.maxWidth / 2,
+                          width: (cardWidth - 64) / 2,
                           child: child,
                         ),
                       )

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
@@ -163,7 +162,10 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   String _inventoryLine(Board board) {
-    return '';
+    if (board.minQuantity > 0) {
+      return 'Số lượng: ${board.quantity} (Min: ${board.minQuantity})';
+    }
+    return 'Số lượng: ${board.quantity}';
   }
 
   String? _optionalText(String value) {
@@ -183,26 +185,25 @@ class _WarehousePageState extends State<WarehousePage> {
     final lowStockParts = parts.where((p) => p.totalQuantity < p.minAmount && p.totalQuantity > 0).length;
     final outOfStockParts = parts.where((p) => p.totalQuantity == 0).length;
 
+    final screenSize = MediaQuery.sizeOf(context);
+    final isLandscape = screenSize.width > screenSize.height && screenSize.height < 600;
+    final wide = screenSize.width >= 760;
+
     return Scaffold(
       resizeToAvoidBottomInset: false,
       body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isLandscape = constraints.maxHeight < 650;
-            final wide = constraints.maxWidth >= 760;
-
-            return Column(
-              children: [
-                // Header & Stats
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    wide ? 20 : 22,
-                    wide ? 22 : 16,
-                    wide ? 20 : 22,
-                    12,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          children: [
+            // Header & Stats
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                wide ? 20 : 22,
+                wide ? 22 : 16,
+                wide ? 20 : 22,
+                12,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Mode Toggle segmented control
                       // _buildModeToggle(isDark),
@@ -710,9 +711,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   child: AnimatedBuilder(
                     animation: Listenable.merge([_searchQuery, _filter, _partFilter]),
                     builder: (context, _) {
-                      final double emptyViewHeight = (constraints.maxHeight.isFinite && constraints.maxHeight < 2000)
-                          ? (constraints.maxHeight - 220).clamp(150.0, 600.0)
-                          : 350.0;
+                      final double emptyViewHeight = (screenSize.height - 220).clamp(150.0, 600.0);
 
                       if (_currentMode == WarehouseMode.boards) {
                         final filtered = _filteredBoards;
@@ -766,21 +765,9 @@ class _WarehousePageState extends State<WarehousePage> {
                             padding: const EdgeInsets.all(16),
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
-                              final animDelay = (50 * (index % 10)).ms;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildBoardListCard(filtered[index])
-                                    .animate(target: 1)
-                                    .fadeIn(
-                                      duration: 300.ms,
-                                      delay: animDelay,
-                                    )
-                                    .slideX(
-                                      begin: -0.1,
-                                      end: 0,
-                                      duration: 300.ms,
-                                      delay: animDelay,
-                                    ),
+                                child: _buildBoardListCard(filtered[index]),
                               );
                             },
                           ),
@@ -895,21 +882,9 @@ class _WarehousePageState extends State<WarehousePage> {
                             padding: const EdgeInsets.all(16),
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
-                              final animDelay = (50 * (index % 10)).ms;
                               return Padding(
                                 padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildPartListCard(filtered[index])
-                                    .animate(target: 1)
-                                    .fadeIn(
-                                      duration: 300.ms,
-                                      delay: animDelay,
-                                    )
-                                    .slideX(
-                                      begin: -0.1,
-                                      end: 0,
-                                      duration: 300.ms,
-                                      delay: animDelay,
-                                    ),
+                                child: _buildPartListCard(filtered[index]),
                               );
                             },
                           ),
@@ -919,9 +894,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                 ),
               ],
-            );
-          },
-        ),
+            ),
       ),
     );
   }
@@ -1125,7 +1098,10 @@ class _WarehousePageState extends State<WarehousePage> {
     Color color,
     bool isDark,
   ) {
-    return _buildCompactStatCard(value, label, icon, color, isDark);
+    return SizedBox(
+      width: 140,
+      child: _buildCompactStatCard(value, label, icon, color, isDark),
+    );
   }
 
   Widget _buildCompactStatCard(
@@ -1135,7 +1111,7 @@ class _WarehousePageState extends State<WarehousePage> {
     Color color,
     bool isDark,
   ) {
-    final background = color.withOpacity(0.12);
+    final background = color.withValues(alpha: 0.12);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -1152,7 +1128,7 @@ class _WarehousePageState extends State<WarehousePage> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Expanded(
+              Flexible(
                 child: Text(
                   label,
                   maxLines: 1,
@@ -1166,6 +1142,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                 ),
               ),
+              const SizedBox(width: 4),
               Container(
                 width: 18,
                 height: 18,
@@ -1192,10 +1169,7 @@ class _WarehousePageState extends State<WarehousePage> {
           ),
         ],
       ),
-    )
-    .animate(target: 1)
-    .fadeIn(duration: 250.ms)
-    .slideY(begin: 0.1, end: 0, duration: 250.ms);
+    );
   }
 
   Widget _buildBoardGridCard(Board board) {
@@ -1726,7 +1700,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                 ),
                 subtitle: Text(
-                  'IPN: ${item.part.ipn} · Danh mục: ${item.part.categoryName ?? "Chưa rõ"}',
+                  'IPN: ${item.part.ipn} · Tồn: ${item.part.totalQuantity.toStringAsFixed(0)} (Min: ${item.part.minAmount.toStringAsFixed(0)})',
                   style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
                 trailing: Container(
@@ -2020,6 +1994,8 @@ class _WarehousePageState extends State<WarehousePage> {
         TextEditingController(text: board?.currentLocationId ?? '');
     final descCtrl = TextEditingController(text: board?.description ?? '');
     final quantityCtrl = TextEditingController(text: board?.quantity.toString() ?? '1');
+    final minQuantityCtrl = TextEditingController(text: board?.minQuantity.toString() ?? '0');
+    final removedPartsCtrl = TextEditingController(text: board?.removedParts ?? '');
     BoardStatus selectedStatus = board?.status ?? BoardStatus.available;
 
     showDialog(
@@ -2061,7 +2037,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               TextField(
                                 controller: nameCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'Tên bo mạch',
+                                  labelText: 'Tên bo mạch *',
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -2086,11 +2062,36 @@ class _WarehousePageState extends State<WarehousePage> {
                                 ),
                               ),
                               const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextField(
+                                      controller: quantityCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Số lượng *',
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: TextField(
+                                      controller: minQuantityCtrl,
+                                      keyboardType: TextInputType.number,
+                                      decoration: const InputDecoration(
+                                        labelText: 'Tồn tối thiểu (Min)',
+                                        hintText: '0',
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
                               TextField(
-                                controller: quantityCtrl,
-                                keyboardType: TextInputType.number,
+                                controller: removedPartsCtrl,
                                 decoration: const InputDecoration(
-                                  labelText: 'Số lượng *',
+                                  labelText: 'Linh kiện đã rã / tháo (nếu có)',
+                                  hintText: 'VD: IC nguồn U1, Tụ C12...',
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -2179,6 +2180,9 @@ class _WarehousePageState extends State<WarehousePage> {
                                 'description': descCtrl.text.trim(),
                                 'serialNumber': serialNumber,
                                 'quantity': int.tryParse(quantityCtrl.text) ?? 1,
+                                'minQuantity': int.tryParse(minQuantityCtrl.text) ?? 0,
+                                if (removedPartsCtrl.text.trim().isNotEmpty)
+                                  'removedParts': removedPartsCtrl.text.trim(),
                                 if (isEditing)
                                   'status': _boardStatusName(selectedStatus),
                               };
@@ -2896,7 +2900,13 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                 child: StatusBadge(status: widget.board.status),
               ),
               _buildInfoRow('Vị trí', widget.board.location),
-              _buildInfoRow('Số lượng', widget.board.quantity.toString()),
+              _buildInfoRow('Số lượng tồn', widget.board.quantity.toString()),
+              if (widget.board.minQuantity > 0)
+                _buildInfoRow('Định mức tối thiểu (Min)', widget.board.minQuantity.toString()),
+              if (widget.board.removedParts != null && widget.board.removedParts!.isNotEmpty)
+                _buildInfoRow('Linh kiện đã rã', widget.board.removedParts!),
+              if (widget.board.partIpn != null && widget.board.partIpn!.isNotEmpty)
+                _buildInfoRow('Mã linh kiện tương ứng', widget.board.partIpn!),
               if (widget.board.checkedOutBy != null)
                 _buildInfoRow('Đang dùng bởi', widget.board.checkedOutBy!),
               if (widget.board.currentRepairOrder != null)

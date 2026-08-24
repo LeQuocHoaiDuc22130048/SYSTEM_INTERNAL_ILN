@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -83,10 +82,7 @@ class _AttendancePageState extends State<AttendancePage>
                               ),
                             ),
                           ],
-                        )
-                        .animate(target: 1)
-                        .fadeIn(duration: 400.ms)
-                        .slideY(begin: -0.2, end: 0, duration: 400.ms),
+                        ),
               ),
             ),
 
@@ -94,8 +90,8 @@ class _AttendancePageState extends State<AttendancePage>
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
+                child: Builder(
+                  builder: (context) {
                     final screenHeight = MediaQuery.sizeOf(context).height;
                     final checkInHeight = screenHeight * 0.25;
 
@@ -197,14 +193,6 @@ class _AttendancePageState extends State<AttendancePage>
                               ),
                             ],
                           ),
-                        )
-                        .animate(target: 1)
-                        .fadeIn(duration: 600.ms, delay: 100.ms)
-                        .slideY(
-                          begin: 0.2,
-                          end: 0,
-                          duration: 600.ms,
-                          delay: 100.ms,
                         );
                   },
                 ),
@@ -308,10 +296,7 @@ class _AttendancePageState extends State<AttendancePage>
                   ),
                 ],
               ),
-            )
-            .animate(target: 1)
-            .fadeIn(duration: 400.ms, delay: 200.ms)
-            .slideY(begin: 0.2, end: 0, duration: 400.ms, delay: 200.ms),
+            ),
         const SizedBox(height: 24),
 
         // Today's attendance list
@@ -327,7 +312,6 @@ class _AttendancePageState extends State<AttendancePage>
         ),
         const SizedBox(height: 12),
         ...records.map((record) {
-          final index = records.indexOf(record);
           return Container(
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(16),
@@ -395,14 +379,6 @@ class _AttendancePageState extends State<AttendancePage>
                     StatusBadge(status: record.status, size: 'sm'),
                   ],
                 ),
-              )
-              .animate(target: 1)
-              .fadeIn(duration: 400.ms, delay: (300 + index * 50).ms)
-              .slideX(
-                begin: -0.2,
-                end: 0,
-                duration: 400.ms,
-                delay: (300 + index * 50).ms,
               );
         }),
       ],

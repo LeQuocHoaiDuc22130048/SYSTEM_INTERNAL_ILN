@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Boxes, CheckCircle, Cpu, History, MapPin } from 'lucide-react';
+import { Search, Plus, Boxes, CheckCircle, Cpu, History, MapPin, Tag } from 'lucide-react';
 import type { Board } from '../../types/warehouse';
 
 interface BoardListPanelProps {
@@ -157,10 +157,36 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
                       <MapPin size={12} />
                       <span>Vị trí: {board.location || 'Chưa đặt'}</span>
                     </div>
+                    {board.model && (
+                      <div className="spec-row">
+                        <Tag size={12} />
+                        <span>Model: {board.model}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    className="board-card-borrow-info"
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
+                  >
+                    <span>
+                      Số lượng: <strong>{board.quantity ?? 1}</strong>
+                    </span>
+                    {(board.minQuantity ?? 0) > 0 && (
+                      <span
+                        style={{
+                          fontSize: '0.75rem',
+                          color: (board.quantity ?? 1) <= (board.minQuantity ?? 0) ? '#dc2626' : 'var(--color-text-light)',
+                          fontWeight: (board.quantity ?? 1) <= (board.minQuantity ?? 0) ? 600 : 400,
+                        }}
+                      >
+                        Min: {board.minQuantity}
+                      </span>
+                    )}
                   </div>
 
                   {board.checkedOutBy && (
-                    <div className="board-card-borrow-info">
+                    <div className="board-card-borrow-info" style={{ marginTop: '4px' }}>
                       <span>Đang mượn bởi: <strong>{board.checkedOutBy}</strong></span>
                     </div>
                   )}

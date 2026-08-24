@@ -37,7 +37,9 @@ public record CreateBoardItemRequest(
 
         String currentLocationId,
 
-        Integer quantity
+        Integer quantity,
+
+        Integer minQuantity
 ) {
 }
 

@@ -32,6 +32,7 @@ export interface Board {
   currentLocationId?: string;
   currentLocationCode?: string;
   quantity?: number;
+  minQuantity?: number;
   activeCheckoutInfo?: ActiveCheckoutInfo;
 }
 

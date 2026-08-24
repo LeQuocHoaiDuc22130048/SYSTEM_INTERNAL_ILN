@@ -22,6 +22,7 @@ public record QrScanResponse(
         String currentLocationCode,
         String status,
         Integer quantity,
+        Integer minQuantity,
 
         HolderInfo holder
 ) {

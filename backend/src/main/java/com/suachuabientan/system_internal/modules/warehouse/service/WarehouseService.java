@@ -83,6 +83,7 @@ public class WarehouseService {
                 .partId(resolvePartId(request.partId()))
                 .currentLocationId(resolveLocationId(request.currentLocationId(), request.location()))
                 .quantity(request.quantity() != null ? request.quantity() : 1)
+                .minQuantity(request.minQuantity() != null ? request.minQuantity() : 0)
                 .status(BoardStatus.AVAILABLE)
                 .build();
 
@@ -143,6 +144,9 @@ public class WarehouseService {
         }
         if (request.quantity() != null) {
             item.setQuantity(request.quantity());
+        }
+        if (request.minQuantity() != null) {
+            item.setMinQuantity(request.minQuantity());
         }
 
         if (request.status() != null) {
@@ -216,6 +220,7 @@ public class WarehouseService {
                 locationCode(item.getCurrentLocationId()),
                 item.getStatus().name(),
                 item.getQuantity(),
+                item.getMinQuantity() != null ? item.getMinQuantity() : 0,
                 holderInfo);
     }
 
@@ -495,6 +500,7 @@ public class WarehouseService {
                 locationCode(item.getCurrentLocationId()),
                 item.getCreatedAt(),
                 item.getQuantity(),
+                item.getMinQuantity() != null ? item.getMinQuantity() : 0,
                 activeCheckout);
     }
 

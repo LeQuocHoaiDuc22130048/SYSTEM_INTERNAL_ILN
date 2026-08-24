@@ -104,6 +104,18 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
             </span>
           </div>
           <div className="spec-detail-item">
+            <span className="label">Định mức tối thiểu (Min)</span>
+            <span className="value">{selectedBoard.minQuantity ?? 0}</span>
+          </div>
+          {selectedBoard.partIpn && (
+            <div className="spec-detail-item">
+              <span className="label">Linh kiện kho liên kết</span>
+              <span className="value" style={{ fontFamily: 'monospace', fontWeight: 600 }}>
+                {selectedBoard.partIpn}
+              </span>
+            </div>
+          )}
+          <div className="spec-detail-item">
             <span className="label">Model thiết bị</span>
             <span className="value">{selectedBoard.model || 'Chưa rõ'}</span>
           </div>

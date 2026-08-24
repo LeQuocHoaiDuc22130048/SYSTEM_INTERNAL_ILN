@@ -469,7 +469,7 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
                             }}
                           >
                             <span style={{ fontFamily: 'monospace' }}>IPN: {part.ipn}</span>
-                            <span>Danh mục: {part.categoryName || 'Chưa rõ'}</span>
+                            <span>Tổng tồn: <strong>{part.totalQuantity}</strong> (Min: {part.minAmount})</span>
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -578,11 +578,15 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
                     <span>
                       Tồn kho: <strong>{part.totalQuantity}</strong>
                     </span>
-                    {part.minAmount > 0 && (
-                      <span style={{ fontSize: '0.7rem', color: 'var(--color-text-light)' }}>
-                        Min: {part.minAmount}
-                      </span>
-                    )}
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        color: isLowStock ? '#dc2626' : 'var(--color-text-light)',
+                        fontWeight: isLowStock ? 600 : 400,
+                      }}
+                    >
+                      Min: {part.minAmount}
+                    </span>
                   </div>
                 </div>
               );

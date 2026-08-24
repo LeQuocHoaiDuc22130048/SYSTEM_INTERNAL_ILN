@@ -286,54 +286,50 @@ class _MainScreenState extends State<MainScreen> {
       return _buildAttendanceOnlyScaffold();
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth > 900;
-        final body = _withProfileNotice(
-          IndexedStack(index: _currentIndex, children: _visiblePages),
-          auth,
-        );
+    final isWide = MediaQuery.sizeOf(context).width > 900;
+    final body = _withProfileNotice(
+      IndexedStack(index: _currentIndex, children: _visiblePages),
+      auth,
+    );
 
-        if (isWide) {
-          return Scaffold(
-            resizeToAvoidBottomInset: false,
-            body: Row(
-              children: [
-                SideNavigation(
-                  currentIndex: _currentIndex,
-                  isDark: isDark,
-                  isExpanded: _isSidebarExpanded,
-                  onIndexChanged: _setCurrentIndex,
-                  onToggleExpand: () =>
-                      setState(() => _isSidebarExpanded = !_isSidebarExpanded),
-                  onToggleTheme: themeProvider.toggleTheme,
-                  notificationBadge: notificationBadge,
-                  onLogout: _logout,
-                ),
-                Expanded(child: body),
-              ],
+    if (isWide) {
+      return Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: Row(
+          children: [
+            SideNavigation(
+              currentIndex: _currentIndex,
+              isDark: isDark,
+              isExpanded: _isSidebarExpanded,
+              onIndexChanged: _setCurrentIndex,
+              onToggleExpand: () =>
+                  setState(() => _isSidebarExpanded = !_isSidebarExpanded),
+              onToggleTheme: themeProvider.toggleTheme,
+              notificationBadge: notificationBadge,
+              onLogout: _logout,
             ),
-          );
-        }
+            Expanded(child: body),
+          ],
+        ),
+      );
+    }
 
-        return Scaffold(
-          resizeToAvoidBottomInset: false,
-          appBar: DashboardMobileAppBar(
-            isDark: isDark,
-            notificationBadge: notificationBadge,
-            onToggleTheme: themeProvider.toggleTheme,
-            onToggleNotifications: _toggleNotifications,
-            showNotification: auth.can(AppPermission.viewNotifications),
-          ),
-          body: body,
-          bottomNavigationBar: MobileNavigationBar(
-            items: _navItems,
-            currentIndex: _currentIndex,
-            isDark: isDark,
-            onIndexChanged: _setCurrentIndex,
-          ),
-        );
-      },
+    return Scaffold(
+      resizeToAvoidBottomInset: false,
+      appBar: DashboardMobileAppBar(
+        isDark: isDark,
+        notificationBadge: notificationBadge,
+        onToggleTheme: themeProvider.toggleTheme,
+        onToggleNotifications: _toggleNotifications,
+        showNotification: auth.can(AppPermission.viewNotifications),
+      ),
+      body: body,
+      bottomNavigationBar: MobileNavigationBar(
+        items: _navItems,
+        currentIndex: _currentIndex,
+        isDark: isDark,
+        onIndexChanged: _setCurrentIndex,
+      ),
     );
   }
 }

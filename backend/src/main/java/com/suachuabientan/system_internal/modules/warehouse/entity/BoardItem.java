@@ -43,6 +43,10 @@ public class BoardItem extends BaseEntity {
     @Builder.Default
     private Integer quantity = 1;
 
+    @Column(name = "min_quantity", nullable = false)
+    @Builder.Default
+    private Integer minQuantity = 0;
+
     @Column(name = "serial_number", unique = true, length = 100)
     private String serialNumber;
 

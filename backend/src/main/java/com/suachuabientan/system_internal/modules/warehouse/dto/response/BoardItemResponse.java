@@ -24,6 +24,7 @@ public record BoardItemResponse(
         String currentLocationCode,
         Instant createdAt,
         Integer quantity,
+        Integer minQuantity,
 
         ActiveCheckoutInfo activeCheckoutInfo
 ) {
