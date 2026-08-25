@@ -12,9 +12,24 @@ public record LocationScanResponse(
         String qrCode,
         Boolean isFull,
         List<LocationPartItem> parts,
+        List<LocationBoardItem> boards,
         int totalPartTypes,
         BigDecimal totalQuantity
 ) {
+    public LocationScanResponse(
+            UUID locationId,
+            String code,
+            String name,
+            String description,
+            String qrCode,
+            Boolean isFull,
+            List<LocationPartItem> parts,
+            int totalPartTypes,
+            BigDecimal totalQuantity
+    ) {
+        this(locationId, code, name, description, qrCode, isFull, parts, List.of(), totalPartTypes, totalQuantity);
+    }
+
     public record LocationPartItem(
             UUID partId,
             UUID partLotId,
@@ -26,5 +41,18 @@ public record LocationScanResponse(
             String categoryName,
             String imageUrl,
             String condition
+    ) {}
+
+    public record LocationBoardItem(
+            UUID boardId,
+            String qrCode,
+            String name,
+            String model,
+            String repairBrand,
+            String category,
+            String status,
+            Integer quantity,
+            Integer minQuantity,
+            String location
     ) {}
 }

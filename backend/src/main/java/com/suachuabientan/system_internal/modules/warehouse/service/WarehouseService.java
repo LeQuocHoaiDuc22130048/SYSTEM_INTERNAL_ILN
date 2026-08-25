@@ -567,11 +567,12 @@ public class WarehouseService {
                         .getId();
             } catch (IllegalArgumentException e) {
                 String code80 = trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed;
-                return storeLocationRepository.findByCodeAndIsDeletedFalse(code80)
+                return storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(code80)
                         .orElseGet(() -> {
                             StoreLocation newLocation = StoreLocation.builder()
                                     .code(code80)
                                     .name(trimmed)
+                                    .qrCode(code80)
                                     .description("Tự động tạo từ liên kết bo mạch")
                                     .isFull(false)
                                     .onlySinglePart(false)
@@ -586,12 +587,13 @@ public class WarehouseService {
         if (!StringUtils.hasText(legacyLocation)) return null;
         String legacyTrimmed = legacyLocation.trim();
         String code80 = legacyTrimmed.length() > 80 ? legacyTrimmed.substring(0, 80) : legacyTrimmed;
-        return storeLocationRepository.findByCodeAndIsDeletedFalse(code80)
+        return storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(code80)
                 .map(StoreLocation::getId)
                 .orElseGet(() -> {
                     StoreLocation newLocation = StoreLocation.builder()
                             .code(code80)
                             .name(legacyTrimmed)
+                            .qrCode(code80)
                             .description("Tự động tạo từ vị trí bo mạch")
                             .isFull(false)
                             .onlySinglePart(false)

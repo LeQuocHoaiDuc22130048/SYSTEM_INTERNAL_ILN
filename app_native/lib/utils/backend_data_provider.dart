@@ -343,6 +343,40 @@ class BackendDataProvider extends ChangeNotifier {
     if (reload) await loadParts();
   }
 
+  Future<Map<String, dynamic>> scanLocationQr(String codeOrQr) async {
+    final res = await api.get('/api/v1/parts/locations/scan/${Uri.encodeComponent(codeOrQr.trim())}');
+    if (res is Map<String, dynamic>) {
+      return res;
+    }
+    return <String, dynamic>{};
+  }
+
+  Future<void> checkoutPart(
+    String partId, {
+    required String storeLocationId,
+    required String partLotId,
+    required double quantity,
+    String? purpose,
+    String? notes,
+    String? repairOrderId,
+    String? repairBrand,
+    bool reload = true,
+  }) async {
+    final body = <String, dynamic>{
+      'storeLocationId': storeLocationId,
+      'partLotId': partLotId,
+      'quantity': quantity,
+      if (purpose != null && purpose.isNotEmpty) 'purpose': purpose,
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      if (repairOrderId != null && repairOrderId.isNotEmpty)
+        'repairOrderId': repairOrderId,
+      if (repairBrand != null && repairBrand.isNotEmpty)
+        'repairBrand': repairBrand,
+    };
+    await api.post('/api/v1/parts/$partId/checkout', body: body);
+    if (reload) await loadParts();
+  }
+
   List<Map<String, dynamic>> _content(dynamic data) {
     if (data is Map<String, dynamic>) {
       final content = data['content'];

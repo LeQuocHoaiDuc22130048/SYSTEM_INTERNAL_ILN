@@ -12,7 +12,7 @@ import '../models/board_history_item.dart';
 import '../models/part.dart';
 import 'scanner_page.dart';
 
-enum WarehouseMode { boards, parts }
+enum WarehouseMode { all, boards, parts }
 enum PartFilterStatus { all, lowStock, outOfStock }
 enum PartSearchMethod { general, locationQr }
 
@@ -48,7 +48,7 @@ class _WarehousePageState extends State<WarehousePage> {
   final ValueNotifier<BoardStatus?> _filter = ValueNotifier(null);
   final ValueNotifier<PartFilterStatus> _partFilter = ValueNotifier(PartFilterStatus.all);
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
-  WarehouseMode _currentMode = WarehouseMode.boards;
+  WarehouseMode _currentMode = WarehouseMode.all;
   PartSearchMethod _partSearchMethod = PartSearchMethod.general;
 
   @override
@@ -107,6 +107,18 @@ class _WarehousePageState extends State<WarehousePage> {
               lot.storeLocationName.toLowerCase().contains(query));
       return matchesFilter && matchesSearch;
     }).toList();
+  }
+
+  List<dynamic> get _filteredUnifiedItems {
+    final boards = _filteredBoards;
+    final parts = _filteredParts;
+    final List<dynamic> merged = [...boards, ...parts];
+    merged.sort((a, b) {
+      final nameA = (a is Board ? a.name : (a as Part).name).toLowerCase();
+      final nameB = (b is Board ? b.name : (b as Part).name).toLowerCase();
+      return nameA.compareTo(nameB);
+    });
+    return merged;
   }
 
   List<LocationGroup> get _filteredLocationGroups {
@@ -205,8 +217,8 @@ class _WarehousePageState extends State<WarehousePage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Mode Toggle segmented control
-                      // _buildModeToggle(isDark),
+                      // Mode Toggle segmented control (Bo mạch vs Linh kiện)
+                      _buildModeToggle(isDark, boards.length, totalParts),
 
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -244,7 +256,79 @@ class _WarehousePageState extends State<WarehousePage> {
                             children: [
                               ElevatedButton.icon(
                                 onPressed: () {
-                                  if (_currentMode == WarehouseMode.boards) {
+                                  if (_currentMode == WarehouseMode.all) {
+                        final unified = _filteredUnifiedItems;
+                        if (unified.isEmpty) {
+                          return RefreshIndicator(
+                            onRefresh: () async {
+                              await Future.wait([
+                                context.read<BackendDataProvider>().loadBoards(),
+                                context.read<BackendDataProvider>().loadParts(),
+                              ]);
+                            },
+                            child: ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: emptyViewHeight,
+                                  child: Center(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      children: [
+                                        const Text('📦', style: TextStyle(fontSize: 48)),
+                                        const SizedBox(height: 16),
+                                        Text(
+                                          'Không tìm thấy mặt hàng nào',
+                                          style: TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark
+                                                ? AppColors.textPrimaryDark
+                                                : AppColors.textPrimaryLight,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: isDark
+                                                ? AppColors.textSecondaryDark
+                                                : AppColors.textSecondaryLight,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+
+                        return RefreshIndicator(
+                          onRefresh: () async {
+                            await Future.wait([
+                              context.read<BackendDataProvider>().loadBoards(),
+                              context.read<BackendDataProvider>().loadParts(),
+                            ]);
+                          },
+                          child: ListView.builder(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: const EdgeInsets.all(16),
+                            itemCount: unified.length,
+                            itemBuilder: (context, index) {
+                              final item = unified[index];
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: item is Board
+                                    ? _buildBoardListCard(item)
+                                    : _buildPartCard(item as Part),
+                              );
+                            },
+                          ),
+                        );
+                      } else if (_currentMode == WarehouseMode.boards) {
                                     _showAddEditBoardDialog();
                                   } else {
                                     _showAddEditPartDialog();
@@ -272,31 +356,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                     ),
                                   );
                                   if (result != null && mounted) {
-                                    String qrCode = (result as String).trim();
-
-                                    // Extract QR code from formatted label block (e.g., "MÃ QR: LOC-A1" or "MÃ VỊ TRÍ KHO: LOC-A1")
-                                    final match = RegExp(r'(?:mã qr|mã vị trí kho):\s*([^\n\r]+)', caseSensitive: false)
-                                        .firstMatch(qrCode);
-                                    if (match != null && match.group(1) != null) {
-                                      qrCode = match.group(1)!.trim();
-                                    }
-
-                                    // Update search query to display matching location/parts
-                                    _searchQuery.value = qrCode;
-                                    _searchController.text = qrCode;
-
-                                    if (!mounted) return;
-                                    final messenger = ScaffoldMessenger.of(context);
-                                    setState(() {
-                                      _partSearchMethod = PartSearchMethod.locationQr;
-                                    });
-
-                                    messenger.showSnackBar(
-                                      SnackBar(
-                                        content: Text('📍 Đã quét Mã Vị Trí Kho: $qrCode. Đang lọc linh kiện theo vị trí.'),
-                                        backgroundColor: AppColors.primary,
-                                      ),
-                                    );
+                                    await _handleWarehouseQrScan(result as String);
                                   }
                                 },
                                 icon: const Icon(
@@ -954,13 +1014,13 @@ class _WarehousePageState extends State<WarehousePage> {
     );
   }
 
-  Widget _buildModeToggle(bool isDark) {
+  Widget _buildModeToggle(bool isDark, int boardsCount, int partsCount) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark ? AppColors.borderDark : AppColors.borderLight,
         ),
@@ -968,7 +1028,7 @@ class _WarehousePageState extends State<WarehousePage> {
       child: Row(
         children: [
           Expanded(
-            child: GestureDetector(
+            child: InkWell(
               onTap: () {
                 setState(() {
                   _currentMode = WarehouseMode.boards;
@@ -977,30 +1037,54 @@ class _WarehousePageState extends State<WarehousePage> {
                   _filter.value = null;
                 });
               },
-              child: Container(
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: _currentMode == WarehouseMode.boards
                       ? AppColors.primary
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
+                  boxShadow: _currentMode == WarehouseMode.boards
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
-                child: Center(
-                  child: Text(
-                    'Bo mạch',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.cpu,
+                      size: 16,
                       color: _currentMode == WarehouseMode.boards
                           ? Colors.white
                           : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Bo mạch ($boardsCount)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _currentMode == WarehouseMode.boards
+                            ? Colors.white
+                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+          const SizedBox(width: 4),
           Expanded(
-            child: GestureDetector(
+            child: InkWell(
               onTap: () {
                 setState(() {
                   _currentMode = WarehouseMode.parts;
@@ -1009,24 +1093,47 @@ class _WarehousePageState extends State<WarehousePage> {
                   _partFilter.value = PartFilterStatus.all;
                 });
               },
-              child: Container(
+              borderRadius: BorderRadius.circular(8),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 decoration: BoxDecoration(
                   color: _currentMode == WarehouseMode.parts
                       ? AppColors.primary
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(8),
+                  boxShadow: _currentMode == WarehouseMode.parts
+                      ? [
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
-                child: Center(
-                  child: Text(
-                    'Linh kiện',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.precision_manufacturing,
+                      size: 16,
                       color: _currentMode == WarehouseMode.parts
                           ? Colors.white
                           : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Linh kiện ($partsCount)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: _currentMode == WarehouseMode.parts
+                            ? Colors.white
+                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -1703,20 +1810,46 @@ class _WarehousePageState extends State<WarehousePage> {
                   'IPN: ${item.part.ipn} · Tồn: ${item.part.totalQuantity.toStringAsFixed(0)} (Min: ${item.part.minAmount.toStringAsFixed(0)})',
                   style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
                 ),
-                trailing: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    'Vị trí này: ${item.lot.amount.toStringAsFixed(0)}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: isDark ? AppColors.textPrimaryDark : AppColors.primary,
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        'Kệ: ${item.lot.amount.toStringAsFixed(0)}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: isDark ? AppColors.textPrimaryDark : AppColors.primary,
+                        ),
+                      ),
                     ),
-                  ),
+                    if (item.lot.amount > 0) ...[
+                      const SizedBox(width: 6),
+                      ElevatedButton(
+                        onPressed: () {
+                          _showPartCheckoutDialog(
+                            context,
+                            part: item.part,
+                            initialLot: item.lot,
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFFD97706),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                        ),
+                        child: const Text('Lấy', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ],
                 ),
               );
             },
@@ -1741,6 +1874,673 @@ class _WarehousePageState extends State<WarehousePage> {
           Navigator.pop(context);
           _showPartDeleteConfirmDialog(part);
         },
+        onCheckout: () {
+          Navigator.pop(context);
+          _showPartCheckoutDialog(context, part: part);
+        },
+      ),
+    );
+  }
+
+  void _showPartCheckoutDialog(
+    BuildContext context, {
+    required Part part,
+    PartLot? initialLot,
+  }) {
+    final availableLots = part.lots.where((l) => l.amount > 0).toList();
+    if (availableLots.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Linh kiện ${part.name} hiện không có tồn kho ở vị trí nào để lấy.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    PartLot selectedLot = initialLot != null && availableLots.any((l) => l.id == initialLot.id)
+        ? availableLots.firstWhere((l) => l.id == initialLot.id)
+        : availableLots.first;
+
+    final qtyCtrl = TextEditingController(text: '1');
+    String selectedPurpose = 'Sửa chữa thiết bị';
+    final notesCtrl = TextEditingController();
+    bool isSubmitting = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDlgState) {
+          final isDark = Theme.of(context).brightness == Brightness.dark;
+
+          return AlertDialog(
+            title: Row(
+              children: [
+                const Icon(Icons.outbox, color: Color(0xFFD97706)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Lấy linh kiện out kho',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          part.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'IPN: ${part.ipn}',
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 12,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Location selection
+                  const Text(
+                    'Vị trí lấy hàng *',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    value: selectedLot.id,
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: availableLots.map((lot) {
+                      return DropdownMenuItem<String>(
+                        value: lot.id,
+                        child: Text(
+                          '📍 ${lot.storeLocationName} (${lot.storeLocationCode}) · Tồn: ${lot.amount.toStringAsFixed(0)}',
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDlgState(() {
+                          selectedLot = availableLots.firstWhere((l) => l.id == val);
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Quantity input
+                  Text(
+                    'Số lượng lấy * (Tối đa: ${selectedLot.amount.toStringAsFixed(0)})',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: qtyCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(),
+                      hintText: 'Nhập số lượng',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Purpose
+                  const Text(
+                    'Mục đích sử dụng',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<String>(
+                    value: selectedPurpose,
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(),
+                    ),
+                    items: const [
+                      DropdownMenuItem(value: 'Sửa chữa thiết bị', child: Text('Sửa chữa thiết bị')),
+                      DropdownMenuItem(value: 'Thay thế linh kiện hỏng', child: Text('Thay thế linh kiện hỏng')),
+                      DropdownMenuItem(value: 'Xuất kiểm thử / R&D', child: Text('Xuất kiểm thử / R&D')),
+                      DropdownMenuItem(value: 'Xuất dự phòng', child: Text('Xuất dự phòng')),
+                      DropdownMenuItem(value: 'Khác', child: Text('Khác (ghi rõ bên dưới)')),
+                    ],
+                    onChanged: (val) {
+                      if (val != null) {
+                        setDlgState(() => selectedPurpose = val);
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Notes
+                  const Text(
+                    'Ghi chú / Đơn sửa chữa',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  ),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: notesCtrl,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      border: OutlineInputBorder(),
+                      hintText: 'VD: Thay IC nguồn cho đơn #RO-1024...',
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.pop(context),
+                child: const Text('Hủy'),
+              ),
+              ElevatedButton(
+                onPressed: isSubmitting
+                    ? null
+                    : () async {
+                        final qty = double.tryParse(qtyCtrl.text.trim());
+                        if (qty == null || qty <= 0) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Vui lòng nhập số lượng hợp lệ')),
+                          );
+                          return;
+                        }
+                        if (qty > selectedLot.amount) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Số lượng vượt quá tồn tại kệ (${selectedLot.amount})')),
+                          );
+                          return;
+                        }
+
+                        setDlgState(() => isSubmitting = true);
+                        try {
+                          await context.read<BackendDataProvider>().checkoutPart(
+                            part.id,
+                            storeLocationId: selectedLot.storeLocationId,
+                            partLotId: selectedLot.id,
+                            quantity: qty,
+                            purpose: selectedPurpose,
+                            notes: notesCtrl.text.trim(),
+                          );
+                          if (!context.mounted) return;
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('✅ Đã lấy ${qty.toStringAsFixed(0)} ${part.name} ra khỏi kệ ${selectedLot.storeLocationCode}'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          setDlgState(() => isSubmitting = false);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
+                          );
+                        }
+                      },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD97706),
+                  foregroundColor: Colors.white,
+                ),
+                child: isSubmitting
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                    : const Text('Xác nhận lấy linh kiện'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  void _showLocationScanResultSheet(Map<String, dynamic> locData) {
+    final locationName = locData['name']?.toString() ?? 'Vị trí kho';
+    final locationCode = locData['code']?.toString() ?? '';
+    final description = locData['description']?.toString();
+    final partsList = (locData['parts'] as List?) ?? [];
+    final boardsList = (locData['boards'] as List?) ?? [];
+    final totalTypes = locData['totalPartTypes'] ?? (partsList.length + boardsList.length);
+    final totalQty = (locData['totalQuantity'] as num?)?.toDouble() ?? 0.0;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final screenSize = MediaQuery.sizeOf(context);
+
+        return Container(
+          constraints: BoxConstraints(maxHeight: screenSize.height * 0.85),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.backgroundDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark ? Colors.white24 : Colors.black12,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Location Header Card
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.location_on, size: 28, color: AppColors.primary),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$locationName ($locationCode)',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          if (description != null && description.isNotEmpty)
+                            Text(
+                              description,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '$totalTypes loại · SL: ${totalQty.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              if (partsList.isEmpty && boardsList.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Text(
+                      'Vị trí kho này hiện chưa có bo mạch hoặc linh kiện nào.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontStyle: FontStyle.italic,
+                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Section: Bo mạch tại vị trí
+                        if (boardsList.isNotEmpty) ...[
+                          Text(
+                            'DANH SÁCH BO MẠCH TẠI KỆ NÀY (${boardsList.length})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          ...boardsList.map((item) {
+                            final b = item as Map<String, dynamic>;
+                            final boardId = b['boardId']?.toString() ?? '';
+                            final name = b['name']?.toString() ?? '';
+                            final model = b['model']?.toString() ?? '';
+                            final qrCode = b['qrCode']?.toString() ?? '';
+                            final qty = (b['quantity'] as num?)?.toInt() ?? 0;
+                            final minQty = (b['minQuantity'] as num?)?.toInt() ?? 0;
+
+                            final allBoards = context.read<BackendDataProvider>().boards;
+                            final matchedBoard = allBoards.firstWhere(
+                              (bo) => bo.id == boardId || bo.qrCode == qrCode,
+                              orElse: () => Board(
+                                id: boardId,
+                                name: name,
+                                qrCode: qrCode,
+                                status: BoardStatus.available,
+                                quantity: qty,
+                                minQuantity: minQty,
+                                model: model,
+                                location: locationCode,
+                              ),
+                            );
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.memory, color: AppColors.primary, size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          name,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          '${model.isNotEmpty ? '$model · ' : ''}QR: $qrCode',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Số lượng: $qty (Min: $minQty)',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.success,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      _showBoardDetail(matchedBoard, fromScan: true);
+                                    },
+                                    icon: const Icon(Icons.outbox, size: 15),
+                                    label: const Text('Lấy / Xuất', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD97706),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                          const SizedBox(height: 12),
+                        ],
+
+                        // Section: Linh kiện tại vị trí
+                        if (partsList.isNotEmpty) ...[
+                          Text(
+                            'DANH SÁCH LINH KIỆN TẠI KỆ NÀY (${partsList.length})',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          ...partsList.map((item) {
+                            final p = item as Map<String, dynamic>;
+                            final partId = p['partId']?.toString() ?? '';
+                            final partName = p['name']?.toString() ?? '';
+                            final ipn = p['ipn']?.toString() ?? '';
+                            final amount = (p['amount'] as num?)?.toDouble() ?? 0.0;
+                            final category = p['categoryName']?.toString() ?? 'Chưa rõ';
+                            final condition = p['condition']?.toString();
+
+                            final allParts = context.read<BackendDataProvider>().parts;
+                            final matchedPart = allParts.firstWhere(
+                              (pa) => pa.id == partId,
+                              orElse: () => Part(
+                                id: partId,
+                                ipn: ipn,
+                                name: partName,
+                                minAmount: 0,
+                                totalQuantity: amount,
+                                lots: [
+                                  PartLot(
+                                    id: p['partLotId']?.toString() ?? '',
+                                    storeLocationId: locData['locationId']?.toString() ?? '',
+                                    storeLocationCode: locationCode,
+                                    storeLocationName: locationName,
+                                    amount: amount,
+                                  ),
+                                ],
+                              ),
+                            );
+
+                            final matchedLot = matchedPart.lots.firstWhere(
+                              (l) => l.id == (p['partLotId']?.toString() ?? ''),
+                              orElse: () => PartLot(
+                                id: p['partLotId']?.toString() ?? '',
+                                storeLocationId: locData['locationId']?.toString() ?? '',
+                                storeLocationCode: locationCode,
+                                storeLocationName: locationName,
+                                amount: amount,
+                              ),
+                            );
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(
+                                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                                ),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFD97706).withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Icon(Icons.settings_input_component, color: Color(0xFFD97706), size: 20),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          partName,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'IPN: $ipn · $category${condition != null ? ' · $condition' : ''}',
+                                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Tồn tại kệ: ${amount.toStringAsFixed(0)}',
+                                          style: const TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.success,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  ElevatedButton.icon(
+                                    onPressed: amount <= 0
+                                        ? null
+                                        : () {
+                                            Navigator.pop(context);
+                                            _showPartCheckoutDialog(
+                                              context,
+                                              part: matchedPart,
+                                              initialLot: matchedLot,
+                                            );
+                                          },
+                                    icon: const Icon(Icons.outbox, size: 15),
+                                    label: const Text('Lấy', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: const Color(0xFFD97706),
+                                      foregroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _handleWarehouseQrScan(String rawResult) async {
+    String qrCode = rawResult.trim();
+
+    final match = RegExp(r'(?:mã qr|mã vị trí kho|mã bo mạch|mã linh kiện):\s*([^\n\r]+)', caseSensitive: false)
+        .firstMatch(qrCode);
+    if (match != null && match.group(1) != null) {
+      qrCode = match.group(1)!.trim();
+    }
+
+    final backend = context.read<BackendDataProvider>();
+
+    // 1. Quét theo Vị trí Kho trước
+    try {
+      final locData = await backend.scanLocationQr(qrCode);
+      if (locData.isNotEmpty && (locData['code'] != null || locData['locationId'] != null || locData['id'] != null)) {
+        if (!mounted) return;
+        _showLocationScanResultSheet(locData);
+        return;
+      }
+    } catch (_) {
+      // Tiếp tục kiểm tra các loại khác nếu không phải mã vị trí
+    }
+
+    // 2. Kiểm tra nếu khớp mã QR bo mạch
+    final matchedBoard = backend.boards.cast<Board?>().firstWhere(
+          (b) => b?.qrCode.toLowerCase() == qrCode.toLowerCase() || b?.id == qrCode,
+          orElse: () => null,
+        );
+    if (matchedBoard != null) {
+      if (!mounted) return;
+      _showBoardDetail(matchedBoard, fromScan: true);
+      return;
+    }
+
+    // 3. Kiểm tra nếu khớp mã IPN linh kiện
+    final matchedPart = backend.parts.cast<Part?>().firstWhere(
+          (p) => p?.ipn.toLowerCase() == qrCode.toLowerCase() || p?.id == qrCode,
+          orElse: () => null,
+        );
+    if (matchedPart != null) {
+      if (!mounted) return;
+      _showPartDetail(matchedPart);
+      return;
+    }
+
+    // Fallback: search query
+    _searchQuery.value = qrCode;
+    _searchController.text = qrCode;
+    setState(() {
+      _partSearchMethod = PartSearchMethod.locationQr;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('📍 Đang lọc theo mã: $qrCode'),
+        backgroundColor: AppColors.primary,
       ),
     );
   }
@@ -3258,11 +4058,13 @@ class _PartDetailSheet extends StatefulWidget {
   final Part part;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+  final VoidCallback onCheckout;
 
   const _PartDetailSheet({
     required this.part,
     required this.onEdit,
     required this.onDelete,
+    required this.onCheckout,
   });
 
   @override
@@ -3572,13 +4374,34 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
             if (_isLoading)
               const Center(child: CircularProgressIndicator())
             else
-              ElevatedButton(
-                onPressed: _showAdjustStockDialog,
-                style: ElevatedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  backgroundColor: AppColors.primary,
-                ),
-                child: const Text('Điều chỉnh số lượng tồn kho', style: TextStyle(color: Colors.white)),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: widget.onCheckout,
+                      icon: const Icon(Icons.outbox, size: 18),
+                      label: const Text('Lấy linh kiện', style: TextStyle(fontWeight: FontWeight.bold)),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        backgroundColor: const Color(0xFFD97706),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _showAdjustStockDialog,
+                      icon: const Icon(Icons.tune, size: 18),
+                      label: const Text('Điều chỉnh kho'),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
           ],
         ),

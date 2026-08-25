@@ -62,6 +62,7 @@ public class PartService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final JdbcTemplate jdbcTemplate;
+    private final com.suachuabientan.system_internal.modules.warehouse.repository.BoardItemRepository boardItemRepository;
 
     private static final List<UserRole> WAREHOUSE_ALERT_ROLES = List.of(
             UserRole.SUPER_ADMIN,
@@ -219,11 +220,13 @@ public class PartService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy linh kiện: " + partId));
 
         String locCode = request.storeLocationCode().trim();
-        StoreLocation location = storeLocationRepository.findByCodeAndIsDeletedFalse(locCode)
+        StoreLocation location = storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(locCode)
+                .or(() -> storeLocationRepository.findByCodeOrQrCode(locCode))
                 .orElseGet(() -> {
                     StoreLocation newLoc = StoreLocation.builder()
                             .code(locCode)
                             .name(locCode)
+                            .qrCode(locCode)
                             .description("Tự động tạo từ điều chỉnh kho linh kiện")
                             .isFull(false)
                             .onlySinglePart(false)
@@ -339,11 +342,13 @@ public class PartService {
                 BigDecimal importQty = item.quantity() != null ? item.quantity() : BigDecimal.ZERO;
                 if (importQty.compareTo(BigDecimal.ZERO) > 0 || StringUtils.hasText(item.storeLocationCode())) {
                     String locCode = StringUtils.hasText(item.storeLocationCode()) ? item.storeLocationCode().trim() : "DEFAULT";
-                    StoreLocation location = storeLocationRepository.findByCodeAndIsDeletedFalse(locCode)
+                    StoreLocation location = storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(locCode)
+                            .or(() -> storeLocationRepository.findByCodeOrQrCode(locCode))
                             .orElseGet(() -> {
                                 StoreLocation newLoc = StoreLocation.builder()
                                         .code(locCode)
                                         .name(locCode)
+                                        .qrCode(locCode)
                                         .description("Tự động tạo từ nhập kho hàng loạt")
                                         .isFull(false)
                                         .onlySinglePart(false)
@@ -422,11 +427,13 @@ public class PartService {
                 BigDecimal importQty = item.quantity() != null ? item.quantity() : BigDecimal.ZERO;
                 if (importQty.compareTo(BigDecimal.ZERO) > 0 || StringUtils.hasText(item.storeLocationCode())) {
                     String locCode = StringUtils.hasText(item.storeLocationCode()) ? item.storeLocationCode().trim() : "DEFAULT";
-                    StoreLocation location = storeLocationRepository.findByCodeAndIsDeletedFalse(locCode)
+                    StoreLocation location = storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(locCode)
+                            .or(() -> storeLocationRepository.findByCodeOrQrCode(locCode))
                             .orElseGet(() -> {
                                 StoreLocation newLoc = StoreLocation.builder()
                                         .code(locCode)
                                         .name(locCode)
+                                        .qrCode(locCode)
                                         .description("Tự động tạo từ nhập kho hàng loạt")
                                         .isFull(false)
                                         .onlySinglePart(false)
@@ -487,14 +494,52 @@ public class PartService {
     }
 
     // ── 1. Quét QR Vị trí Kho ──────────────────────────────────────────
-    @Transactional(readOnly = true)
+    @Transactional
     public LocationScanResponse scanLocationQr(String codeOrQr) {
-        StoreLocation location = storeLocationRepository.findByCodeOrQrCode(codeOrQr.trim())
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy vị trí kho với mã/QR: " + codeOrQr));
+        String cleanCode = codeOrQr.trim();
+        cleanCode = cleanCode.replaceAll("(?i)^(?:mã qr|mã vị trí kho|vị trí|location):\\s*", "").trim();
 
-        List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(location.getId());
+        List<StoreLocation> matchingLocations = storeLocationRepository.findAllByCodeOrQrCodeIgnoreCase(cleanCode);
+        StoreLocation location;
+        List<UUID> locationIds = new ArrayList<>();
+
+        if (matchingLocations.isEmpty()) {
+            // Kiểm tra xem có bo mạch nào lưu ở vị trí này không
+            List<com.suachuabientan.system_internal.modules.warehouse.entity.BoardItem> boards =
+                    boardItemRepository.findByLocationText(cleanCode);
+            if (boards.isEmpty()) {
+                // Kiểm tra nếu mã quét là mã QR của chính bo mạch
+                var boardByQr = boardItemRepository.findByQrCodeAndIsDeletedFalse(cleanCode);
+                if (boardByQr.isPresent()) {
+                    var b = boardByQr.get();
+                    String loc = b.getLocation() != null ? b.getLocation() : "KHO";
+                    return scanLocationQr(loc);
+                }
+                throw new ResourceNotFoundException("Không tìm thấy vị trí kho hoặc bo mạch với mã: " + codeOrQr);
+            }
+
+            // Tự động tạo và lưu vị trí kho để đồng bộ lâu dài
+            StoreLocation newLoc = StoreLocation.builder()
+                    .code(cleanCode.toUpperCase())
+                    .name("Vị trí " + cleanCode)
+                    .description("Vị trí kho " + cleanCode)
+                    .qrCode(cleanCode)
+                    .isFull(false)
+                    .build();
+            try {
+                location = storeLocationRepository.save(newLoc);
+                locationIds.add(location.getId());
+            } catch (Exception e) {
+                location = newLoc;
+            }
+        } else {
+            location = matchingLocations.get(0);
+            locationIds = matchingLocations.stream().map(StoreLocation::getId).toList();
+        }
+
+        List<PartLot> lots = locationIds.isEmpty() ? List.of() : partLotRepository.findByStoreLocationIdInAndIsDeletedFalse(locationIds);
         List<LocationScanResponse.LocationPartItem> partItems = new ArrayList<>();
-        BigDecimal totalQty = BigDecimal.ZERO;
+        BigDecimal totalPartQty = BigDecimal.ZERO;
 
         for (PartLot lot : lots) {
             if (lot.getAmount() == null || lot.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
@@ -503,7 +548,7 @@ public class PartService {
             Part part = partRepository.findByIdAndIsDeletedFalse(lot.getPartId()).orElse(null);
             if (part == null) continue;
 
-            totalQty = totalQty.add(lot.getAmount());
+            totalPartQty = totalPartQty.add(lot.getAmount());
             partItems.add(new LocationScanResponse.LocationPartItem(
                     part.getId(),
                     lot.getId(),
@@ -518,15 +563,46 @@ public class PartService {
             ));
         }
 
+        // Tìm các bo mạch (BoardItem) được gán ở vị trí này
+        List<com.suachuabientan.system_internal.modules.warehouse.entity.BoardItem> boards =
+                locationIds.isEmpty()
+                        ? boardItemRepository.findByLocationText(cleanCode)
+                        : boardItemRepository.findByLocationOrLocationIds(cleanCode, locationIds);
+        List<LocationScanResponse.LocationBoardItem> boardItems = new ArrayList<>();
+        BigDecimal totalBoardQty = BigDecimal.ZERO;
+
+        for (var b : boards) {
+            int qty = b.getQuantity() != null ? b.getQuantity() : 0;
+            if (qty > 0) {
+                totalBoardQty = totalBoardQty.add(BigDecimal.valueOf(qty));
+            }
+            boardItems.add(new LocationScanResponse.LocationBoardItem(
+                    b.getId(),
+                    b.getQrCode(),
+                    b.getName(),
+                    b.getModel(),
+                    b.getRepairBrand(),
+                    b.getCategory(),
+                    b.getStatus() != null ? b.getStatus().name() : "AVAILABLE",
+                    qty,
+                    b.getMinQuantity() != null ? b.getMinQuantity() : 0,
+                    b.getLocation()
+            ));
+        }
+
+        BigDecimal totalQty = totalPartQty.add(totalBoardQty);
+        int totalTypes = partItems.size() + boardItems.size();
+
         return new LocationScanResponse(
                 location.getId(),
                 location.getCode(),
                 location.getName(),
                 location.getDescription(),
-                location.getQrCode(),
+                location.getQrCode() != null ? location.getQrCode() : location.getCode(),
                 location.getIsFull(),
                 partItems,
-                partItems.size(),
+                boardItems,
+                totalTypes,
                 totalQty
         );
     }

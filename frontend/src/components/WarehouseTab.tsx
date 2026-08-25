@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import { exportLocationQrPdfList, type LocationQrExportData, type QrPrintConfig } from '../utils/pdf';
-import type { Board, BoardHistoryItem, Part, PartCheckoutHistoryItem, WarehouseTabProps } from '../types/warehouse';
+import type { Board, BoardHistoryItem, Part, PartLot, PartCheckoutHistoryItem, WarehouseTabProps } from '../types/warehouse';
 
 import { BoardListPanel } from './warehouse/BoardListPanel';
 import { PartListPanel } from './warehouse/PartListPanel';
@@ -19,6 +19,7 @@ import { LocationQrScanModal } from './warehouse/LocationQrScanModal';
 import { PartCheckoutModal } from './warehouse/PartCheckoutModal';
 import { PartReturnModal } from './warehouse/PartReturnModal';
 import { PartBulkImportModal } from './warehouse/PartBulkImportModal';
+import { UnifiedListPanel } from './warehouse/UnifiedListPanel';
 import './WarehouseTab.css';
 
 
@@ -57,12 +58,15 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [checkoutQuantity, setCheckoutQuantity] = useState<number>(1);
 
   // Warehouse Mode: BOARDS, PARTS, or PART_LOGS
-  const [warehouseMode, setWarehouseMode] = useState<'BOARDS' | 'PARTS' | 'PART_LOGS'>('PARTS');
+  const [warehouseMode, setWarehouseMode] = useState<'ALL' | 'BOARDS' | 'PARTS' | 'PART_LOGS'>('ALL');
+  const [unifiedTypeFilter, setUnifiedTypeFilter] = useState<'ALL' | 'BOARDS' | 'PARTS'>('ALL');
+  const [unifiedStockFilter, setUnifiedStockFilter] = useState<'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
 
   // New Part Modals & QR Scan states
   const [isLocationQrScanModalOpen, setIsLocationQrScanModalOpen] = useState<boolean>(false);
   const [locationScanInitialCode, setLocationScanInitialCode] = useState<string>('');
   const [isPartCheckoutModalOpen, setIsPartCheckoutModalOpen] = useState<boolean>(false);
+  const [checkoutInitialLot, setCheckoutInitialLot] = useState<PartLot | null>(null);
   const [isPartReturnModalOpen, setIsPartReturnModalOpen] = useState<boolean>(false);
   const [checkoutHistoryItemToReturn, setCheckoutHistoryItemToReturn] = useState<PartCheckoutHistoryItem | null>(null);
 
@@ -882,27 +886,44 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
     <div className="warehouse-container">
       {/* Top Header Mode Switcher & Quick QR Scan Bar */}
       <div className="warehouse-header-bar">
-        <div style={{ display: 'flex', gap: '8px', backgroundColor: 'var(--color-bg, #f1f5f9)', padding: '4px', borderRadius: '10px', border: '1px solid var(--color-border, #e2e8f0)' }}>
+        <div style={{ display: 'flex', gap: '6px', backgroundColor: 'var(--color-bg, #f1f5f9)', padding: '4px', borderRadius: '10px', border: '1px solid var(--color-border, #e2e8f0)' }}>
+          <button
+            type="button"
+            className={`warehouse-mode-btn ${warehouseMode === 'ALL' ? 'active' : ''}`}
+            onClick={() => {
+              setWarehouseMode('ALL');
+              setSelectedBoard(null);
+              setSelectedPart(null);
+            }}
+          >
+            🏢 Tất Cả Kho ({boards.length + parts.length})
+          </button>
           <button
             type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'PARTS' ? 'active' : ''}`}
-            onClick={() => setWarehouseMode('PARTS')}
+            onClick={() => {
+              setWarehouseMode('PARTS');
+              setSelectedBoard(null);
+            }}
           >
-            🧱 Kho Linh Kiện (Parts)
+            🧱 Kho Linh Kiện ({parts.length})
           </button>
           <button
             type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'BOARDS' ? 'active' : ''}`}
-            onClick={() => setWarehouseMode('BOARDS')}
+            onClick={() => {
+              setWarehouseMode('BOARDS');
+              setSelectedPart(null);
+            }}
           >
-            📱 Bo Mạch (Boards)
+            📱 Bo Mạch ({boards.length})
           </button>
           <button
             type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'PART_LOGS' ? 'active' : ''}`}
             onClick={() => setWarehouseMode('PART_LOGS')}
           >
-            📜 Nhật Ký Lấy/Trả Linh Kiện
+            📜 Nhật Ký Lấy/Trả
           </button>
         </div>
 
@@ -943,7 +964,44 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
         <div className="warehouse-layout">
           {/* Left Column: Stats, Filter & Grid */}
           <div className="warehouse-main-panel">
-            {warehouseMode === 'BOARDS' ? (
+            {warehouseMode === 'ALL' ? (
+              <UnifiedListPanel
+                boards={boards}
+                parts={parts}
+                loading={loading || loadingParts}
+                searchTerm={searchTerm}
+                setSearchTerm={setSearchTerm}
+                typeFilter={unifiedTypeFilter}
+                setTypeFilter={setUnifiedTypeFilter}
+                stockFilter={unifiedStockFilter}
+                setStockFilter={setUnifiedStockFilter}
+                onSelectBoard={(b) => {
+                  setSelectedPart(null);
+                  handleSelectBoard(b);
+                }}
+                onSelectPart={(p) => {
+                  setSelectedBoard(null);
+                  setSelectedPart(p);
+                }}
+                onAddBoard={() => openAddEditModal(null)}
+                onAddPart={() => openAddEditPartModal(null)}
+                onQuickCheckoutPart={(p, lot) => {
+                  setSelectedPart(p);
+                  setCheckoutInitialLot(lot || (p.lots && p.lots.length > 0 ? p.lots[0] : null));
+                  setIsPartCheckoutModalOpen(true);
+                }}
+                onQuickCheckoutBoard={(b) => {
+                  setSelectedBoard(b);
+                  setCheckoutQuantity(1);
+                  setCheckoutNote('');
+                  setIsCheckoutModalOpen(true);
+                }}
+                onScanLocationQr={() => {
+                  setLocationScanInitialCode('');
+                  setIsLocationQrScanModalOpen(true);
+                }}
+              />
+            ) : warehouseMode === 'BOARDS' ? (
               <BoardListPanel
                 boards={boards}
                 loading={loading}
@@ -1668,6 +1726,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           const matchedPart = parts.find((p) => p.id === partItem.partId);
           if (matchedPart) {
             setSelectedPart(matchedPart);
+            const matchedLot = matchedPart.lots?.find((l) => l.id === partItem.partLotId);
+            setCheckoutInitialLot(matchedLot || null);
           }
           setIsPartCheckoutModalOpen(true);
         }}
@@ -1692,8 +1752,12 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
       {/* Part Checkout (Lấy Linh Kiện) Modal */}
       <PartCheckoutModal
         isOpen={isPartCheckoutModalOpen}
-        onClose={() => setIsPartCheckoutModalOpen(false)}
+        onClose={() => {
+          setIsPartCheckoutModalOpen(false);
+          setCheckoutInitialLot(null);
+        }}
         part={selectedPart}
+        initialLot={checkoutInitialLot}
         onSuccess={() => {
           fetchParts();
         }}

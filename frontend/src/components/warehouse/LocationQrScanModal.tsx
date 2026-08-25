@@ -224,84 +224,125 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                 </div>
               </div>
 
-              {/* Header label for Parts */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>
-                  Danh sách linh kiện trong vị trí này ({scanResult.parts.length})
-                </span>
-                <span style={{ fontSize: '0.78rem', color: '#64748b' }}>
-                  Quét QR vị trí để tra cứu & lấy linh kiện nhanh
-                </span>
-              </div>
-
-              {/* Part Items at this location */}
-              <div style={{ maxHeight: '350px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {scanResult.parts.length === 0 ? (
-                  <div style={{ padding: '30px', textAlign: 'center', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-                    Vị trí kho này hiện chưa có linh kiện nào được lưu trữ.
+              {/* Boards List */}
+              {scanResult.boards && scanResult.boards.length > 0 && (
+                <div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155', marginBottom: '8px' }}>
+                    Danh sách bo mạch trong vị trí này ({scanResult.boards.length})
                   </div>
-                ) : (
-                  scanResult.parts.map((item) => (
-                    <div
-                      key={item.partLotId || item.partId}
-                      style={{
-                        backgroundColor: '#fff',
-                        border: '1px solid #e2e8f0',
-                        padding: '12px 16px',
-                        borderRadius: '8px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        gap: '12px',
-                        boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#0f172a' }}>{item.name}</div>
-                        <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', gap: '12px', marginTop: '2px', flexWrap: 'wrap' }}>
-                          <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#1e293b' }}>IPN: {item.ipn}</span>
-                          <span>Danh mục: {item.categoryName || 'Chưa rõ'}</span>
-                          {item.condition && <span>Tình trạng: {item.condition}</span>}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                    {scanResult.boards.map((b) => (
+                      <div
+                        key={b.boardId || b.qrCode}
+                        style={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #e2e8f0',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '12px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#0f172a' }}>{b.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', gap: '12px', marginTop: '2px', flexWrap: 'wrap' }}>
+                            {b.model && <span>Model: {b.model}</span>}
+                            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#1e293b' }}>QR: {b.qrCode}</span>
+                            <span style={{ color: b.status === 'AVAILABLE' ? '#16a34a' : '#d97706', fontWeight: 600 }}>
+                              {b.status === 'AVAILABLE' ? 'Sẵn sàng' : b.status}
+                            </span>
+                          </div>
                         </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                         <div style={{ textAlign: 'right', minWidth: '70px' }}>
-                          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Tồn tại kệ</span>
-                          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#16a34a' }}>{item.amount}</div>
+                          <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Số lượng</span>
+                          <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#2563eb' }}>{b.quantity} (Min: {b.minQuantity})</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Parts List */}
+              {scanResult.parts && scanResult.parts.length > 0 && (
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem', color: '#334155' }}>
+                      Danh sách linh kiện trong vị trí này ({scanResult.parts.length})
+                    </span>
+                  </div>
+                  <div style={{ maxHeight: '280px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    {scanResult.parts.map((item) => (
+                      <div
+                        key={item.partLotId || item.partId}
+                        style={{
+                          backgroundColor: '#fff',
+                          border: '1px solid #e2e8f0',
+                          padding: '12px 16px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '12px',
+                          boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#0f172a' }}>{item.name}</div>
+                          <div style={{ fontSize: '0.8rem', color: '#64748b', display: 'flex', gap: '12px', marginTop: '2px', flexWrap: 'wrap' }}>
+                            <span style={{ fontFamily: 'monospace', fontWeight: 600, color: '#1e293b' }}>IPN: {item.ipn}</span>
+                            <span>Danh mục: {item.categoryName || 'Chưa rõ'}</span>
+                            {item.condition && <span>Tình trạng: {item.condition}</span>}
+                          </div>
                         </div>
 
-                        {onSelectPartForCheckout && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onSelectPartForCheckout(item, scanResult);
-                              onClose();
-                            }}
-                            style={{
-                              backgroundColor: '#d97706',
-                              color: '#fff',
-                              border: 'none',
-                              padding: '8px 12px',
-                              borderRadius: '6px',
-                              fontSize: '0.82rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '4px',
-                              whiteSpace: 'nowrap',
-                            }}
-                          >
-                            <ArrowUpRight size={14} />
-                            Lấy linh kiện
-                          </button>
-                        )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                          <div style={{ textAlign: 'right', minWidth: '70px' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Tồn tại kệ</span>
+                            <div style={{ fontWeight: 700, fontSize: '1.05rem', color: '#16a34a' }}>{item.amount}</div>
+                          </div>
+
+                          {onSelectPartForCheckout && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectPartForCheckout(item, scanResult);
+                                onClose();
+                              }}
+                              style={{
+                                backgroundColor: '#d97706',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '8px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.82rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                whiteSpace: 'nowrap',
+                              }}
+                            >
+                              <ArrowUpRight size={14} />
+                              Lấy linh kiện
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))
-                )}
-              </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {(!scanResult.boards || scanResult.boards.length === 0) && (!scanResult.parts || scanResult.parts.length === 0) && (
+                <div style={{ padding: '30px', textAlign: 'center', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                  Vị trí kho này hiện chưa có bo mạch hoặc linh kiện nào được lưu trữ.
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ padding: '40px 20px', textAlign: 'center', color: '#64748b', backgroundColor: '#f8fafc', borderRadius: '10px', border: '1px dashed #cbd5e1' }}>

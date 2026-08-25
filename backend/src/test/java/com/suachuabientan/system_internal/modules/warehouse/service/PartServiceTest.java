@@ -67,6 +67,9 @@ class PartServiceTest {
     @Mock
     private JdbcTemplate jdbcTemplate;
 
+    @Mock
+    private com.suachuabientan.system_internal.modules.warehouse.repository.BoardItemRepository boardItemRepository;
+
     @InjectMocks
     private PartService partService;
 
@@ -185,7 +188,7 @@ class PartServiceTest {
         lot.setId(lotId);
 
         when(partRepository.findByIdAndIsDeletedFalse(partId)).thenReturn(Optional.of(part));
-        when(storeLocationRepository.findByCodeAndIsDeletedFalse("KHO-B1")).thenReturn(Optional.of(location));
+        when(storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse("KHO-B1")).thenReturn(Optional.of(location));
         when(partLotRepository.findByPartIdAndStoreLocationIdAndIsDeletedFalse(partId, locationId)).thenReturn(Optional.of(lot));
         when(partLotRepository.findByPartIdAndIsDeletedFalse(partId)).thenReturn(List.of(lot));
 
@@ -209,6 +212,45 @@ class PartServiceTest {
 
         assertTrue(titleCaptor.getValue().contains("Hết hàng"));
         assertTrue(bodyCaptor.getValue().contains("HẾT HÀNG trong kho"));
+    }
+
+    @Test
+    @DisplayName("Quét QR vị trí kho không phân biệt hoa thường và hậu tố _QR")
+    void scanLocationQr_CaseInsensitive_Success() {
+        StoreLocation loc = StoreLocation.builder()
+                .code("LOC1")
+                .name("Kệ 1")
+                .qrCode("LOC1")
+                .isFull(false)
+                .build();
+        loc.setId(locationId);
+
+        Part part = Part.builder()
+                .ipn("IGBT-60N100")
+                .name("Transistor 60N100")
+                .build();
+        part.setId(partId);
+
+        PartLot lot = PartLot.builder()
+                .partId(partId)
+                .storeLocationId(locationId)
+                .amount(new BigDecimal("100"))
+                .build();
+        lot.setId(lotId);
+
+        when(storeLocationRepository.findAllByCodeOrQrCodeIgnoreCase("loc1")).thenReturn(List.of(loc));
+        when(partLotRepository.findByStoreLocationIdInAndIsDeletedFalse(List.of(locationId))).thenReturn(List.of(lot));
+        when(partRepository.findByIdAndIsDeletedFalse(partId)).thenReturn(Optional.of(part));
+
+        var res = partService.scanLocationQr("loc1");
+
+        assertNotNull(res);
+        assertEquals("LOC1", res.code());
+        assertEquals(1, res.totalPartTypes());
+        assertEquals(new BigDecimal("100"), res.totalQuantity());
+        assertEquals(1, res.parts().size());
+        assertEquals("IGBT-60N100", res.parts().get(0).ipn());
+        assertEquals(new BigDecimal("100"), res.parts().get(0).amount());
     }
 
     @Test

@@ -121,6 +121,19 @@ export interface LocationPartItem {
   condition?: string;
 }
 
+export interface LocationBoardItem {
+  boardId: string;
+  qrCode: string;
+  name: string;
+  model?: string;
+  repairBrand?: string;
+  category?: string;
+  status: string;
+  quantity: number;
+  minQuantity: number;
+  location?: string;
+}
+
 export interface LocationScanData {
   locationId: string;
   code: string;
@@ -129,6 +142,7 @@ export interface LocationScanData {
   qrCode?: string;
   isFull?: boolean;
   parts: LocationPartItem[];
+  boards?: LocationBoardItem[];
   totalPartTypes: number;
   totalQuantity: number;
 }
@@ -177,5 +191,42 @@ export interface BulkImportPartResponse {
   failedCount: number;
   errors: BulkImportErrorItem[];
   items: Part[];
+}
+
+export interface UnifiedWarehouseItem {
+  id: string;
+  itemType: 'BOARD' | 'PART';
+  name: string;
+  code: string;
+  qrCode?: string;
+  categoryName?: string;
+  location: string;
+  storeLocationId?: string;
+  quantity: number;
+  minQuantity?: number;
+  unit?: string;
+  status: 'AVAILABLE' | 'LOW_STOCK' | 'OUT_OF_STOCK' | 'CHECKED_OUT' | 'MAINTENANCE' | string;
+  model?: string;
+  description?: string;
+  imageUrl?: string;
+  holderName?: string;
+  updatedAt?: string;
+  lots?: {
+    id: string;
+    storeLocationId?: string;
+    storeLocationCode: string;
+    storeLocationName: string;
+    amount: number;
+    condition?: string;
+  }[];
+}
+
+export interface UnifiedWarehouseSummary {
+  totalItems: number;
+  totalQuantity: number;
+  boardCount: number;
+  partCount: number;
+  lowStockCount: number;
+  outOfStockCount: number;
 }
 

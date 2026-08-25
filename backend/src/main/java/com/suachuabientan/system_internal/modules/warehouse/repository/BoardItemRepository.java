@@ -83,4 +83,22 @@ public interface BoardItemRepository extends JpaRepository<BoardItem, UUID> {
                 WHERE b.isDeleted = false AND b.status = :status
             """)
     long countByStatus(@Param("status") BoardStatus status);
+
+    @Query("SELECT b FROM BoardItem b WHERE b.isDeleted = false AND (" +
+           "LOWER(TRIM(COALESCE(b.location, ''))) = LOWER(TRIM(:locationCode)) OR " +
+           "LOWER(TRIM(COALESCE(b.location, ''))) = LOWER(TRIM(REPLACE(REPLACE(:locationCode, '_QR', ''), '_qr', '')))" +
+           ")")
+    java.util.List<BoardItem> findByLocationText(
+            @Param("locationCode") String locationCode
+    );
+
+    @Query("SELECT b FROM BoardItem b WHERE b.isDeleted = false AND (" +
+           "(b.currentLocationId IS NOT NULL AND b.currentLocationId IN :locationIds) OR " +
+           "LOWER(TRIM(COALESCE(b.location, ''))) = LOWER(TRIM(:locationCode)) OR " +
+           "LOWER(TRIM(COALESCE(b.location, ''))) = LOWER(TRIM(REPLACE(REPLACE(:locationCode, '_QR', ''), '_qr', '')))" +
+           ")")
+    java.util.List<BoardItem> findByLocationOrLocationIds(
+            @Param("locationCode") String locationCode,
+            @Param("locationIds") java.util.List<UUID> locationIds
+    );
 }
