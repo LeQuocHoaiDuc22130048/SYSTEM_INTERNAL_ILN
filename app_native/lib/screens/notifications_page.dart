@@ -360,6 +360,7 @@ class _NotificationVisuals {
           background: AppColors.errorLight,
         );
       case 'PART_LOW_STOCK_ALERT':
+      case 'BOARD_LOW_STOCK_ALERT':
         return const _NotificationVisuals(
           icon: LucideIcons.boxes,
           color: AppColors.warning,

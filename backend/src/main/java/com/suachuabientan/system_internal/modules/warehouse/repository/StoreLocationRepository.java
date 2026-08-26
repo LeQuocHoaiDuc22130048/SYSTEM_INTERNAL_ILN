@@ -14,7 +14,11 @@ public interface StoreLocationRepository extends JpaRepository<StoreLocation, UU
 
     Optional<StoreLocation> findByCodeIgnoreCaseAndIsDeletedFalse(String code);
 
+    Optional<StoreLocation> findByCodeIgnoreCase(String code);
+
     Optional<StoreLocation> findByQrCodeAndIsDeletedFalse(String qrCode);
+
+    Optional<StoreLocation> findByQrCodeIgnoreCase(String qrCode);
 
     Optional<StoreLocation> findByIdAndIsDeletedFalse(UUID id);
 
@@ -23,7 +27,8 @@ public interface StoreLocationRepository extends JpaRepository<StoreLocation, UU
            "LOWER(TRIM(COALESCE(sl.qrCode, ''))) = LOWER(TRIM(:codeOrQr)) OR " +
            "LOWER(TRIM(sl.name)) = LOWER(TRIM(:codeOrQr)) OR " +
            "LOWER(TRIM(sl.code)) = LOWER(TRIM(REPLACE(REPLACE(:codeOrQr, '_QR', ''), '_qr', ''))) OR " +
-           "LOWER(TRIM(COALESCE(sl.qrCode, ''))) = LOWER(TRIM(REPLACE(REPLACE(:codeOrQr, '_QR', ''), '_qr', '')))" +
+           "LOWER(TRIM(COALESCE(sl.qrCode, ''))) = LOWER(TRIM(REPLACE(REPLACE(:codeOrQr, '_QR', ''), '_qr', ''))) OR " +
+           "LOWER(TRIM(sl.name)) LIKE LOWER(CONCAT('%', TRIM(:codeOrQr), '%'))" +
            ")")
     List<StoreLocation> findAllByCodeOrQrCodeIgnoreCase(@Param("codeOrQr") String codeOrQr);
 
@@ -32,7 +37,8 @@ public interface StoreLocationRepository extends JpaRepository<StoreLocation, UU
            "LOWER(TRIM(COALESCE(sl.qrCode, ''))) = LOWER(TRIM(:codeOrQr)) OR " +
            "LOWER(TRIM(sl.name)) = LOWER(TRIM(:codeOrQr)) OR " +
            "LOWER(TRIM(sl.code)) = LOWER(TRIM(REPLACE(REPLACE(:codeOrQr, '_QR', ''), '_qr', ''))) OR " +
-           "LOWER(TRIM(COALESCE(sl.qrCode, ''))) = LOWER(TRIM(REPLACE(REPLACE(:codeOrQr, '_QR', ''), '_qr', '')))" +
+           "LOWER(TRIM(COALESCE(sl.qrCode, ''))) = LOWER(TRIM(REPLACE(REPLACE(:codeOrQr, '_QR', ''), '_qr', ''))) OR " +
+           "LOWER(TRIM(sl.name)) LIKE LOWER(CONCAT('%', TRIM(:codeOrQr), '%'))" +
            ")")
     Optional<StoreLocation> findByCodeOrQrCode(@Param("codeOrQr") String codeOrQr);
 }

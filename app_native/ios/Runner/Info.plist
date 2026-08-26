@@ -69,7 +69,11 @@
 	<key>NSCameraUsageDescription</key>
 	<string>Ứng dụng cần truy cập máy ảnh để quét mã QR và nhận diện khuôn mặt chấm công.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Ung dung can truy cap thu vien de gui anh va video trong tin nhan.</string>
+	<string>Ứng dụng cần truy cập thư viện để gửi ảnh và video trong tin nhắn cũng như tải tài liệu.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>Ứng dụng cần quyền lưu hình ảnh và tệp vào thư viện thiết bị.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Ứng dụng cần quyền micro khi quay video trong mục tin nhắn hoặc hỗ trợ.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

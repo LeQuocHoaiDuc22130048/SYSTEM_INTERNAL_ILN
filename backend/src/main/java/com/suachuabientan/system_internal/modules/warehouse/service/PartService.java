@@ -15,6 +15,7 @@ import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartChec
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartReturnRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdatePartRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreateStoreLocationRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdateStoreLocationRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.BulkImportPartResponse;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.CategoryInfo;
 import com.suachuabientan.system_internal.modules.warehouse.dto.response.LocationInfo;
@@ -35,6 +36,8 @@ import com.suachuabientan.system_internal.modules.warehouse.repository.PartLotRe
 import com.suachuabientan.system_internal.modules.warehouse.repository.PartRepository;
 import com.suachuabientan.system_internal.modules.warehouse.repository.StockMovementRepository;
 import com.suachuabientan.system_internal.modules.warehouse.repository.StoreLocationRepository;
+import java.util.Objects;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -68,7 +71,8 @@ public class PartService {
             UserRole.SUPER_ADMIN,
             UserRole.ADMIN,
             UserRole.MANAGER,
-            UserRole.WAREHOUSE
+            UserRole.WAREHOUSE,
+            UserRole.TECHNICIAN
     );
 
     @Transactional(readOnly = true)
@@ -499,7 +503,40 @@ public class PartService {
         String cleanCode = codeOrQr.trim();
         cleanCode = cleanCode.replaceAll("(?i)^(?:mã qr|mã vị trí kho|vị trí|location):\\s*", "").trim();
 
-        List<StoreLocation> matchingLocations = storeLocationRepository.findAllByCodeOrQrCodeIgnoreCase(cleanCode);
+        List<StoreLocation> matchingLocations = new ArrayList<>(storeLocationRepository.findAllByCodeOrQrCodeIgnoreCase(cleanCode));
+
+        // Kiểm tra nếu là UUID của StoreLocation
+        if (matchingLocations.isEmpty()) {
+            try {
+                UUID locUuid = UUID.fromString(cleanCode);
+                storeLocationRepository.findByIdAndIsDeletedFalse(locUuid).ifPresent(matchingLocations::add);
+            } catch (Exception ignored) {}
+        }
+
+        // Kiểm tra nếu quét trúng mã IPN hoặc ID của Linh kiện -> chuyển hướng sang vị trí kho của linh kiện
+        if (matchingLocations.isEmpty()) {
+            Optional<Part> partOpt = partRepository.findByIpnAndIsDeletedFalse(cleanCode);
+            if (partOpt.isEmpty()) {
+                try {
+                    UUID partUuid = UUID.fromString(cleanCode);
+                    partOpt = partRepository.findByIdAndIsDeletedFalse(partUuid);
+                } catch (Exception ignored) {}
+            }
+            if (partOpt.isPresent()) {
+                Part p = partOpt.get();
+                List<PartLot> lots = partLotRepository.findByPartIdAndIsDeletedFalse(p.getId());
+                for (PartLot lot : lots) {
+                    if (lot.getStoreLocationId() != null) {
+                        storeLocationRepository.findByIdAndIsDeletedFalse(lot.getStoreLocationId())
+                                .ifPresent(matchingLocations::add);
+                    }
+                }
+                if (!matchingLocations.isEmpty()) {
+                    return scanLocationQr(matchingLocations.get(0).getCode());
+                }
+            }
+        }
+
         StoreLocation location;
         List<UUID> locationIds = new ArrayList<>();
 
@@ -510,12 +547,24 @@ public class PartService {
             if (boards.isEmpty()) {
                 // Kiểm tra nếu mã quét là mã QR của chính bo mạch
                 var boardByQr = boardItemRepository.findByQrCodeAndIsDeletedFalse(cleanCode);
+                if (boardByQr.isEmpty()) {
+                    try {
+                        UUID boardUuid = UUID.fromString(cleanCode);
+                        boardByQr = boardItemRepository.findByIdAndIsDeletedFalse(boardUuid);
+                    } catch (Exception ignored) {}
+                }
                 if (boardByQr.isPresent()) {
                     var b = boardByQr.get();
+                    if (b.getCurrentLocationId() != null) {
+                        var locOpt = storeLocationRepository.findByIdAndIsDeletedFalse(b.getCurrentLocationId());
+                        if (locOpt.isPresent()) {
+                            return scanLocationQr(locOpt.get().getCode());
+                        }
+                    }
                     String loc = b.getLocation() != null ? b.getLocation() : "KHO";
                     return scanLocationQr(loc);
                 }
-                throw new ResourceNotFoundException("Không tìm thấy vị trí kho hoặc bo mạch với mã: " + codeOrQr);
+                throw new ResourceNotFoundException("Không tìm thấy vị trí kho, bo mạch hoặc linh kiện với mã: " + codeOrQr);
             }
 
             // Tự động tạo và lưu vị trí kho để đồng bộ lâu dài
@@ -534,7 +583,7 @@ public class PartService {
             }
         } else {
             location = matchingLocations.get(0);
-            locationIds = matchingLocations.stream().map(StoreLocation::getId).toList();
+            locationIds = matchingLocations.stream().map(StoreLocation::getId).filter(Objects::nonNull).distinct().toList();
         }
 
         List<PartLot> lots = locationIds.isEmpty() ? List.of() : partLotRepository.findByStoreLocationIdInAndIsDeletedFalse(locationIds);
@@ -766,20 +815,52 @@ public class PartService {
     @Transactional
     public LocationInfo createLocation(CreateStoreLocationRequest request, UUID userId) {
         String code = request.code().trim();
-        if (storeLocationRepository.findByCodeAndIsDeletedFalse(code).isPresent()) {
-            throw new BusinessException("Mã vị trí kho " + code + " đã tồn tại trong hệ thống");
+        String qrCode = StringUtils.hasText(request.qrCode()) ? request.qrCode().trim() : code;
+
+        Optional<StoreLocation> existingByCode = storeLocationRepository.findByCodeIgnoreCase(code);
+        if (existingByCode.isPresent()) {
+            StoreLocation existing = existingByCode.get();
+            if (!Boolean.TRUE.equals(existing.getIsDeleted())) {
+                throw new BusinessException("Mã vị trí kho '" + code + "' đã tồn tại trong hệ thống");
+            }
+            // Khôi phục và tái sử dụng bản ghi đã bị xóa mềm trước đó
+            existing.setCode(code);
+            existing.setName(request.name().trim());
+            existing.setDescription(StringUtils.hasText(request.description()) ? request.description().trim() : null);
+            existing.setQrCode(qrCode);
+            existing.setIsDeleted(false);
+            existing.setDeletedAt(null);
+            existing.setUpdatedBy(userId);
+            StoreLocation saved = storeLocationRepository.save(existing);
+            log.info("Khôi phục vị trí kho: id={}, code={}, qrCode={}, name={}, by={}", saved.getId(), saved.getCode(), saved.getQrCode(), saved.getName(), userId);
+            return new LocationInfo(
+                    saved.getId(),
+                    saved.getCode(),
+                    saved.getName(),
+                    saved.getDescription(),
+                    saved.getQrCode(),
+                    0,
+                    BigDecimal.ZERO
+            );
         }
 
-        String qrCode = StringUtils.hasText(request.qrCode()) ? request.qrCode().trim() : code;
+        // Kiểm tra trùng qrCode nếu khác code
+        Optional<StoreLocation> existingByQr = storeLocationRepository.findByQrCodeIgnoreCase(qrCode);
+        if (existingByQr.isPresent() && !Boolean.TRUE.equals(existingByQr.get().getIsDeleted())) {
+            throw new BusinessException("Mã QR '" + qrCode + "' đã được gán cho vị trí " + existingByQr.get().getCode());
+        }
+
         StoreLocation location = StoreLocation.builder()
                 .code(code)
                 .name(request.name().trim())
-                .description(request.description() != null ? request.description().trim() : null)
+                .description(StringUtils.hasText(request.description()) ? request.description().trim() : null)
                 .qrCode(qrCode)
                 .isFull(false)
                 .onlySinglePart(false)
                 .build();
+        location.setIsDeleted(false);
         location.setCreatedBy(userId);
+        location.setUpdatedBy(userId);
         StoreLocation saved = storeLocationRepository.save(location);
         log.info("Tạo vị trí kho mới: code={}, qrCode={}, name={}, by={}", saved.getCode(), saved.getQrCode(), saved.getName(), userId);
         return new LocationInfo(
@@ -791,6 +872,112 @@ public class PartService {
                 0,
                 BigDecimal.ZERO
         );
+    }
+
+    @Transactional
+    public LocationInfo updateLocation(UUID id, UpdateStoreLocationRequest request, UUID userId) {
+        StoreLocation location = storeLocationRepository.findByIdAndIsDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy vị trí kho: " + id));
+
+        if (StringUtils.hasText(request.code())) {
+            String newCode = request.code().trim();
+            if (!newCode.equalsIgnoreCase(location.getCode())) {
+                storeLocationRepository.findByCodeIgnoreCase(newCode).ifPresent(existing -> {
+                    if (!existing.getId().equals(id)) {
+                        if (!Boolean.TRUE.equals(existing.getIsDeleted())) {
+                            throw new BusinessException("Mã vị trí kho '" + newCode + "' đã tồn tại trong hệ thống");
+                        } else {
+                            // Đổi code của bản ghi đã xóa để giải phóng code mới
+                            existing.setCode(existing.getCode() + "_DELETED_" + System.currentTimeMillis());
+                            storeLocationRepository.save(existing);
+                        }
+                    }
+                });
+                location.setCode(newCode);
+            }
+        }
+
+        if (StringUtils.hasText(request.name())) {
+            location.setName(request.name().trim());
+        }
+
+        if (request.description() != null) {
+            location.setDescription(StringUtils.hasText(request.description()) ? request.description().trim() : null);
+        }
+
+        if (request.qrCode() != null) {
+            String newQr = StringUtils.hasText(request.qrCode()) ? request.qrCode().trim() : location.getCode();
+            storeLocationRepository.findByQrCodeIgnoreCase(newQr).ifPresent(existing -> {
+                if (!existing.getId().equals(id) && !Boolean.TRUE.equals(existing.getIsDeleted())) {
+                    throw new BusinessException("Mã QR '" + newQr + "' đã được gán cho vị trí " + existing.getCode());
+                }
+            });
+            location.setQrCode(newQr);
+        }
+
+        location.setUpdatedBy(userId);
+        StoreLocation saved = storeLocationRepository.save(location);
+        log.info("Cập nhật vị trí kho: id={}, code={}, name={}, by={}", saved.getId(), saved.getCode(), saved.getName(), userId);
+
+        List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(saved.getId());
+        int partTypes = (int) lots.stream()
+                .filter(l -> l.getAmount() != null && l.getAmount().compareTo(BigDecimal.ZERO) > 0)
+                .map(PartLot::getPartId)
+                .distinct()
+                .count();
+        BigDecimal totalQty = lots.stream()
+                .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new LocationInfo(
+                saved.getId(),
+                saved.getCode(),
+                saved.getName(),
+                saved.getDescription(),
+                saved.getQrCode() != null ? saved.getQrCode() : saved.getCode(),
+                partTypes,
+                totalQty
+        );
+    }
+
+    @Transactional
+    public void deleteLocation(UUID id, UUID userId) {
+        StoreLocation location = storeLocationRepository.findByIdAndIsDeletedFalse(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy vị trí kho: " + id));
+
+        // 1. Kiểm tra xem vị trí có đang chứa lô linh kiện còn tồn kho không
+        List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(id);
+        long activeLotsCount = lots.stream()
+                .filter(l -> l.getAmount() != null && l.getAmount().compareTo(BigDecimal.ZERO) > 0)
+                .count();
+        BigDecimal totalPartQty = lots.stream()
+                .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // 2. Kiểm tra xem vị trí có đang chứa bo mạch nào không
+        List<com.suachuabientan.system_internal.modules.warehouse.entity.BoardItem> boardsAtLocation =
+                boardItemRepository.findByLocationText(location.getCode());
+        long activeBoardsCount = boardsAtLocation.stream()
+                .filter(b -> !Boolean.TRUE.equals(b.getIsDeleted()) && (b.getQuantity() == null || b.getQuantity() > 0))
+                .count();
+
+        if (activeLotsCount > 0 || activeBoardsCount > 0) {
+            List<String> reasons = new ArrayList<>();
+            if (activeLotsCount > 0) {
+                reasons.add("Còn " + activeLotsCount + " loại linh kiện (Tổng tồn kho: " + totalPartQty + ")");
+            }
+            if (activeBoardsCount > 0) {
+                reasons.add("Còn " + activeBoardsCount + " bo mạch đang lưu trữ");
+            }
+            String detailMsg = String.join(" và ", reasons);
+            throw new BusinessException("Không thể xóa vị trí '" + location.getName() + " (" + location.getCode() + ")' vì "
+                    + detailMsg + ". Vui lòng chuyển linh kiện/bo mạch sang vị trí khác hoặc xuất kho trước khi xóa!");
+        }
+
+        location.setIsDeleted(true);
+        location.setUpdatedBy(userId);
+        storeLocationRepository.save(location);
+        log.info("Xóa vị trí kho thành công: id={}, code={}, by={}", id, location.getCode(), userId);
     }
 
     @Transactional(readOnly = true)

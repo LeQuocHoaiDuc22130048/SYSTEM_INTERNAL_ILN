@@ -82,16 +82,22 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
                   onClick={() => onOpenLocationScan(selectedBoard.location)}
                   style={{
                     marginLeft: '6px',
-                    padding: '2px 8px',
+                    padding: '3px 8px',
                     fontSize: '0.75rem',
+                    fontWeight: 600,
                     background: '#eff6ff',
                     border: '1px solid #bfdbfe',
                     color: '#2563eb',
                     borderRadius: '4px',
                     cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
                   }}
+                  title="Xem, sửa hoặc xóa vị trí kho này"
                 >
-                  Tra cứu vị trí
+                  <MapPin size={12} />
+                  Quản lý / Xóa vị trí
                 </button>
               )}
             </span>

@@ -159,6 +159,7 @@ export interface LocationInfo {
 
 export interface WarehouseTabProps {
   showToast: (msg: string) => void;
+  initialMode?: 'ALL' | 'BOARDS' | 'PARTS' | 'LOCATIONS' | 'PART_LOGS';
 }
 
 export interface BulkImportPartItem {

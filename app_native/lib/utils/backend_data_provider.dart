@@ -7,6 +7,7 @@ import '../models/repair_order.dart';
 import '../models/board_history_item.dart';
 import '../models/user.dart';
 import '../models/part.dart';
+import '../models/store_location.dart';
 import 'api_client.dart';
 
 class BackendDataProvider extends ChangeNotifier {
@@ -19,6 +20,7 @@ class BackendDataProvider extends ChangeNotifier {
   List<RepairOrder> repairOrders = [];
   List<Board> boards = [];
   List<Part> parts = [];
+  List<StoreLocation> locations = [];
   List<AttendanceRecord> attendanceRecords = [];
 
   bool isLoading = false;
@@ -34,6 +36,7 @@ class BackendDataProvider extends ChangeNotifier {
         loadRepairOrders(notify: false),
         loadBoards(notify: false),
         loadParts(notify: false),
+        loadLocations(notify: false),
       ];
 
       if (isManagerOrAbove) {
@@ -312,11 +315,15 @@ class BackendDataProvider extends ChangeNotifier {
   }
 
   Future<void> loadParts({bool notify = true}) async {
-    final data = await api.get(
-      '/api/v1/parts',
-      queryParameters: {'size': 200},
-    );
-    parts = _content(data).map(Part.fromJson).toList();
+    try {
+      final data = await api.get(
+        '/api/v1/parts',
+        queryParameters: {'size': 200},
+      );
+      parts = _content(data).map(Part.fromJson).toList();
+    } catch (e, stack) {
+      debugPrint('Error loading parts: $e\n$stack');
+    }
     if (notify) notifyListeners();
   }
 
@@ -333,14 +340,16 @@ class BackendDataProvider extends ChangeNotifier {
     bool reload = true,
   }) async {
     await api.post(
-      '/api/v1/parts/$partId/adjust',
+      '/api/v1/parts/$partId/adjust-stock',
       body: {
-        'locationCode': locationCode,
+        'storeLocationCode': locationCode,
         'amount': amount,
         if (note != null && note.isNotEmpty) 'note': note,
       },
     );
-    if (reload) await loadParts();
+    if (reload) {
+      await Future.wait([loadParts(), loadLocations()]);
+    }
   }
 
   Future<Map<String, dynamic>> scanLocationQr(String codeOrQr) async {
@@ -375,6 +384,64 @@ class BackendDataProvider extends ChangeNotifier {
     };
     await api.post('/api/v1/parts/$partId/checkout', body: body);
     if (reload) await loadParts();
+  }
+
+  Future<void> loadLocations({bool notify = true}) async {
+    try {
+      final data = await api.get('/api/v1/parts/locations');
+      if (data is List) {
+        locations = data.map((e) => StoreLocation.fromJson(e as Map<String, dynamic>)).toList();
+      } else {
+        locations = _content(data).map(StoreLocation.fromJson).toList();
+      }
+      if (notify) notifyListeners();
+    } catch (e) {
+      debugPrint('Error loading store locations: $e');
+    }
+  }
+
+  Future<StoreLocation> createStoreLocation({
+    required String code,
+    required String name,
+    String? description,
+    String? qrCode,
+    bool reload = true,
+  }) async {
+    final body = <String, dynamic>{
+      'code': code.trim(),
+      'name': name.trim(),
+      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+      if (qrCode != null && qrCode.trim().isNotEmpty) 'qrCode': qrCode.trim(),
+    };
+    final res = await api.post('/api/v1/parts/locations', body: body);
+    final created = StoreLocation.fromJson(res is Map<String, dynamic> ? res : <String, dynamic>{});
+    if (reload) await loadLocations();
+    return created;
+  }
+
+  Future<StoreLocation> updateStoreLocation({
+    required String id,
+    required String code,
+    required String name,
+    String? description,
+    String? qrCode,
+    bool reload = true,
+  }) async {
+    final body = <String, dynamic>{
+      'code': code.trim(),
+      'name': name.trim(),
+      if (description != null) 'description': description.trim(),
+      if (qrCode != null) 'qrCode': qrCode.trim(),
+    };
+    final res = await api.patch('/api/v1/parts/locations/$id', body: body);
+    final updated = StoreLocation.fromJson(res is Map<String, dynamic> ? res : <String, dynamic>{});
+    if (reload) await loadLocations();
+    return updated;
+  }
+
+  Future<void> deleteStoreLocation(String id, {bool reload = true}) async {
+    await api.delete('/api/v1/parts/locations/$id');
+    if (reload) await loadLocations();
   }
 
   List<Map<String, dynamic>> _content(dynamic data) {

@@ -5,6 +5,7 @@ import com.suachuabientan.system_internal.modules.warehouse.dto.request.AdjustSt
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.BulkImportPartRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreatePartRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.CreateStoreLocationRequest;
+import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdateStoreLocationRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartCheckoutRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.PartReturnRequest;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.UpdatePartRequest;
@@ -188,6 +189,31 @@ public class PartController {
         UUID userId = extractUserId(userDetails);
         return ResponseEntity.status(201)
                 .body(ApiResponse.created(partService.createLocation(request, userId)));
+    }
+
+    @Operation(summary = "Cập nhật thông tin vị trí kho")
+    @PatchMapping("/locations/{id}")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    public ResponseEntity<ApiResponse<LocationInfo>> updateLocation(
+            @PathVariable UUID id,
+            @Valid @RequestBody UpdateStoreLocationRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UUID userId = extractUserId(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(
+                partService.updateLocation(id, request, userId),
+                "Cập nhật vị trí kho thành công"
+        ));
+    }
+
+    @Operation(summary = "Xóa vị trí kho")
+    @DeleteMapping("/locations/{id}")
+    @PreAuthorize(RoleExpressions.WAREHOUSE_DELETE)
+    public ResponseEntity<ApiResponse<Void>> deleteLocation(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        UUID userId = extractUserId(userDetails);
+        partService.deleteLocation(id, userId);
+        return ResponseEntity.ok(ApiResponse.success(null, "Xóa vị trí kho thành công"));
     }
 
     private UUID extractUserId(UserDetails userDetails) {

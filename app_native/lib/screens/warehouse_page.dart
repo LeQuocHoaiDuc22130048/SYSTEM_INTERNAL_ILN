@@ -10,7 +10,10 @@ import '../widgets/status_badge.dart';
 import '../models/board.dart';
 import '../models/board_history_item.dart';
 import '../models/part.dart';
+import '../models/store_location.dart';
+import '../widgets/location_picker_dialog.dart';
 import 'scanner_page.dart';
+import 'location_management_page.dart';
 
 enum WarehouseMode { all, boards, parts }
 enum PartFilterStatus { all, lowStock, outOfStock }
@@ -57,6 +60,7 @@ class _WarehousePageState extends State<WarehousePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<BackendDataProvider>().loadBoards();
       context.read<BackendDataProvider>().loadParts();
+      context.read<BackendDataProvider>().loadLocations();
     });
   }
 
@@ -70,12 +74,16 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   List<Board> get _filteredBoards {
-    final query = _searchQuery.value.toLowerCase();
+    final query = _searchQuery.value.toLowerCase().trim();
     final currentFilter = _filter.value;
+    final partFilter = _partFilter.value;
     final boards = context.read<BackendDataProvider>().boards;
     return boards.where((board) {
       final matchesFilter =
           currentFilter == null || board.status == currentFilter;
+      final matchesStockFilter = partFilter == PartFilterStatus.all ||
+          (partFilter == PartFilterStatus.lowStock && board.quantity < board.minQuantity && board.quantity > 0) ||
+          (partFilter == PartFilterStatus.outOfStock && board.quantity == 0);
       final matchesSearch =
           query.isEmpty ||
           board.name.toLowerCase().contains(query) ||
@@ -85,7 +93,7 @@ class _WarehousePageState extends State<WarehousePage> {
           (board.serialNumber?.toLowerCase().contains(query) ?? false) ||
           (board.partIpn?.toLowerCase().contains(query) ?? false) ||
           (board.currentLocationCode?.toLowerCase().contains(query) ?? false);
-      return matchesFilter && matchesSearch;
+      return matchesFilter && matchesStockFilter && matchesSearch;
     }).toList();
   }
 
@@ -216,10 +224,7 @@ class _WarehousePageState extends State<WarehousePage> {
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Mode Toggle segmented control (Bo mạch vs Linh kiện)
-                      _buildModeToggle(isDark, boards.length, totalParts),
-
+                children: [
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -228,7 +233,7 @@ class _WarehousePageState extends State<WarehousePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  _currentMode == WarehouseMode.boards ? 'Kho Bo mạch' : 'Kho Linh kiện',
+                                  'Kho Hàng',
                                   style: TextStyle(
                                     fontSize: 24,
                                     fontWeight: FontWeight.w700,
@@ -239,9 +244,13 @@ class _WarehousePageState extends State<WarehousePage> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  _currentMode == WarehouseMode.boards
-                                      ? '${boards.length} bo mạch trong kho'
-                                      : '$totalParts loại linh kiện trong kho',
+                                  boards.isEmpty && parts.isEmpty
+                                      ? '0 mặt hàng trong kho'
+                                      : parts.isNotEmpty && boards.isNotEmpty
+                                          ? '${parts.length} linh kiện, ${boards.length} bo mạch'
+                                          : parts.isNotEmpty
+                                              ? '${parts.length} loại linh kiện'
+                                              : '${boards.length} bo mạch trong kho',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: isDark
@@ -256,16 +265,352 @@ class _WarehousePageState extends State<WarehousePage> {
                             children: [
                               ElevatedButton.icon(
                                 onPressed: () {
-                                  if (_currentMode == WarehouseMode.all) {
-                        final unified = _filteredUnifiedItems;
-                        if (unified.isEmpty) {
-                          return RefreshIndicator(
-                            onRefresh: () async {
-                              await Future.wait([
+                                  _showAddSelectionSheet();
+                                },
+                                icon: const Icon(Icons.add, size: 16),
+                                label: const Text(
+                                  'Thêm',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 10,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              ElevatedButton.icon(
+                                onPressed: () async {
+                                  final result = await Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const ScannerPage(),
+                                    ),
+                                  );
+                                  if (result != null && mounted) {
+                                    await _handleWarehouseQrScan(result as String);
+                                  }
+                                },
+                                icon: const Icon(
+                                  Icons.qr_code_scanner,
+                                  size: 16,
+                                ),
+                                label: const Text(
+                                  'Quét',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                style: ElevatedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 10,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              IconButton(
+                                tooltip: 'Quản lý Vị trí kho',
+                                icon: const Icon(Icons.location_on_outlined, size: 20),
+                                style: IconButton.styleFrom(
+                                  backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+                                  padding: const EdgeInsets.all(8),
+                                ),
+                                onPressed: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => const LocationManagementPage(),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+
+                      // Search and View Toggle
+                      Row(
+                        children: [
+                          Expanded(
+                            child: SizedBox(
+                              height: 36,
+                              child: TextField(
+                                controller: _searchController,
+                                onChanged: (value) {
+                                  _searchQuery.value = value;
+                                },
+                                style: const TextStyle(fontSize: 12),
+                                decoration: InputDecoration(
+                                  hintText: _partSearchMethod == PartSearchMethod.locationQr
+                                      ? 'Nhập hoặc quét mã QR vị trí (VD: LOC-A1)...'
+                                      : 'Tìm tên, mã IPN, vị trí, danh mục...',
+                                  prefixIcon: const Icon(
+                                    Icons.search,
+                                    size: 18,
+                                  ),
+                                  filled: true,
+                                  fillColor: isDark
+                                      ? AppColors.surfaceDark
+                                      : Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                        ? AppColors.borderDark
+                                        : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(
+                                      color: isDark
+                                        ? AppColors.borderDark
+                                        : AppColors.borderLight,
+                                    ),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 0,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+
+                      // Filters for Parts
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                            height: 32,
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: [
+                                  _buildPartFilterChip('Tất cả', PartFilterStatus.all, totalParts),
+                                  const SizedBox(width: 6),
+                                  _buildPartFilterChip('Sắp hết', PartFilterStatus.lowStock, lowStockParts),
+                                  const SizedBox(width: 6),
+                                  _buildPartFilterChip('Hết hàng', PartFilterStatus.outOfStock, outOfStockParts),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          // Search Method Switcher Bar
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                Text(
+                                  'Phương thức tìm:',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                ChoiceChip(
+                                  label: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.search, size: 12),
+                                      SizedBox(width: 4),
+                                      Text('🔍 Tên / IPN', style: TextStyle(fontSize: 11)),
+                                    ],
+                                  ),
+                                  selected: _partSearchMethod == PartSearchMethod.general,
+                                  onSelected: (selected) {
+                                    if (selected) {
+                                      setState(() {
+                                        _partSearchMethod = PartSearchMethod.general;
+                                      });
+                                    }
+                                  },
+                                  selectedColor: AppColors.primary.withOpacity(0.15),
+                                  labelStyle: TextStyle(
+                                    fontSize: 11,
+                                    color: _partSearchMethod == PartSearchMethod.general
+                                        ? AppColors.primary
+                                        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                    fontWeight: _partSearchMethod == PartSearchMethod.general ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                  side: BorderSide(
+                                    color: _partSearchMethod == PartSearchMethod.general
+                                        ? AppColors.primary
+                                        : (isDark ? AppColors.borderDark : AppColors.borderLight),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                                const SizedBox(width: 6),
+                                ChoiceChip(
+                                  label: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.location_on, size: 12),
+                                      SizedBox(width: 4),
+                                      Text('📍 Vị trí / Quét QR', style: TextStyle(fontSize: 11)),
+                                    ],
+                                  ),
+                                  selected: _partSearchMethod == PartSearchMethod.locationQr,
+                                  onSelected: (selected) {
+                                    if (selected) {
+                                      setState(() {
+                                        _partSearchMethod = PartSearchMethod.locationQr;
+                                      });
+                                    }
+                                  },
+                                  selectedColor: AppColors.primary.withOpacity(0.15),
+                                  labelStyle: TextStyle(
+                                    fontSize: 11,
+                                    color: _partSearchMethod == PartSearchMethod.locationQr
+                                        ? AppColors.primary
+                                        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                                    fontWeight: _partSearchMethod == PartSearchMethod.locationQr ? FontWeight.bold : FontWeight.normal,
+                                  ),
+                                  side: BorderSide(
+                                    color: _partSearchMethod == PartSearchMethod.locationQr
+                                        ? AppColors.primary
+                                        : (isDark ? AppColors.borderDark : AppColors.borderLight),
+                                  ),
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (_partSearchMethod == PartSearchMethod.locationQr && _searchQuery.value.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.qr_code_scanner, size: 14, color: AppColors.primary),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Đang lọc vị trí: "${_searchQuery.value}"',
+                                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  GestureDetector(
+                                    onTap: () {
+                                      _searchController.clear();
+                                      _searchQuery.value = '';
+                                    },
+                                    child: const Icon(Icons.close, size: 14, color: AppColors.primary),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // List
+                Expanded(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_searchQuery, _filter, _partFilter]),
+                    builder: (context, _) {
+                      final double emptyViewHeight = (screenSize.height - 220).clamp(150.0, 600.0);
+
+                      if (backend.isLoading && boards.isEmpty && parts.isEmpty) {
+                        return const Center(
+                          child: CircularProgressIndicator(),
+                        );
+                      }
+
+                      if (_currentMode == WarehouseMode.all) {
+                        if (_partSearchMethod == PartSearchMethod.locationQr) {
+                          final locationGroups = _filteredLocationGroups;
+                          if (locationGroups.isEmpty) {
+                            return RefreshIndicator(
+                              onRefresh: () => Future.wait([
                                 context.read<BackendDataProvider>().loadBoards(),
                                 context.read<BackendDataProvider>().loadParts(),
-                              ]);
-                            },
+                                context.read<BackendDataProvider>().loadLocations(),
+                              ]),
+                              child: ListView(
+                                physics: const AlwaysScrollableScrollPhysics(),
+                                children: [
+                                  SizedBox(
+                                    height: emptyViewHeight,
+                                    child: Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Text('📍', style: TextStyle(fontSize: 48)),
+                                          const SizedBox(height: 16),
+                                          Text(
+                                            'Không tìm thấy mặt hàng ở vị trí này',
+                                            style: TextStyle(
+                                              fontSize: 16,
+                                              fontWeight: FontWeight.w600,
+                                              color: isDark
+                                                  ? AppColors.textPrimaryDark
+                                                  : AppColors.textPrimaryLight,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            'Thử đổi từ khóa hoặc quét lại mã QR vị trí khác',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: isDark
+                                                  ? AppColors.textSecondaryDark
+                                                  : AppColors.textSecondaryLight,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }
+
+                          return RefreshIndicator(
+                            onRefresh: () => Future.wait([
+                              context.read<BackendDataProvider>().loadBoards(),
+                              context.read<BackendDataProvider>().loadParts(),
+                              context.read<BackendDataProvider>().loadLocations(),
+                            ]),
+                            child: ListView.builder(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              padding: const EdgeInsets.all(16),
+                              itemCount: locationGroups.length,
+                              itemBuilder: (context, index) {
+                                return _buildLocationGroupCard(locationGroups[index]);
+                              },
+                            ),
+                          );
+                        }
+
+                        final filtered = _filteredUnifiedItems;
+                        if (filtered.isEmpty) {
+                          return RefreshIndicator(
+                            onRefresh: () => Future.wait([
+                              context.read<BackendDataProvider>().loadBoards(),
+                              context.read<BackendDataProvider>().loadParts(),
+                              context.read<BackendDataProvider>().loadLocations(),
+                            ]),
                             child: ListView(
                               physics: const AlwaysScrollableScrollPhysics(),
                               children: [
@@ -289,7 +634,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                         ),
                                         const SizedBox(height: 4),
                                         Text(
-                                          'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm',
+                                          'Thử thay đổi từ khóa tìm kiếm hoặc bộ lọc',
                                           style: TextStyle(
                                             fontSize: 14,
                                             color: isDark
@@ -307,473 +652,33 @@ class _WarehousePageState extends State<WarehousePage> {
                         }
 
                         return RefreshIndicator(
-                          onRefresh: () async {
-                            await Future.wait([
-                              context.read<BackendDataProvider>().loadBoards(),
-                              context.read<BackendDataProvider>().loadParts(),
-                            ]);
-                          },
+                          onRefresh: () => Future.wait([
+                            context.read<BackendDataProvider>().loadBoards(),
+                            context.read<BackendDataProvider>().loadParts(),
+                            context.read<BackendDataProvider>().loadLocations(),
+                          ]),
                           child: ListView.builder(
                             physics: const AlwaysScrollableScrollPhysics(),
                             padding: const EdgeInsets.all(16),
-                            itemCount: unified.length,
+                            itemCount: filtered.length,
                             itemBuilder: (context, index) {
-                              final item = unified[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: item is Board
-                                    ? _buildBoardListCard(item)
-                                    : _buildPartCard(item as Part),
-                              );
+                              final item = filtered[index];
+                              if (item is Board) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildBoardListCard(item),
+                                );
+                              } else if (item is Part) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildPartListCard(item),
+                                );
+                              }
+                              return const SizedBox.shrink();
                             },
                           ),
                         );
                       } else if (_currentMode == WarehouseMode.boards) {
-                                    _showAddEditBoardDialog();
-                                  } else {
-                                    _showAddEditPartDialog();
-                                  }
-                                },
-                                icon: const Icon(Icons.add, size: 16),
-                                label: const Text(
-                                  'Thêm',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton.icon(
-                                onPressed: () async {
-                                  final result = await Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => const ScannerPage(),
-                                    ),
-                                  );
-                                  if (result != null && mounted) {
-                                    await _handleWarehouseQrScan(result as String);
-                                  }
-                                },
-                                icon: const Icon(
-                                  Icons.qr_code_scanner,
-                                  size: 16,
-                                ),
-                                label: const Text(
-                                  'Quét QR',
-                                  style: TextStyle(fontSize: 12),
-                                ),
-                                style: ElevatedButton.styleFrom(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 10,
-                                  ),
-                                ),
-                              ),
-
-                            ],
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Responsive Stats
-                      if (isLandscape)
-                        SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Row(
-                            children: _currentMode == WarehouseMode.boards
-                                ? [
-                                    _buildLandscapeStatCard(
-                                      '${boards.length}',
-                                      'Tổng',
-                                      LucideIcons.cpu,
-                                      AppColors.primary,
-                                      isDark,
-                                    ),
-                                    const SizedBox(width: 22),
-                                    _buildLandscapeStatCard(
-                                      '${boards.where((b) => b.status == BoardStatus.available).length}',
-                                      'Sẵn sàng',
-                                      Icons.inventory_2_outlined,
-                                      AppColors.success,
-                                      isDark,
-                                    ),
-                                    const SizedBox(width: 22),
-                                    _buildLandscapeStatCard(
-                                      '${boards.where((b) => b.status == BoardStatus.checkedOut).length}',
-                                      'Đang dùng',
-                                      LucideIcons.wrench,
-                                      AppColors.warning,
-                                      isDark,
-                                    ),
-                                    const SizedBox(width: 22),
-                                    _buildLandscapeStatCard(
-                                      '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
-                                      'Bảo trì',
-                                      Icons.warning_amber,
-                                      AppColors.error,
-                                      isDark,
-                                    ),
-                                  ]
-                                : [
-                                    _buildLandscapeStatCard(
-                                      '$totalParts',
-                                      'Tổng loại',
-                                      Icons.widgets,
-                                      AppColors.primary,
-                                      isDark,
-                                    ),
-                                    const SizedBox(width: 22),
-                                    _buildLandscapeStatCard(
-                                      totalPartQty.toStringAsFixed(0),
-                                      'Tổng tồn kho',
-                                      Icons.inventory_2_outlined,
-                                      AppColors.success,
-                                      isDark,
-                                    ),
-                                    const SizedBox(width: 22),
-                                    _buildLandscapeStatCard(
-                                      '$lowStockParts',
-                                      'Sắp hết',
-                                      Icons.warning_amber,
-                                      AppColors.warning,
-                                      isDark,
-                                    ),
-                                    const SizedBox(width: 22),
-                                    _buildLandscapeStatCard(
-                                      '$outOfStockParts',
-                                      'Hết hàng',
-                                      Icons.error_outline,
-                                      AppColors.error,
-                                      isDark,
-                                    ),
-                                  ],
-                          ),
-                        )
-                      else
-                        Row(
-                          children: _currentMode == WarehouseMode.boards
-                              ? [
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      '${boards.length}',
-                                      'Tổng',
-                                      LucideIcons.cpu,
-                                      AppColors.primary,
-                                      isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      '${boards.where((b) => b.status == BoardStatus.available).length}',
-                                      'Sẵn sàng',
-                                      Icons.inventory_2_outlined,
-                                      AppColors.success,
-                                      isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      '${boards.where((b) => b.status == BoardStatus.checkedOut).length}',
-                                      'Đang dùng',
-                                      LucideIcons.wrench,
-                                      AppColors.warning,
-                                      isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
-                                      'Bảo trì',
-                                      Icons.warning_amber,
-                                      AppColors.error,
-                                      isDark,
-                                    ),
-                                  ),
-                                ]
-                              : [
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      '$totalParts',
-                                      'Tổng loại',
-                                      Icons.widgets,
-                                      AppColors.primary,
-                                      isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      totalPartQty.toStringAsFixed(0),
-                                      'Tổng tồn',
-                                      Icons.inventory_2_outlined,
-                                      AppColors.success,
-                                      isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      '$lowStockParts',
-                                      'Sắp hết',
-                                      Icons.warning_amber,
-                                      AppColors.warning,
-                                      isDark,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                    child: _buildCompactStatCard(
-                                      '$outOfStockParts',
-                                      'Hết hàng',
-                                      Icons.error_outline,
-                                      AppColors.error,
-                                      isDark,
-                                    ),
-                                  ),
-                                ],
-                        ),
-                      const SizedBox(height: 12),
-
-                      // Search and View Toggle
-                      Row(
-                        children: [
-                          Expanded(
-                            child: SizedBox(
-                              height: 36,
-                              child: TextField(
-                                controller: _searchController,
-                                onChanged: (value) {
-                                  _searchQuery.value = value;
-                                },
-                                style: const TextStyle(fontSize: 12),
-                                decoration: InputDecoration(
-                                  hintText: _currentMode == WarehouseMode.boards
-                                      ? 'Tìm tên, mã QR, model...'
-                                      : 'Tìm tên, mã IPN, danh mục...',
-                                  prefixIcon: const Icon(
-                                    Icons.search,
-                                    size: 18,
-                                  ),
-                                  filled: true,
-                                  fillColor: isDark
-                                      ? AppColors.surfaceDark
-                                      : Colors.white,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: isDark
-                                          ? AppColors.borderDark
-                                          : AppColors.borderLight,
-                                    ),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    borderSide: BorderSide(
-                                      color: isDark
-                                          ? AppColors.borderDark
-                                          : AppColors.borderLight,
-                                    ),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 0,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Filters
-                      if (_currentMode == WarehouseMode.boards)
-                        SizedBox(
-                          height: 32,
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _buildFilterChip('Tất cả', null, boards.length),
-                                const SizedBox(width: 6),
-                                _buildFilterChip(
-                                  'Sẵn sàng',
-                                  BoardStatus.available,
-                                  boards
-                                      .where(
-                                        (b) => b.status == BoardStatus.available,
-                                      )
-                                      .length,
-                                ),
-                                const SizedBox(width: 6),
-                                _buildFilterChip(
-                                  'Đang dùng',
-                                  BoardStatus.checkedOut,
-                                  boards
-                                      .where(
-                                        (b) => b.status == BoardStatus.checkedOut,
-                                      )
-                                      .length,
-                                ),
-                                const SizedBox(width: 6),
-                                _buildFilterChip(
-                                  'Bảo trì',
-                                  BoardStatus.maintenance,
-                                  boards
-                                      .where(
-                                        (b) =>
-                                            b.status == BoardStatus.maintenance,
-                                      )
-                                      .length,
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      else
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            SizedBox(
-                              height: 32,
-                              child: SingleChildScrollView(
-                                scrollDirection: Axis.horizontal,
-                                child: Row(
-                                  children: [
-                                    _buildPartFilterChip('Tất cả', PartFilterStatus.all, totalParts),
-                                    const SizedBox(width: 6),
-                                    _buildPartFilterChip('Sắp hết', PartFilterStatus.lowStock, lowStockParts),
-                                    const SizedBox(width: 6),
-                                    _buildPartFilterChip('Hết hàng', PartFilterStatus.outOfStock, outOfStockParts),
-                                  ],
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // Search Method Switcher Bar
-                            SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: [
-                                  Text(
-                                    'Phương thức tìm:',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  ChoiceChip(
-                                    label: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.search, size: 12),
-                                        SizedBox(width: 4),
-                                        Text('🔍 Tên / IPN', style: TextStyle(fontSize: 11)),
-                                      ],
-                                    ),
-                                    selected: _partSearchMethod == PartSearchMethod.general,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setState(() {
-                                          _partSearchMethod = PartSearchMethod.general;
-                                        });
-                                      }
-                                    },
-                                    selectedColor: AppColors.primary.withOpacity(0.15),
-                                    labelStyle: TextStyle(
-                                      fontSize: 11,
-                                      color: _partSearchMethod == PartSearchMethod.general
-                                          ? AppColors.primary
-                                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                                      fontWeight: _partSearchMethod == PartSearchMethod.general ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 6),
-                                  ChoiceChip(
-                                    label: const Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.location_on, size: 12),
-                                        SizedBox(width: 4),
-                                        Text('📍 Vị trí / Quét QR', style: TextStyle(fontSize: 11)),
-                                      ],
-                                    ),
-                                    selected: _partSearchMethod == PartSearchMethod.locationQr,
-                                    onSelected: (selected) {
-                                      if (selected) {
-                                        setState(() {
-                                          _partSearchMethod = PartSearchMethod.locationQr;
-                                        });
-                                      }
-                                    },
-                                    selectedColor: AppColors.primary.withOpacity(0.15),
-                                    labelStyle: TextStyle(
-                                      fontSize: 11,
-                                      color: _partSearchMethod == PartSearchMethod.locationQr
-                                          ? AppColors.primary
-                                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                                      fontWeight: _partSearchMethod == PartSearchMethod.locationQr ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            if (_partSearchMethod == PartSearchMethod.locationQr && _searchQuery.value.trim().isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.qr_code_scanner, size: 14, color: AppColors.primary),
-                                    const SizedBox(width: 6),
-                                    Text(
-                                      'Đang lọc vị trí: "${_searchQuery.value}"',
-                                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    GestureDetector(
-                                      onTap: () {
-                                        _searchController.clear();
-                                        _searchQuery.value = '';
-                                      },
-                                      child: const Icon(Icons.close, size: 14, color: AppColors.primary),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                // List
-                Expanded(
-                  child: AnimatedBuilder(
-                    animation: Listenable.merge([_searchQuery, _filter, _partFilter]),
-                    builder: (context, _) {
-                      final double emptyViewHeight = (screenSize.height - 220).clamp(150.0, 600.0);
-
-                      if (_currentMode == WarehouseMode.boards) {
                         final filtered = _filteredBoards;
                         if (filtered.isEmpty) {
                           return RefreshIndicator(
@@ -1027,118 +932,294 @@ class _WarehousePageState extends State<WarehousePage> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _currentMode = WarehouseMode.boards;
-                  _searchQuery.value = '';
-                  _searchController.clear();
-                  _filter.value = null;
-                });
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: _currentMode == WarehouseMode.boards
-                      ? AppColors.primary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: _currentMode == WarehouseMode.boards
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      LucideIcons.cpu,
-                      size: 16,
-                      color: _currentMode == WarehouseMode.boards
-                          ? Colors.white
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Bo mạch ($boardsCount)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: _currentMode == WarehouseMode.boards
-                            ? Colors.white
-                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+          _buildModeToggleItem(
+            mode: WarehouseMode.all,
+            title: 'Tất cả (${boardsCount + partsCount})',
+            icon: Icons.all_inbox_rounded,
+            isDark: isDark,
           ),
           const SizedBox(width: 4),
-          Expanded(
-            child: InkWell(
-              onTap: () {
-                setState(() {
-                  _currentMode = WarehouseMode.parts;
-                  _searchQuery.value = '';
-                  _searchController.clear();
-                  _partFilter.value = PartFilterStatus.all;
-                });
-              },
-              borderRadius: BorderRadius.circular(8),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: _currentMode == WarehouseMode.parts
-                      ? AppColors.primary
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                  boxShadow: _currentMode == WarehouseMode.parts
-                      ? [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
+          _buildModeToggleItem(
+            mode: WarehouseMode.boards,
+            title: 'Bo mạch ($boardsCount)',
+            icon: LucideIcons.cpu,
+            isDark: isDark,
+          ),
+          const SizedBox(width: 4),
+          _buildModeToggleItem(
+            mode: WarehouseMode.parts,
+            title: 'Linh kiện ($partsCount)',
+            icon: Icons.precision_manufacturing,
+            isDark: isDark,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeToggleItem({
+    required WarehouseMode mode,
+    required String title,
+    required IconData icon,
+    required bool isDark,
+  }) {
+    final isSelected = _currentMode == mode;
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _currentMode = mode;
+            _searchQuery.value = '';
+            _searchController.clear();
+            _filter.value = null;
+            _partFilter.value = PartFilterStatus.all;
+          });
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: isSelected
+                ? [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 15,
+                color: isSelected
+                    ? Colors.white
+                    : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+              ),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                    color: isSelected
+                        ? Colors.white
+                        : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+                  ),
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.precision_manufacturing,
-                      size: 16,
-                      color: _currentMode == WarehouseMode.parts
-                          ? Colors.white
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Linh kiện ($partsCount)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: _currentMode == WarehouseMode.parts
-                            ? Colors.white
-                            : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      ),
-                    ),
-                  ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAllModeFilterChip(String label, WarehouseMode mode) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final isSelected = _currentMode == mode;
+
+    return SizedBox(
+      height: 32,
+      child: FilterChip(
+        label: Text(label),
+        selected: isSelected,
+        onSelected: (_) {
+          setState(() {
+            _currentMode = mode;
+            _searchQuery.value = '';
+            _searchController.clear();
+          });
+        },
+        backgroundColor: isDark ? AppColors.surfaceDark : const Color(0xFFF1F5F9),
+        selectedColor: AppColors.primary,
+        labelStyle: TextStyle(
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+          color: isSelected
+              ? Colors.white
+              : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
+        ),
+        labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+        padding: EdgeInsets.zero,
+        visualDensity: VisualDensity.compact,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+
+  void _showAddSelectionSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white24 : Colors.black12,
+                  borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            Text(
+              'Thêm mới vào Kho',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(LucideIcons.cpu, color: AppColors.info, size: 22),
+              ),
+              title: Text(
+                'Bo mạch mới',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                ),
+              ),
+              subtitle: Text(
+                'Tạo hồ sơ theo dõi bo mạch / thiết bị sửa chữa',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showAddEditBoardDialog();
+              },
+            ),
+            const Divider(height: 12),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.precision_manufacturing, color: AppColors.success, size: 22),
+              ),
+              title: Text(
+                'Linh kiện mới',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                ),
+              ),
+              subtitle: Text(
+                'Thêm linh kiện điện tử, số lượng tồn kho và vị trí lưu trữ',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                _showAddEditPartDialog();
+              },
+            ),
+            const Divider(height: 12),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.add_location_alt_rounded, color: AppColors.primary, size: 22),
+              ),
+              title: Text(
+                'Vị trí lưu kho mới',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                ),
+              ),
+              subtitle: Text(
+                'Tạo mã kệ / ngăn lưu trữ mới cho bo mạch và linh kiện',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                showCreateStoreLocationDialog(context);
+              },
+            ),
+            const Divider(height: 12),
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(LucideIcons.mapPin, color: AppColors.info, size: 22),
+              ),
+              title: Text(
+                'Quản lý Vị trí kho & Kệ',
+                style: TextStyle(
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                ),
+              ),
+              subtitle: Text(
+                'Xem danh sách kệ hàng, sửa thông tin, xóa vị trí và quét QR',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                ),
+              ),
+              trailing: const Icon(Icons.chevron_right, size: 20),
+              onTap: () {
+                Navigator.pop(ctx);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const LocationManagementPage(),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 10),
+          ],
+        ),
       ),
     );
   }
@@ -2579,6 +2660,8 @@ class _WarehousePageState extends State<WarehousePage> {
     final minAmountCtrl = TextEditingController(text: part?.minAmount.toStringAsFixed(0) ?? '0');
     final categoryCtrl = TextEditingController(text: part?.categoryName ?? '');
     final descCtrl = TextEditingController(text: part?.description ?? '');
+    StoreLocation? initialLocation;
+    final initialQtyCtrl = TextEditingController();
 
     showDialog(
       context: context,
@@ -2646,7 +2729,30 @@ class _WarehousePageState extends State<WarehousePage> {
                                   hintText: 'VD: Tụ điện, Điện trở...',
                                 ),
                               ),
-
+                              if (!isEditing) ...[
+                                const SizedBox(height: 12),
+                                LocationPickerField(
+                                  selectedLocation: initialLocation,
+                                  fallbackCode: null,
+                                  label: 'Vị trí lưu kho ban đầu (Tùy chọn)',
+                                  onSelected: (loc) {
+                                    setDialogState(() {
+                                      initialLocation = loc;
+                                    });
+                                  },
+                                ),
+                                if (initialLocation != null) ...[
+                                  const SizedBox(height: 12),
+                                  TextField(
+                                    controller: initialQtyCtrl,
+                                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                    decoration: const InputDecoration(
+                                      labelText: 'Số lượng nhập kho ban đầu',
+                                      hintText: 'VD: 50, 100...',
+                                    ),
+                                  ),
+                                ],
+                              ],
                               const SizedBox(height: 12),
                               TextField(
                                 controller: descCtrl,
@@ -2690,12 +2796,26 @@ class _WarehousePageState extends State<WarehousePage> {
                                   body: body,
                                 );
                               } else {
-                                await backend.api.post(
+                                final res = await backend.api.post(
                                   '/api/v1/parts',
                                   body: body,
                                 );
+                                final createdPartId = res is Map<String, dynamic> ? res['id']?.toString() : null;
+                                final initQty = double.tryParse(initialQtyCtrl.text.trim()) ?? 0.0;
+                                if (createdPartId != null && initialLocation != null && initQty > 0) {
+                                  await backend.adjustPartStock(
+                                    createdPartId,
+                                    locationCode: initialLocation!.code,
+                                    amount: initQty,
+                                    note: 'Khởi tạo tồn kho ban đầu',
+                                    reload: false,
+                                  );
+                                }
                               }
-                              await backend.loadParts();
+                              await Future.wait([
+                                backend.loadParts(),
+                                backend.loadLocations(),
+                              ]);
                               if (!context.mounted) return;
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -2798,6 +2918,24 @@ class _WarehousePageState extends State<WarehousePage> {
     final removedPartsCtrl = TextEditingController(text: board?.removedParts ?? '');
     BoardStatus selectedStatus = board?.status ?? BoardStatus.available;
 
+    final allLocations = context.read<BackendDataProvider>().locations;
+    StoreLocation? selectedLocation;
+    if (board != null) {
+      if (board.currentLocationId != null && board.currentLocationId!.isNotEmpty) {
+        selectedLocation = allLocations.cast<StoreLocation?>().firstWhere(
+          (l) => l?.id == board.currentLocationId,
+          orElse: () => null,
+        );
+      }
+      if (selectedLocation == null && board.location.isNotEmpty) {
+        selectedLocation = allLocations.cast<StoreLocation?>().firstWhere(
+          (l) => l?.code.toLowerCase() == board.location.toLowerCase() ||
+                 l?.name.toLowerCase() == board.location.toLowerCase(),
+          orElse: () => null,
+        );
+      }
+    }
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -2855,11 +2993,22 @@ class _WarehousePageState extends State<WarehousePage> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-                              TextField(
-                                controller: locationCtrl,
-                                decoration: const InputDecoration(
-                                  labelText: 'Vị trí',
-                                ),
+                              LocationPickerField(
+                                selectedLocation: selectedLocation,
+                                fallbackCode: locationCtrl.text,
+                                label: 'Vị trí lưu kho bo mạch',
+                                onSelected: (loc) {
+                                  setDialogState(() {
+                                    selectedLocation = loc;
+                                    if (loc != null) {
+                                      locationCtrl.text = loc.code;
+                                      currentLocationIdCtrl.text = loc.id;
+                                    } else {
+                                      locationCtrl.text = '';
+                                      currentLocationIdCtrl.text = '';
+                                    }
+                                  });
+                                },
                               ),
                               const SizedBox(height: 12),
                               Row(
@@ -3003,7 +3152,10 @@ class _WarehousePageState extends State<WarehousePage> {
                                   body: body,
                                 );
                               }
-                              await backend.loadBoards();
+                              await Future.wait([
+                                backend.loadBoards(),
+                                backend.loadLocations(),
+                              ]);
                               if (!context.mounted) return;
                               Navigator.pop(context);
                               ScaffoldMessenger.of(context).showSnackBar(
@@ -4075,61 +4227,90 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
   bool _isLoading = false;
 
   void _showAdjustStockDialog() {
-    final locationCodeCtrl = TextEditingController();
-    final amountCtrl = TextEditingController();
+    final allLocations = context.read<BackendDataProvider>().locations;
+    StoreLocation? selectedLocation;
+    if (widget.part.lots.isNotEmpty) {
+      final firstLot = widget.part.lots.first;
+      selectedLocation = allLocations.cast<StoreLocation?>().firstWhere(
+        (l) => l?.id == firstLot.storeLocationId || l?.code.toLowerCase() == firstLot.storeLocationCode.toLowerCase(),
+        orElse: () => null,
+      );
+    }
+
+    final locationCodeCtrl = TextEditingController(
+      text: selectedLocation?.code ?? (widget.part.lots.isNotEmpty ? widget.part.lots.first.storeLocationCode : ''),
+    );
+    final amountCtrl = TextEditingController(
+      text: widget.part.totalQuantity > 0 ? widget.part.totalQuantity.toStringAsFixed(0) : '',
+    );
     final noteCtrl = TextEditingController();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Điều chỉnh tồn kho'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: locationCodeCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Mã vị trí lưu kho *',
-                  hintText: 'VD: DEFAULT, Kệ A - Hàng 2...',
+      builder: (dlgContext) => StatefulBuilder(
+        builder: (context, setDlgState) => AlertDialog(
+          title: const Text('Điều chỉnh tồn kho'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                LocationPickerField(
+                  selectedLocation: selectedLocation,
+                  fallbackCode: locationCodeCtrl.text,
+                  label: 'Vị trí lưu kho linh kiện *',
+                  isRequired: true,
+                  onSelected: (loc) {
+                    setDlgState(() {
+                      selectedLocation = loc;
+                      if (loc != null) {
+                        locationCodeCtrl.text = loc.code;
+                      } else {
+                        locationCodeCtrl.text = '';
+                      }
+                    });
+                  },
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: amountCtrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: const InputDecoration(
-                  labelText: 'Số lượng tồn kho mới *',
-                  hintText: 'Nhập số lượng thực tế trong kho',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: amountCtrl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: const InputDecoration(
+                    labelText: 'Số lượng tồn kho mới *',
+                    hintText: 'Nhập số lượng thực tế trong kho',
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Ghi chú lý do điều chỉnh',
-                  hintText: 'Nhập thêm hàng, kiểm kho...',
+                const SizedBox(height: 12),
+                TextField(
+                  controller: noteCtrl,
+                  decoration: const InputDecoration(
+                    labelText: 'Ghi chú lý do điều chỉnh',
+                    hintText: 'Nhập thêm hàng, kiểm kho...',
+                  ),
+                  maxLines: 2,
                 ),
-                maxLines: 2,
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              final locCode = locationCodeCtrl.text.trim();
-              final amountStr = amountCtrl.text.trim();
-              if (locCode.isEmpty || amountStr.isEmpty) return;
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dlgContext),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                final locCode = selectedLocation?.code ?? locationCodeCtrl.text.trim();
+                final amountStr = amountCtrl.text.trim();
+                if (locCode.isEmpty || amountStr.isEmpty) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Vui lòng chọn vị trí và nhập số lượng tồn kho')),
+                  );
+                  return;
+                }
 
-              final amount = double.tryParse(amountStr);
-              if (amount == null || amount < 0) return;
+                final amount = double.tryParse(amountStr);
+                if (amount == null || amount < 0) return;
 
-              Navigator.pop(context); // Close dialog
+                Navigator.pop(dlgContext); // Close dialog
               setState(() => _isLoading = true);
 
               try {
@@ -4161,8 +4342,9 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
           ),
         ],
       ),
-    );
-  }
+    ),
+  );
+}
 
   @override
   Widget build(BuildContext context) {

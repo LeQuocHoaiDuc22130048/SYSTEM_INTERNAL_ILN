@@ -25,6 +25,9 @@ import com.suachuabientan.system_internal.modules.warehouse.repository.BoardItem
 import com.suachuabientan.system_internal.modules.warehouse.repository.PartRepository;
 import com.suachuabientan.system_internal.modules.warehouse.repository.StockMovementRepository;
 import com.suachuabientan.system_internal.modules.warehouse.repository.StoreLocationRepository;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
+import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -52,6 +55,15 @@ public class WarehouseService {
     private final StoreLocationRepository storeLocationRepository;
     private final StockMovementRepository stockMovementRepository;
     private final JdbcTemplate jdbcTemplate;
+    private final NotificationService notificationService;
+
+    private static final List<UserRole> WAREHOUSE_ALERT_ROLES = List.of(
+            UserRole.SUPER_ADMIN,
+            UserRole.ADMIN,
+            UserRole.MANAGER,
+            UserRole.WAREHOUSE,
+            UserRole.TECHNICIAN
+    );
 
     @Transactional
     public BoardItemResponse create(CreateBoardItemRequest request, UUID createdByUserId) {
@@ -88,6 +100,7 @@ public class WarehouseService {
                 .build();
 
         BoardItem saved = boardItemRepository.save(item);
+        checkAndNotifyLowStock(saved);
         log.info("Tạo bo mạch mới: qrCode={}, name={}, by={}", saved.getQrCode(), saved.getName(), createdByUserId);
         return toResponse(saved);
     }
@@ -155,8 +168,10 @@ public class WarehouseService {
             }
             item.setStatus(request.status());
         }
+        BoardItem saved = boardItemRepository.save(item);
+        checkAndNotifyLowStock(saved);
         log.info("Cập nhật bo mạch: id={}, by={}", id, updatedByUserId);
-        return toResponse(boardItemRepository.save(item));
+        return toResponse(saved);
     }
 
     @Transactional
@@ -289,6 +304,8 @@ public class WarehouseService {
 
         log.info("Lấy bo mạch: boardId={}, takenBy={}, qty={}, remainQty={}",
                 boardItemId, userId, qtyTaken, newQty);
+
+        checkAndNotifyLowStock(item);
 
         return toCheckoutResponse(savedCheckout, item);
     }
@@ -640,5 +657,42 @@ public class WarehouseService {
         return storeLocationRepository.findByIdAndIsDeletedFalse(locationId)
                 .map(StoreLocation::getCode)
                 .orElse(null);
+    }
+
+    public void checkAndNotifyLowStock(BoardItem item) {
+        if (item == null || item.getMinQuantity() == null || item.getMinQuantity() <= 0) {
+            return;
+        }
+
+        int currentQty = item.getQuantity() != null ? item.getQuantity() : 0;
+        int minQty = item.getMinQuantity();
+
+        if (currentQty <= minQty) {
+            String title;
+            String body;
+
+            if (currentQty <= 0) {
+                title = "Hết hàng bo mạch: " + item.getName();
+                body = "Bo mạch " + item.getName() + " (Model: " + (item.getModel() != null ? item.getModel() : "N/A") + ", QR: " + item.getQrCode() + ") đã HẾT HÀNG trong kho (Tồn kho: 0, Định mức Min: " + minQty + "). Vui lòng nhập thêm.";
+            } else {
+                title = "Cảnh báo tồn kho tối thiểu: " + item.getName();
+                body = "Bo mạch " + item.getName() + " (Model: " + (item.getModel() != null ? item.getModel() : "N/A") + ") chỉ còn " + currentQty + " chiếc, đã đạt hoặc dưới mức tối thiểu (Min: " + minQty + "). Vị trí: " + (item.getLocation() != null ? item.getLocation() : "KHO") + ".";
+            }
+
+            try {
+                notificationService.sendToRoles(
+                        WAREHOUSE_ALERT_ROLES,
+                        NotificationType.BOARD_LOW_STOCK_ALERT,
+                        title,
+                        body,
+                        "BOARD",
+                        item.getId().toString(),
+                        true
+                );
+                log.info("Đã gửi cảnh báo tồn kho tối thiểu cho bo mạch: id={}, qty={}, minQty={}", item.getId(), currentQty, minQty);
+            } catch (Exception e) {
+                log.error("Lỗi khi gửi thông báo cảnh báo tồn kho bo mạch id={}: {}", item.getId(), e.getMessage());
+            }
+        }
     }
 }

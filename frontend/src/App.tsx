@@ -28,7 +28,7 @@ import { exportAttendanceExcel } from './utils/excel';
 type DataSource = 'api' | 'error' | 'loading';
 
 /** Tab đang hiển thị */
-type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
+type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts';
 
 /** Dữ liệu target để mở EditModal */
 interface EditModalTarget {
@@ -63,7 +63,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'orders', 'warehouse', 'accounts'];
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'orders', 'warehouse', 'locations', 'accounts'];
     const hash = window.location.hash.replace('#', '') as ActiveTab;
     if (validTabs.includes(hash)) return hash;
 
@@ -83,7 +83,7 @@ function App() {
 
   // Lắng nghe sự kiện hashchange khi người dùng bấm nút Back/Forward trên trình duyệt
   useEffect(() => {
-    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'orders', 'warehouse', 'accounts'];
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'orders', 'warehouse', 'locations', 'accounts'];
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') as ActiveTab;
       if (validTabs.includes(hash)) {
@@ -473,8 +473,14 @@ function App() {
               showToast={showToast}
               currentUser={currentUser}
             />
+          ) : activeTab === 'locations' ? (
+            <WarehouseTab
+              initialMode="LOCATIONS"
+              showToast={showToast}
+            />
           ) : (
             <WarehouseTab
+              initialMode="ALL"
               showToast={showToast}
             />
           )}

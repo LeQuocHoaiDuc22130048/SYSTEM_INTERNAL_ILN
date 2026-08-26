@@ -371,7 +371,8 @@ public class UnifiedWarehouseService {
             } else if (b.getStatus() == BoardStatus.CHECKED_OUT) {
                 b.setStatus(BoardStatus.AVAILABLE);
             }
-            boardItemRepository.save(b);
+            BoardItem savedBoard = boardItemRepository.save(b);
+            warehouseService.checkAndNotifyLowStock(savedBoard);
         } else {
             partService.adjustStock(id, req, userId);
         }

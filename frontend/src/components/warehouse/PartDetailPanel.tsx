@@ -1,5 +1,5 @@
 import React from 'react';
-import { Boxes, Edit2, Trash2, ArrowUpRight, QrCode } from 'lucide-react';
+import { Boxes, Edit2, Trash2, ArrowUpRight, MapPin } from 'lucide-react';
 import type { Part } from '../../types/warehouse';
 
 interface PartDetailPanelProps {
@@ -120,21 +120,22 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
                       type="button"
                       onClick={() => onOpenLocationScan(lot.storeLocationCode)}
                       style={{
-                        padding: '2px 8px',
-                        fontSize: '0.72rem',
+                        padding: '3px 8px',
+                        fontSize: '0.74rem',
+                        fontWeight: 600,
                         background: '#eff6ff',
                         border: '1px solid #bfdbfe',
                         color: '#2563eb',
                         borderRadius: '4px',
                         cursor: 'pointer',
-                        display: 'flex',
+                        display: 'inline-flex',
                         alignItems: 'center',
                         gap: '3px',
                       }}
-                      title="Xem thông tin & quét QR vị trí này"
+                      title="Xem, sửa hoặc xóa vị trí này"
                     >
-                      <QrCode size={11} />
-                      QR Vị trí
+                      <MapPin size={12} />
+                      Quản lý / Xóa vị trí
                     </button>
                   )}
                 </div>

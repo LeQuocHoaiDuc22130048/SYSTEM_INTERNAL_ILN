@@ -702,21 +702,6 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                     </div>
                   )}
 
-                  {activeItem.description && (
-                    <div
-                      className="live-qr-subtext"
-                      style={{
-                        fontSize: `${Math.max(8, config.titleFontSize - 2)}px`,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        width: '100%',
-                      }}
-                    >
-                      {activeItem.description}
-                    </div>
-                  )}
-
                   {activeItem.totalPartTypes !== undefined && (
                     <div className="live-qr-subtext" style={{ fontSize: '9px', color: '#64748b' }}>
                       {activeItem.totalPartTypes} loại linh kiện

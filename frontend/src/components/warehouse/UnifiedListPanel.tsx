@@ -29,6 +29,7 @@ interface UnifiedListPanelProps {
   onQuickCheckoutPart?: (p: Part, lot?: PartLot) => void;
   onQuickCheckoutBoard?: (b: Board) => void;
   onScanLocationQr?: () => void;
+  onOpenLocationManagement?: () => void;
 }
 
 export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
@@ -47,6 +48,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
   onAddPart,
   onQuickCheckoutPart,
   onQuickCheckoutBoard,
+  onOpenLocationManagement,
 }) => {
   // 1. Calculate Stats
   const totalBoards = boards.length;
@@ -421,7 +423,29 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {onOpenLocationManagement && (
+            <button
+              type="button"
+              onClick={onOpenLocationManagement}
+              style={{
+                backgroundColor: '#ffffff',
+                color: '#2563eb',
+                border: '1.5px solid #bfdbfe',
+                padding: '7px 12px',
+                borderRadius: '8px',
+                fontWeight: 600,
+                fontSize: '0.82rem',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+              }}
+            >
+              <MapPin size={15} />
+              Quản Lý Vị Trí
+            </button>
+          )}
           <button
             type="button"
             onClick={onAddBoard}

@@ -20,8 +20,8 @@ import type { UserInfo } from '../mockData';
 import { isAdminOrAbove, isManagerOrAbove as _isManagerOrAbove, getRoleLabel } from '../utils/permissions';
 
 interface SidebarProps {
-  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts';
-  setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => void;
+  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts';
+  setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts') => void;
   currentUser: UserInfo | null;
   handleLogout: () => void;
 }
@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isManagerOrAbove = React.useMemo(() => _isManagerOrAbove(currentUser), [currentUser]);
   const showAccountsTab = React.useMemo(() => isAdminOrAbove(currentUser), [currentUser]);
 
-  const handleTabClick = (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => {
+  const handleTabClick = (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts') => {
     setActiveTab(tab);
   };
 
@@ -166,7 +166,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   onClick={() => handleTabClick('warehouse')}
                 >
                   <Boxes size={16} className="item-icon" />
-                  <span>Kho bo mạch</span>
+                  <span>Kho bo mạch & Linh kiện</span>
                 </button>
               </div>
             )}

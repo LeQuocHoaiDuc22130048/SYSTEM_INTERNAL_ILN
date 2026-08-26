@@ -16,6 +16,8 @@ import { PartDetailPanel } from './warehouse/PartDetailPanel';
 import { QrPrintConfigModal } from './warehouse/QrPrintConfigModal';
 import { PartCheckoutHistoryPanel } from './warehouse/PartCheckoutHistoryPanel';
 import { LocationQrScanModal } from './warehouse/LocationQrScanModal';
+import { LocationManagementModal } from './warehouse/LocationManagementModal';
+import { LocationListPanel } from './warehouse/LocationListPanel';
 import { PartCheckoutModal } from './warehouse/PartCheckoutModal';
 import { PartReturnModal } from './warehouse/PartReturnModal';
 import { PartBulkImportModal } from './warehouse/PartBulkImportModal';
@@ -23,7 +25,7 @@ import { UnifiedListPanel } from './warehouse/UnifiedListPanel';
 import './WarehouseTab.css';
 
 
-export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
+export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMode }) => {
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -57,8 +59,16 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   const [checkoutNote, setCheckoutNote] = useState<string>('');
   const [checkoutQuantity, setCheckoutQuantity] = useState<number>(1);
 
-  // Warehouse Mode: BOARDS, PARTS, or PART_LOGS
-  const [warehouseMode, setWarehouseMode] = useState<'ALL' | 'BOARDS' | 'PARTS' | 'PART_LOGS'>('ALL');
+  // Warehouse Mode: ALL, BOARDS, PARTS, LOCATIONS, or PART_LOGS
+  const [warehouseMode, setWarehouseMode] = useState<'ALL' | 'BOARDS' | 'PARTS' | 'LOCATIONS' | 'PART_LOGS'>(
+    initialMode || 'ALL'
+  );
+
+  useEffect(() => {
+    if (initialMode) {
+      setWarehouseMode(initialMode);
+    }
+  }, [initialMode]);
   const [unifiedTypeFilter, setUnifiedTypeFilter] = useState<'ALL' | 'BOARDS' | 'PARTS'>('ALL');
   const [unifiedStockFilter, setUnifiedStockFilter] = useState<'ALL' | 'IN_STOCK' | 'LOW_STOCK' | 'OUT_OF_STOCK'>('ALL');
 
@@ -103,6 +113,9 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
   // Autocomplete lists
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
   const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string; description?: string; qrCode?: string; totalPartTypes?: number; totalQuantity?: number }>>([]);
+
+  // Location Management Modal States
+  const [isLocationManagementModalOpen, setIsLocationManagementModalOpen] = useState<boolean>(false);
 
   // Add Location Modal States
   const [isAddLocationModalOpen, setIsAddLocationModalOpen] = useState<boolean>(false);
@@ -920,6 +933,17 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           </button>
           <button
             type="button"
+            className={`warehouse-mode-btn ${warehouseMode === 'LOCATIONS' ? 'active' : ''}`}
+            onClick={() => {
+              setWarehouseMode('LOCATIONS');
+              setSelectedBoard(null);
+              setSelectedPart(null);
+            }}
+          >
+            📍 Vị Trí Kho ({locations.length})
+          </button>
+          <button
+            type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'PART_LOGS' ? 'active' : ''}`}
             onClick={() => setWarehouseMode('PART_LOGS')}
           >
@@ -927,30 +951,62 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <button
-            type="button"
-            onClick={() => {
+        {warehouseMode !== 'LOCATIONS' && (
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <button
+              type="button"
+              onClick={() => {
+                setLocationScanInitialCode('');
+                setIsLocationQrScanModalOpen(true);
+              }}
+              style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+            >
+              <QrCode size={16} />
+              Quét QR Vị Trí
+            </button>
+
+            <button
+              type="button"
+              onClick={() => handleOpenLocationQrPrint()}
+              style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1.5px solid #bfdbfe', padding: '8px 14px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
+            >
+              🏷️ In Tem QR
+            </button>
+          </div>
+        )}
+      </div>
+
+      {warehouseMode === 'LOCATIONS' ? (
+        <div style={{ flex: 1, minHeight: '550px' }}>
+          <LocationListPanel
+            locations={locations}
+            onRefreshLocations={fetchLocations}
+            onPrintLocationQr={(loc) => {
+              handleOpenLocationQrPrint([
+                {
+                  id: loc.id,
+                  code: loc.code,
+                  name: loc.name,
+                  qrCode: loc.qrCode || loc.code,
+                  description: loc.description,
+                  totalPartTypes: loc.totalPartTypes,
+                  totalQuantity: loc.totalQuantity,
+                },
+              ]);
+            }}
+            onPrintAllLocationsQr={() => handleOpenLocationQrPrint()}
+            onScanLocationQr={() => {
               setLocationScanInitialCode('');
               setIsLocationQrScanModalOpen(true);
             }}
-            style={{ backgroundColor: '#2563eb', color: '#ffffff', border: 'none', padding: '8px 16px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
-          >
-            <QrCode size={16} />
-            Quét QR Vị Trí Kho
-          </button>
-
-          <button
-            type="button"
-            onClick={() => handleOpenLocationQrPrint()}
-            style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1.5px solid #bfdbfe', padding: '8px 14px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
-          >
-            🏷️ In Tem QR Vị Trí
-          </button>
+            onViewLocationParts={(locCode) => {
+              setWarehouseMode('PARTS');
+              setPartSearchTerm(locCode);
+            }}
+            showToast={showToast}
+          />
         </div>
-      </div>
-
-      {warehouseMode === 'PART_LOGS' ? (
+      ) : warehouseMode === 'PART_LOGS' ? (
         <div style={{ flex: 1, minHeight: '550px' }}>
           <PartCheckoutHistoryPanel
             showToast={showToast}
@@ -1000,6 +1056,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
                   setLocationScanInitialCode('');
                   setIsLocationQrScanModalOpen(true);
                 }}
+                onOpenLocationManagement={() => setIsLocationManagementModalOpen(true)}
               />
             ) : warehouseMode === 'BOARDS' ? (
               <BoardListPanel
@@ -1746,6 +1803,32 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast }) => {
           ]);
           setIsQrConfigModalOpen(true);
         }}
+        onRefreshLocations={fetchLocations}
+        showToast={showToast}
+      />
+
+      {/* Location Management (Quản Lý Vị Trí Lưu Kho) Modal */}
+      <LocationManagementModal
+        isOpen={isLocationManagementModalOpen}
+        onClose={() => setIsLocationManagementModalOpen(false)}
+        locations={locations}
+        onRefreshLocations={fetchLocations}
+        onPrintLocationQr={(loc) => {
+          if (loc) {
+            handleOpenLocationQrPrint([
+              {
+                id: loc.id,
+                code: loc.code,
+                name: loc.name,
+                qrCode: loc.qrCode || loc.code,
+                description: loc.description,
+                totalPartTypes: loc.totalPartTypes,
+                totalQuantity: loc.totalQuantity,
+              },
+            ]);
+          }
+        }}
+        onPrintAllLocationsQr={() => handleOpenLocationQrPrint()}
         showToast={showToast}
       />
 

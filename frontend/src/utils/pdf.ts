@@ -210,11 +210,6 @@ export async function exportLocationQrPdfList(
                 : ''
             }
             ${
-              loc.description
-                ? `<div class="qr-subtext">${escapeHtml(loc.description)}</div>`
-                : ''
-            }
-            ${
               loc.totalPartTypes !== undefined
                 ? `<div class="qr-subtext" style="font-size: 7.5px; color: #64748b;">${loc.totalPartTypes} loại linh kiện</div>`
                 : ''

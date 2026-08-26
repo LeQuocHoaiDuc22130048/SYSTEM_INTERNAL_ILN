@@ -1,5 +1,8 @@
-﻿-- V56__clean_sample_warehouse_data.sql
+-- V56__clean_sample_warehouse_data.sql
 -- Xoa toan bo du lieu mau thu nghiem (mock/sample data) khoi database de chi luu va lay du lieu thuc te
+
+-- 0. Bo sung cot min_quantity neu chua co
+ALTER TABLE board_items ADD COLUMN IF NOT EXISTS min_quantity integer DEFAULT 0;
 
 -- 1. Xoa cac bien dong kho mau
 DELETE FROM stock_movements
@@ -34,7 +37,24 @@ WHERE id IN (
   '50000000-0000-0000-0000-000000000005'
 ) OR lot_code IN ('LOT-2026-IGBT-001', 'LOT-2026-MOS-002', 'LOT-2026-IC-003', 'LOT-2026-CAP-004', 'LOT-2026-RES-005');
 
--- 4. Xoa cac linh kien mau (FGH40N60SMD, TK20A60W, UCC27531, CAP-10UF-50V, RES-0805-10K)
+-- 4. Go lien ket part_id o cac bo mach
+UPDATE board_items SET part_id = NULL
+WHERE part_id IN (
+  '40000000-0000-0000-0000-000000000001',
+  '40000000-0000-0000-0000-000000000002',
+  '40000000-0000-0000-0000-000000000003',
+  '40000000-0000-0000-0000-000000000004',
+  '40000000-0000-0000-0000-000000000005'
+);
+
+-- 5. Xoa cac bo mach mau tu V54
+DELETE FROM board_items
+WHERE id IN (
+  '60000000-0000-0000-0000-000000000001',
+  '60000000-0000-0000-0000-000000000002'
+) OR qr_code IN ('BOARD_SG110_CTRL_01', 'BOARD_SUN2000_PWR_02');
+
+-- 6. Xoa cac linh kien mau
 DELETE FROM parts
 WHERE id IN (
   '40000000-0000-0000-0000-000000000001',
@@ -44,14 +64,7 @@ WHERE id IN (
   '40000000-0000-0000-0000-000000000005'
 ) OR ipn IN ('FGH40N60SMD', 'TK20A60W', 'UCC27531', 'CAP-10UF-50V', 'RES-0805-10K');
 
--- 5. Xoa cac bo mach mau tu V54 (neu co)
-DELETE FROM board_items
-WHERE id IN (
-  '60000000-0000-0000-0000-000000000001',
-  '60000000-0000-0000-0000-000000000002'
-) OR qr_code IN ('BOARD_SG110_CTRL_01', 'BOARD_SUN2000_PWR_02');
-
--- 6. Xoa cac vi tri kho mau neu khong co linh kien/bo mach thuc te nao gan vao
+-- 7. Xoa cac vi tri kho mau neu khong co linh kien/bo mach thuc te nao gan vao
 DELETE FROM store_locations
 WHERE id IN (
   '30000000-0000-0000-0000-000000000001',
@@ -60,3 +73,4 @@ WHERE id IN (
 )
 AND NOT EXISTS (SELECT 1 FROM part_lots WHERE store_location_id = store_locations.id AND is_deleted = false)
 AND NOT EXISTS (SELECT 1 FROM board_items WHERE current_location_id = store_locations.id AND is_deleted = false);
+
