@@ -55,6 +55,8 @@ export const DAILY_STATUS_LABEL_MAP: Record<DailyStatusChar, string> = {
   v: 'Nghỉ phép',
   h: 'Nghỉ lễ / Cuối tuần',
   o: 'Tăng ca',
+  m: 'Nửa công (Ca sáng)',
+  c: 'Nửa công (Ca chiều)',
   f: 'Chưa diễn ra',
 };
 
@@ -66,5 +68,7 @@ export const CALENDAR_STATUS_LABEL_MAP: Record<DailyStatusChar, string> = {
   v: 'LEAVE',
   h: 'HOLIDAY',
   o: 'OT',
+  m: 'HALF_DAY',
+  c: 'HALF_DAY',
   f: 'FUTURE',
 };

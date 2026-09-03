@@ -32,8 +32,11 @@ public class AttendanceQueryController {
     private final WorkScheduleRepository workScheduleRepository;
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
-    private static final LocalTime DEFAULT_SHIFT_START = LocalTime.of(8, 0);
-    private static final LocalTime DEFAULT_SHIFT_END = LocalTime.of(17, 0);
+    private static final LocalTime DEFAULT_SHIFT_START = LocalTime.of(8, 30);
+    private static final LocalTime MORNING_SHIFT_END = LocalTime.of(12, 0);
+    private static final LocalTime AFTERNOON_SHIFT_START = LocalTime.of(13, 30);
+    private static final LocalTime DEFAULT_SHIFT_END = LocalTime.of(17, 30);
+    private static final LocalTime OVERTIME_MIN_CHECKOUT = LocalTime.of(21, 0);
     private static final int LATE_GRACE_MINUTES = 15;
 
     @GetMapping("/monthly")
@@ -77,7 +80,7 @@ public class AttendanceQueryController {
             Map<LocalDate, List<AttendanceRecord>> recordsByDate = empRecords.stream()
                     .collect(Collectors.groupingBy(r -> r.getCheckTime().atZone(ZONE).toLocalDate()));
 
-            int workDays = 0;
+            double workDays = 0.0;
             int lateCount = 0;
             int absentDays = 0;
             int leaveDays = 0;
@@ -168,34 +171,59 @@ public class AttendanceQueryController {
                             absentDays++;
                         }
                     } else {
+                        LocalTime inTime = checkIn != null ? checkIn.atZone(ZONE).toLocalTime() : null;
+                        LocalTime outTime = checkOut != null ? checkOut.atZone(ZONE).toLocalTime() : null;
+
+                        // Xác định ca làm việc:
+                        // Ca 1 (Sáng: 08:30 - 12:00): nếu checkout ~12h (<= 13:00) và không làm chiều -> 0.5 công
+                        // Ca 2 (Chiều: 13:30 - 17:30): nếu checkin ~13h30 (>= 12:30) và không làm sáng -> 0.5 công
+                        // Cả ngày (2 ca): làm cả sáng và chiều -> 1.0 công
+                        boolean isHalfDayMorning = outTime != null && !outTime.isAfter(LocalTime.of(13, 0))
+                                && (inTime == null || inTime.isBefore(LocalTime.of(12, 30)));
+                        boolean isHalfDayAfternoon = inTime != null && !inTime.isBefore(LocalTime.of(12, 30))
+                                && !isHalfDayMorning;
+
                         boolean isLate = false;
-                        if (checkIn != null) {
-                            LocalTime checkInTime = checkIn.atZone(ZONE).toLocalTime();
-                            if (checkInTime.isAfter(shiftStart.plusMinutes(LATE_GRACE_MINUTES))) {
+                        if (isHalfDayAfternoon) {
+                            if (inTime != null && inTime.isAfter(AFTERNOON_SHIFT_START.plusMinutes(LATE_GRACE_MINUTES))) {
+                                isLate = true;
+                            }
+                        } else {
+                            if (inTime != null && inTime.isAfter(shiftStart.plusMinutes(LATE_GRACE_MINUTES))) {
                                 isLate = true;
                             }
                         }
 
-                        boolean isOvertime = false;
-                        // Calculate working hours and check for overtime
-                        if (checkIn != null && checkOut != null) {
-                            double minutes = Duration.between(checkIn, checkOut).toMinutes();
-                            totalHours += Math.max(0.0, minutes / 60.0);
+                        // Quy định tăng ca: Chỉ khi nào làm việc đến 21:00 (9h tối) hoặc sau 21:00 mới được ghi nhận tăng ca
+                        boolean isOvertime = outTime != null && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
 
-                            // Calculate overtime (past 18:00)
-                            LocalTime overtimeStart = LocalTime.of(18, 0);
-                            Instant overtimeStartInstant = date.atTime(overtimeStart).atZone(ZONE).toInstant();
-                            if (checkOut.isAfter(overtimeStartInstant)) {
-                                double otMinutes = Duration.between(overtimeStartInstant, checkOut).toMinutes();
-                                overtimeHours += Math.max(0.0, otMinutes / 60.0);
-                                if (otMinutes > 0) {
-                                    isOvertime = true;
+                        // Tính số giờ thực làm và số giờ tăng ca
+                        if (checkIn != null && checkOut != null) {
+                            double rawMinutes = Duration.between(checkIn, checkOut).toMinutes();
+                            double actualMinutes;
+                            if (isHalfDayMorning || isHalfDayAfternoon) {
+                                actualMinutes = rawMinutes;
+                            } else {
+                                // Làm cả ngày: trừ 90 phút (1.5h) nghỉ trưa 12:00 - 13:30
+                                actualMinutes = Math.max(0.0, rawMinutes - 90);
+                            }
+                            totalHours += Math.max(0.0, actualMinutes / 60.0);
+
+                            if (isOvertime) {
+                                Instant shiftEndInstant = date.atTime(shiftEnd).atZone(ZONE).toInstant();
+                                if (checkOut.isAfter(shiftEndInstant)) {
+                                    double otMinutes = Duration.between(shiftEndInstant, checkOut).toMinutes();
+                                    overtimeHours += Math.max(0.0, otMinutes / 60.0);
                                 }
                             }
                         }
 
                         if (isOvertime) {
                             patternBuilder.append("o");
+                        } else if (isHalfDayMorning) {
+                            patternBuilder.append("m");
+                        } else if (isHalfDayAfternoon) {
+                            patternBuilder.append("c");
                         } else if (isLate) {
                             patternBuilder.append("l");
                         } else {
@@ -205,10 +233,17 @@ public class AttendanceQueryController {
                         if (isLate) {
                             lateCount++;
                         }
-                        workDays++;
+
+                        if (isHalfDayMorning || isHalfDayAfternoon) {
+                            workDays += 0.5;
+                        } else {
+                            workDays += 1.0;
+                        }
                     }
                 }
             }
+
+            workDays = Math.round(workDays * 10.0) / 10.0;
 
             if ("Nguyễn Kim Thy".equalsIgnoreCase(employee.getFullName())) {
                 formattedNoteList.add(0, "Làm việc Online");
@@ -270,7 +305,7 @@ public class AttendanceQueryController {
         DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZONE);
         LocalDate today = LocalDate.now(ZONE);
 
-        int workDays = 0;
+        double workDays = 0.0;
         int lateCount = 0;
         int absentDays = 0;
         double totalHours = 0.0;
@@ -317,32 +352,58 @@ public class AttendanceQueryController {
                             .max(Instant::compareTo)
                             .orElse(null);
 
+                    LocalTime inTime = checkIn != null ? checkIn.atZone(ZONE).toLocalTime() : null;
+                    LocalTime outTime = checkOut != null ? checkOut.atZone(ZONE).toLocalTime() : null;
+
+                    // Xác định ca làm việc:
+                    // Ca 1 (Sáng: 08:30 - 12:00): nếu checkout ~12h (<= 13:00) và không làm chiều -> 0.5 công
+                    // Ca 2 (Chiều: 13:30 - 17:30): nếu checkin ~13h30 (>= 12:30) và không làm sáng -> 0.5 công
+                    // Cả ngày (2 ca): làm cả sáng và chiều -> 1.0 công
+                    boolean isHalfDayMorning = outTime != null && !outTime.isAfter(LocalTime.of(13, 0))
+                            && (inTime == null || inTime.isBefore(LocalTime.of(12, 30)));
+                    boolean isHalfDayAfternoon = inTime != null && !inTime.isBefore(LocalTime.of(12, 30))
+                            && !isHalfDayMorning;
+
                     boolean isLate = false;
-                    if (checkIn != null) {
-                        LocalTime checkInTime = checkIn.atZone(ZONE).toLocalTime();
-                        if (checkInTime.isAfter(shiftStart.plusMinutes(LATE_GRACE_MINUTES))) {
+                    if (isHalfDayAfternoon) {
+                        if (inTime != null && inTime.isAfter(AFTERNOON_SHIFT_START.plusMinutes(LATE_GRACE_MINUTES))) {
+                            isLate = true;
+                        }
+                    } else {
+                        if (inTime != null && inTime.isAfter(shiftStart.plusMinutes(LATE_GRACE_MINUTES))) {
                             isLate = true;
                         }
                     }
 
-                    boolean isOvertime = false;
-                    if (checkIn != null && checkOut != null) {
-                        double minutes = Duration.between(checkIn, checkOut).toMinutes();
-                        totalHours += minutes / 60.0;
+                    // Quy định tăng ca: Chỉ khi nào làm việc đến 21:00 (9h tối) hoặc sau 21:00 mới được ghi nhận tăng ca
+                    boolean isOvertime = outTime != null && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
 
-                        LocalTime overtimeStart = LocalTime.of(18, 0);
-                        Instant overtimeStartInstant = date.atTime(overtimeStart).atZone(ZONE).toInstant();
-                        if (checkOut.isAfter(overtimeStartInstant)) {
-                            double otMinutes = Duration.between(overtimeStartInstant, checkOut).toMinutes();
-                            overtimeHours += otMinutes / 60.0;
-                            if (otMinutes > 0) {
-                                isOvertime = true;
+                    if (checkIn != null && checkOut != null) {
+                        double rawMinutes = Duration.between(checkIn, checkOut).toMinutes();
+                        double actualMinutes;
+                        if (isHalfDayMorning || isHalfDayAfternoon) {
+                            actualMinutes = rawMinutes;
+                        } else {
+                            // Làm cả ngày: trừ 90 phút (1.5h) nghỉ trưa 12:00 - 13:30
+                            actualMinutes = Math.max(0.0, rawMinutes - 90);
+                        }
+                        totalHours += Math.max(0.0, actualMinutes / 60.0);
+
+                        if (isOvertime) {
+                            Instant shiftEndInstant = date.atTime(shiftEnd).atZone(ZONE).toInstant();
+                            if (checkOut.isAfter(shiftEndInstant)) {
+                                double otMinutes = Duration.between(shiftEndInstant, checkOut).toMinutes();
+                                overtimeHours += Math.max(0.0, otMinutes / 60.0);
                             }
                         }
                     }
 
                     if (isOvertime) {
                         status = "OVERTIME";
+                    } else if (isHalfDayMorning) {
+                        status = "HALF_DAY_MORNING";
+                    } else if (isHalfDayAfternoon) {
+                        status = "HALF_DAY_AFTERNOON";
                     } else if (isLate) {
                         status = "LATE";
                     } else {
@@ -352,7 +413,12 @@ public class AttendanceQueryController {
                     if (isLate) {
                         lateCount++;
                     }
-                    workDays++;
+
+                    if (isHalfDayMorning || isHalfDayAfternoon) {
+                        workDays += 0.5;
+                    } else {
+                        workDays += 1.0;
+                    }
                 }
             }
 
@@ -378,11 +444,13 @@ public class AttendanceQueryController {
             ));
         }
 
+        workDays = Math.round(workDays * 10.0) / 10.0;
+
         EmployeeInfo empInfo = new EmployeeInfo(
                 employee.getId(),
                 employee.getFullName(),
                 employee.getDepartment() != null ? employee.getDepartment() : "General",
-                "Ca hành chính",
+                "Ca hành chính (Sáng: 08:30 - 12:00, Chiều: 13:30 - 17:30)",
                 DEFAULT_SHIFT_START.toString(),
                 DEFAULT_SHIFT_END.toString()
         );
@@ -506,18 +574,20 @@ public class AttendanceQueryController {
                     // Leave (no records)
                 } else if (mod < 7) {
                     // Late
-                    LocalTime checkInTime = LocalTime.of(8, 20 + (hash % 15));
-                    LocalTime checkOutTime = LocalTime.of(17, (hash % 20));
+                    LocalTime checkInTime = LocalTime.of(8, 50 + (hash % 15));
+                    LocalTime checkOutTime = LocalTime.of(17, 30 + (hash % 20));
                     insertRecord(user.getId(), date.atTime(checkInTime).atZone(ZONE).toInstant(), AttendanceType.IN);
                     insertRecord(user.getId(), date.atTime(checkOutTime).atZone(ZONE).toInstant(), AttendanceType.OUT);
                 } else {
                     // Present
-                    LocalTime checkInTime = LocalTime.of(7, 45 + (hash % 14));
+                    LocalTime checkInTime = LocalTime.of(8, 15 + (hash % 14));
                     LocalTime checkOutTime;
                     if (hash % 5 == 0) {
-                        checkOutTime = LocalTime.of(18, 5 + (hash % 30)); // Overtime (after 18:00)
+                        checkOutTime = LocalTime.of(21, 5 + (hash % 30)); // Overtime (at or after 21:00)
+                    } else if (hash % 7 == 0) {
+                        checkOutTime = LocalTime.of(12, 0); // Checkout 12h -> 0.5 cong ca sang
                     } else {
-                        checkOutTime = LocalTime.of(17, 5 + (hash % 30));
+                        checkOutTime = LocalTime.of(17, 30 + (hash % 30));
                     }
                     insertRecord(user.getId(), date.atTime(checkInTime).atZone(ZONE).toInstant(), AttendanceType.IN);
                     insertRecord(user.getId(), date.atTime(checkOutTime).atZone(ZONE).toInstant(), AttendanceType.OUT);
@@ -547,7 +617,7 @@ public class AttendanceQueryController {
             String name,
             String employeeCode,
             String dept,
-            int workDays,
+            double workDays,
             int lateCount,
             int absentDays,
             double totalHours,
@@ -574,7 +644,7 @@ public class AttendanceQueryController {
     ) {}
 
     public record HistorySummary(
-            int workDays,
+            double workDays,
             double totalHours,
             int lateCount,
             int absentDays,

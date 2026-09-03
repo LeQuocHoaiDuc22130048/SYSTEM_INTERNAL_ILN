@@ -36,8 +36,12 @@ import com.suachuabientan.system_internal.modules.warehouse.repository.PartLotRe
 import com.suachuabientan.system_internal.modules.warehouse.repository.PartRepository;
 import com.suachuabientan.system_internal.modules.warehouse.repository.StockMovementRepository;
 import com.suachuabientan.system_internal.modules.warehouse.repository.StoreLocationRepository;
+import com.suachuabientan.system_internal.modules.warehouse.entity.BoardItem;
+import com.suachuabientan.system_internal.modules.warehouse.repository.BoardItemRepository;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -65,7 +69,7 @@ public class PartService {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final JdbcTemplate jdbcTemplate;
-    private final com.suachuabientan.system_internal.modules.warehouse.repository.BoardItemRepository boardItemRepository;
+    private final BoardItemRepository boardItemRepository;
 
     private static final List<UserRole> WAREHOUSE_ALERT_ROLES = List.of(
             UserRole.SUPER_ADMIN,
@@ -652,7 +656,11 @@ public class PartService {
                 partItems,
                 boardItems,
                 totalTypes,
-                totalQty
+                totalQty,
+                partItems.size(),
+                totalPartQty,
+                boardItems.size(),
+                totalBoardQty
         );
     }
 
@@ -833,15 +841,11 @@ public class PartService {
             existing.setUpdatedBy(userId);
             StoreLocation saved = storeLocationRepository.save(existing);
             log.info("Khôi phục vị trí kho: id={}, code={}, qrCode={}, name={}, by={}", saved.getId(), saved.getCode(), saved.getQrCode(), saved.getName(), userId);
-            return new LocationInfo(
-                    saved.getId(),
-                    saved.getCode(),
-                    saved.getName(),
-                    saved.getDescription(),
-                    saved.getQrCode(),
-                    0,
-                    BigDecimal.ZERO
-            );
+            List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(saved.getId());
+            List<BoardItem> boards = boardItemRepository.findAll().stream()
+                    .filter(b -> !Boolean.TRUE.equals(b.getIsDeleted()) && matchesLocation(b, saved))
+                    .toList();
+            return buildLocationInfo(saved, lots, boards);
         }
 
         // Kiểm tra trùng qrCode nếu khác code
@@ -863,15 +867,11 @@ public class PartService {
         location.setUpdatedBy(userId);
         StoreLocation saved = storeLocationRepository.save(location);
         log.info("Tạo vị trí kho mới: code={}, qrCode={}, name={}, by={}", saved.getCode(), saved.getQrCode(), saved.getName(), userId);
-        return new LocationInfo(
-                saved.getId(),
-                saved.getCode(),
-                saved.getName(),
-                saved.getDescription(),
-                saved.getQrCode(),
-                0,
-                BigDecimal.ZERO
-        );
+        List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(saved.getId());
+        List<BoardItem> boards = boardItemRepository.findAll().stream()
+                .filter(b -> !Boolean.TRUE.equals(b.getIsDeleted()) && matchesLocation(b, saved))
+                .toList();
+        return buildLocationInfo(saved, lots, boards);
     }
 
     @Transactional
@@ -920,24 +920,10 @@ public class PartService {
         log.info("Cập nhật vị trí kho: id={}, code={}, name={}, by={}", saved.getId(), saved.getCode(), saved.getName(), userId);
 
         List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(saved.getId());
-        int partTypes = (int) lots.stream()
-                .filter(l -> l.getAmount() != null && l.getAmount().compareTo(BigDecimal.ZERO) > 0)
-                .map(PartLot::getPartId)
-                .distinct()
-                .count();
-        BigDecimal totalQty = lots.stream()
-                .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return new LocationInfo(
-                saved.getId(),
-                saved.getCode(),
-                saved.getName(),
-                saved.getDescription(),
-                saved.getQrCode() != null ? saved.getQrCode() : saved.getCode(),
-                partTypes,
-                totalQty
-        );
+        List<BoardItem> boards = boardItemRepository.findAll().stream()
+                .filter(b -> !Boolean.TRUE.equals(b.getIsDeleted()) && matchesLocation(b, saved))
+                .toList();
+        return buildLocationInfo(saved, lots, boards);
     }
 
     @Transactional
@@ -982,30 +968,80 @@ public class PartService {
 
     @Transactional(readOnly = true)
     public List<LocationInfo> getLocations() {
-        return storeLocationRepository.findAll().stream()
+        List<StoreLocation> locations = storeLocationRepository.findAll().stream()
                 .filter(loc -> !Boolean.TRUE.equals(loc.getIsDeleted()))
-                .map(loc -> {
-                    List<PartLot> lots = partLotRepository.findByStoreLocationIdAndIsDeletedFalse(loc.getId());
-                    int partTypes = (int) lots.stream()
-                            .filter(l -> l.getAmount() != null && l.getAmount().compareTo(BigDecimal.ZERO) > 0)
-                            .map(PartLot::getPartId)
-                            .distinct()
-                            .count();
-                    BigDecimal totalQty = lots.stream()
-                            .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
-                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .toList();
 
-                    return new LocationInfo(
-                            loc.getId(),
-                            loc.getCode(),
-                            loc.getName(),
-                            loc.getDescription(),
-                            loc.getQrCode() != null ? loc.getQrCode() : loc.getCode(),
-                            partTypes,
-                            totalQty
-                    );
+        List<PartLot> allLots = partLotRepository.findAll().stream()
+                .filter(lot -> !Boolean.TRUE.equals(lot.getIsDeleted()) && lot.getStoreLocationId() != null)
+                .toList();
+        Map<UUID, List<PartLot>> lotsByLocationId = allLots.stream()
+                .collect(Collectors.groupingBy(PartLot::getStoreLocationId));
+
+        List<BoardItem> allBoards = boardItemRepository.findAll().stream()
+                .filter(b -> !Boolean.TRUE.equals(b.getIsDeleted()))
+                .toList();
+
+        return locations.stream()
+                .map(loc -> {
+                    List<PartLot> locLots = lotsByLocationId.getOrDefault(loc.getId(), List.of());
+                    List<BoardItem> locBoards = allBoards.stream()
+                            .filter(b -> matchesLocation(b, loc))
+                            .toList();
+                    return buildLocationInfo(loc, locLots, locBoards);
                 })
                 .toList();
+    }
+
+    private boolean matchesLocation(BoardItem b, StoreLocation loc) {
+        if (b.getCurrentLocationId() != null && b.getCurrentLocationId().equals(loc.getId())) {
+            return true;
+        }
+        if (b.getCurrentLocationId() == null && StringUtils.hasText(b.getLocation())) {
+            String bLoc = b.getLocation().trim();
+            if (bLoc.equalsIgnoreCase(loc.getCode().trim()) ||
+                bLoc.equalsIgnoreCase(loc.getName().trim()) ||
+                (loc.getQrCode() != null && bLoc.equalsIgnoreCase(loc.getQrCode().trim())) ||
+                bLoc.equalsIgnoreCase(loc.getCode().trim().replaceAll("(?i)_qr$", ""))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private LocationInfo buildLocationInfo(StoreLocation loc, List<PartLot> lots, List<BoardItem> boards) {
+        int partTypes = (int) lots.stream()
+                .filter(l -> l.getAmount() != null && l.getAmount().compareTo(BigDecimal.ZERO) > 0)
+                .map(PartLot::getPartId)
+                .distinct()
+                .count();
+        BigDecimal partsTotalQty = lots.stream()
+                .map(l -> l.getAmount() != null ? l.getAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int boardTypes = (int) boards.stream()
+                .filter(b -> b.getQuantity() != null && b.getQuantity() > 0)
+                .count();
+        BigDecimal boardsTotalQty = boards.stream()
+                .map(b -> BigDecimal.valueOf(b.getQuantity() != null ? b.getQuantity() : 0))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        int totalTypes = partTypes + boardTypes;
+        BigDecimal totalQty = partsTotalQty.add(boardsTotalQty);
+
+        return new LocationInfo(
+                loc.getId(),
+                loc.getCode(),
+                loc.getName(),
+                loc.getDescription(),
+                loc.getQrCode() != null ? loc.getQrCode() : loc.getCode(),
+                totalTypes,
+                totalQty,
+                partTypes,
+                partsTotalQty,
+                boardTypes,
+                boardsTotalQty
+        );
     }
 
     // Mappers & Helpers

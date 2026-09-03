@@ -14,8 +14,42 @@ public record LocationScanResponse(
         List<LocationPartItem> parts,
         List<LocationBoardItem> boards,
         int totalPartTypes,
-        BigDecimal totalQuantity
+        BigDecimal totalQuantity,
+        int partTypesCount,
+        BigDecimal partQuantity,
+        int boardTypesCount,
+        BigDecimal boardQuantity
 ) {
+    public LocationScanResponse(
+            UUID locationId,
+            String code,
+            String name,
+            String description,
+            String qrCode,
+            Boolean isFull,
+            List<LocationPartItem> parts,
+            List<LocationBoardItem> boards,
+            int totalPartTypes,
+            BigDecimal totalQuantity
+    ) {
+        this(
+                locationId,
+                code,
+                name,
+                description,
+                qrCode,
+                isFull,
+                parts,
+                boards,
+                totalPartTypes,
+                totalQuantity,
+                parts != null ? parts.size() : 0,
+                parts != null ? parts.stream().map(p -> p.amount() != null ? p.amount() : BigDecimal.ZERO).reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO,
+                boards != null ? boards.size() : 0,
+                boards != null ? boards.stream().map(b -> BigDecimal.valueOf(b.quantity() != null ? b.quantity() : 0)).reduce(BigDecimal.ZERO, BigDecimal::add) : BigDecimal.ZERO
+        );
+    }
+
     public LocationScanResponse(
             UUID locationId,
             String code,

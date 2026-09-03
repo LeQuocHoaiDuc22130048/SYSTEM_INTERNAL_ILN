@@ -38,6 +38,48 @@ export function createTimeoutController(timeoutMs = REQUEST_TIMEOUT_MS) {
 }
 
 /**
+ * Biến lưu trữ Promise làm mới token đang chạy để tránh gọi nhiều API refresh đồng thời (race condition)
+ */
+let refreshPromise: Promise<string | null> | null = null;
+
+async function doRefreshToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) {
+    return null;
+  }
+
+  try {
+    const originalFetch = window.fetch;
+    const refreshResponse = await originalFetch('/api/v1/auth/refresh', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+
+    if (refreshResponse.ok) {
+      const result = await refreshResponse.json();
+      if (result && result.data) {
+        const { accessToken, refreshToken: newRefreshToken } = result.data;
+        localStorage.setItem('accessToken', accessToken);
+        localStorage.setItem('refreshToken', newRefreshToken);
+        return accessToken;
+      }
+    } else {
+      // Refresh token đã hết hạn hoặc không hợp lệ -> xóa auth và báo hết phiên
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('currentUser');
+      window.dispatchEvent(new CustomEvent('auth:expired'));
+    }
+  } catch (e) {
+    console.error('[Auth Interceptor] Lỗi khi tự động làm mới token:', e);
+  }
+  return null;
+}
+
+/**
  * Thiết lập interceptor cho window.fetch toàn cục để tự động refresh token khi gặp lỗi 401/403.
  */
 export function setupFetchInterceptor() {
@@ -55,54 +97,42 @@ export function setupFetchInterceptor() {
 
       const refreshToken = localStorage.getItem('refreshToken');
       if (refreshToken) {
-        try {
-          const refreshResponse = await originalFetch('/api/v1/auth/refresh', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ refreshToken }),
+        if (!refreshPromise) {
+          refreshPromise = doRefreshToken().finally(() => {
+            refreshPromise = null;
           });
+        }
 
-          if (refreshResponse.ok) {
-            const result = await refreshResponse.json();
-            if (result && result.data) {
-              const { accessToken, refreshToken: newRefreshToken } = result.data;
-              localStorage.setItem('accessToken', accessToken);
-              localStorage.setItem('refreshToken', newRefreshToken);
-
-              // Cập nhật Authorization header trong init
-              const newInit = init ? { ...init } : {};
-              if (newInit.headers) {
-                if (newInit.headers instanceof Headers) {
-                  newInit.headers.set('Authorization', `Bearer ${accessToken}`);
-                } else if (Array.isArray(newInit.headers)) {
-                  const headersArray = [...newInit.headers];
-                  const authIndex = headersArray.findIndex(h => h[0].toLowerCase() === 'authorization');
-                  if (authIndex !== -1) {
-                    headersArray[authIndex] = ['Authorization', `Bearer ${accessToken}`];
-                  } else {
-                    headersArray.push(['Authorization', `Bearer ${accessToken}`]);
-                  }
-                  newInit.headers = headersArray;
-                } else {
-                  newInit.headers = {
-                    ...newInit.headers,
-                    'Authorization': `Bearer ${accessToken}`
-                  };
-                }
+        const newAccessToken = await refreshPromise;
+        if (newAccessToken) {
+          // Cập nhật Authorization header trong init
+          const newInit = init ? { ...init } : {};
+          if (newInit.headers) {
+            if (newInit.headers instanceof Headers) {
+              newInit.headers.set('Authorization', `Bearer ${newAccessToken}`);
+            } else if (Array.isArray(newInit.headers)) {
+              const headersArray = [...newInit.headers];
+              const authIndex = headersArray.findIndex(h => h[0].toLowerCase() === 'authorization');
+              if (authIndex !== -1) {
+                headersArray[authIndex] = ['Authorization', `Bearer ${newAccessToken}`];
               } else {
-                newInit.headers = {
-                  'Authorization': `Bearer ${accessToken}`
-                };
+                headersArray.push(['Authorization', `Bearer ${newAccessToken}`]);
               }
-
-              // Thực hiện lại request ban đầu với token mới
-              return originalFetch(input, newInit);
+              newInit.headers = headersArray;
+            } else {
+              newInit.headers = {
+                ...newInit.headers,
+                'Authorization': `Bearer ${newAccessToken}`
+              };
             }
+          } else {
+            newInit.headers = {
+              'Authorization': `Bearer ${newAccessToken}`
+            };
           }
-        } catch (e) {
-          console.error('[Auth Interceptor] Lỗi khi tự động làm mới token:', e);
+
+          // Thực hiện lại request ban đầu với token mới
+          return originalFetch(input, newInit);
         }
       }
     }
@@ -110,3 +140,4 @@ export function setupFetchInterceptor() {
     return response;
   };
 }
+

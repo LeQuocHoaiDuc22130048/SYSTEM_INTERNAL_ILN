@@ -23,11 +23,11 @@ export const EditModal: React.FC<EditModalProps> = ({
   onSaveSuccess,
 }) => {
   const [hasEditCheckIn, setHasEditCheckIn] = useState<boolean>(false);
-  const [editCheckInTime, setEditCheckInTime] = useState<string>('08:00');
+  const [editCheckInTime, setEditCheckInTime] = useState<string>('08:30');
   const [editCheckInRecordId, setEditCheckInRecordId] = useState<string | null>(null);
 
   const [hasEditCheckOut, setHasEditCheckOut] = useState<boolean>(false);
-  const [editCheckOutTime, setEditCheckOutTime] = useState<string>('17:00');
+  const [editCheckOutTime, setEditCheckOutTime] = useState<string>('17:30');
   const [editCheckOutRecordId, setEditCheckOutRecordId] = useState<string | null>(null);
 
   const [editNote, setEditNote] = useState<string>('');
@@ -39,11 +39,11 @@ export const EditModal: React.FC<EditModalProps> = ({
     const checkOutEvent = dayLog.events?.find((e: any) => e.type === 'CHECK_OUT');
 
     setHasEditCheckIn(!!checkInEvent);
-    setEditCheckInTime(checkInEvent?.logTime?.substring(0, 5) ?? '08:00');
+    setEditCheckInTime(checkInEvent?.logTime?.substring(0, 5) ?? '08:30');
     setEditCheckInRecordId(checkInEvent?.id ?? null);
 
     setHasEditCheckOut(!!checkOutEvent);
-    setEditCheckOutTime(checkOutEvent?.logTime?.substring(0, 5) ?? '17:00');
+    setEditCheckOutTime(checkOutEvent?.logTime?.substring(0, 5) ?? '17:30');
     setEditCheckOutRecordId(checkOutEvent?.id ?? null);
 
     setEditNote('');

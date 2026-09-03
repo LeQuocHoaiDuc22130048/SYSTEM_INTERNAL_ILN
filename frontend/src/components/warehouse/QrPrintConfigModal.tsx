@@ -22,26 +22,26 @@ import {
 import './QrPrintConfigModal.css';
 
 const DEFAULT_CONFIG: QrPrintConfig = {
-  printerDriver: 'system_default',
+  printerDriver: 'tns_label_thermal',
   printerDpi: 203,
   printMode: 'direct_thermal',
   printDarkness: 8,
   printSpeed: 4,
   template: 'mobile_standard',
-  presetSize: '40x50',
-  widthMm: 40,
+  presetSize: '50x50',
+  widthMm: 50,
   heightMm: 50,
-  qrSizePx: 95,
-  titleFontSize: 10,
+  qrSizePx: 110,
+  titleFontSize: 11,
   codeFontSize: 12,
   layoutOrder: 'qr_top',
   textAlign: 'center',
-  paddingMm: 1.5,
+  paddingMm: 2,
   borderWidthPx: 1.5,
-  borderRadiusPx: 6,
+  borderRadiusPx: 4,
   showBorder: true,
   showName: true,
-  showModel: false,
+  showModel: true,
   showLocation: true,
   showCodeText: true,
   showSerialNumber: false,
@@ -54,7 +54,7 @@ interface QrPrintConfigModalProps {
   locations?: LocationQrExportData[];
   boards?: BoardQrExportData[]; // backward compatibility
   onClose: () => void;
-  onConfirmPrint: (config: QrPrintConfig) => void;
+  onConfirmPrint: (config: QrPrintConfig, selectedItems?: LocationQrExportData[]) => void;
 }
 
 export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
@@ -111,11 +111,16 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
     return printItems[Math.min(activeIndex, printItems.length - 1)] || printItems[0];
   }, [printItems, activeIndex]);
 
+  const cleanLocationCode = useMemo(() => {
+    return (activeItem?.code || activeItem?.qrCode || 'LOC-A1').replace(/_QR$/i, '').trim();
+  }, [activeItem]);
+
+  const qrValue = cleanLocationCode;
+
   // Generate Base64 QR code for preview
   useEffect(() => {
-    const qrValue = (activeItem.code || activeItem.qrCode || 'N/A').replace(/_QR$/i, '').trim();
     generateQrDataUrl(qrValue).then((url) => setPreviewQrUrl(url));
-  }, [activeItem]);
+  }, [qrValue]);
 
   const handleCopyModalQr = () => {
     const rawQrText = (activeItem.code || activeItem.qrCode || '').replace(/_QR$/i, '').trim();
@@ -138,6 +143,33 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
     let pad = config.paddingMm;
 
     switch (preset) {
+      case '50x50':
+        w = 50;
+        h = 50;
+        t = 'mobile_standard';
+        q = 115;
+        titleFs = 12;
+        codeFs = 13;
+        pad = 2;
+        break;
+      case '50x30':
+        w = 50;
+        h = 30;
+        t = 'mobile_standard';
+        q = 80;
+        titleFs = 10;
+        codeFs = 11;
+        pad = 1.5;
+        break;
+      case '40x30':
+        w = 40;
+        h = 30;
+        t = 'mobile_standard';
+        q = 75;
+        titleFs = 9;
+        codeFs = 10;
+        pad = 1.5;
+        break;
       case '40x50':
         w = 40;
         h = 50;
@@ -146,15 +178,6 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
         titleFs = 10;
         codeFs = 12;
         pad = 1.5;
-        break;
-      case '50x50':
-        w = 50;
-        h = 50;
-        t = 'mobile_standard';
-        q = 110;
-        titleFs = 11;
-        codeFs = 13;
-        pad = 2;
         break;
       case '50x40':
         w = 50;
@@ -246,6 +269,9 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
     setTimeout(() => {
       let msg = '';
       switch (config.printerDriver) {
+        case 'tns_label_thermal':
+          msg = '✅ Đã kết nối máy in nhiệt TNS_LABEL (Port USB001, Driver: LABEL). Sẵn sàng in tem 50x50 mm!';
+          break;
         case 'eleph_phomemo':
           msg = '✅ Driver Eleph-label / Phomemo sẵn sàng (203 DPI, Nhiệt trực tiếp)';
           break;
@@ -262,12 +288,12 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
           msg = '⚡ Đã phát hiện máy in tem USB/Serial trên thiết bị!';
           break;
         default:
-          msg = '✅ Driver Máy in hệ thống (Windows/macOS) sẵn sàng!';
+          msg = '✅ Driver Máy in hệ thống TNS_LABEL sẵn sàng!';
           break;
       }
       setTestDriverStatus(msg);
-      setTimeout(() => setTestDriverStatus(null), 4000);
-    }, 600);
+      setTimeout(() => setTestDriverStatus(null), 4500);
+    }, 400);
   };
 
   const handleSaveDefaults = () => {
@@ -288,19 +314,17 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
 
   if (!isOpen) return null;
 
-  const qrValue = (activeItem.code || activeItem.qrCode || 'N/A').replace(/_QR$/i, '').trim();
-
   return (
     <div className="qr-print-modal-overlay">
       <div className="qr-print-modal-container">
         {/* Header */}
         <div className="qr-print-modal-header">
-          <div>
+          <div className="qr-print-modal-title">
             <h3>
               <MapPin size={22} color="#0284c7" />
-              <span>In Tem Nhãn QR Vị Trí Kho / Kệ Kho</span>
+              <span>In Tem Nhãn QR Vị Trí Kho / Linh Kiện</span>
             </h3>
-            <p>Khổ giấy tem nhãn chuẩn 50x50mm, 50x40mm cho máy in tem nhiệt (TNS_LABEL, Xprinter, Phomemo,...)</p>
+            <p>Khổ tem nhiệt chuẩn 50x50mm cho máy in TNS_LABEL (DLabel, Xprinter, TSC...)</p>
           </div>
           <button className="btn-close-modal" onClick={onClose} title="Đóng">
             <X size={20} />
@@ -330,12 +354,12 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                       }))
                     }
                   >
-                    <option value="system_default">🖨️ Máy in mặc định hệ thống (TNS, Xprinter...)</option>
-                    <option value="eleph_phomemo">📱 Eleph-label / Phomemo</option>
+                    <option value="tns_label_thermal">🖨️ TNS_LABEL (Máy in nhiệt USB - DLabel)</option>
+                    <option value="system_default">🖨️ Máy in mặc định hệ thống</option>
                     <option value="xprinter_tspl">🏷️ Xprinter / TSC (TSPL Direct)</option>
+                    <option value="eleph_phomemo">📱 Phomemo / Niimbot</option>
                     <option value="godex_ezpl">🏷️ GoDEX / Bixolon (EZPL)</option>
                     <option value="pdf_virtual">📄 Máy in ảo PDF / Xem trước PDF</option>
-                    <option value="web_usb_direct">⚡ WebUSB Direct Thermal</option>
                   </select>
                 </div>
 
@@ -351,7 +375,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                       }))
                     }
                   >
-                    <option value={203}>203 DPI (Máy in di động tiêu chuẩn)</option>
+                    <option value={203}>203 DPI (Máy in di động / TNS_LABEL)</option>
                     <option value={300}>300 DPI (Máy in nhiệt công nghiệp nét cao)</option>
                   </select>
                 </div>
@@ -364,7 +388,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                   onClick={handleTestPrinterDriver}
                 >
                   <Zap size={14} />
-                  <span>Kiểm tra cổng giao tiếp Driver</span>
+                  <span>Kiểm tra cổng giao tiếp Driver TNS_LABEL</span>
                 </button>
               </div>
 
@@ -385,24 +409,38 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
               <div className="preset-buttons-row">
                 <button
                   type="button"
-                  className={`preset-btn ${config.presetSize === '40x50' ? 'active' : ''}`}
-                  onClick={() => handlePresetChange('40x50')}
-                >
-                  40 x 50 mm (Máy TNS_LABEL)
-                </button>
-                <button
-                  type="button"
                   className={`preset-btn ${config.presetSize === '50x50' ? 'active' : ''}`}
                   onClick={() => handlePresetChange('50x50')}
                 >
-                  50 x 50 mm (Vuông)
+                  ⭐ 50 x 50 mm (TNS_LABEL Vuông)
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${config.presetSize === '50x30' ? 'active' : ''}`}
+                  onClick={() => handlePresetChange('50x30')}
+                >
+                  50 x 30 mm
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${config.presetSize === '40x30' ? 'active' : ''}`}
+                  onClick={() => handlePresetChange('40x30')}
+                >
+                  40 x 30 mm
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${config.presetSize === '40x50' ? 'active' : ''}`}
+                  onClick={() => handlePresetChange('40x50')}
+                >
+                  40 x 50 mm
                 </button>
                 <button
                   type="button"
                   className={`preset-btn ${config.presetSize === '50x40' ? 'active' : ''}`}
                   onClick={() => handlePresetChange('50x40')}
                 >
-                  50 x 40 mm (Ngang)
+                  50 x 40 mm
                 </button>
                 <button
                   type="button"
@@ -417,13 +455,6 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                   onClick={() => handlePresetChange('70x50')}
                 >
                   70 x 50 mm
-                </button>
-                <button
-                  type="button"
-                  className={`preset-btn ${config.presetSize === '70x30' ? 'active' : ''}`}
-                  onClick={() => handlePresetChange('70x30')}
-                >
-                  70 x 30 mm
                 </button>
                 <button
                   type="button"
@@ -595,12 +626,11 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                 <span>Xem Trước Tem ({config.widthMm}mm x {config.heightMm}mm)</span>
               </span>
 
-              {printItems && printItems.length > 1 && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
-                  <span>Chọn vị trí:</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {printItems && printItems.length > 1 && (
                   <select
                     className="control-select"
-                    style={{ width: 'auto', padding: '4px 8px' }}
+                    style={{ width: 'auto', padding: '3px 6px', fontSize: '12px' }}
                     value={activeIndex}
                     onChange={(e) => setActiveIndex(Number(e.target.value))}
                   >
@@ -610,8 +640,30 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                       </option>
                     ))}
                   </select>
-                </div>
-              )}
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => onConfirmPrint(config, [activeItem])}
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    backgroundColor: '#10b981',
+                    color: '#ffffff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '4px 10px',
+                    fontSize: '12px',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                  title="In ngay tem đang xem trên máy in TNS_LABEL"
+                >
+                  <Printer size={13} />
+                  <span>In tem này</span>
+                </button>
+              </div>
             </div>
 
             {/* Viewport Render Canvas */}
@@ -702,11 +754,16 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                     </div>
                   )}
 
-                  {activeItem.totalPartTypes !== undefined && (
-                    <div className="live-qr-subtext" style={{ fontSize: '9px', color: '#64748b' }}>
-                      {activeItem.totalPartTypes} loại linh kiện
+                  {((activeItem.partTypesCount !== undefined && activeItem.partTypesCount > 0) || (activeItem.boardTypesCount !== undefined && activeItem.boardTypesCount > 0)) ? (
+                    <div style={{ fontSize: '8px', fontWeight: 700, color: '#0f172a', display: 'flex', justifyContent: 'space-around', width: '100%', marginTop: '2px' }}>
+                      <span>📦 LK: {activeItem.partTypesCount || 0} ({activeItem.partQuantity || 0})</span>
+                      <span>⚡ Bo: {activeItem.boardTypesCount || 0} ({activeItem.boardQuantity || 0})</span>
                     </div>
-                  )}
+                  ) : activeItem.totalPartTypes !== undefined && activeItem.totalPartTypes > 0 ? (
+                    <div className="live-qr-subtext" style={{ fontSize: '9px', color: '#64748b' }}>
+                      {activeItem.totalPartTypes} loại hàng tồn
+                    </div>
+                  ) : null}
 
                   {config.showCodeText && (
                     <div
@@ -763,10 +820,21 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
             <button className="btn-secondary" onClick={onClose}>
               Hủy bỏ
             </button>
-            <button className="btn-primary-print" onClick={handlePrintClick}>
+            {printItems.length > 1 && (
+              <button
+                className="btn-secondary"
+                onClick={() => onConfirmPrint(config, [activeItem])}
+                style={{ fontWeight: 600, color: '#0369a1', borderColor: '#bae6fd', backgroundColor: '#f0f9ff' }}
+                title={`Chỉ in riêng tem vị trí: ${activeItem.name}`}
+              >
+                <Printer size={15} />
+                <span>In riêng tem #{activeIndex + 1} ({activeItem.code})</span>
+              </button>
+            )}
+            <button className="btn-primary-print" onClick={handlePrintClick} style={{ backgroundColor: '#0284c7', fontSize: '14px', padding: '10px 22px' }}>
               <Printer size={18} />
               <span>
-                In {printItems.length} Tem Nhãn Vị Trí
+                {printItems.length > 1 ? `🖨️ In Tem Ngay (Tất cả ${printItems.length} tem)` : '🖨️ In Tem Ngay (TNS_LABEL)'}
               </span>
             </button>
           </div>

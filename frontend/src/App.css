@@ -351,6 +351,8 @@
 .mini-day.v { background-color: var(--color-leave); }
 .mini-day.h { background-color: #cbd5e1; }
 .mini-day.o { background-color: var(--color-ot); }
+.mini-day.m { background-color: #0284c7; }
+.mini-day.c { background-color: #0ea5e9; }
 .mini-day.f { background-color: #e2e8f0; opacity: 0.5; }
 
 .tooltip {
@@ -577,6 +579,8 @@
 .calendar-cell.v { background-color: var(--color-leave-light); border: 0.5px solid var(--color-leave); color: var(--color-leave); }
 .calendar-cell.h { background-color: var(--color-holiday-light); border: 0.5px solid #cbd5e1; color: var(--color-holiday); }
 .calendar-cell.o { background-color: var(--color-ot-light); border: 0.5px solid var(--color-ot); color: var(--color-ot); }
+.calendar-cell.m { background-color: #e0f2fe; border: 0.5px solid #0284c7; color: #0369a1; }
+.calendar-cell.c { background-color: #e0f2fe; border: 0.5px solid #0284c7; color: #0369a1; }
 .calendar-cell.f { background-color: #f8fafc; border: 0.5px dashed #cbd5e1; color: var(--color-text-light); opacity: 0.6; }
 
 .calendar-date {
@@ -597,6 +601,8 @@
 .calendar-cell.v .calendar-status { background-color: var(--color-leave); color: white; }
 .calendar-cell.h .calendar-status { background-color: var(--color-holiday); color: white; }
 .calendar-cell.o .calendar-status { background-color: var(--color-ot); color: white; }
+.calendar-cell.m .calendar-status { background-color: #0284c7; color: white; }
+.calendar-cell.c .calendar-status { background-color: #0284c7; color: white; }
 
 .calendar-cell-top {
   display: flex;

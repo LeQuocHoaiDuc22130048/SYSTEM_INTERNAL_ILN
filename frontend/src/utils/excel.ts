@@ -207,8 +207,16 @@ export async function exportAttendanceExcel(
         : 'f';
 
       const isWorked = statusChar === 'p' || statusChar === 'l' || statusChar === 'o';
+      const isHalfDay = statusChar === 'm' || statusChar === 'c';
 
-      if (isWorked) {
+      if (isHalfDay) {
+        cell.value = 0.5;
+        cell.font = { name: 'Arial', size: 10, bold: true };
+        if (isSunday) {
+          cell.fill = yellowFill;
+          cell.font = { name: 'Arial', size: 10, color: { argb: 'FFD66A00' }, bold: true };
+        }
+      } else if (isWorked) {
         if (isSunday) {
           cell.value = 1.5;
           cell.fill = yellowFill;
@@ -400,7 +408,9 @@ export async function exportEmployeeHistoryExcel(
   worksheet.getCell('E4').font = { bold: true };
 
   worksheet.getCell('A5').value = 'Ca làm việc:';
-  worksheet.getCell('B5').value = `${historyData.employee.shiftName || 'Ca hành chính'} (${historyData.employee.shiftStart || '08:00'} - ${historyData.employee.shiftEnd || '17:00'})`;
+  worksheet.getCell('B5').value = historyData.employee.shiftName
+    ? historyData.employee.shiftName
+    : `Ca hành chính (Sáng: ${historyData.employee.shiftStart || '08:30'} - 12:00, Chiều: 13:30 - ${historyData.employee.shiftEnd || '17:30'})`;
   worksheet.getCell('B5').font = { bold: true };
 
   // Khối thống kê: Cột G & H
@@ -441,7 +451,14 @@ export async function exportEmployeeHistoryExcel(
     if (checkInEvent && checkOutEvent) {
       const [ih, im] = checkInEvent.logTime.split(':').map(Number);
       const [oh, om] = checkOutEvent.logTime.split(':').map(Number);
-      hoursVal = parseFloat(((oh * 60 + om - (ih * 60 + im)) / 60).toFixed(2));
+      const inMinutes = ih * 60 + im;
+      const outMinutes = oh * 60 + om;
+      let diffMin = outMinutes - inMinutes;
+      // Khấu trừ 90 phút (1.5h) nghỉ trưa 12:00 - 13:30 nếu làm cả ngày qua 2 ca
+      if (inMinutes < 12 * 60 + 30 && outMinutes > 13 * 60) {
+        diffMin = Math.max(0, diffMin - 90);
+      }
+      hoursVal = parseFloat(((Math.max(0, diffMin)) / 60).toFixed(2));
     }
 
     // Format ngày sang DD/MM/YYYY
@@ -455,6 +472,9 @@ export async function exportEmployeeHistoryExcel(
       LEAVE: 'Nghỉ phép',
       HOLIDAY: 'Cuối tuần / Lễ',
       OVERTIME: 'Tăng ca',
+      HALF_DAY_MORNING: 'Nửa công (Ca sáng)',
+      HALF_DAY_AFTERNOON: 'Nửa công (Ca chiều)',
+      HALF_DAY: 'Nửa công (0.5)',
       FUTURE: '-'
     };
     const statusLabel = STATUS_MAP[day.status as keyof typeof STATUS_MAP] || day.status;

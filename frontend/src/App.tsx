@@ -115,6 +115,17 @@ function App() {
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
+  // Lắng nghe sự kiện hết hạn phiên đăng nhập từ fetch interceptor
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      setIsAuthenticated(false);
+      setCurrentUser(null);
+      showToast('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
+    };
+    window.addEventListener('auth:expired', handleAuthExpired);
+    return () => window.removeEventListener('auth:expired', handleAuthExpired);
+  }, [showToast]);
+
   const handleLogout = useCallback(async () => {
     const refreshToken = localStorage.getItem('refreshToken');
     try {

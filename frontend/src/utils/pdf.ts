@@ -8,6 +8,10 @@ export interface LocationQrExportData {
   description?: string;
   totalPartTypes?: number;
   totalQuantity?: number;
+  partTypesCount?: number;
+  partQuantity?: number;
+  boardTypesCount?: number;
+  boardQuantity?: number;
 }
 
 export interface BoardQrExportData {
@@ -21,6 +25,7 @@ export interface BoardQrExportData {
 }
 
 export type PrinterDriverType =
+  | 'tns_label_thermal'
   | 'system_default'
   | 'eleph_phomemo'
   | 'xprinter_tspl'
@@ -35,7 +40,7 @@ export interface QrPrintConfig {
   printDarkness: number;
   printSpeed: number;
   template: 'mobile_standard' | 'compact' | 'detailed' | 'horizontal' | 'grid';
-  presetSize: '50x50' | '50x40' | '40x50' | '40x40' | '60x40' | '70x50' | '70x30' | 'a4' | 'custom';
+  presetSize: '50x50' | '50x30' | '40x30' | '50x40' | '40x50' | '40x40' | '60x40' | '70x50' | '70x30' | 'a4' | 'custom';
   widthMm: number;
   heightMm: number;
   qrSizePx: number;
@@ -56,27 +61,27 @@ export interface QrPrintConfig {
 }
 
 export const DEFAULT_QR_PRINT_CONFIG: QrPrintConfig = {
-  printerDriver: 'system_default',
+  printerDriver: 'tns_label_thermal',
   printerDpi: 203,
   printMode: 'direct_thermal',
   printDarkness: 8,
   printSpeed: 4,
   template: 'mobile_standard',
-  presetSize: '40x50',
-  widthMm: 40,
+  presetSize: '50x50',
+  widthMm: 50,
   heightMm: 50,
-  qrSizePx: 95,
-  titleFontSize: 10,
+  qrSizePx: 110,
+  titleFontSize: 11,
   codeFontSize: 12,
   layoutOrder: 'qr_top',
   textAlign: 'center',
-  paddingMm: 1.5,
+  paddingMm: 2,
   borderWidthPx: 1.5,
-  borderRadiusPx: 6,
+  borderRadiusPx: 4,
   showBorder: true,
   showName: true,
   showModel: true,
-  showLocation: false,
+  showLocation: true,
   showCodeText: true,
   showSerialNumber: false,
 };
@@ -200,28 +205,33 @@ export async function exportLocationQrPdfList(
 
       return `
         <div class="qr-card">
+          ${
+            config.showName && loc.name
+              ? `<div class="qr-title">${escapeHtml(loc.name)}</div>`
+              : ''
+          }
           <div class="qr-image-wrapper">
             ${qrSvg}
           </div>
           <div class="qr-info-meta" style="align-items: ${alignItemCss}; text-align: ${textAlignCss};">
             ${
-              config.showName && loc.name
-                ? `<div class="qr-title">${escapeHtml(loc.name)}</div>`
-                : ''
-            }
-            ${
-              loc.totalPartTypes !== undefined
-                ? `<div class="qr-subtext" style="font-size: 7.5px; color: #64748b;">${loc.totalPartTypes} loại linh kiện</div>`
-                : ''
-            }
-            ${
               config.showCodeText
                 ? `
                 <div class="qr-code-box">
-                  <span class="qr-code-label">MÃ VỊ TRÍ KHO:</span>
+                  <span class="qr-code-label">VỊ TRÍ KHO:</span>
                   <span class="qr-code-text">${escapeHtml(cleanCode)}</span>
                 </div>
               `
+                : ''
+            }
+            ${
+              (loc.partTypesCount !== undefined && loc.partTypesCount > 0) || (loc.boardTypesCount !== undefined && loc.boardTypesCount > 0)
+                ? `<div class="qr-stats-row" style="font-size: 8px; font-weight: 700; color: #000; display: flex; justify-content: space-around; width: 100%; margin-top: 1px;">
+                    <span>📦 LK: ${loc.partTypesCount || 0} (${loc.partQuantity || 0})</span>
+                    <span>⚡ Bo: ${loc.boardTypesCount || 0} (${loc.boardQuantity || 0})</span>
+                  </div>`
+                : loc.totalPartTypes !== undefined && loc.totalPartTypes > 0
+                ? `<div class="qr-subtext" style="font-size: 8px; color: #000; font-weight: 600;">${loc.totalPartTypes} loại hàng tồn</div>`
                 : ''
             }
           </div>

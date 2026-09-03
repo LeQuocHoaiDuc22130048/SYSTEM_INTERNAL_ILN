@@ -22,7 +22,7 @@ export const ManualModal: React.FC<ManualModalProps> = ({
   onSaveSuccess,
 }) => {
   const [manualType, setManualType] = useState<AttendanceCheckType>('IN');
-  const [manualTime, setManualTime] = useState<string>('08:00');
+  const [manualTime, setManualTime] = useState<string>('08:30');
   const [manualNote, setManualNote] = useState<string>('');
   const [manualSubmitting, setManualSubmitting] = useState<boolean>(false);
 

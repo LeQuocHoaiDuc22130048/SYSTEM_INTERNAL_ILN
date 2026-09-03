@@ -78,6 +78,10 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
       ABSENT: <span className="pill-badge absent">Vắng KP</span>,
       LEAVE: <span className="pill-badge leave">Nghỉ phép</span>,
       HOLIDAY: <span className="pill-badge holiday">Nghỉ lễ/CN</span>,
+      OVERTIME: <span className="pill-badge ot">Tăng ca</span>,
+      HALF_DAY_MORNING: <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (Sáng)</span>,
+      HALF_DAY_AFTERNOON: <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (Chiều)</span>,
+      HALF_DAY: <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (0.5)</span>,
       FUTURE: null,
     };
     return badgeMap[status] ?? <span className="pill-badge holiday">Nghỉ lễ/CN</span>;
@@ -92,14 +96,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     let realMsg = 'Thực làm: 0h';
 
     if (inEvent) {
-      const [sh, sm] = shiftStart.split(':').map(Number);
+      const [sh, sm] = (shiftStart || '08:30').split(':').map(Number);
       const [eh, em] = inEvent.logTime.split(':').map(Number);
       const diffMin = (eh * 60 + em) - (sh * 60 + sm);
       inMsg = diffMin > LATE_GRACE_MINUTES ? `Vào: muộn +${diffMin}p` : 'Vào: đúng giờ';
     }
 
     if (outEvent) {
-      const [sh, sm] = shiftEnd.split(':').map(Number);
+      const [sh, sm] = (shiftEnd || '17:30').split(':').map(Number);
       const [eh, em] = outEvent.logTime.split(':').map(Number);
       const diffMin = (sh * 60 + sm) - (eh * 60 + em);
       outMsg = diffMin > 5 ? `Ra: sớm -${diffMin}p` : 'Ra: đúng giờ';
@@ -108,7 +112,13 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     if (inEvent && outEvent) {
       const [ih, im] = inEvent.logTime.split(':').map(Number);
       const [oh, om] = outEvent.logTime.split(':').map(Number);
-      const diffMin = (oh * 60 + om) - (ih * 60 + im);
+      const inMin = ih * 60 + im;
+      const outMin = oh * 60 + om;
+      let diffMin = outMin - inMin;
+      // Trừ 1.5h nghỉ trưa nếu làm cả ngày qua 2 ca
+      if (inMin < 12 * 60 + 30 && outMin > 13 * 60) {
+        diffMin = Math.max(0, diffMin - 90);
+      }
       const hrs = Math.floor(diffMin / 60);
       const mins = diffMin % 60;
       realMsg = `Thực làm: ${hrs}h${mins.toString().padStart(2, '0')}m`;
@@ -146,7 +156,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
               <span className="modal-emp-meta">
                 Phòng ban: <strong>{employee.dept}</strong> &middot;{' '}
                 Tháng {currentMonth}/{currentYear} &middot;{' '}
-                Ca làm việc: <strong>Ca hành chính (08:00 - 17:00)</strong>
+                Ca làm việc: <strong>{historyData?.employee.shiftName || 'Ca hành chính (08:30 - 12:00, 13:30 - 17:30)'}</strong>
               </span>
             </div>
           </div>

@@ -11,7 +11,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-import { getAuthHeaders } from '../../utils/auth';
+import { getAuthHeaders, getJsonAuthHeaders } from '../../utils/auth';
 import type { LocationScanData, LocationPartItem } from '../../types/warehouse';
 
 interface LocationQrScanModalProps {
@@ -116,7 +116,7 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
     try {
       const res = await fetch(`/api/v1/parts/locations/${scanResult.locationId}`, {
         method: 'PATCH',
-        headers: getAuthHeaders(),
+        headers: getJsonAuthHeaders(),
         body: JSON.stringify({
           code: editCode.trim(),
           name: editName.trim(),
@@ -292,8 +292,11 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                  <span style={{ backgroundColor: '#2563eb', color: '#fff', padding: '4px 12px', borderRadius: '12px', fontSize: '0.82rem', fontWeight: 600 }}>
-                    {scanResult.totalPartTypes} loại linh kiện · Tổng SL: {scanResult.totalQuantity}
+                  <span style={{ backgroundColor: '#059669', color: '#fff', padding: '4px 10px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600 }}>
+                    📦 Linh kiện: {scanResult.parts?.length || scanResult.partTypesCount || 0} loại ({scanResult.partQuantity !== undefined ? scanResult.partQuantity : (scanResult.parts?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0)})
+                  </span>
+                  <span style={{ backgroundColor: '#4f46e5', color: '#fff', padding: '4px 10px', borderRadius: '8px', fontSize: '0.82rem', fontWeight: 600 }}>
+                    ⚡ Bo mạch: {scanResult.boards?.length || scanResult.boardTypesCount || 0} loại ({scanResult.boardQuantity !== undefined ? scanResult.boardQuantity : (scanResult.boards?.reduce((sum, b) => sum + (b.quantity || 0), 0) || 0)})
                   </span>
 
                   {onPrintLocationQr && (

@@ -16,7 +16,7 @@ import {
   LayoutGrid,
   List,
 } from 'lucide-react';
-import { getAuthHeaders } from '../../utils/auth';
+import { getAuthHeaders, getJsonAuthHeaders } from '../../utils/auth';
 
 export interface LocationItem {
   id: string;
@@ -26,6 +26,10 @@ export interface LocationItem {
   qrCode?: string;
   totalPartTypes?: number;
   totalQuantity?: number;
+  partTypesCount?: number;
+  partQuantity?: number;
+  boardTypesCount?: number;
+  boardQuantity?: number;
 }
 
 interface LocationListPanelProps {
@@ -129,7 +133,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
         // Update
         const res = await fetch(`/api/v1/parts/locations/${editingLocation.id}`, {
           method: 'PATCH',
-          headers: getAuthHeaders(),
+          headers: getJsonAuthHeaders(),
           body: JSON.stringify({
             code: formCode.trim().toUpperCase(),
             name: formName.trim(),
@@ -149,7 +153,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
         // Create
         const res = await fetch('/api/v1/parts/locations', {
           method: 'POST',
-          headers: getAuthHeaders(),
+          headers: getJsonAuthHeaders(),
           body: JSON.stringify({
             code: formCode.trim().toUpperCase(),
             name: formName.trim(),
@@ -577,17 +581,21 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                     <th style={{ padding: '12px 16px' }}>Tên Vị Trí / Kệ</th>
                     <th style={{ padding: '12px 16px' }}>Mô Tả</th>
                     <th style={{ padding: '12px 16px' }}>Mã QR</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Số Loại LK</th>
-                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Tổng Tồn Kho</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Linh Kiện</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Bo Mạch</th>
+                    <th style={{ padding: '12px 16px', textAlign: 'center' }}>Tổng Tồn</th>
                     <th style={{ padding: '12px 16px', textAlign: 'center' }}>Trạng Thái</th>
                     <th style={{ padding: '12px 16px', textAlign: 'right' }}>Thao Tác</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredLocations.map((loc, idx) => {
-                    const partCount = loc.totalPartTypes || 0;
-                    const totalQty = loc.totalQuantity || 0;
-                    const isOccupied = partCount > 0 || totalQty > 0;
+                    const partCount = loc.partTypesCount !== undefined ? loc.partTypesCount : (loc.totalPartTypes || 0);
+                    const partQty = loc.partQuantity !== undefined ? loc.partQuantity : 0;
+                    const boardCount = loc.boardTypesCount !== undefined ? loc.boardTypesCount : 0;
+                    const boardQty = loc.boardQuantity !== undefined ? loc.boardQuantity : 0;
+                    const totalQty = loc.totalQuantity !== undefined ? loc.totalQuantity : (partQty + boardQty);
+                    const isOccupied = partCount > 0 || partQty > 0 || boardCount > 0 || boardQty > 0;
 
                     return (
                       <tr
@@ -625,10 +633,37 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                         <td style={{ padding: '12px 16px', fontFamily: 'monospace', fontSize: '12px', color: '#475569' }}>
                           {loc.qrCode || loc.code}
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: isOccupied ? '#059669' : '#94a3b8' }}>
-                          {partCount}
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: partQty > 0 || partCount > 0 ? '#ecfdf5' : '#f8fafc',
+                              color: partQty > 0 || partCount > 0 ? '#059669' : '#94a3b8',
+                              border: `1px solid ${partQty > 0 || partCount > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                            }}
+                          >
+                            📦 {partCount} loại ({partQty})
+                          </span>
                         </td>
-                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: isOccupied ? '#0284c7' : '#94a3b8' }}>
+                        <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              fontWeight: 600,
+                              padding: '2px 8px',
+                              borderRadius: '6px',
+                              backgroundColor: boardQty > 0 || boardCount > 0 ? '#eff6ff' : '#f8fafc',
+                              color: boardQty > 0 || boardCount > 0 ? '#2563eb' : '#94a3b8',
+                              border: `1px solid ${boardQty > 0 || boardCount > 0 ? '#bfdbfe' : '#e2e8f0'}`,
+                            }}
+                          >
+                            ⚡ {boardCount} loại ({boardQty})
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 16px', textAlign: 'center', fontWeight: 700, color: isOccupied ? '#0f172a' : '#94a3b8' }}>
                           {totalQty}
                         </td>
                         <td style={{ padding: '12px 16px', textAlign: 'center' }}>
@@ -751,9 +786,12 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
             }}
           >
             {filteredLocations.map((loc) => {
-              const partCount = loc.totalPartTypes || 0;
-              const totalQty = loc.totalQuantity || 0;
-              const isOccupied = partCount > 0 || totalQty > 0;
+              const partCount = loc.partTypesCount !== undefined ? loc.partTypesCount : (loc.totalPartTypes || 0);
+              const partQty = loc.partQuantity !== undefined ? loc.partQuantity : 0;
+              const boardCount = loc.boardTypesCount !== undefined ? loc.boardTypesCount : 0;
+              const boardQty = loc.boardQuantity !== undefined ? loc.boardQuantity : 0;
+              const totalQty = loc.totalQuantity !== undefined ? loc.totalQuantity : (partQty + boardQty);
+              const isOccupied = partCount > 0 || partQty > 0 || boardCount > 0 || boardQty > 0;
 
               return (
                 <div
@@ -894,51 +932,82 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                     </div>
                   </div>
 
-                  {/* Footer & Part Count */}
+                  {/* Footer & Badges */}
                   <div
                     style={{
                       borderTop: '1px solid #f1f5f9',
                       paddingTop: '12px',
                       marginTop: '8px',
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
+                      flexDirection: 'column',
+                      gap: '8px',
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: '12px',
-                        fontWeight: 600,
-                        color: isOccupied ? '#059669' : '#94a3b8',
-                        backgroundColor: isOccupied ? '#ecfdf5' : '#f8fafc',
-                        padding: '3px 10px',
-                        borderRadius: '6px',
-                      }}
-                    >
-                      {isOccupied ? `${partCount} loại LK (Tồn: ${totalQty})` : 'Trống (0 linh kiện)'}
-                    </span>
-
-                    {isOccupied && (
-                      <button
-                        type="button"
-                        onClick={() => onViewLocationParts(loc.code)}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                      <span
                         style={{
-                          background: 'none',
-                          border: 'none',
-                          color: '#2563eb',
-                          fontSize: '12px',
+                          fontSize: '11.5px',
                           fontWeight: 600,
-                          cursor: 'pointer',
+                          color: partQty > 0 || partCount > 0 ? '#059669' : '#94a3b8',
+                          backgroundColor: partQty > 0 || partCount > 0 ? '#ecfdf5' : '#f8fafc',
+                          border: `1px solid ${partQty > 0 || partCount > 0 ? '#a7f3d0' : '#e2e8f0'}`,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
                           display: 'inline-flex',
                           alignItems: 'center',
-                          gap: '3px',
-                          padding: 0,
+                          gap: '4px',
                         }}
                       >
-                        <span>Xem linh kiện</span>
-                        <ArrowRight size={13} />
-                      </button>
-                    )}
+                        <span>📦 Linh kiện:</span>
+                        <b>{partCount} loại ({partQty})</b>
+                      </span>
+
+                      <span
+                        style={{
+                          fontSize: '11.5px',
+                          fontWeight: 600,
+                          color: boardQty > 0 || boardCount > 0 ? '#2563eb' : '#94a3b8',
+                          backgroundColor: boardQty > 0 || boardCount > 0 ? '#eff6ff' : '#f8fafc',
+                          border: `1px solid ${boardQty > 0 || boardCount > 0 ? '#bfdbfe' : '#e2e8f0'}`,
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '4px',
+                        }}
+                      >
+                        <span>⚡ Bo mạch:</span>
+                        <b>{boardCount} loại ({boardQty})</b>
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '2px' }}>
+                      <span style={{ fontSize: '11.5px', color: '#64748b' }}>
+                        Tổng tồn: <strong style={{ color: '#0f172a' }}>{totalQty}</strong>
+                      </span>
+
+                      {isOccupied && (
+                        <button
+                          type="button"
+                          onClick={() => onViewLocationParts(loc.code)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#2563eb',
+                            fontSize: '12px',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            padding: 0,
+                          }}
+                        >
+                          <span>Xem chi tiết</span>
+                          <ArrowRight size={13} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );

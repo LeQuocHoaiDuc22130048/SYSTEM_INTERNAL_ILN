@@ -10,7 +10,7 @@ import {
   AlertCircle,
   PackageCheck,
 } from 'lucide-react';
-import { getAuthHeaders } from '../../utils/auth';
+import { getAuthHeaders, getJsonAuthHeaders } from '../../utils/auth';
 
 export interface LocationItem {
   id: string;
@@ -20,6 +20,10 @@ export interface LocationItem {
   qrCode?: string;
   totalPartTypes?: number;
   totalQuantity?: number;
+  partTypesCount?: number;
+  partQuantity?: number;
+  boardTypesCount?: number;
+  boardQuantity?: number;
 }
 
 interface LocationManagementModalProps {
@@ -95,7 +99,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
         // Update
         const res = await fetch(`/api/v1/parts/locations/${editingLocation.id}`, {
           method: 'PATCH',
-          headers: getAuthHeaders(),
+          headers: getJsonAuthHeaders(),
           body: JSON.stringify({
             code: formCode.trim(),
             name: formName.trim(),
@@ -115,7 +119,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
         // Create
         const res = await fetch('/api/v1/parts/locations', {
           method: 'POST',
-          headers: getAuthHeaders(),
+          headers: getJsonAuthHeaders(),
           body: JSON.stringify({
             code: formCode.trim(),
             name: formName.trim(),
@@ -308,8 +312,10 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {filteredLocations.map((loc) => {
-                const partCount = loc.totalPartTypes || 0;
-                const totalQty = loc.totalQuantity || 0;
+                const partCount = loc.partTypesCount !== undefined ? loc.partTypesCount : (loc.totalPartTypes || 0);
+                const partQty = loc.partQuantity !== undefined ? loc.partQuantity : 0;
+                const boardCount = loc.boardTypesCount !== undefined ? loc.boardTypesCount : 0;
+                const boardQty = loc.boardQuantity !== undefined ? loc.boardQuantity : 0;
 
                 return (
                   <div
@@ -346,21 +352,35 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
                       </div>
 
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                           <span style={{ fontWeight: 700, fontSize: '14px', color: '#0f172a' }}>
                             {loc.name}
                           </span>
                           <span
                             style={{
                               fontSize: '11px',
-                              padding: '2px 6px',
+                              padding: '2px 8px',
                               borderRadius: '4px',
-                              backgroundColor: partCount > 0 ? '#ecfdf5' : '#f8fafc',
-                              color: partCount > 0 ? '#059669' : '#94a3b8',
+                              backgroundColor: partQty > 0 || partCount > 0 ? '#ecfdf5' : '#f8fafc',
+                              color: partQty > 0 || partCount > 0 ? '#059669' : '#94a3b8',
+                              border: `1px solid ${partQty > 0 || partCount > 0 ? '#a7f3d0' : '#e2e8f0'}`,
                               fontWeight: 600,
                             }}
                           >
-                            {partCount > 0 ? `${partCount} loại linh kiện (Tồn: ${totalQty})` : 'Trống (0 linh kiện)'}
+                            📦 LK: {partCount} loại (SL: {partQty})
+                          </span>
+                          <span
+                            style={{
+                              fontSize: '11px',
+                              padding: '2px 8px',
+                              borderRadius: '4px',
+                              backgroundColor: boardQty > 0 || boardCount > 0 ? '#eff6ff' : '#f8fafc',
+                              color: boardQty > 0 || boardCount > 0 ? '#2563eb' : '#94a3b8',
+                              border: `1px solid ${boardQty > 0 || boardCount > 0 ? '#bfdbfe' : '#e2e8f0'}`,
+                              fontWeight: 600,
+                            }}
+                          >
+                            ⚡ Bo mạch: {boardCount} loại (SL: {boardQty})
                           </span>
                         </div>
 

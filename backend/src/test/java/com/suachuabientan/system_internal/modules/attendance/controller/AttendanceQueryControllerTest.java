@@ -184,10 +184,9 @@ class AttendanceQueryControllerTest {
 
         when(userRepository.findAll()).thenReturn(java.util.List.of(employee));
 
-        // Let's create records for 2026-06-01:
-        // IN at 08:15 (not late because grace is 15 mins), OUT at 18:30 (overtime starts past 18:00, so 0.5 hrs overtime)
-        java.time.Instant checkIn1 = java.time.LocalDateTime.of(2026, 6, 1, 8, 15).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
-        java.time.Instant checkOut1 = java.time.LocalDateTime.of(2026, 6, 1, 18, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        // 2026-06-01: IN at 08:30 (not late), OUT at 21:30 (overtime: past 21:00, 4.0 hrs OT from 17:30 to 21:30)
+        java.time.Instant checkIn1 = java.time.LocalDateTime.of(2026, 6, 1, 8, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        java.time.Instant checkOut1 = java.time.LocalDateTime.of(2026, 6, 1, 21, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
 
         AttendanceRecord recIn1 = AttendanceRecord.builder()
                 .employeeId(empId)
@@ -205,9 +204,8 @@ class AttendanceQueryControllerTest {
                 .build();
         recOut1.setIsDeleted(false);
 
-        // Let's create records for 2026-06-02:
-        // IN at 08:16 (late because grace is 15 mins, so > 8:15 is late), OUT at 18:00 (not overtime because OT starts after 18:00)
-        java.time.Instant checkIn2 = java.time.LocalDateTime.of(2026, 6, 2, 8, 16).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        // 2026-06-02: IN at 08:50 (late because grace is 15 mins past 08:30), OUT at 18:00 (not overtime because checkout < 21:00)
+        java.time.Instant checkIn2 = java.time.LocalDateTime.of(2026, 6, 2, 8, 50).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
         java.time.Instant checkOut2 = java.time.LocalDateTime.of(2026, 6, 2, 18, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
 
         AttendanceRecord recIn2 = AttendanceRecord.builder()
@@ -226,8 +224,48 @@ class AttendanceQueryControllerTest {
                 .build();
         recOut2.setIsDeleted(false);
 
+        // 2026-06-03: IN at 08:30, OUT at 12:00 -> Morning half-day (0.5 cong)
+        java.time.Instant checkIn3 = java.time.LocalDateTime.of(2026, 6, 3, 8, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        java.time.Instant checkOut3 = java.time.LocalDateTime.of(2026, 6, 3, 12, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+
+        AttendanceRecord recIn3 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.IN)
+                .checkTime(checkIn3)
+                .isValid(true)
+                .build();
+        recIn3.setIsDeleted(false);
+
+        AttendanceRecord recOut3 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.OUT)
+                .checkTime(checkOut3)
+                .isValid(true)
+                .build();
+        recOut3.setIsDeleted(false);
+
+        // 2026-06-04: IN at 13:30, OUT at 17:30 -> Afternoon half-day (0.5 cong)
+        java.time.Instant checkIn4 = java.time.LocalDateTime.of(2026, 6, 4, 13, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        java.time.Instant checkOut4 = java.time.LocalDateTime.of(2026, 6, 4, 17, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+
+        AttendanceRecord recIn4 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.IN)
+                .checkTime(checkIn4)
+                .isValid(true)
+                .build();
+        recIn4.setIsDeleted(false);
+
+        AttendanceRecord recOut4 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.OUT)
+                .checkTime(checkOut4)
+                .isValid(true)
+                .build();
+        recOut4.setIsDeleted(false);
+
         when(attendanceRecordRepository.findByCheckTimeBetween(any(), any()))
-                .thenReturn(java.util.List.of(recIn1, recOut1, recIn2, recOut2));
+                .thenReturn(java.util.List.of(recIn1, recOut1, recIn2, recOut2, recIn3, recOut3, recIn4, recOut4));
         when(workScheduleRepository.findByWorkDateBetween(any(), any()))
                 .thenReturn(Collections.emptyList());
 
@@ -236,7 +274,8 @@ class AttendanceQueryControllerTest {
                 .param("month", "6"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].lateCount").value(1))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].overtimeHours").value(0.5));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].overtimeHours").value(4.0))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].workDays").value(3.0));
     }
 
     @Test

@@ -43,7 +43,7 @@ export interface HistoryEvent {
 export interface DailyHistoryLog {
   date: string;
   dayOfWeek: string;
-  status: 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'OVERTIME' | 'FUTURE';
+  status: 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'OVERTIME' | 'HALF_DAY_MORNING' | 'HALF_DAY_AFTERNOON' | 'HALF_DAY' | 'FUTURE';
   events: HistoryEvent[];
 }
 
@@ -65,8 +65,8 @@ export interface UserInfo {
   permissions?: string[];
 }
 
-/** Ký tự đại diện cho trạng thái ngày trong dailyPattern */
-export type DailyStatusChar = 'p' | 'l' | 'a' | 'v' | 'h' | 'o' | 'f';
+/** Ký tự đại diện cho trạng thái ngày trong dailyPattern (p=present, l=late, a=absent, v=leave, h=holiday, o=overtime, m=half-morning, c=half-afternoon, f=future) */
+export type DailyStatusChar = 'p' | 'l' | 'a' | 'v' | 'h' | 'o' | 'm' | 'c' | 'f';
 
 /** Loại chấm công thủ công */
 export type AttendanceCheckType = 'IN' | 'OUT';

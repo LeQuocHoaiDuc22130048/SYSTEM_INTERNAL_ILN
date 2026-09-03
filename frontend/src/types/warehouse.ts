@@ -145,6 +145,10 @@ export interface LocationScanData {
   boards?: LocationBoardItem[];
   totalPartTypes: number;
   totalQuantity: number;
+  partTypesCount?: number;
+  partQuantity?: number;
+  boardTypesCount?: number;
+  boardQuantity?: number;
 }
 
 export interface LocationInfo {
@@ -155,6 +159,10 @@ export interface LocationInfo {
   qrCode?: string;
   totalPartTypes?: number;
   totalQuantity?: number;
+  partTypesCount?: number;
+  partQuantity?: number;
+  boardTypesCount?: number;
+  boardQuantity?: number;
 }
 
 export interface WarehouseTabProps {

@@ -75,7 +75,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
         return <span className="pill-badge late">Thiếu check-in</span>;
       }
       if (hasIn && !hasOut) {
-        const shiftEnd = report.shiftEnd ?? '17:00';
+        const shiftEnd = report.shiftEnd ?? '17:30';
         if (isPast || (isToday && isPastShiftEnd(shiftEnd))) {
           return <span className="pill-badge late">Thiếu check-out</span>;
         }
@@ -91,8 +91,17 @@ export const DailyTab: React.FC<DailyTabProps> = ({
         if (report.isEarlyLeave) {
           return <span className="pill-badge late">Về sớm</span>;
         }
-        if (statusChar === 'h' || statusChar === 'o') {
+        if (statusChar === 'o') {
           return <span className="pill-badge ot">Tăng ca</span>;
+        }
+        if (statusChar === 'm') {
+          return <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (Sáng)</span>;
+        }
+        if (statusChar === 'c') {
+          return <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (Chiều)</span>;
+        }
+        if (statusChar === 'h') {
+          return <span className="pill-badge holiday">Nghỉ lễ/CN</span>;
         }
         return <span className="pill-badge present">Đủ công</span>;
       }
@@ -169,8 +178,9 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                   ? `${(report.totalMinutes / 60).toFixed(1)}h`
                   : '-';
 
-                const shiftStart = report?.shiftStart ?? '08:00';
-                const shiftEnd = report?.shiftEnd ?? '17:00';
+                const shiftLabel = report?.shiftStart && report?.shiftEnd && (report.shiftStart !== '08:30' || report.shiftEnd !== '17:30')
+                  ? `Ca (${report.shiftStart} - ${report.shiftEnd})`
+                  : 'Ca hành chính (08:30 - 12:00, 13:30 - 17:30)';
 
                 return (
                   <tr key={emp.id} className="table-row">
@@ -185,7 +195,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                     </td>
                     <td>
                       <span className="shift-label">
-                        Ca hành chính ({shiftStart} - {shiftEnd})
+                        {shiftLabel}
                       </span>
                     </td>
                     <td className={`number-cell ${checkInClass}`}>{checkInText}</td>

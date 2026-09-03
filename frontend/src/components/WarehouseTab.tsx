@@ -112,7 +112,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
 
   // Autocomplete lists
   const [categories, setCategories] = useState<Array<{ id: string; name: string }>>([]);
-  const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string; description?: string; qrCode?: string; totalPartTypes?: number; totalQuantity?: number }>>([]);
+  const [locations, setLocations] = useState<Array<{ id: string; code: string; name: string; description?: string; qrCode?: string; totalPartTypes?: number; totalQuantity?: number; partTypesCount?: number; partQuantity?: number; boardTypesCount?: number; boardQuantity?: number }>>([]);
 
   // Location Management Modal States
   const [isLocationManagementModalOpen, setIsLocationManagementModalOpen] = useState<boolean>(false);
@@ -134,9 +134,9 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
   const [isQrConfigModalOpen, setIsQrConfigModalOpen] = useState<boolean>(false);
   const [locationsForQrPrint, setLocationsForQrPrint] = useState<LocationQrExportData[]>([]);
 
-  const handleOpenLocationQrPrint = useCallback((locList?: LocationQrExportData[]) => {
-    if (locList && locList.length > 0) {
-      setLocationsForQrPrint(locList);
+  const handleOpenLocationQrPrint = useCallback((targetLocs?: LocationQrExportData[]) => {
+    if (targetLocs && targetLocs.length > 0) {
+      setLocationsForQrPrint(targetLocs);
     } else {
       setLocationsForQrPrint(
         locations.map((l) => {
@@ -149,6 +149,10 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
             description: l.description,
             totalPartTypes: l.totalPartTypes,
             totalQuantity: l.totalQuantity,
+            partTypesCount: l.partTypesCount,
+            partQuantity: l.partQuantity,
+            boardTypesCount: l.boardTypesCount,
+            boardQuantity: l.boardQuantity,
           };
         })
       );
@@ -659,8 +663,8 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
               method: 'POST',
               headers: getJsonAuthHeaders(),
               body: JSON.stringify({
-                locationCode: partInitialLocationCode.trim(),
-                quantity: parseFloat(partInitialQuantity),
+                storeLocationCode: partInitialLocationCode.trim(),
+                amount: parseFloat(partInitialQuantity),
                 note: 'Khởi tạo vị trí & số lượng kho ban đầu',
               }),
             });
@@ -991,6 +995,10 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                   description: loc.description,
                   totalPartTypes: loc.totalPartTypes,
                   totalQuantity: loc.totalQuantity,
+                  partTypesCount: loc.partTypesCount,
+                  partQuantity: loc.partQuantity,
+                  boardTypesCount: loc.boardTypesCount,
+                  boardQuantity: loc.boardQuantity,
                 },
               ]);
             }}
@@ -1763,13 +1771,14 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
         isOpen={isQrConfigModalOpen}
         locations={locationsForQrPrint}
         onClose={() => setIsQrConfigModalOpen(false)}
-        onConfirmPrint={(config: QrPrintConfig) => {
+        onConfirmPrint={(config: QrPrintConfig, selectedItems?: LocationQrExportData[]) => {
           setIsQrConfigModalOpen(false);
+          const itemsToPrint = selectedItems && selectedItems.length > 0 ? selectedItems : locationsForQrPrint;
           const filename =
-            locationsForQrPrint.length === 1
-              ? `Tem_QR_ViTri_${locationsForQrPrint[0].code}`
+            itemsToPrint.length === 1
+              ? `Tem_QR_ViTri_${itemsToPrint[0].code}`
               : 'Danh_sach_tem_QR_vi_tri_kho';
-          exportLocationQrPdfList(locationsForQrPrint, filename, config);
+          exportLocationQrPdfList(itemsToPrint, filename, config);
         }}
       />
 
@@ -1824,6 +1833,10 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 description: loc.description,
                 totalPartTypes: loc.totalPartTypes,
                 totalQuantity: loc.totalQuantity,
+                partTypesCount: loc.partTypesCount,
+                partQuantity: loc.partQuantity,
+                boardTypesCount: loc.boardTypesCount,
+                boardQuantity: loc.boardQuantity,
               },
             ]);
           }
