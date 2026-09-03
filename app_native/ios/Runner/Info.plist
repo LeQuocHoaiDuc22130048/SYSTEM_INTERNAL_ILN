@@ -76,8 +76,10 @@
 	<string>Ứng dụng cần quyền micro khi quay video trong mục tin nhắn hoặc hỗ trợ.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
-		<key>NSAllowsArbitraryLoads</key>
+		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

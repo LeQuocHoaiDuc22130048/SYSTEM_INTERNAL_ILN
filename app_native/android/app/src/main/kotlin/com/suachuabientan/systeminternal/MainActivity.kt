@@ -1,4 +1,4 @@
-package com.example.system_internal_likenew
+﻿package com.suachuabientan.systeminternal
 
 import io.flutter.embedding.android.FlutterActivity
 

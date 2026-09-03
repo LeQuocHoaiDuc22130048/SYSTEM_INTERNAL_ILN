@@ -193,6 +193,30 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  Future<void> deleteAccount({
+    required String password,
+    String? reason,
+  }) async {
+    await _run(() async {
+      _log('Delete account started for username=${_currentUser?.username}');
+      await api.delete(
+        '/api/v1/auth/me',
+        body: {
+          'password': password,
+          if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+        },
+      );
+
+      api.accessToken = null;
+      api.refreshToken = null;
+      _currentUser = null;
+      _profileError = null;
+      _logoutWarning = null;
+      await _secureStorage.delete(key: _userCacheKey);
+      _log('Account deleted successfully and session cleared locally');
+    });
+  }
+
   Future<void> loadMe() async {
     _isLoadingProfile = true;
     _profileError = null;

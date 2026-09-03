@@ -8,6 +8,7 @@ import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../utils/network_provider.dart';
+import 'privacy_policy_page.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -955,6 +956,30 @@ class _LoginPageState extends State<LoginPage> {
             child: Text(
               _isLogin ? 'Đăng ký tài khoản mới' : 'Đã có tài khoản? Đăng nhập',
               style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Center(
+          child: TextButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+              );
+            },
+            icon: Icon(
+              LucideIcons.shieldCheck,
+              size: 14,
+              color: Colors.white.withValues(alpha: 0.7),
+            ),
+            label: Text(
+              'Chính sách bảo mật',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withValues(alpha: 0.7),
+                decoration: TextDecoration.underline,
+                decorationColor: Colors.white.withValues(alpha: 0.7),
+              ),
             ),
           ),
         ),

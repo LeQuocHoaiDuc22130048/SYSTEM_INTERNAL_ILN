@@ -211,7 +211,11 @@ class ApiClient {
     Object? lastConnectionError;
     Stopwatch? stopwatch;
 
-    for (final candidateBaseUrl in _baseUrlCandidates) {
+    final candidates = _lastSuccessfulBaseUrl != null
+        ? [_lastSuccessfulBaseUrl!, ..._baseUrlCandidates.where((u) => u != _lastSuccessfulBaseUrl)]
+        : _baseUrlCandidates;
+
+    for (final candidateBaseUrl in candidates) {
       requestUri = uriFor(candidateBaseUrl, path, queryParameters);
       stopwatch = Stopwatch()..start();
       _log('$method $requestUri');

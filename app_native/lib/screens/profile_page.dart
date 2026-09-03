@@ -8,6 +8,7 @@ import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../utils/notification_provider.dart';
 import '../utils/update_provider.dart';
+import 'privacy_policy_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -233,6 +234,47 @@ class _ProfilePageState extends State<ProfilePage> {
             color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
           ListTile(
+            leading: Icon(
+              LucideIcons.shieldCheck,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
+            ),
+            title: Text(
+              'Chính sách bảo mật',
+              style: TextStyle(
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : AppColors.textPrimaryLight,
+              ),
+            ),
+            subtitle: Text(
+              'Quy định quyền riêng tư & bảo vệ dữ liệu',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+            trailing: Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
+            ),
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+              );
+            },
+          ),
+          Divider(
+            height: 1,
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+          ListTile(
             leading: const Icon(
               LucideIcons.logOut,
               color: Colors.redAccent,
@@ -250,6 +292,38 @@ class _ProfilePageState extends State<ProfilePage> {
               color: Colors.redAccent,
             ),
             onTap: _handleLogout,
+          ),
+          Divider(
+            height: 1,
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+          ListTile(
+            leading: const Icon(
+              LucideIcons.userX,
+              color: Colors.red,
+            ),
+            title: const Text(
+              'Xóa tài khoản',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              'Vô hiệu hóa vĩnh viễn tài khoản và dữ liệu',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
+              ),
+            ),
+            trailing: const Icon(
+              LucideIcons.chevronRight,
+              size: 18,
+              color: Colors.red,
+            ),
+            onTap: user == null ? null : () => _showDeleteAccountDialog(user),
           ),
         ],
       ),
@@ -328,6 +402,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (confirmed == true && mounted) {
       try {
         await context.read<NotificationProvider>().prepareForLogout();
+        if (!mounted) return;
         await context.read<AuthProvider>().logout();
       } catch (_) {
         _showSnackBar('Không thể đăng xuất. Vui lòng thử lại.', isError: true);
@@ -605,6 +680,267 @@ class _ProfilePageState extends State<ProfilePage> {
         currentController.dispose();
         newController.dispose();
         confirmController.dispose();
+      });
+    }
+  }
+
+  Future<void> _showDeleteAccountDialog(User user) async {
+    final formKey = GlobalKey<FormState>();
+    final passwordController = TextEditingController();
+    final reasonController = TextEditingController();
+
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) {
+          var isDeleting = false;
+          var obscurePassword = true;
+          var confirmedCheckbox = false;
+          final isDark = Theme.of(dialogContext).brightness == Brightness.dark;
+
+          Future<void> submit(StateSetter setDialogState) async {
+            if (!formKey.currentState!.validate()) return;
+            if (!confirmedCheckbox) {
+              _showSnackBar(
+                'Vui lòng đánh dấu xác nhận đồng ý xóa tài khoản.',
+                isError: true,
+              );
+              return;
+            }
+
+            setDialogState(() => isDeleting = true);
+            try {
+              await context.read<NotificationProvider>().prepareForLogout();
+              if (!mounted) return;
+              await context.read<AuthProvider>().deleteAccount(
+                    password: passwordController.text,
+                    reason: reasonController.text.trim().isEmpty
+                        ? null
+                        : reasonController.text.trim(),
+                  );
+
+              if (!mounted || !dialogContext.mounted) return;
+              Navigator.of(dialogContext).pop();
+              _showSnackBar(
+                'Tài khoản của bạn đã được xóa và vô hiệu hóa thành công.',
+              );
+            } on ApiException catch (error) {
+              if (dialogContext.mounted) {
+                _showSnackBar(error.message, isError: true);
+              }
+            } catch (_) {
+              if (dialogContext.mounted) {
+                _showSnackBar(
+                  'Không thể xóa tài khoản. Vui lòng thử lại.',
+                  isError: true,
+                );
+              }
+            } finally {
+              if (dialogContext.mounted) {
+                setDialogState(() => isDeleting = false);
+              }
+            }
+          }
+
+          return StatefulBuilder(
+            builder: (context, setDialogState) {
+              return AlertDialog(
+                title: const Row(
+                  children: [
+                    Icon(
+                      LucideIcons.alertTriangle,
+                      color: Colors.red,
+                      size: 24,
+                    ),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Xóa tài khoản',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                content: SingleChildScrollView(
+                  child: Form(
+                    key: formKey,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.red.withValues(alpha: isDark ? 0.15 : 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.red.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'CẢNH BÁO BẢO MẬT & DỮ LIỆU:',
+                                style: TextStyle(
+                                  color: Colors.red,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              Text(
+                                '• Hành động này không thể hoàn tác.\n'
+                                '• Mọi quyền truy cập hệ thống và phiên đăng nhập sẽ bị chấm dứt ngay lập tức.\n'
+                                '• Dữ liệu khuôn mặt sinh trắc học và thông báo đẩy sẽ bị hủy bỏ hoàn toàn.\n'
+                                '• Tài khoản sẽ bị vô hiệu hóa theo đúng quy trình bảo mật nội bộ.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Xác minh mật khẩu để tiếp tục:',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        TextFormField(
+                          controller: passwordController,
+                          decoration: InputDecoration(
+                            labelText: 'Mật khẩu hiện tại *',
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                obscurePassword
+                                    ? LucideIcons.eyeOff
+                                    : LucideIcons.eye,
+                                size: 18,
+                              ),
+                              onPressed: () {
+                                setDialogState(() {
+                                  obscurePassword = !obscurePassword;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: obscurePassword,
+                          textInputAction: TextInputAction.next,
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return 'Vui lòng nhập mật khẩu xác nhận.';
+                            }
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: reasonController,
+                          decoration: const InputDecoration(
+                            labelText: 'Lý do xóa (tùy chọn)',
+                            border: OutlineInputBorder(),
+                          ),
+                          textInputAction: TextInputAction.done,
+                          maxLines: 2,
+                        ),
+                        const SizedBox(height: 8),
+                        InkWell(
+                          onTap: isDeleting
+                              ? null
+                              : () {
+                                  setDialogState(() {
+                                    confirmedCheckbox = !confirmedCheckbox;
+                                  });
+                                },
+                          borderRadius: BorderRadius.circular(6),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6.0),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: Checkbox(
+                                    value: confirmedCheckbox,
+                                    activeColor: Colors.red,
+                                    onChanged: isDeleting
+                                        ? null
+                                        : (val) {
+                                            setDialogState(() {
+                                              confirmedCheckbox = val ?? false;
+                                            });
+                                          },
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Tôi hiểu và đồng ý xóa vĩnh viễn tài khoản này.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.red,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: isDeleting
+                        ? null
+                        : () {
+                            FocusScope.of(dialogContext).unfocus();
+                            Navigator.of(dialogContext).pop();
+                          },
+                    child: const Text('Hủy'),
+                  ),
+                  FilledButton(
+                    onPressed: isDeleting ? null : () => submit(setDialogState),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: Colors.red,
+                      foregroundColor: Colors.white,
+                    ),
+                    child: isDeleting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Text('Xác nhận xóa tài khoản'),
+                  ),
+                ],
+              );
+            },
+          );
+        },
+      );
+    } finally {
+      Future.delayed(const Duration(milliseconds: 500), () {
+        passwordController.dispose();
+        reasonController.dispose();
       });
     }
   }

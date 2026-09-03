@@ -206,6 +206,58 @@ void main() {
       expect(authProvider.currentUser, isNull);
     });
 
+    test('TC6b: Successful deleteAccount', () async {
+      String? deleteBody;
+      setupMockClient((request) async {
+        if (request.url.path == '/api/v1/auth/me' && request.method == 'DELETE') {
+          deleteBody = request.body;
+          return http.Response(
+            jsonEncode({'message': 'Tài khoản đã được xóa'}),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      apiClient.accessToken = 'token';
+      apiClient.refreshToken = 'refresh';
+
+      await authProvider.deleteAccount(
+        password: 'CurrentPassword123!',
+        reason: 'Không còn nhu cầu sử dụng',
+      );
+
+      expect(deleteBody, isNotNull);
+      final decoded = jsonDecode(deleteBody!);
+      expect(decoded['password'], 'CurrentPassword123!');
+      expect(decoded['reason'], 'Không còn nhu cầu sử dụng');
+      expect(apiClient.accessToken, isNull);
+      expect(apiClient.refreshToken, isNull);
+      expect(authProvider.isAuthenticated, isFalse);
+      expect(authProvider.currentUser, isNull);
+    });
+
+    test('TC6c: Failed deleteAccount throws ApiException', () async {
+      setupMockClient((request) async {
+        if (request.url.path == '/api/v1/auth/me' && request.method == 'DELETE') {
+          return http.Response(
+            jsonEncode({'message': 'Mật khẩu xác nhận không chính xác'}),
+            400,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      apiClient.accessToken = 'token';
+
+      expect(
+        () => authProvider.deleteAccount(password: 'WrongPassword!'),
+        throwsA(isA<ApiException>()),
+      );
+    });
+
     test('TC7: loadMe success', () async {
       setupMockClient((request) async {
         if (request.url.path == '/api/v1/employees/me') {

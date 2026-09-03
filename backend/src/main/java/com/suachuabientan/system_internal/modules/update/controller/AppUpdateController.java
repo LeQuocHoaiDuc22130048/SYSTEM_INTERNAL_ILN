@@ -8,6 +8,7 @@ import com.suachuabientan.system_internal.modules.update.service.AppUpdateServic
 import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -52,15 +53,33 @@ public class AppUpdateController {
     @Value("${app.update.release-dir:./releases}")
     private String releaseDir;
 
+    @Value("${app.update.public-base-url:}")
+    private String publicBaseUrl;
+
+    @Value("${app.update.ios.bundle-id:com.suachuabientan.systeminternal}")
+    private String iosBundleId;
+
+    @Value("${app.update.ios.app-title:System Internal}")
+    private String iosAppTitle;
+
     @Operation(summary = "Kiểm tra phiên bản cập nhật")
     @GetMapping("/check")
-    public ResponseEntity<ApiResponse<AppUpdateInfo>> checkUpdate(@RequestParam String version) {
+    public ResponseEntity<ApiResponse<AppUpdateInfo>> checkUpdate(
+            @RequestParam String version,
+            @RequestParam(required = false, defaultValue = "android") String platform,
+            HttpServletRequest request) {
         AppUpdate latest = appUpdateService.getLatestReleased();
         
         String currentLatestVersion = latest != null ? latest.getVersion() : latestVersion;
         String currentDownloadUrl = latest != null ? latest.getDownloadUrl() : downloadUrl;
         boolean currentMandatory = latest != null ? latest.getMandatory() : mandatory;
         String currentChangelog = latest != null ? latest.getChangelog() : changelog;
+
+        if ("ios".equalsIgnoreCase(platform)) {
+            String baseUrl = getBaseUrl(request);
+            String manifestUrl = baseUrl + "/api/v1/app-updates/ios/manifest.plist?version=" + currentLatestVersion;
+            currentDownloadUrl = "itms-services://?action=download-manifest&url=" + manifestUrl;
+        }
 
         boolean updateAvailable = appUpdateService.isVersionNewer(currentLatestVersion, version);
         String formattedChangelog = currentChangelog != null ? currentChangelog.replace("\\n", "\n") : "";
@@ -72,6 +91,82 @@ public class AppUpdateController {
             formattedChangelog
         );
         return ResponseEntity.ok(ApiResponse.success(updateInfo));
+    }
+
+    @Operation(summary = "Tải manifest.plist cho cài đặt OTA trên iOS qua itms-services")
+    @GetMapping(value = "/ios/manifest.plist", produces = {"application/x-plist;charset=UTF-8", "text/xml;charset=UTF-8", MediaType.APPLICATION_XML_VALUE})
+    public ResponseEntity<String> getIosManifest(
+            @RequestParam(required = false) String version,
+            HttpServletRequest request) {
+        AppUpdate latest = appUpdateService.getLatestReleased();
+        String targetVersion = (version != null && !version.isBlank())
+                ? version
+                : (latest != null ? latest.getVersion() : latestVersion);
+
+        String baseUrl = getBaseUrl(request);
+        String ipaUrl = baseUrl + "/api/v1/app-updates/download/system_internal_v" + targetVersion + ".ipa";
+
+        String plistXml = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+                <plist version="1.0">
+                <dict>
+                    <key>items</key>
+                    <array>
+                        <dict>
+                            <key>assets</key>
+                            <array>
+                                <dict>
+                                    <key>kind</key>
+                                    <string>software-package</string>
+                                    <key>url</key>
+                                    <string>%s</string>
+                                </dict>
+                            </array>
+                            <key>metadata</key>
+                            <dict>
+                                <key>bundle-identifier</key>
+                                <string>%s</string>
+                                <key>bundle-version</key>
+                                <string>%s</string>
+                                <key>kind</key>
+                                <string>software</string>
+                                <key>title</key>
+                                <string>%s</string>
+                            </dict>
+                        </dict>
+                    </array>
+                </dict>
+                </plist>
+                """.formatted(ipaUrl, iosBundleId, targetVersion, iosAppTitle);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("application/x-plist;charset=UTF-8"))
+                .body(plistXml);
+    }
+
+    private String getBaseUrl(HttpServletRequest request) {
+        if (publicBaseUrl != null && !publicBaseUrl.isBlank()) {
+            return publicBaseUrl.replaceAll("/+$", "");
+        }
+        if (request == null) {
+            return "https://localhost:8080";
+        }
+        String scheme = request.getHeader("X-Forwarded-Proto");
+        if (scheme == null || scheme.isBlank()) {
+            scheme = request.getScheme();
+        }
+        String host = request.getHeader("X-Forwarded-Host");
+        if (host == null || host.isBlank()) {
+            host = request.getHeader("Host");
+            if (host == null || host.isBlank()) {
+                int port = request.getServerPort();
+                boolean isDefaultPort = ("http".equalsIgnoreCase(scheme) && port == 80)
+                        || ("https".equalsIgnoreCase(scheme) && port == 443);
+                host = request.getServerName() + (isDefaultPort ? "" : ":" + port);
+            }
+        }
+        return scheme + "://" + host;
     }
 
     @Operation(summary = "Lấy danh sách các bản cập nhật")

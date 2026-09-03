@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'dart:io';
 import 'dart:convert';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'api_client.dart';
 import 'notification_provider.dart';
@@ -85,7 +86,10 @@ class UpdateProvider with ChangeNotifier {
       await _loadCurrentVersion();
       final response = await api.get(
         '/api/v1/app-updates/check',
-        queryParameters: {'version': _currentVersion},
+        queryParameters: {
+          'version': _currentVersion,
+          'platform': Platform.operatingSystem,
+        },
       );
 
       if (manual && context.mounted && Navigator.canPop(context)) {
@@ -253,6 +257,59 @@ class UpdateProvider with ChangeNotifier {
     }
   }
 
+  Future<void> startUpdate(BuildContext context, AppUpdateInfo info) async {
+    if (Platform.isIOS) {
+      await _launchIosOtaUpdate(context, info);
+    } else {
+      final downloadUrlResolved = api.resolveUrl(info.downloadUrl);
+      await _downloadAndInstall(context, downloadUrlResolved);
+    }
+  }
+
+  Future<void> _launchIosOtaUpdate(BuildContext context, AppUpdateInfo info) async {
+    try {
+      final rawUrl = info.downloadUrl.trim();
+      Uri itmsUri;
+
+      if (rawUrl.startsWith('itms-services://')) {
+        itmsUri = Uri.parse(rawUrl);
+      } else {
+        final resolvedManifestUrl = api.resolveUrl(rawUrl);
+        itmsUri = Uri.parse(
+          'itms-services://?action=download-manifest&url=${Uri.encodeComponent(resolvedManifestUrl)}',
+        );
+      }
+
+      if (await canLaunchUrl(itmsUri)) {
+        await launchUrl(itmsUri, mode: LaunchMode.externalApplication);
+        if (context.mounted) {
+          _showSnackBar(
+            context,
+            'Đang mở trình cài đặt OTA của iOS. Vui lòng trở về Màn hình chính để theo dõi.',
+          );
+          if (!info.mandatory && Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        }
+      } else {
+        final fallbackUri = Uri.parse(api.resolveUrl(rawUrl));
+        if (await canLaunchUrl(fallbackUri)) {
+          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
+        } else {
+          throw Exception('Không thể mở liên kết cài đặt OTA.');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        _showSnackBar(
+          context,
+          'Lỗi khởi động cài đặt OTA trên iOS: ${e.toString()}',
+          isError: true,
+        );
+      }
+    }
+  }
+
   void _showUpdateDialog(BuildContext context, AppUpdateInfo info) {
     showDialog(
       context: context,
@@ -265,8 +322,8 @@ class UpdateProvider with ChangeNotifier {
             final downloadProgress = provider.downloadProgress;
             final downloadStatus = provider.downloadStatus;
 
-            return WillPopScope(
-              onWillPop: () async => !info.mandatory && !isDownloading,
+            return PopScope(
+              canPop: !info.mandatory && !isDownloading,
               child: Dialog(
                 backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -280,7 +337,7 @@ class UpdateProvider with ChangeNotifier {
                         child: Container(
                           padding: const EdgeInsets.all(16),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withValues(alpha: 0.1),
                             shape: BoxShape.circle,
                           ),
                           child: const Icon(
@@ -346,6 +403,36 @@ class UpdateProvider with ChangeNotifier {
                         ),
                       ),
                       const SizedBox(height: 24),
+                      if (Platform.isIOS) ...[
+                        Container(
+                          width: double.infinity,
+                          margin: const EdgeInsets.only(bottom: 16),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Colors.blue.withValues(alpha: isDark ? 0.15 : 0.08),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: Colors.blue.withValues(alpha: 0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.apple, size: 22, color: Colors.blue),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Cài đặt OTA trực tiếp qua giao thức itms-services. Bấm "Cập nhật ngay" và trở về Màn hình chính để theo dõi tiến trình cài đặt.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    height: 1.35,
+                                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       if (isDownloading) ...[
                         Text(
                           downloadStatus,
@@ -382,8 +469,7 @@ class UpdateProvider with ChangeNotifier {
                             const SizedBox(width: 12),
                             FilledButton(
                               onPressed: () {
-                                final downloadUrlResolved = api.resolveUrl(info.downloadUrl);
-                                provider._downloadAndInstall(dialogContext, downloadUrlResolved);
+                                provider.startUpdate(dialogContext, info);
                               },
                               style: FilledButton.styleFrom(
                                 backgroundColor: AppColors.primary,

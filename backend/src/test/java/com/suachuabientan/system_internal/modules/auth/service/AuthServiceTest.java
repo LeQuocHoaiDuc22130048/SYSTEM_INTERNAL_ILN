@@ -3,11 +3,14 @@ package com.suachuabientan.system_internal.modules.auth.service;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
 import com.suachuabientan.system_internal.common.util.JwtUtil;
+import com.suachuabientan.system_internal.modules.auth.dto.request.DeleteAccountRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RequestPasswordResetOtpRequest;
 import com.suachuabientan.system_internal.modules.auth.entity.PasswordResetOtp;
 import com.suachuabientan.system_internal.modules.auth.entity.RefreshToken;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.modules.auth.mapper.UserMapper;
 import com.suachuabientan.system_internal.modules.auth.repository.PasswordResetOtpRepository;
 import com.suachuabientan.system_internal.modules.auth.repository.RefreshTokenRepository;
@@ -29,7 +32,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.contains;
@@ -179,5 +185,67 @@ class AuthServiceTest {
 
         verify(refreshTokenRepository).revokeAllByUserId(userId);
         verify(notificationService).clearDeviceToken(userId);
+    }
+
+    @Test
+    void deleteMyAccountSuccess() {
+        UUID userId = UUID.randomUUID();
+        UserEntity testUser = new UserEntity();
+        testUser.setId(userId);
+        testUser.setUsername("myuser");
+        testUser.setRole(UserRole.EMPLOYEE);
+        testUser.setStatus(UserStatus.ACTIVE);
+        testUser.setPasswordHash("hashed-password");
+        testUser.setFaceEnrolled(true);
+        testUser.setFaceEncoding("[0.1, 0.2]");
+        testUser.setDeviceToken("fcm-token");
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("mypassword", "hashed-password")).thenReturn(true);
+
+        authService.deleteMyAccount(userId, new DeleteAccountRequest("mypassword", "No longer work here"));
+
+        assertTrue(testUser.getIsDeleted());
+        assertEquals(UserStatus.DELETED, testUser.getStatus());
+        assertNull(testUser.getDeviceToken());
+        assertNull(testUser.getFaceEncoding());
+        assertFalse(testUser.getFaceEnrolled());
+
+        verify(userRepository).save(testUser);
+        verify(refreshTokenRepository).revokeAllByUserId(userId);
+        verify(notificationService).clearDeviceToken(userId);
+    }
+
+    @Test
+    void deleteMyAccountFailsWhenPasswordIncorrect() {
+        UUID userId = UUID.randomUUID();
+        UserEntity testUser = new UserEntity();
+        testUser.setId(userId);
+        testUser.setRole(UserRole.EMPLOYEE);
+        testUser.setPasswordHash("hashed-password");
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(testUser));
+        when(passwordEncoder.matches("wrong-password", "hashed-password")).thenReturn(false);
+
+        assertThrows(BusinessException.class, () ->
+                authService.deleteMyAccount(userId, new DeleteAccountRequest("wrong-password", null)));
+
+        verify(userRepository, never()).save(any());
+        verify(refreshTokenRepository, never()).revokeAllByUserId(any());
+    }
+
+    @Test
+    void deleteMyAccountFailsForSuperAdmin() {
+        UUID userId = UUID.randomUUID();
+        UserEntity testUser = new UserEntity();
+        testUser.setId(userId);
+        testUser.setRole(UserRole.SUPER_ADMIN);
+
+        when(userRepository.findByIdAndIsDeletedFalse(userId)).thenReturn(Optional.of(testUser));
+
+        assertThrows(BusinessException.class, () ->
+                authService.deleteMyAccount(userId, new DeleteAccountRequest("mypassword", null)));
+
+        verify(userRepository, never()).save(any());
     }
 }

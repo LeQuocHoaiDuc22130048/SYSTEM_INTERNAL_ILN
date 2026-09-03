@@ -4,6 +4,7 @@ package com.suachuabientan.system_internal.modules.auth.controller;
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ChangePasswordRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.DeleteAccountRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
@@ -105,6 +106,26 @@ public class AuthController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         authService.changePassword(userDetails.getUserId(), request);
         return ResponseEntity.ok(ApiResponse.success(null, "Đổi mật khẩu thành công"));
+    }
+
+    @Operation(summary = "Người dùng tự xóa hoặc vô hiệu hóa tài khoản của mình")
+    @DeleteMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> deleteMyAccount(
+            @Valid @RequestBody DeleteAccountRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.deleteMyAccount(userDetails.getUserId(), request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Tài khoản của bạn đã được xóa và vô hiệu hóa thành công"));
+    }
+
+    @Operation(summary = "Người dùng tự xóa hoặc vô hiệu hóa tài khoản của mình (POST alias)")
+    @PostMapping("/delete-account")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<Void>> deleteMyAccountPost(
+            @Valid @RequestBody DeleteAccountRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.deleteMyAccount(userDetails.getUserId(), request);
+        return ResponseEntity.ok(ApiResponse.success(null, "Tài khoản của bạn đã được xóa và vô hiệu hóa thành công"));
     }
 
     // ── Duyệt tài khoản — chỉ MANAGER+ ──────────────────────

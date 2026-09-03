@@ -13,6 +13,7 @@ import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.entity.UserRegistrationRequestEntity;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ChangePasswordRequest;
+import com.suachuabientan.system_internal.modules.auth.dto.request.DeleteAccountRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RefreshTokenRequest;
@@ -340,6 +341,39 @@ public class AuthService {
     }
 
     @Transactional
+    public void deleteMyAccount(UUID userId, DeleteAccountRequest request) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+
+        // SUPER_ADMIN không được phép tự xóa trên app để tránh mất quyền quản trị tối cao
+        if (UserRole.SUPER_ADMIN.equals(user.getRole())) {
+            throw new BusinessException(
+                    "Tài khoản Quản trị viên tối cao (SUPER_ADMIN) không thể tự xóa qua ứng dụng di động. Vui lòng liên hệ quản trị hệ thống.",
+                    400
+            );
+        }
+
+        if (!passwordEncoder.matches(request.password(), user.getPasswordHash())) {
+            throw new BusinessException("Mật khẩu xác nhận không chính xác", 400);
+        }
+
+        // Thực hiện quy trình bảo mật: soft-delete, thu hồi token, xóa dữ liệu nhạy cảm
+        user.softDelete(userId);
+        user.setStatus(UserStatus.DELETED);
+        user.setDeviceToken(null);
+        user.setFaceEncoding(null);
+        user.setFaceEnrolled(false);
+        user.setFaceVerifiedBy(null);
+        userRepository.save(user);
+
+        refreshTokenRepository.revokeAllByUserId(user.getId());
+        notificationService.clearDeviceToken(user.getId());
+
+        log.warn("Tài khoản đã tự yêu cầu xóa và vô hiệu hóa thành công: userId={}, username={}, reason={}",
+                user.getId(), user.getUsername(), request.reason());
+    }
+
+    @Transactional
     public void deleteUser(UUID targetUserId, UUID performedByUserId) {
         UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException(STR."Không tìm thấy nhân viên: \{targetUserId}"));
@@ -347,7 +381,14 @@ public class AuthService {
         // Soft delete — không xóa thật (DB rules)
         user.softDelete(performedByUserId);
         user.setStatus(UserStatus.DELETED);
+        user.setDeviceToken(null);
+        user.setFaceEncoding(null);
+        user.setFaceEnrolled(false);
+        user.setFaceVerifiedBy(null);
         userRepository.save(user);
+
+        refreshTokenRepository.revokeAllByUserId(targetUserId);
+        notificationService.clearDeviceToken(targetUserId);
         log.info("Xoá tài khoản (soft): userId={}, by={}", targetUserId, performedByUserId);
     }
 
