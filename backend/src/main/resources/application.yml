@@ -99,3 +99,5 @@ app:
     download-url: ${APP_UPDATE_DOWNLOAD_URL:/api/v1/app-updates/download/system_internal_v1.1.6.apk}
     mandatory: ${APP_UPDATE_MANDATORY:true}
     release-dir: ${APP_UPDATE_RELEASE_DIR:./releases}
+    ios:
+      app-store-url: ${APP_UPDATE_IOS_APP_STORE_URL:https://apps.apple.com/app/id6740000000}

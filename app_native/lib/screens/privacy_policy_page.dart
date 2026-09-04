@@ -101,7 +101,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                     'Nếu bạn có bất kỳ câu hỏi nào về quyền riêng tư hoặc cần hỗ trợ dữ liệu cá nhân, vui lòng liên hệ:\n\n'
                     '• Đơn vị: Bộ phận Kỹ thuật - Sửa Chữa Biến Tần\n'
                     '• Email: support@suachuabientan.com\n'
-                    '• Hotline: 0903 000 000',
+                    '• Hotline: 0964 266 771',
               ),
               const SizedBox(height: 32),
               Center(

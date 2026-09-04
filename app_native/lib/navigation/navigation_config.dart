@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../models/app_permission.dart';
@@ -6,11 +7,11 @@ import 'main_tabs.dart';
 import 'navigation_item.dart';
 
 List<NavigationItem> buildMainNavigationItems(AuthProvider auth) {
-  if (auth.isAttendanceAccount) {
+  if (auth.isAttendanceAccount && !Platform.isIOS) {
     return const [
       NavigationItem(
         icon: Icons.access_time_outlined,
-        label: 'Ch\u1EA5m c\u00F4ng',
+        label: 'Chấm công',
         activeIcon: Icons.access_time,
         tabIndex: MainTabs.attendance,
       ),
@@ -79,7 +80,7 @@ bool canAccessMainTab(AuthProvider auth, int tabIndex) {
     case MainTabs.warehouse:
       return auth.can(AppPermission.viewWarehouse);
     case MainTabs.attendance:
-      return auth.can(AppPermission.viewAttendance);
+      return !Platform.isIOS && auth.can(AppPermission.viewAttendance);
     case MainTabs.messages:
       return auth.can(AppPermission.useMessages);
     case MainTabs.notifications:

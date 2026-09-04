@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -120,7 +121,7 @@ class _MainScreenState extends State<MainScreen> {
       case MainTabs.warehouse:
         return const WarehousePage();
       case MainTabs.attendance:
-        return context.read<AuthProvider>().isAttendanceAccount
+        return (context.read<AuthProvider>().isAttendanceAccount && !Platform.isIOS)
             ? _buildAttendanceOnlyScaffold()
             : DashboardPage(onNavigateToTab: _setCurrentIndex);
       case MainTabs.messages:

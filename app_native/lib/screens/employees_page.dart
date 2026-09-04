@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
@@ -456,7 +457,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarColor = _getAvatarColor(user.role);
     final currentRole = context.watch<AuthProvider>().role;
-    final canEnrollFace = currentRole.isManagerOrAbove;
+    final canEnrollFace = !Platform.isIOS && currentRole.isManagerOrAbove;
 
     return Container(
       decoration: BoxDecoration(
@@ -553,12 +554,13 @@ class _EmployeeDetailSheet extends StatelessWidget {
                 'Trạng thái',
                 user.status == UserStatus.active ? 'Hoạt động' : 'Tạm ngưng',
               ),
-              _buildInfoRow(
-                context,
-                Icons.face_retouching_natural,
-                'Khuôn mặt',
-                user.faceEnrolled ? 'Đã đăng ký' : 'Chưa đăng ký',
-              ),
+              if (!Platform.isIOS)
+                _buildInfoRow(
+                  context,
+                  Icons.face_retouching_natural,
+                  'Khuôn mặt',
+                  user.faceEnrolled ? 'Đã đăng ký' : 'Chưa đăng ký',
+                ),
               const SizedBox(height: 24),
 
               // Stats

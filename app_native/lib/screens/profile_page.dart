@@ -796,7 +796,7 @@ class _ProfilePageState extends State<ProfilePage> {
                               Text(
                                 '• Hành động này không thể hoàn tác.\n'
                                 '• Mọi quyền truy cập hệ thống và phiên đăng nhập sẽ bị chấm dứt ngay lập tức.\n'
-                                '• Dữ liệu khuôn mặt sinh trắc học và thông báo đẩy sẽ bị hủy bỏ hoàn toàn.\n'
+                                '• Dữ liệu tài khoản cá nhân và thông báo đẩy sẽ bị hủy bỏ hoàn toàn.\n'
                                 '• Tài khoản sẽ bị vô hiệu hóa theo đúng quy trình bảo mật nội bộ.',
                                 style: TextStyle(
                                   fontSize: 12,

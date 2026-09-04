@@ -259,51 +259,39 @@ class UpdateProvider with ChangeNotifier {
 
   Future<void> startUpdate(BuildContext context, AppUpdateInfo info) async {
     if (Platform.isIOS) {
-      await _launchIosOtaUpdate(context, info);
+      await _openAppStore(context, info);
     } else {
       final downloadUrlResolved = api.resolveUrl(info.downloadUrl);
       await _downloadAndInstall(context, downloadUrlResolved);
     }
   }
 
-  Future<void> _launchIosOtaUpdate(BuildContext context, AppUpdateInfo info) async {
+  Future<void> _openAppStore(BuildContext context, AppUpdateInfo info) async {
     try {
       final rawUrl = info.downloadUrl.trim();
-      Uri itmsUri;
+      final targetUrl = rawUrl.isNotEmpty &&
+              (rawUrl.startsWith('http://') ||
+                  rawUrl.startsWith('https://') ||
+                  rawUrl.startsWith('itms-apps://'))
+          ? rawUrl
+          : 'https://apps.apple.com/app/id6740000000';
 
-      if (rawUrl.startsWith('itms-services://')) {
-        itmsUri = Uri.parse(rawUrl);
-      } else {
-        final resolvedManifestUrl = api.resolveUrl(rawUrl);
-        itmsUri = Uri.parse(
-          'itms-services://?action=download-manifest&url=${Uri.encodeComponent(resolvedManifestUrl)}',
-        );
-      }
-
-      if (await canLaunchUrl(itmsUri)) {
-        await launchUrl(itmsUri, mode: LaunchMode.externalApplication);
+      final uri = Uri.parse(targetUrl);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
         if (context.mounted) {
-          _showSnackBar(
-            context,
-            'Đang mở trình cài đặt OTA của iOS. Vui lòng trở về Màn hình chính để theo dõi.',
-          );
           if (!info.mandatory && Navigator.canPop(context)) {
             Navigator.pop(context);
           }
         }
       } else {
-        final fallbackUri = Uri.parse(api.resolveUrl(rawUrl));
-        if (await canLaunchUrl(fallbackUri)) {
-          await launchUrl(fallbackUri, mode: LaunchMode.externalApplication);
-        } else {
-          throw Exception('Không thể mở liên kết cài đặt OTA.');
-        }
+        throw Exception('Không thể mở liên kết App Store.');
       }
     } catch (e) {
       if (context.mounted) {
         _showSnackBar(
           context,
-          'Lỗi khởi động cài đặt OTA trên iOS: ${e.toString()}',
+          'Lỗi mở App Store: ${e.toString()}',
           isError: true,
         );
       }
@@ -421,7 +409,7 @@ class UpdateProvider with ChangeNotifier {
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
-                                  'Cài đặt OTA trực tiếp qua giao thức itms-services. Bấm "Cập nhật ngay" và trở về Màn hình chính để theo dõi tiến trình cài đặt.',
+                                  'Bản cập nhật mới có sẵn trên App Store. Nhấn "Cập nhật ngay" để mở App Store và cập nhật ứng dụng.',
                                   style: TextStyle(
                                     fontSize: 12,
                                     height: 1.35,

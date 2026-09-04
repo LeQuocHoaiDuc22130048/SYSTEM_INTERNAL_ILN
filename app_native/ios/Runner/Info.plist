@@ -67,7 +67,7 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<key>NSCameraUsageDescription</key>
-	<string>Ứng dụng cần truy cập máy ảnh để quét mã QR và nhận diện khuôn mặt chấm công.</string>
+	<string>Ứng dụng cần truy cập máy ảnh để quét mã QR linh kiện, thiết bị và chụp ảnh biên bản sửa chữa.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Ứng dụng cần truy cập thư viện để gửi ảnh và video trong tin nhắn cũng như tải tài liệu.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>

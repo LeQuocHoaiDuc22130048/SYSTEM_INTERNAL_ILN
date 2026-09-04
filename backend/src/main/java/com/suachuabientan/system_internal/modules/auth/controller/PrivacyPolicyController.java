@@ -119,7 +119,7 @@ public class PrivacyPolicyController {
                     <ul>
                         <li><strong>Đơn vị phát triển:</strong> Bộ phận Kỹ thuật & Quản trị Hệ thống - Sửa Chữa Biến Tần</li>
                         <li><strong>Email hỗ trợ:</strong> support@suachuabientan.com</li>
-                        <li><strong>Hotline:</strong> 0903 000 000</li>
+                        <li><strong>Hotline:</strong> 0964 266 771</li>
                     </ul>
 
                     <footer>

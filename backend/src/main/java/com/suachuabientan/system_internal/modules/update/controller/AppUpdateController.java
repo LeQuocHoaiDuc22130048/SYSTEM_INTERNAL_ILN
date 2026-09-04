@@ -62,6 +62,9 @@ public class AppUpdateController {
     @Value("${app.update.ios.app-title:System Internal}")
     private String iosAppTitle;
 
+    @Value("${app.update.ios.app-store-url:https://apps.apple.com/app/id6740000000}")
+    private String iosAppStoreUrl;
+
     @Operation(summary = "Kiểm tra phiên bản cập nhật")
     @GetMapping("/check")
     public ResponseEntity<ApiResponse<AppUpdateInfo>> checkUpdate(
@@ -76,9 +79,9 @@ public class AppUpdateController {
         String currentChangelog = latest != null ? latest.getChangelog() : changelog;
 
         if ("ios".equalsIgnoreCase(platform)) {
-            String baseUrl = getBaseUrl(request);
-            String manifestUrl = baseUrl + "/api/v1/app-updates/ios/manifest.plist?version=" + currentLatestVersion;
-            currentDownloadUrl = "itms-services://?action=download-manifest&url=" + manifestUrl;
+            currentDownloadUrl = (iosAppStoreUrl != null && !iosAppStoreUrl.isBlank())
+                    ? iosAppStoreUrl
+                    : "https://apps.apple.com/app/id6740000000";
         }
 
         boolean updateAvailable = appUpdateService.isVersionNewer(currentLatestVersion, version);
@@ -93,7 +96,7 @@ public class AppUpdateController {
         return ResponseEntity.ok(ApiResponse.success(updateInfo));
     }
 
-    @Operation(summary = "Tải manifest.plist cho cài đặt OTA trên iOS qua itms-services")
+    @Operation(summary = "Tải manifest.plist cho môi trường kiểm thử nội bộ iOS")
     @GetMapping(value = "/ios/manifest.plist", produces = {"application/x-plist;charset=UTF-8", "text/xml;charset=UTF-8", MediaType.APPLICATION_XML_VALUE})
     public ResponseEntity<String> getIosManifest(
             @RequestParam(required = false) String version,
