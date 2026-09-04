@@ -88,6 +88,14 @@ class NotificationProvider extends ChangeNotifier {
       }
 
       firebaseReady = true;
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        await FirebaseMessaging.instance
+            .setForegroundNotificationPresentationOptions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+      }
       await _initializeLocalNotifications();
       _foregroundSub ??= FirebaseMessaging.onMessage.listen(
         _handleForegroundMessage,
@@ -147,6 +155,11 @@ class NotificationProvider extends ChangeNotifier {
             channelDescription: 'In-app and push notifications',
             importance: Importance.high,
             priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
           ),
         ),
         payload: payload,
@@ -423,9 +436,26 @@ class NotificationProvider extends ChangeNotifier {
     _deviceTokenSyncing = true;
     try {
       final settings = await FirebaseMessaging.instance
-          .requestPermission()
+          .requestPermission(
+            alert: true,
+            badge: true,
+            sound: true,
+            provisional: false,
+          )
           .timeout(const Duration(seconds: 5));
       if (settings.authorizationStatus == AuthorizationStatus.denied) return;
+
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+        String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        if (apnsToken == null) {
+          await Future.delayed(const Duration(milliseconds: 1500));
+          apnsToken = await FirebaseMessaging.instance.getAPNSToken();
+        }
+        if (apnsToken == null) {
+          _log('APNs token is not ready yet; token sync will retry later');
+          return;
+        }
+      }
 
       final token = await FirebaseMessaging.instance.getToken().timeout(
         const Duration(seconds: 5),
@@ -514,6 +544,11 @@ class NotificationProvider extends ChangeNotifier {
             channelDescription: 'In-app and push notifications',
             importance: Importance.high,
             priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(
+            presentAlert: true,
+            presentBadge: true,
+            presentSound: true,
           ),
         ),
         payload: jsonEncode(message.data),
