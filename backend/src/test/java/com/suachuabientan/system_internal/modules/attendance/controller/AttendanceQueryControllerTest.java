@@ -141,6 +141,48 @@ class AttendanceQueryControllerTest {
 
     @Test
     @WithUserDetails(value = "testemployee", setupBefore = TestExecutionEvent.TEST_EXECUTION)
+    void getEmployeeLogsForTechnicianSelfSucceeds() throws Exception {
+        UserEntity technician = new UserEntity();
+        technician.setId(employeeId);
+        technician.setUsername("testemployee");
+        technician.setRole(UserRole.TECHNICIAN);
+        technician.setStatus(UserStatus.ACTIVE);
+
+        when(userRepository.findByIdAndIsDeletedFalse(employeeId)).thenReturn(Optional.of(technician));
+        when(attendanceRecordRepository.findByEmployeeIdAndCheckTimeBetween(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(workScheduleRepository.findByEmployeeAndDateRange(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/attendance/" + employeeId + "/logs")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithUserDetails(value = "testemployee", setupBefore = TestExecutionEvent.TEST_EXECUTION)
+    void getMyLogsAsEmployeeSucceeds() throws Exception {
+        UserEntity employee = new UserEntity();
+        employee.setId(employeeId);
+        employee.setUsername("testemployee");
+        employee.setRole(UserRole.EMPLOYEE);
+        employee.setStatus(UserStatus.ACTIVE);
+
+        when(userRepository.findByIdAndIsDeletedFalse(employeeId)).thenReturn(Optional.of(employee));
+        when(attendanceRecordRepository.findByEmployeeIdAndCheckTimeBetween(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+        when(workScheduleRepository.findByEmployeeAndDateRange(any(), any(), any()))
+                .thenReturn(Collections.emptyList());
+
+        mockMvc.perform(get("/api/attendance/me/logs")
+                .param("year", "2026")
+                .param("month", "6"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @WithUserDetails(value = "testemployee", setupBefore = TestExecutionEvent.TEST_EXECUTION)
     void getEmployeeLogsForOtherAsEmployeeReturns403() throws Exception {
         UUID otherEmployeeId = UUID.randomUUID();
         mockMvc.perform(get("/api/attendance/" + otherEmployeeId + "/logs")

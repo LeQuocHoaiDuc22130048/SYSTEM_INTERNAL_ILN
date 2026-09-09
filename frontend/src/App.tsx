@@ -342,7 +342,7 @@ function App() {
         if (!hasIn && hasOut) {
           lateEarly++;
         } else if (hasIn && !hasOut) {
-          const shiftEnd = report.shiftEnd ?? '17:00';
+          const shiftEnd = report.shiftEnd ?? '17:30';
           if (isPast || (isToday && isPastShiftEnd(shiftEnd))) {
             lateEarly++;
           } else {
@@ -357,8 +357,10 @@ function App() {
         }
       } else {
         if (!isFuture && statusChar !== 'f' && statusChar !== 'h') {
-          if (statusChar === 'a' || statusChar === 'v' || statusChar === 'o' || statusChar === '') {
+          if (statusChar === 'a' || statusChar === 'v' || statusChar === '') {
             absent++;
+          } else {
+            onTime++;
           }
         }
       }
@@ -424,6 +426,9 @@ function App() {
               setActiveTab={setActiveTab}
               showToast={showToast}
               currentUser={currentUser}
+              onViewPersonalAttendance={setHistoryEmployee}
+              currentMonth={currentMonth}
+              currentYear={currentYear}
             />
           ) : activeTab === 'monthly' ? (
             <>

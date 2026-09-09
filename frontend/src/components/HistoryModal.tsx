@@ -71,7 +71,24 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }));
   };
 
-  const getModalDayStatusBadge = (status: string) => {
+  const isOvertimeLogTime = (logTime?: string): boolean => {
+    if (!logTime) return false;
+    const [h, m] = logTime.split(':').map(Number);
+    if (isNaN(h)) return false;
+    return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
+  };
+
+  const getModalDayStatusBadge = (status: string, checkOutTime?: string) => {
+    let effectiveStatus = status;
+    if (checkOutTime) {
+      const isOt = isOvertimeLogTime(checkOutTime);
+      if (effectiveStatus === 'OVERTIME' && !isOt) {
+        effectiveStatus = 'PRESENT';
+      } else if (effectiveStatus === 'PRESENT' && isOt) {
+        effectiveStatus = 'OVERTIME';
+      }
+    }
+
     const badgeMap: Record<string, React.ReactNode> = {
       PRESENT: <span className="pill-badge present">Đủ công</span>,
       LATE: <span className="pill-badge late">Vào muộn</span>,
@@ -84,7 +101,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
       HALF_DAY: <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (0.5)</span>,
       FUTURE: null,
     };
-    return badgeMap[status] ?? <span className="pill-badge holiday">Nghỉ lễ/CN</span>;
+    return badgeMap[effectiveStatus] ?? <span className="pill-badge holiday">Nghỉ lễ/CN</span>;
   };
 
   const getEventTimeDiffs = (events: any[], shiftStart: string, shiftEnd: string) => {
@@ -230,7 +247,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                   const checkOutEvent = dayLog.events.find(e => e.type === 'CHECK_OUT');
                   const hasLate = dayLog.status === 'LATE';
                   const hasManual = dayLog.events.some(e => e.source === 'MANUAL');
-                  const hasOT = dayLog.events.some(e => e.note.includes('OT'));
+                  const hasOT = checkOutEvent ? isOvertimeLogTime(checkOutEvent.logTime) : dayLog.events.some(e => e.note.includes('OT'));
 
                   return (
                     <div key={dayLog.date} className="day-block">
@@ -257,7 +274,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                           </div>
                         </div>
                         <div className="day-right-side">
-                          {getModalDayStatusBadge(dayLog.status)}
+                          {getModalDayStatusBadge(dayLog.status, checkOutEvent?.logTime)}
                           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                         </div>
                       </div>

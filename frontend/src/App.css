@@ -329,6 +329,15 @@
   color: var(--color-absent);
 }
 
+.number-cell.ot {
+  color: var(--color-ot);
+  font-weight: 700;
+}
+
+.number-cell.success {
+  color: var(--color-success);
+}
+
 /* Mini Pattern Bar */
 .mini-bar {
   display: flex;
@@ -400,12 +409,12 @@
   font-weight: 600;
 }
 
-.pill-badge.present { background-color: var(--color-success-light); color: var(--color-success); }
-.pill-badge.late { background-color: var(--color-late-light); color: var(--color-late); }
-.pill-badge.absent { background-color: var(--color-absent-light); color: var(--color-absent); }
-.pill-badge.leave { background-color: var(--color-leave-light); color: var(--color-leave); }
-.pill-badge.holiday { background-color: var(--color-holiday-light); color: var(--color-holiday); }
-.pill-badge.ot { background-color: var(--color-ot-light); color: var(--color-ot); }
+.pill-badge.present { background-color: var(--color-success-light); color: var(--color-success); border: 1px solid rgba(99, 153, 34, 0.25); }
+.pill-badge.late { background-color: var(--color-late-light); color: var(--color-late); border: 1px solid rgba(186, 117, 23, 0.25); }
+.pill-badge.absent { background-color: var(--color-absent-light); color: var(--color-absent); border: 1px solid rgba(226, 75, 74, 0.25); }
+.pill-badge.leave { background-color: var(--color-leave-light); color: var(--color-leave); border: 1px solid rgba(55, 138, 221, 0.25); }
+.pill-badge.holiday { background-color: var(--color-holiday-light); color: var(--color-holiday); border: 1px solid rgba(138, 148, 166, 0.25); }
+.pill-badge.ot { background-color: var(--color-ot-light); color: var(--color-ot); border: 1px solid rgba(139, 92, 246, 0.35); font-weight: 700; }
 
 /* Legend at Footer */
 .legend-section {

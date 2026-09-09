@@ -1,8 +1,10 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
+import '../models/attendance.dart';
 import '../models/board.dart';
 import '../models/repair_order.dart';
 import '../navigation/main_tabs.dart';
@@ -11,10 +13,29 @@ import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
 
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
 
   const DashboardPage({super.key, this.onNavigateToTab});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final auth = context.read<AuthProvider>();
+      if (!auth.isManagerOrAbove) {
+        context.read<BackendDataProvider>().loadMyAttendance(
+              employeeId: auth.currentUser?.id,
+              notify: true,
+            );
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +104,7 @@ class DashboardPage extends StatelessWidget {
                           const SizedBox(height: 20),
                           _TodayAttendanceCard(isDark: isDark),
                           const SizedBox(height: 20),
-                          _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
+                          _RecentOrdersCard(isDark: isDark, onNavigateToTab: widget.onNavigateToTab),
                         ],
                       ),
               ),
@@ -97,20 +118,29 @@ class DashboardPage extends StatelessWidget {
   Widget _buildEmployeeDashboard(BuildContext context, bool isDark, bool wide) {
     final backend = Provider.of<BackendDataProvider>(context);
     final myOrders = backend.repairOrders;
+    final history = backend.myAttendanceHistory;
+    final summary = history?.summary;
+
+    final workDaysDisplay = summary != null
+        ? (summary.workDays % 1 == 0
+            ? summary.workDays.toInt().toString()
+            : summary.workDays.toString())
+        : '0';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _DashboardHeader(isDark: isDark, wide: wide),
         const SizedBox(height: 24),
         GridView.builder(
-          itemCount: 2,
+          itemCount: 4,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: wide ? 4 : 2,
             mainAxisSpacing: wide ? 20 : 10,
             crossAxisSpacing: wide ? 12 : 10,
-            mainAxisExtent: wide ? 112 : 98,
+            mainAxisExtent: wide ? 114 : 106,
           ),
           itemBuilder: (context, index) {
             final stats = [
@@ -130,13 +160,37 @@ class DashboardPage extends StatelessWidget {
                 color: AppColors.warning,
                 background: AppColors.warningLight,
               ),
+              _DashboardStat(
+                label: 'Công tháng này',
+                value: '$workDaysDisplay công',
+                icon: LucideIcons.calendarCheck,
+                color: const Color(0xFF10B981),
+                background: const Color(0xFFECFDF5),
+                helper:
+                    '${summary != null ? summary.totalHours.toStringAsFixed(1) : '0.0'} giờ làm',
+              ),
+              _DashboardStat(
+                label: 'Đi muộn / Tăng ca',
+                value: '${summary?.lateCount ?? 0} lần',
+                icon: LucideIcons.clockAlert,
+                color: const Color(0xFFF59E0B),
+                background: const Color(0xFFFFFBEB),
+                helper:
+                    '+${summary != null ? summary.overtimeHours.toStringAsFixed(1) : '0.0'}h tăng ca',
+              ),
             ];
             final stat = stats[index];
             return _DashboardStatCard(stat: stat, isDark: isDark);
           },
         ),
         const SizedBox(height: 20),
-        _RecentOrdersCard(isDark: isDark, onNavigateToTab: onNavigateToTab),
+        _PersonalAttendanceCard(
+          isDark: isDark,
+          wide: wide,
+          onNavigateToTab: widget.onNavigateToTab,
+        ),
+        const SizedBox(height: 20),
+        _RecentOrdersCard(isDark: isDark, onNavigateToTab: widget.onNavigateToTab),
       ],
     );
   }
@@ -328,13 +382,14 @@ class _DashboardStatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return _Panel(
       isDark: isDark,
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
                   stat.label,
@@ -342,50 +397,56 @@ class _DashboardStatCard extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    height: 1.2,
+                    height: 1.1,
                     color: isDark
                         ? AppColors.textSecondaryDark
                         : AppColors.textSecondaryLight,
                   ),
                 ),
-                const SizedBox(height: 5),
-                Text(
-                  stat.value,
-                  style: TextStyle(
-                    fontSize: 23,
-                    height: 1,
-                    fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
+                const SizedBox(height: 4),
+                FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    stat.value,
+                    style: TextStyle(
+                      fontSize: 20,
+                      height: 1.1,
+                      fontWeight: FontWeight.w700,
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : AppColors.textPrimaryLight,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 8),
-                if (stat.trend != null)
+                if (stat.trend != null) ...[
+                  const SizedBox(height: 3),
                   Text(
                     stat.trend!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 11,
-                      height: 1.2,
+                      fontSize: 10,
+                      height: 1.1,
                       color: AppColors.success,
                       fontWeight: FontWeight.w600,
                     ),
-                  )
-                else if (stat.helper != null)
+                  ),
+                ] else if (stat.helper != null) ...[
+                  const SizedBox(height: 3),
                   Text(
                     stat.helper!,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontSize: 11,
-                      height: 1.2,
+                      fontSize: 10,
+                      height: 1.1,
                       color: isDark
                           ? AppColors.textSecondaryDark
                           : AppColors.textSecondaryLight,
                     ),
                   ),
+                ],
               ],
             ),
           ),
@@ -871,6 +932,1078 @@ class _TodayAttendanceCard extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _PersonalAttendanceCard extends StatefulWidget {
+  final bool isDark;
+  final bool wide;
+  final void Function(int tabIndex)? onNavigateToTab;
+
+  const _PersonalAttendanceCard({
+    super.key,
+    required this.isDark,
+    required this.wide,
+    this.onNavigateToTab,
+  });
+
+  @override
+  State<_PersonalAttendanceCard> createState() => _PersonalAttendanceCardState();
+}
+
+class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
+  late int _selectedYear;
+  late int _selectedMonth;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _selectedYear = now.year;
+    _selectedMonth = now.month;
+  }
+
+  void _changeMonth(int delta) {
+    setState(() {
+      var m = _selectedMonth + delta;
+      var y = _selectedYear;
+      if (m < 1) {
+        m = 12;
+        y--;
+      } else if (m > 12) {
+        m = 1;
+        y++;
+      }
+      _selectedMonth = m;
+      _selectedYear = y;
+    });
+    final auth = context.read<AuthProvider>();
+    context.read<BackendDataProvider>().loadMyAttendance(
+          employeeId: auth.currentUser?.id,
+          year: _selectedYear,
+          month: _selectedMonth,
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final backend = context.watch<BackendDataProvider>();
+    final history = backend.myAttendanceHistory;
+    final summary = history?.summary;
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _selectedYear == now.year && _selectedMonth == now.month;
+
+    final allDays = history?.days ?? [];
+    final relevantDays = allDays
+        .where(
+            (d) => (!isCurrentMonth || d.day <= now.day) && d.status != 'FUTURE')
+        .toList();
+    final displayDays = relevantDays.reversed.toList();
+
+    return _Panel(
+      isDark: widget.isDark,
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    LucideIcons.calendar,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _SectionTitle('Lịch làm việc trong tháng',
+                          isDark: widget.isDark),
+                      const SizedBox(height: 3),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          InkWell(
+                            onTap: () => _changeMonth(-1),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Icon(
+                                LucideIcons.chevronLeft,
+                                size: 16,
+                                color: widget.isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Text(
+                              'Tháng $_selectedMonth/$_selectedYear',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: isCurrentMonth
+                                    ? AppColors.primary
+                                    : (widget.isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight),
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            onTap: () => _changeMonth(1),
+                            borderRadius: BorderRadius.circular(4),
+                            child: Padding(
+                              padding: const EdgeInsets.all(2),
+                              child: Icon(
+                                LucideIcons.chevronRight,
+                                size: 16,
+                                color: widget.isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                if (displayDays.isNotEmpty)
+                  TextButton.icon(
+                    onPressed: () => _showAllHistoryModal(
+                      context,
+                      history,
+                      widget.isDark,
+                      _selectedYear,
+                      _selectedMonth,
+                    ),
+                    icon: const Icon(LucideIcons.list, size: 14),
+                    label: const Text('Xem tất cả'),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (summary != null) ...[
+            Divider(
+              height: 1,
+              color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+            ),
+            Padding(
+              padding: const EdgeInsets.all(14),
+              child: _buildSummaryChips(
+                  summary, widget.isDark),
+            ),
+          ],
+          Divider(
+            height: 1,
+            color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+          if (backend.isLoadingMyAttendance && history == null)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Center(
+                child: SizedBox(
+                  width: 24,
+                  height: 24,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            )
+          else if (displayDays.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(
+                      LucideIcons.calendarOff,
+                      size: 36,
+                      color: widget.isDark
+                          ? AppColors.textSecondaryDark.withValues(alpha: 0.5)
+                          : AppColors.textSecondaryLight.withValues(alpha: 0.5),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Chưa có lịch làm việc trong tháng $_selectedMonth/$_selectedYear',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: widget.isDark
+                            ? AppColors.textSecondaryDark
+                            : AppColors.textSecondaryLight,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Column(
+              children: [
+                ...displayDays.take(7).map((dayLog) {
+                  final isToday = isCurrentMonth && dayLog.day == now.day;
+                  return _DailyHistoryRow(
+                    dayLog: dayLog,
+                    isDark: widget.isDark,
+                    isToday: isToday,
+                    onTap: () => _showDayDetail(
+                        context, dayLog, widget.isDark),
+                  );
+                }),
+                if (displayDays.length > 7)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Center(
+                      child: TextButton(
+                        onPressed: () =>
+                            _showAllHistoryModal(
+                          context,
+                          history,
+                          widget.isDark,
+                          _selectedYear,
+                          _selectedMonth,
+                        ),
+                        child: Text(
+                          'Xem thêm ${displayDays.length - 7} ngày khác trong tháng...',
+                          style: const TextStyle(fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+
+  static Widget _buildSummaryChips(AttendanceSummary summary, bool isDark) {
+    final workDaysStr = summary.workDays % 1 == 0
+        ? summary.workDays.toInt().toString()
+        : summary.workDays.toString();
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        _summaryChip(
+          icon: LucideIcons.calendarCheck,
+          label: '$workDaysStr công',
+          color: const Color(0xFF10B981),
+          bg: isDark
+              ? const Color(0xFF064E3B).withValues(alpha: 0.4)
+              : const Color(0xFFECFDF5),
+          isDark: isDark,
+        ),
+        _summaryChip(
+          icon: LucideIcons.clock,
+          label: '${summary.totalHours.toStringAsFixed(1)}h làm',
+          color: const Color(0xFF3B82F6),
+          bg: isDark
+              ? const Color(0xFF1E3A8A).withValues(alpha: 0.4)
+              : const Color(0xFFEFF6FF),
+          isDark: isDark,
+        ),
+        _summaryChip(
+          icon: LucideIcons.alertCircle,
+          label: '${summary.lateCount} lần muộn',
+          color: const Color(0xFFF59E0B),
+          bg: isDark
+              ? const Color(0xFF78350F).withValues(alpha: 0.4)
+              : const Color(0xFFFFFBEB),
+          isDark: isDark,
+        ),
+        _summaryChip(
+          icon: LucideIcons.zap,
+          label: '+${summary.overtimeHours.toStringAsFixed(1)}h tăng ca',
+          color: const Color(0xFF8B5CF6),
+          bg: isDark
+              ? const Color(0xFF4C1D95).withValues(alpha: 0.4)
+              : const Color(0xFFF5F3FF),
+          isDark: isDark,
+        ),
+      ],
+    );
+  }
+
+  static Widget _summaryChip({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required Color bg,
+    required bool isDark,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 12, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: isDark ? Colors.white : color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static void _showDayDetail(
+    BuildContext context,
+    DailyHistoryLog dayLog,
+    bool isDark,
+  ) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        final badgeStyle = _getStatusBadgeStyle(dayLog.status, isDark);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF475569)
+                          : const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${dayLog.dow}, Ngày ${dayLog.date}',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            'Ca hành chính (08:30 - 17:30)',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: badgeStyle.bg,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: badgeStyle.border),
+                      ),
+                      child: Text(
+                        dayLog.statusLabel,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: badgeStyle.fg,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFF8FAFC),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Giờ vào',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              dayLog.checkIn ?? '--:--',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 28,
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Giờ ra',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              dayLog.checkOut ?? '--:--',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 28,
+                        color: isDark
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Thời gian làm',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${dayLog.totalHours.toStringAsFixed(1)}h${dayLog.overtimeHours > 0 ? ' (+${dayLog.overtimeHours.toStringAsFixed(1)}h)' : ''}',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : AppColors.textPrimaryLight,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (dayLog.note.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isDark
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(LucideIcons.info,
+                            size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            dayLog.note,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 18),
+                Text(
+                  'Chi tiết các lần quét (${dayLog.events.length})',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                if (dayLog.events.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Center(
+                      child: Text(
+                        'Không có nhật ký quét chi tiết trong ngày',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  ...dayLog.events.map((event) {
+                    final isCheckIn =
+                        event.type == 'IN' || event.type == 'CHECK_IN';
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 14, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: isDark
+                              ? const Color(0xFF334155)
+                              : const Color(0xFFE2E8F0),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            isCheckIn ? LucideIcons.logIn : LucideIcons.logOut,
+                            size: 16,
+                            color: isCheckIn
+                                ? const Color(0xFF10B981)
+                                : const Color(0xFF3B82F6),
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            isCheckIn ? 'VÀO' : 'RA',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: isCheckIn
+                                  ? const Color(0xFF10B981)
+                                  : const Color(0xFF3B82F6),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            event.time,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? const Color(0xFF334155)
+                                  : const Color(0xFFE2E8F0),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              event.method == 'MANUAL'
+                                  ? 'Thủ công'
+                                  : 'Khuôn mặt (${(event.confidence * 100).toInt()}%)',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  static void _showAllHistoryModal(
+    BuildContext context,
+    EmployeeHistoryData? history,
+    bool isDark,
+    int year,
+    int month,
+  ) {
+    if (history == null) return;
+    final now = DateTime.now();
+    final isCurrentMonth = year == now.year && month == now.month;
+    final allDays = history.days.reversed.toList();
+    final summary = history.summary;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) {
+        return DraggableScrollableSheet(
+          initialChildSize: 0.85,
+          minChildSize: 0.5,
+          maxChildSize: 0.95,
+          expand: false,
+          builder: (context, scrollController) {
+            return Column(
+              children: [
+                const SizedBox(height: 12),
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: isDark
+                        ? const Color(0xFF475569)
+                        : const Color(0xFFCBD5E1),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Lịch làm việc tháng $month/$year',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '${history.employeeName} · ${summary.workDays % 1 == 0 ? summary.workDays.toInt() : summary.workDays} công · ${summary.totalHours.toStringAsFixed(1)} giờ',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(LucideIcons.x, size: 20),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(
+                  height: 1,
+                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: allDays.length,
+                    itemBuilder: (context, index) {
+                      final dayLog = allDays[index];
+                      final isToday = isCurrentMonth && dayLog.day == now.day;
+                      return _DailyHistoryRow(
+                        dayLog: dayLog,
+                        isDark: isDark,
+                        isToday: isToday,
+                        onTap: () => _showDayDetail(context, dayLog, isDark),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+class _DailyHistoryRow extends StatelessWidget {
+  final DailyHistoryLog dayLog;
+  final bool isDark;
+  final bool isToday;
+  final VoidCallback onTap;
+
+  const _DailyHistoryRow({
+    required this.dayLog,
+    required this.isDark,
+    this.isToday = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final badgeStyle = _getStatusBadgeStyle(dayLog.status, isDark);
+
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isToday
+              ? AppColors.primary.withValues(alpha: 0.04)
+              : Colors.transparent,
+          border: Border(
+            top: BorderSide(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            ),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 52,
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(
+                color: isToday
+                    ? AppColors.primary.withValues(alpha: 0.12)
+                    : (isDark
+                        ? const Color(0xFF1E293B)
+                        : const Color(0xFFF1F5F9)),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isToday
+                      ? AppColors.primary
+                      : (isDark
+                          ? const Color(0xFF334155)
+                          : const Color(0xFFE2E8F0)),
+                  width: isToday ? 1.5 : 1.0,
+                ),
+              ),
+              child: Column(
+                children: [
+                  Text(
+                    isToday ? 'HÔM NAY' : _shortDow(dayLog.dow),
+                    style: TextStyle(
+                      fontSize: isToday ? 8.0 : 10,
+                      fontWeight: isToday ? FontWeight.w800 : FontWeight.w600,
+                      color: isToday
+                          ? AppColors.primary
+                          : (isDark
+                              ? AppColors.textSecondaryDark
+                              : AppColors.textSecondaryLight),
+                    ),
+                  ),
+                  Text(
+                    dayLog.day.toString().padLeft(2, '0'),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: isToday
+                          ? AppColors.primary
+                          : (isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      if (dayLog.hasCheckIn) ...[
+                        const Icon(LucideIcons.arrowDownRight,
+                            size: 13, color: Color(0xFF10B981)),
+                        const SizedBox(width: 3),
+                        Text(
+                          dayLog.checkIn!,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(LucideIcons.arrowUpRight,
+                            size: 13, color: Color(0xFF3B82F6)),
+                        const SizedBox(width: 3),
+                        Text(
+                          dayLog.checkOut ?? '--:--',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
+                        ),
+                      ] else ...[
+                        Text(
+                          dayLog.status == 'HOLIDAY'
+                              ? 'Nghỉ cuối tuần / Lễ'
+                              : (dayLog.status == 'LEAVE'
+                                  ? 'Nghỉ phép'
+                                  : 'Chưa có bản ghi'),
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontStyle: FontStyle.italic,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      if (dayLog.totalHours > 0) ...[
+                        Text(
+                          '${dayLog.totalHours.toStringAsFixed(1)} giờ',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
+                          ),
+                        ),
+                      ],
+                      if (dayLog.overtimeHours > 0) ...[
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '+${dayLog.overtimeHours.toStringAsFixed(1)}h OT',
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF8B5CF6),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (dayLog.note.isNotEmpty) ...[
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            dayLog.note,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: badgeStyle.bg,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: badgeStyle.border),
+              ),
+              child: Text(
+                dayLog.statusLabel,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: badgeStyle.fg,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _shortDow(String dow) {
+    if (dow.contains('Hai')) return 'T2';
+    if (dow.contains('Ba')) return 'T3';
+    if (dow.contains('Tư')) return 'T4';
+    if (dow.contains('Năm')) return 'T5';
+    if (dow.contains('Sáu')) return 'T6';
+    if (dow.contains('Bảy')) return 'T7';
+    if (dow.contains('Nhật')) return 'CN';
+    return dow;
+  }
+}
+
+class _BadgeStyle {
+  final Color bg;
+  final Color fg;
+  final Color border;
+
+  const _BadgeStyle({
+    required this.bg,
+    required this.fg,
+    required this.border,
+  });
+}
+
+_BadgeStyle _getStatusBadgeStyle(String status, bool isDark) {
+  switch (status) {
+    case 'OVERTIME':
+      return _BadgeStyle(
+        bg: isDark ? const Color(0xFF3B1D5C) : const Color(0xFFF3E8FF),
+        fg: const Color(0xFF9333EA),
+        border: const Color(0xFFD8B4FE),
+      );
+    case 'PRESENT':
+      return _BadgeStyle(
+        bg: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
+        fg: const Color(0xFF10B981),
+        border: const Color(0xFFA7F3D0),
+      );
+    case 'LATE':
+    case 'EARLY_LEAVE':
+      return _BadgeStyle(
+        bg: isDark ? const Color(0xFF78350F) : const Color(0xFFFFFBEB),
+        fg: const Color(0xFFD97706),
+        border: const Color(0xFFFDE68A),
+      );
+    case 'HALF_DAY_MORNING':
+    case 'HALF_DAY_AFTERNOON':
+      return _BadgeStyle(
+        bg: isDark ? const Color(0xFF1E3A8A) : const Color(0xFFEFF6FF),
+        fg: const Color(0xFF2563EB),
+        border: const Color(0xFFBFDBFE),
+      );
+    case 'LEAVE':
+      return _BadgeStyle(
+        bg: isDark ? const Color(0xFF312E81) : const Color(0xFFEEF2FF),
+        fg: const Color(0xFF4F46E5),
+        border: const Color(0xFFC7D2FE),
+      );
+    case 'ABSENT':
+      return _BadgeStyle(
+        bg: isDark ? const Color(0xFF7F1D1D) : const Color(0xFFFEF2F2),
+        fg: const Color(0xFFEF4444),
+        border: const Color(0xFFFECACA),
+      );
+    case 'HOLIDAY':
+    default:
+      return _BadgeStyle(
+        bg: isDark ? const Color(0xFF1F2937) : const Color(0xFFF3F4F6),
+        fg: isDark ? const Color(0xFF9CA3AF) : const Color(0xFF6B7280),
+        border: isDark ? const Color(0xFF374151) : const Color(0xFFE5E7EB),
+      );
   }
 }
 

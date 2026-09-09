@@ -1,17 +1,22 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Wrench, Activity, CheckCircle2, Cpu, Users, UserPlus,
-  AlertTriangle, RefreshCw, ArrowRight, UserCheck
+  AlertTriangle, RefreshCw, ArrowRight, UserCheck,
+  CalendarCheck, Clock, LogIn, LogOut
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { getAuthHeaders } from '../utils/auth';
 import { getAvatarLetters } from '../utils/employee';
+import { isAdminOrAbove } from '../utils/permissions';
 import './DashboardTab.css';
 
 interface DashboardTabProps {
   setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => void;
   showToast: (message: string) => void;
   currentUser: UserInfo | null;
+  onViewPersonalAttendance?: (emp: { id: string; name: string; dept: string }) => void;
+  currentMonth?: number;
+  currentYear?: number;
 }
 
 interface OrderRecord {
@@ -53,24 +58,70 @@ interface AttendanceReportRecord {
   records?: AttendanceResponseRecord[];
 }
 
+interface PersonalEvent {
+  id: string;
+  logTime: string;
+  type: string;
+  source: string;
+  confidence: number;
+  note?: string;
+}
+
+interface PersonalHistoryDay {
+  date: string;
+  dayOfWeek: string;
+  status: string;
+  events: PersonalEvent[];
+}
+
+interface PersonalSummary {
+  workDays: number;
+  totalHours: number;
+  lateCount: number;
+  absentDays: number;
+  overtimeHours: number;
+}
+
+interface MyTodayAttendance {
+  date: string;
+  checkIn: string | null;
+  checkOut: string | null;
+  totalMinutes?: number | null;
+  isLate: boolean;
+  isEarlyLeave: boolean;
+  shiftStart?: string;
+  shiftEnd?: string;
+  records?: AttendanceResponseRecord[];
+}
+
 export const DashboardTab: React.FC<DashboardTabProps> = ({
   setActiveTab,
   showToast,
-  currentUser
+  currentUser,
+  onViewPersonalAttendance,
+  currentMonth,
+  currentYear
 }) => {
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [boards, setBoards] = useState<BoardRecord[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<AttendanceReportRecord[]>([]);
   const [pendingUsers, setPendingUsers] = useState<any[]>([]);
+  const [myToday, setMyToday] = useState<MyTodayAttendance | null>(null);
+  const [personalDays, setPersonalDays] = useState<PersonalHistoryDay[]>([]);
+  const [personalSummary, setPersonalSummary] = useState<PersonalSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  const isAdmin = useMemo(() => isAdminOrAbove(currentUser), [currentUser]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
       const headers = getAuthHeaders();
       const today = new Date();
       const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const queryYear = currentYear || today.getFullYear();
+      const queryMonth = currentMonth || (today.getMonth() + 1);
 
       // 1. Fetch Orders
       const ordersRes = await fetch('/api/v1/repair-orders?size=200', { headers });
@@ -82,28 +133,62 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       const boardsData = boardsRes.ok ? await boardsRes.json() : null;
       const fetchedBoards: BoardRecord[] = boardsData?.data?.content || boardsData?.data || [];
 
-      // 3. Fetch Employees (Manager+)
       let fetchedEmployees: any[] = [];
-      const employeesRes = await fetch('/api/v1/employees?size=200', { headers });
-      if (employeesRes.ok) {
-        const empData = await employeesRes.json();
-        fetchedEmployees = empData?.data?.employees || empData?.data?.content || empData?.data || [];
-      }
-
-      // 4. Fetch Today Attendance (Manager+)
       let fetchedAttendance: AttendanceReportRecord[] = [];
-      const attendanceRes = await fetch(`/api/v1/attendance/report?date=${todayStr}`, { headers });
-      if (attendanceRes.ok) {
-        const attData = await attendanceRes.json();
-        fetchedAttendance = attData?.data || [];
-      }
-
-      // 5. Fetch Pending Users (Manager+)
       let fetchedPending: any[] = [];
-      const pendingRes = await fetch('/api/v1/auth/pending?size=200', { headers });
-      if (pendingRes.ok) {
-        const pendData = await pendingRes.json();
-        fetchedPending = pendData?.data?.content || pendData?.data || [];
+      let fetchedMyToday: MyTodayAttendance | null = null;
+      let fetchedPersonalDays: PersonalHistoryDay[] = [];
+      let fetchedPersonalSummary: PersonalSummary | null = null;
+
+      if (isAdmin) {
+        // 3. Fetch Employees (Manager/Admin)
+        const employeesRes = await fetch('/api/v1/employees?size=200', { headers });
+        if (employeesRes.ok) {
+          const empData = await employeesRes.json();
+          fetchedEmployees = empData?.data?.employees || empData?.data?.content || empData?.data || [];
+        }
+
+        // 4. Fetch Today Attendance for all employees (Admin)
+        const attendanceRes = await fetch(`/api/v1/attendance/report?date=${todayStr}`, { headers });
+        if (attendanceRes.ok) {
+          const attData = await attendanceRes.json();
+          fetchedAttendance = attData?.data || [];
+        }
+
+        // 5. Fetch Pending Users (Admin)
+        const pendingRes = await fetch('/api/v1/auth/pending?size=200', { headers });
+        if (pendingRes.ok) {
+          const pendData = await pendingRes.json();
+          fetchedPending = pendData?.data?.content || pendData?.data || [];
+        }
+      } else {
+        // Tài khoản có vai trò khác quản trị viên: Lấy ngày chấm công cá nhân
+        // 1. Chấm công hôm nay của cá nhân
+        try {
+          const todayRes = await fetch('/api/v1/attendance/me/today', { headers });
+          if (todayRes.ok) {
+            const todayData = await todayRes.json();
+            fetchedMyToday = todayData?.data || null;
+          }
+        } catch (err) {
+          console.warn('Lỗi khi tải chấm công hôm nay của cá nhân:', err);
+        }
+
+        // 2. Danh sách các ngày chấm công trong tháng & tổng hợp công cá nhân
+        if (currentUser?.id) {
+          try {
+            const logsRes = await fetch(`/api/attendance/${currentUser.id}/logs?year=${queryYear}&month=${queryMonth}`, { headers });
+            if (logsRes.ok) {
+              const logsData = await logsRes.json();
+              if (logsData?.data) {
+                fetchedPersonalDays = logsData.data.days || [];
+                fetchedPersonalSummary = logsData.data.summary || null;
+              }
+            }
+          } catch (err) {
+            console.warn('Lỗi khi tải lịch sử ngày chấm công cá nhân:', err);
+          }
+        }
       }
 
       setOrders(fetchedOrders);
@@ -111,6 +196,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       setEmployees(fetchedEmployees);
       setAttendance(fetchedAttendance);
       setPendingUsers(fetchedPending);
+      setMyToday(fetchedMyToday);
+      setPersonalDays(fetchedPersonalDays);
+      setPersonalSummary(fetchedPersonalSummary);
     } catch (e: any) {
       console.error('Error fetching dashboard stats:', e);
       showToast('Có lỗi xảy ra khi tải số liệu thống kê.');
@@ -118,7 +206,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [showToast]);
+  }, [showToast, isAdmin, currentUser?.id, currentYear, currentMonth]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -287,6 +375,101 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     }
   };
 
+  // Helper to format personal attendance status badge
+  const getPersonalDayBadge = (status: string) => {
+    switch (status.toUpperCase()) {
+      case 'PRESENT':
+        return <span className="att-badge success">Đủ công</span>;
+      case 'LATE':
+        return <span className="att-badge warning">Vào muộn</span>;
+      case 'OVERTIME':
+        return <span className="att-badge purple">Tăng ca</span>;
+      case 'HALF_DAY_MORNING':
+        return <span className="att-badge info">Nửa công (Sáng)</span>;
+      case 'HALF_DAY_AFTERNOON':
+        return <span className="att-badge info">Nửa công (Chiều)</span>;
+      case 'HALF_DAY':
+        return <span className="att-badge info">Nửa công (0.5)</span>;
+      case 'LEAVE':
+        return <span className="att-badge info">Nghỉ phép</span>;
+      case 'ABSENT':
+        return <span className="att-badge danger">Vắng KP</span>;
+      case 'HOLIDAY':
+        return <span className="att-badge secondary">Nghỉ lễ/CN</span>;
+      default:
+        return <span className="att-badge secondary">{status}</span>;
+    }
+  };
+
+  const formatDayDisplay = (dateStr: string, dayOfWeek: string) => {
+    try {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        return `${dayOfWeek}, ${parts[2]}/${parts[1]}`;
+      }
+    } catch {
+      // fallback
+    }
+    return `${dayOfWeek}, ${dateStr}`;
+  };
+
+  const getDayInOut = (day: PersonalHistoryDay) => {
+    if (!day.events || day.events.length === 0) {
+      return { checkIn: null, checkOut: null, duration: null };
+    }
+    const inEv = day.events.find(e => e.type === 'IN' || e.type === 'CHECK_IN');
+    const outEv = [...day.events].reverse().find(e => e.type === 'OUT' || e.type === 'CHECK_OUT');
+
+    let duration: string | null = null;
+    if (inEv && outEv && inEv.logTime && outEv.logTime) {
+      const [ih, im] = inEv.logTime.split(':').map(Number);
+      const [oh, om] = outEv.logTime.split(':').map(Number);
+      if (!isNaN(ih) && !isNaN(im) && !isNaN(oh) && !isNaN(om)) {
+        let diffMin = (oh * 60 + om) - (ih * 60 + im);
+        if (ih * 60 + im < 12 * 60 + 30 && oh * 60 + om > 13 * 60) {
+          diffMin = Math.max(0, diffMin - 90);
+        }
+        if (diffMin > 0) {
+          const hrs = Math.floor(diffMin / 60);
+          const mins = diffMin % 60;
+          duration = `${hrs}h${mins > 0 ? `${mins}p` : ''}`;
+        }
+      }
+    }
+
+    return {
+      checkIn: inEv?.logTime || null,
+      checkOut: outEv?.logTime || null,
+      duration
+    };
+  };
+
+  const pastPersonalDays = useMemo(() => {
+    return [...personalDays]
+      .filter(d => d.status !== 'FUTURE')
+      .sort((a, b) => b.date.localeCompare(a.date));
+  }, [personalDays]);
+
+  const myTodayTimes = useMemo(() => {
+    if (!myToday) return { checkInStr: null, checkOutStr: null };
+    const formatTime = (timeStr?: string | null) => {
+      if (!timeStr) return null;
+      try {
+        return new Date(timeStr).toLocaleTimeString('vi-VN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+      } catch {
+        return null;
+      }
+    };
+    return {
+      checkInStr: formatTime(myToday.checkIn),
+      checkOutStr: formatTime(myToday.checkOut)
+    };
+  }, [myToday]);
+
   if (loading) {
     return <div className="dashboard-loading"><RefreshCw size={24} className="spin" /> Đang tải số liệu...</div>;
   }
@@ -368,17 +551,32 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
         </div>
 
-        {/* Card 5: Nhân viên có mặt */}
-        <div className="stat-card border-teal">
-          <div className="stat-info">
-            <span className="stat-label">Nhân viên có mặt</span>
-            <span className="stat-value">{stats.checkedInEmployees}/{stats.totalEmployees}</span>
-            <span className="stat-sub">Đã check-in hôm nay</span>
+        {/* Card 5: Nhân viên có mặt (Admin) HOẶC Ngày công của tôi (Non-admin) */}
+        {isAdmin ? (
+          <div className="stat-card border-teal">
+            <div className="stat-info">
+              <span className="stat-label">Nhân viên có mặt</span>
+              <span className="stat-value">{stats.checkedInEmployees}/{stats.totalEmployees}</span>
+              <span className="stat-sub">Đã check-in hôm nay</span>
+            </div>
+            <div className="stat-icon-wrapper bg-teal">
+              <Users size={20} className="icon-teal" />
+            </div>
           </div>
-          <div className="stat-icon-wrapper bg-teal">
-            <Users size={20} className="icon-teal" />
+        ) : (
+          <div className="stat-card border-teal">
+            <div className="stat-info">
+              <span className="stat-label">Công tháng này</span>
+              <span className="stat-value">{personalSummary ? personalSummary.workDays : 0} công</span>
+              <span className="stat-sub">
+                {personalSummary ? `Tổng giờ làm: ${personalSummary.totalHours}h` : `Tháng ${currentMonth || (new Date().getMonth() + 1)}`}
+              </span>
+            </div>
+            <div className="stat-icon-wrapper bg-teal">
+              <CalendarCheck size={20} className="icon-teal" />
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Card 6: Đơn chờ phân công */}
         <div className="stat-card border-pink">
@@ -404,17 +602,36 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
         </div>
 
-        {/* Card 8: Tài khoản chờ duyệt */}
-        <div className="stat-card border-amber">
-          <div className="stat-info">
-            <span className="stat-label">Tài khoản chờ duyệt</span>
-            <span className="stat-value">{stats.pendingCount}</span>
-            <span className="stat-sub">Chờ xét duyệt hệ thống</span>
+        {/* Card 8: Tài khoản chờ duyệt (Admin) HOẶC Đi muộn / Tăng ca (Non-admin) */}
+        {isAdmin ? (
+          <div className="stat-card border-amber">
+            <div className="stat-info">
+              <span className="stat-label">Tài khoản chờ duyệt</span>
+              <span className="stat-value">{stats.pendingCount}</span>
+              <span className="stat-sub">Chờ xét duyệt hệ thống</span>
+            </div>
+            <div className="stat-icon-wrapper bg-amber">
+              <UserCheck size={20} className="icon-amber" />
+            </div>
           </div>
-          <div className="stat-icon-wrapper bg-amber">
-            <UserCheck size={20} className="icon-amber" />
+        ) : (
+          <div className="stat-card border-amber">
+            <div className="stat-info">
+              <span className="stat-label">Đi muộn / Về sớm</span>
+              <span className="stat-value">{personalSummary ? personalSummary.lateCount : 0} lần</span>
+              <span className="stat-sub">
+                {personalSummary && personalSummary.overtimeHours > 0
+                  ? `Tăng ca: ${personalSummary.overtimeHours}h`
+                  : personalSummary?.lateCount === 0
+                    ? 'Chuyên cần đúng giờ'
+                    : 'Cần chú ý giờ giấc'}
+              </span>
+            </div>
+            <div className="stat-icon-wrapper bg-amber">
+              <Clock size={20} className="icon-amber" />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Main content split */}
@@ -568,39 +785,180 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
         {/* Right Side: Data Lists */}
         <div className="dashboard-lists-column">
-          {/* Today Attendance Panel */}
-          <div className="dashboard-panel flex-column">
-            <div className="panel-header">
-              <h3 className="panel-title">Chấm công hôm nay</h3>
-              <span className="panel-badge">{stats.checkedInEmployees} Nhân viên</span>
+          {/* Attendance Panel: Admin sees company-wide today check-ins; Non-admin sees personal attendance days */}
+          {isAdmin ? (
+            <div className="dashboard-panel flex-column">
+              <div className="panel-header">
+                <h3 className="panel-title">Chấm công hôm nay</h3>
+                <span className="panel-badge">{stats.checkedInEmployees} Nhân viên</span>
+              </div>
+              <div className="list-container attendance-list">
+                {attendance.length === 0 ? (
+                  <div className="empty-state">Không có nhân viên nào check-in hôm nay</div>
+                ) : (
+                  attendance.map((rec, index) => {
+                    const empName = rec.records && rec.records.length > 0
+                      ? rec.records[0].employeeName
+                      : 'Nhân viên';
+                    const checkInTime = rec.checkIn ? new Date(rec.checkIn).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
+                    return (
+                      <div key={index} className="list-item">
+                        <div className="item-avatar">
+                          {getAvatarLetters(empName)}
+                        </div>
+                        <div className="item-details">
+                          <span className="item-primary-name">{empName}</span>
+                          <span className="item-secondary-info">Check-in: {checkInTime}</span>
+                        </div>
+                        <div className="item-action-status">
+                          {getAttendanceStatusBadge(rec)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-            <div className="list-container attendance-list">
-              {attendance.length === 0 ? (
-                <div className="empty-state">Không có nhân viên nào check-in hôm nay</div>
-              ) : (
-                attendance.map((rec, index) => {
-                  const empName = rec.records && rec.records.length > 0
-                    ? rec.records[0].employeeName
-                    : 'Nhân viên';
-                  const checkInTime = rec.checkIn ? new Date(rec.checkIn).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit', hour12: false }) : '--:--';
-                  return (
-                    <div key={index} className="list-item">
-                      <div className="item-avatar">
-                        {getAvatarLetters(empName)}
-                      </div>
-                      <div className="item-details">
-                        <span className="item-primary-name">{empName}</span>
-                        <span className="item-secondary-info">Check-in: {checkInTime}</span>
-                      </div>
-                      <div className="item-action-status">
-                        {getAttendanceStatusBadge(rec)}
-                      </div>
+          ) : (
+            <div className="dashboard-panel flex-column personal-attendance-panel">
+              <div className="panel-header">
+                <div className="panel-title-group">
+                  <h3 className="panel-title">Ngày chấm công của bạn</h3>
+                  <span className="panel-badge">
+                    {personalSummary ? `${personalSummary.workDays} công` : 'Cá nhân'}
+                  </span>
+                </div>
+                {onViewPersonalAttendance && currentUser && (
+                  <button
+                    className="btn-link"
+                    onClick={() => onViewPersonalAttendance({
+                      id: currentUser.id || '',
+                      name: currentUser.fullName || currentUser.username,
+                      dept: currentUser.department || 'Nhân viên'
+                    })}
+                  >
+                    <span>Xem chi tiết tháng</span>
+                    <ArrowRight size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Thẻ chấm công hôm nay */}
+              <div className="personal-today-card">
+                <div className="ptc-header">
+                  <span className="ptc-date">Hôm nay ({new Date().toLocaleDateString('vi-VN')})</span>
+                  {myToday?.checkIn ? (
+                    myToday.isLate && myToday.isEarlyLeave ? (
+                      <span className="att-badge warning">Muộn & Về sớm</span>
+                    ) : myToday.isLate ? (
+                      <span className="att-badge warning">Đi muộn</span>
+                    ) : myToday.isEarlyLeave ? (
+                      <span className="att-badge warning">Về sớm</span>
+                    ) : myToday.checkOut ? (
+                      <span className="att-badge success">Đủ công</span>
+                    ) : (
+                      <span className="att-badge success">Đã vào ca</span>
+                    )
+                  ) : (
+                    <span className="att-badge danger">Chưa chấm công</span>
+                  )}
+                </div>
+                <div className="ptc-times-row">
+                  <div className="ptc-time-box">
+                    <LogIn size={15} className="ptc-icon in" />
+                    <div className="ptc-time-text">
+                      <span className="ptc-time-label">Giờ vào</span>
+                      <strong className="ptc-time-value">{myTodayTimes.checkInStr || '--:--'}</strong>
                     </div>
-                  );
-                })
+                  </div>
+                  <div className="ptc-divider" />
+                  <div className="ptc-time-box">
+                    <LogOut size={15} className="ptc-icon out" />
+                    <div className="ptc-time-text">
+                      <span className="ptc-time-label">Giờ ra</span>
+                      <strong className="ptc-time-value">{myTodayTimes.checkOutStr || '--:--'}</strong>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tóm tắt nhanh thống kê tháng */}
+              {personalSummary && (
+                <div className="personal-summary-chips">
+                  <div className="mini-chip">
+                    <span className="mc-label">Tổng công</span>
+                    <strong className="mc-val text-teal">{personalSummary.workDays}</strong>
+                  </div>
+                  <div className="mini-chip">
+                    <span className="mc-label">Tổng giờ</span>
+                    <strong className="mc-val text-blue">{personalSummary.totalHours}h</strong>
+                  </div>
+                  <div className="mini-chip">
+                    <span className="mc-label">Đi muộn</span>
+                    <strong className={`mc-val ${personalSummary.lateCount > 0 ? 'text-amber' : 'text-green'}`}>
+                      {personalSummary.lateCount}
+                    </strong>
+                  </div>
+                  <div className="mini-chip">
+                    <span className="mc-label">Tăng ca</span>
+                    <strong className="mc-val text-purple">{personalSummary.overtimeHours}h</strong>
+                  </div>
+                </div>
               )}
+
+              {/* Tiêu đề danh sách ngày */}
+              <div className="personal-days-title">
+                <span>Lịch sử các ngày trong tháng</span>
+                <span className="pdt-sub">Bấm vào ngày để xem chi tiết</span>
+              </div>
+
+              {/* Danh sách các ngày chấm công trong tháng */}
+              <div className="list-container personal-attendance-list">
+                {pastPersonalDays.length === 0 ? (
+                  <div className="empty-state">Chưa có bản ghi chấm công nào trong tháng này</div>
+                ) : (
+                  pastPersonalDays.map((day, index) => {
+                    const inOut = getDayInOut(day);
+                    return (
+                      <div
+                        key={index}
+                        className={`list-item clickable personal-day-row ${day.status.toLowerCase()}`}
+                        onClick={() => onViewPersonalAttendance && currentUser && onViewPersonalAttendance({
+                          id: currentUser.id || '',
+                          name: currentUser.fullName || currentUser.username,
+                          dept: currentUser.department || 'Nhân viên'
+                        })}
+                        title="Bấm để xem chi tiết lịch sử"
+                      >
+                        <div className="day-date-badge">
+                          <span className="dd-dow">{day.dayOfWeek}</span>
+                          <span className="dd-day">{day.date.split('-')[2]}</span>
+                        </div>
+                        <div className="item-details">
+                          <div className="day-primary-row">
+                            <span className="item-primary-name">
+                              {formatDayDisplay(day.date, day.dayOfWeek)}
+                            </span>
+                            {inOut.duration && (
+                              <span className="day-duration-tag">{inOut.duration}</span>
+                            )}
+                          </div>
+                          <span className="item-secondary-info">
+                            {inOut.checkIn || inOut.checkOut
+                              ? `Vào: ${inOut.checkIn || '--:--'} · Ra: ${inOut.checkOut || '--:--'}`
+                              : 'Không có quẹt thẻ'}
+                          </span>
+                        </div>
+                        <div className="item-action-status">
+                          {getPersonalDayBadge(day.status)}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Recent Orders Panel */}
           <div className="dashboard-panel flex-column">

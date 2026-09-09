@@ -13,7 +13,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 
 import java.time.*;
 import java.time.format.DateTimeFormatter;
@@ -270,6 +272,16 @@ public class AttendanceQueryController {
         return ResponseEntity.ok(ApiResponse.success(new MonthlyAttendanceResponse(employeeStatsList)));
     }
 
+    @GetMapping("/me/logs")
+    public ResponseEntity<ApiResponse<EmployeeHistoryResponse>> getMyLogs(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) Integer month,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        int targetYear = year != null ? year : LocalDate.now(ZONE).getYear();
+        int targetMonth = month != null ? month : LocalDate.now(ZONE).getMonthValue();
+        return getEmployeeLogs(userDetails.getUserId(), targetYear, targetMonth);
+    }
+
     @GetMapping("/{employeeId}/logs")
     @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER') or principal.userId.toString() == #p0.toString()")
     public ResponseEntity<ApiResponse<EmployeeHistoryResponse>> getEmployeeLogs(
@@ -280,9 +292,7 @@ public class AttendanceQueryController {
         UserEntity employee = userRepository.findByIdAndIsDeletedFalse(employeeId)
                 .orElseThrow(() -> new IllegalArgumentException("Không tìm thấy nhân viên"));
 
-        if (employee.getRole() == UserRole.ADMIN || employee.getRole() == UserRole.SUPER_ADMIN ||
-            employee.getRole() == UserRole.TECHNICIAN || employee.getRole() == UserRole.WAREHOUSE ||
-            employee.getRole() == UserRole.ATTENDANCE) {
+        if (employee.getRole() == UserRole.ATTENDANCE) {
             throw new IllegalArgumentException("Không tìm thấy nhân viên");
         }
 
@@ -326,6 +336,10 @@ public class AttendanceQueryController {
 
             String status = "PRESENT";
             List<HistoryEvent> events = new ArrayList<>();
+            Instant checkIn = null;
+            Instant checkOut = null;
+            double dayActualHours = 0.0;
+            double dayOtHours = 0.0;
 
             if (date.isAfter(today)) {
                 status = "FUTURE";
@@ -340,13 +354,13 @@ public class AttendanceQueryController {
                         absentDays++;
                     }
                 } else {
-                    Instant checkIn = dayRecords.stream()
+                    checkIn = dayRecords.stream()
                             .filter(r -> r.getType() == AttendanceType.IN)
                             .map(AttendanceRecord::getCheckTime)
                             .min(Instant::compareTo)
                             .orElse(null);
 
-                    Instant checkOut = dayRecords.stream()
+                    checkOut = dayRecords.stream()
                             .filter(r -> r.getType() == AttendanceType.OUT)
                             .map(AttendanceRecord::getCheckTime)
                             .max(Instant::compareTo)
@@ -387,13 +401,15 @@ public class AttendanceQueryController {
                             // Làm cả ngày: trừ 90 phút (1.5h) nghỉ trưa 12:00 - 13:30
                             actualMinutes = Math.max(0.0, rawMinutes - 90);
                         }
-                        totalHours += Math.max(0.0, actualMinutes / 60.0);
+                        dayActualHours = Math.max(0.0, actualMinutes / 60.0);
+                        totalHours += dayActualHours;
 
                         if (isOvertime) {
                             Instant shiftEndInstant = date.atTime(shiftEnd).atZone(ZONE).toInstant();
                             if (checkOut.isAfter(shiftEndInstant)) {
                                 double otMinutes = Duration.between(shiftEndInstant, checkOut).toMinutes();
-                                overtimeHours += Math.max(0.0, otMinutes / 60.0);
+                                dayOtHours = Math.max(0.0, otMinutes / 60.0);
+                                overtimeHours += dayOtHours;
                             }
                         }
                     }
@@ -436,10 +452,20 @@ public class AttendanceQueryController {
             // sort events chronologically
             events.sort(Comparator.comparing(HistoryEvent::logTime));
 
+            String checkInStr = checkIn != null ? timeFormatter.format(checkIn) : null;
+            String checkOutStr = checkOut != null ? timeFormatter.format(checkOut) : null;
+            String dayNote = schedule != null && schedule.getNote() != null ? schedule.getNote() : "";
+
             daysList.add(new DailyHistoryLog(
+                    d,
                     date.toString(),
                     dowStr,
                     status,
+                    checkInStr,
+                    checkOutStr,
+                    Math.round(dayActualHours * 10.0) / 10.0,
+                    Math.round(dayOtHours * 10.0) / 10.0,
+                    dayNote,
                     events
             ));
         }
@@ -652,9 +678,15 @@ public class AttendanceQueryController {
     ) {}
 
     public record DailyHistoryLog(
+            int day,
             String date,
             String dayOfWeek,
             String status,
+            String checkIn,
+            String checkOut,
+            double totalHours,
+            double overtimeHours,
+            String note,
             List<HistoryEvent> events
     ) {}
 

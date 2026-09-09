@@ -477,7 +477,18 @@ export async function exportEmployeeHistoryExcel(
       HALF_DAY: 'Nửa công (0.5)',
       FUTURE: '-'
     };
-    const statusLabel = STATUS_MAP[day.status as keyof typeof STATUS_MAP] || day.status;
+
+    let effectiveStatus = day.status;
+    if (checkOutEvent?.logTime) {
+      const [oh, om] = checkOutEvent.logTime.split(':').map(Number);
+      const isOt = !isNaN(oh) && (oh > 21 || (oh === 21 && (isNaN(om) || om >= 0)));
+      if (effectiveStatus === 'OVERTIME' && !isOt) {
+        effectiveStatus = checkInEvent && checkInEvent.logTime > '08:45' ? 'LATE' : 'PRESENT';
+      } else if (effectiveStatus === 'PRESENT' && isOt) {
+        effectiveStatus = 'OVERTIME';
+      }
+    }
+    const statusLabel = STATUS_MAP[effectiveStatus as keyof typeof STATUS_MAP] || effectiveStatus;
 
     // Lấy ghi chú thủ công / lý do cập nhật
     const manualNotes = day.events

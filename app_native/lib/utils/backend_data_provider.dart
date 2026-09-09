@@ -22,6 +22,9 @@ class BackendDataProvider extends ChangeNotifier {
   List<Part> parts = [];
   List<StoreLocation> locations = [];
   List<AttendanceRecord> attendanceRecords = [];
+  EmployeeHistoryData? myAttendanceHistory;
+  MyTodayAttendance? myTodayAttendance;
+  bool isLoadingMyAttendance = false;
 
   bool isLoading = false;
   String? error;
@@ -45,6 +48,8 @@ class BackendDataProvider extends ChangeNotifier {
           loadPendingUsers(notify: false),
           loadAttendance(notify: false),
         ]);
+      } else {
+        futures.add(loadMyAttendance(notify: false));
       }
 
       await Future.wait(futures);
@@ -211,6 +216,59 @@ class BackendDataProvider extends ChangeNotifier {
       ).map(AttendanceRecord.fromJson).toList();
     }
     if (notify) notifyListeners();
+  }
+
+  Future<void> loadMyAttendance({
+    String? employeeId,
+    int? year,
+    int? month,
+    bool notify = true,
+  }) async {
+    isLoadingMyAttendance = true;
+    if (notify) notifyListeners();
+
+    final now = DateTime.now();
+    final targetYear = year ?? now.year;
+    final targetMonth = month ?? now.month;
+
+    try {
+      // 1. Tải trạng thái hôm nay của tài khoản cá nhân
+      try {
+        final todayData = await api.get('/api/v1/attendance/me/today');
+        if (todayData is Map<String, dynamic>) {
+          myTodayAttendance = MyTodayAttendance.fromJson(todayData);
+        }
+      } catch (e) {
+        debugPrint('loadMyAttendance today error: $e');
+      }
+
+      // 2. Tải lịch sử các ngày chấm công trong tháng
+      try {
+        dynamic logsData;
+        try {
+          logsData = await api.get(
+            '/api/attendance/me/logs',
+            queryParameters: {'year': targetYear, 'month': targetMonth},
+          );
+        } catch (_) {
+          if (employeeId != null && employeeId.isNotEmpty) {
+            logsData = await api.get(
+              '/api/attendance/$employeeId/logs',
+              queryParameters: {'year': targetYear, 'month': targetMonth},
+            );
+          }
+        }
+
+        if (logsData is Map<String, dynamic>) {
+          myAttendanceHistory = EmployeeHistoryData.fromJson(logsData);
+        }
+      } catch (e) {
+        debugPrint('loadMyAttendance logs error: $e');
+      }
+    } finally {
+      isLoadingMyAttendance = false;
+      if (notify) notifyListeners();
+    }
   }
 
   Future<void> approveUser(User user) async {

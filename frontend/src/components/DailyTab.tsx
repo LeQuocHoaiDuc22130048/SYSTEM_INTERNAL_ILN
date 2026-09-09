@@ -61,6 +61,16 @@ export const DailyTab: React.FC<DailyTabProps> = ({
     return (currentHours > endHours) || (currentHours === endHours && currentMinutes > endMinutes);
   };
 
+  const isOvertimeCheckout = (checkOutIso: string | null): boolean => {
+    if (!checkOutIso) return false;
+    const timeStr = formatTime(checkOutIso);
+    if (!timeStr || timeStr === '-') return false;
+    const [h, m] = timeStr.split(':').map(Number);
+    if (isNaN(h)) return false;
+    // Quy định tăng ca: Phải làm việc và check-out từ 21:00 trở đi
+    return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
+  };
+
   const getStatusPill = (report: any, statusChar: string) => {
     const todayStr = getTodayStr();
     const isToday = selectedDate === todayStr;
@@ -91,7 +101,12 @@ export const DailyTab: React.FC<DailyTabProps> = ({
         if (report.isEarlyLeave) {
           return <span className="pill-badge late">Về sớm</span>;
         }
-        if (statusChar === 'o') {
+        // Quy định tăng ca: Chỉ khi checkout từ 21:00 trở đi mới hiển thị Tăng ca
+        const isOT = isOvertimeCheckout(report.checkOut);
+        if (isOT) {
+          return <span className="pill-badge ot">Tăng ca</span>;
+        }
+        if (!report.checkOut && statusChar === 'o') {
           return <span className="pill-badge ot">Tăng ca</span>;
         }
         if (statusChar === 'm') {
@@ -109,6 +124,9 @@ export const DailyTab: React.FC<DailyTabProps> = ({
 
     if (isFuture || statusChar === 'f') {
       return <span className="pill-badge holiday">Chưa diễn ra</span>;
+    }
+    if (statusChar === 'o') {
+      return <span className="pill-badge ot">Tăng ca</span>;
     }
     if (statusChar === 'v') {
       return <span className="pill-badge leave">Nghỉ phép</span>;
@@ -170,10 +188,11 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                 const report = dailyReportMap[emp.id];
                 const statusChar = getDailyStatusFromPattern(emp, selectedDate);
 
+                const isOT = isOvertimeCheckout(report?.checkOut);
                 const checkInText = report?.checkIn ? `In: ${formatTime(report.checkIn)}` : '-';
                 const checkInClass = report?.checkIn ? (report.isLate ? 'warning' : 'success') : '';
                 const checkOutText = report?.checkOut ? `Out: ${formatTime(report.checkOut)}` : '-';
-                const checkOutClass = report?.checkOut ? (report.isEarlyLeave ? 'warning' : 'success') : '';
+                const checkOutClass = report?.checkOut ? (report.isEarlyLeave ? 'warning' : isOT ? 'ot' : 'success') : '';
                 const workingHours = report?.totalMinutes
                   ? `${(report.totalMinutes / 60).toFixed(1)}h`
                   : '-';

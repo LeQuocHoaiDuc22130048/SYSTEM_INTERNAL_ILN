@@ -216,21 +216,38 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                         const checkInEvent = dayLog?.events?.find(e => e.type === 'CHECK_IN');
                                         const checkOutEvent = dayLog?.events?.find(e => e.type === 'CHECK_OUT');
 
+                                        const isOvertimeLogTime = (logTime?: string): boolean => {
+                                           if (!logTime) return false;
+                                           const [h, m] = logTime.split(':').map(Number);
+                                           if (isNaN(h)) return false;
+                                           return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
+                                         };
+
                                         const getCellState = () => {
-                                          if (dayLog) {
-                                            switch (dayLog.status as string) {
-                                              case 'PRESENT': return 'p';
-                                              case 'LATE': return 'l';
-                                              case 'ABSENT': return 'a';
-                                              case 'LEAVE': return 'v';
-                                              case 'HOLIDAY': return 'h';
-                                              case 'OVERTIME':
-                                              case 'OT': return 'o';
-                                              case 'FUTURE': return 'f';
-                                            }
-                                          }
-                                          return dayObj.state;
-                                        };
+                                           let state = dayObj.state;
+                                           if (dayLog) {
+                                             switch (dayLog.status as string) {
+                                               case 'PRESENT': state = 'p'; break;
+                                               case 'LATE': state = 'l'; break;
+                                               case 'ABSENT': state = 'a'; break;
+                                               case 'LEAVE': state = 'v'; break;
+                                               case 'HOLIDAY': state = 'h'; break;
+                                               case 'OVERTIME':
+                                               case 'OT': state = 'o'; break;
+                                               case 'FUTURE': state = 'f'; break;
+                                               default: state = dayObj.state;
+                                             }
+                                           }
+                                           // Quy định tăng ca: Chỉ khi checkout từ 21:00 trở đi mới hiển thị 'o' (Tăng ca)
+                                           if (checkOutEvent?.logTime) {
+                                             if (isOvertimeLogTime(checkOutEvent.logTime)) {
+                                               state = 'o';
+                                             } else if (state === 'o') {
+                                               state = (dayLog?.status === 'LATE' || (checkInEvent && checkInEvent.logTime > '08:45')) ? 'l' : 'p';
+                                             }
+                                           }
+                                           return state;
+                                         };
                                         const cellState = getCellState();
 
                                         return (
