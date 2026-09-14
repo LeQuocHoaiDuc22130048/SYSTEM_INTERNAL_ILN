@@ -109,11 +109,46 @@ function App() {
   const [editModalTarget, setEditModalTarget] = useState<EditModalTarget | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
+
+  // Tự động đóng sidebar khi chuyển sang màn hình lớn (> 1024px)
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 1024) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Đóng sidebar khi nhấn phím Escape
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isSidebarOpen) {
+        setIsSidebarOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarOpen]);
+
+  // Khóa cuộn trang khi mở sidebar trên màn hình nhỏ
+  useEffect(() => {
+    if (isSidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isSidebarOpen]);
 
   // Lắng nghe sự kiện hết hạn phiên đăng nhập từ fetch interceptor
   useEffect(() => {
@@ -399,11 +434,20 @@ function App() {
     <div className="app-layout">
       {toastMessage && <div className="toast-msg">{toastMessage}</div>}
 
+      {/* Lớp phủ làm tối màn hình bên phải khi mở Sidebar trên màn hình nhỏ */}
+      <div
+        className={`sidebar-overlay ${isSidebarOpen ? 'active' : ''}`}
+        onClick={() => setIsSidebarOpen(false)}
+        aria-hidden="true"
+      />
+
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         currentUser={currentUser}
         handleLogout={handleLogout}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
       />
 
       <div className="main-container">
@@ -418,6 +462,8 @@ function App() {
           dataSource={dataSource}
           connectionError={connectionError}
           handleRetryConnection={handleRetryConnection}
+          onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
+          isSidebarOpen={isSidebarOpen}
         />
 
         <div className="main-content-inner">

@@ -483,7 +483,9 @@ export async function exportEmployeeHistoryExcel(
       const [oh, om] = checkOutEvent.logTime.split(':').map(Number);
       const isOt = !isNaN(oh) && (oh > 21 || (oh === 21 && (isNaN(om) || om >= 0)));
       if (effectiveStatus === 'OVERTIME' && !isOt) {
-        effectiveStatus = checkInEvent && checkInEvent.logTime > '08:45' ? 'LATE' : 'PRESENT';
+        const isAfternoon = checkInEvent && checkInEvent.logTime >= '12:30';
+        const isLate = isAfternoon ? (checkInEvent && checkInEvent.logTime > '13:45') : (checkInEvent && checkInEvent.logTime > '08:45');
+        effectiveStatus = isLate ? 'LATE' : isAfternoon ? 'HALF_DAY_AFTERNOON' : 'PRESENT';
       } else if (effectiveStatus === 'PRESENT' && isOt) {
         effectiveStatus = 'OVERTIME';
       }

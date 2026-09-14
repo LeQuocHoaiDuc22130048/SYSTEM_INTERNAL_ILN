@@ -6,6 +6,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  Menu,
+  X,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -19,6 +21,8 @@ interface HeaderProps {
   dataSource: 'api' | 'error' | 'loading';
   connectionError: string | null;
   handleRetryConnection: () => void;
+  onToggleSidebar?: () => void;
+  isSidebarOpen?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -32,6 +36,8 @@ export const Header: React.FC<HeaderProps> = ({
   dataSource,
   connectionError,
   handleRetryConnection,
+  onToggleSidebar,
+  isSidebarOpen = false,
 }) => {
 
   return (
@@ -59,6 +65,17 @@ export const Header: React.FC<HeaderProps> = ({
 
       <header className="header">
         <div className="header-left">
+          {onToggleSidebar && (
+            <button
+              type="button"
+              className="sidebar-toggle-btn"
+              onClick={onToggleSidebar}
+              title={isSidebarOpen ? "Ẩn thanh điều hướng" : "Mở thanh điều hướng"}
+              aria-label={isSidebarOpen ? "Ẩn thanh điều hướng" : "Mở thanh điều hướng"}
+            >
+              {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
+            </button>
+          )}
           <h1 className="title">
             {activeTab === 'dashboard'
               ? 'Dashboard tổng hợp'

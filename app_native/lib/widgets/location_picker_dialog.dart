@@ -4,6 +4,7 @@ import '../models/store_location.dart';
 import '../screens/scanner_page.dart';
 import '../theme/app_colors.dart';
 import '../utils/backend_data_provider.dart';
+import 'modal_top_bar.dart';
 
 Future<StoreLocation?> showCreateStoreLocationDialog(
   BuildContext context, {
@@ -174,20 +175,11 @@ Future<StoreLocation?> showStoreLocationPicker(
                 color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
               ),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
               child: Column(
                 children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDark ? Colors.white24 : Colors.black12,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                  const ModalTopBar(),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       const Icon(Icons.location_on, color: AppColors.primary, size: 22),

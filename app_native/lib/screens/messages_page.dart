@@ -17,6 +17,7 @@ import '../utils/chat_provider.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../services/giphy_service.dart';
+import '../widgets/modal_top_bar.dart';
 import '../widgets/video_player_dialog.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -298,6 +299,7 @@ void _showConversationActions(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const ModalTopBar(),
           ListTile(
             leading: const Icon(Icons.push_pin_outlined),
             title: Text(
@@ -2358,8 +2360,9 @@ void _showMessageActionSheet(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          const ModalTopBar(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: _reactionEmojis

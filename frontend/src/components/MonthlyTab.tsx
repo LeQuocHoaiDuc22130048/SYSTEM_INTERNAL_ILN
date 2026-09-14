@@ -223,7 +223,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                            return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
                                          };
 
-                                        const getCellState = () => {
+                                         const getCellState = () => {
                                            let state = dayObj.state;
                                            if (dayLog) {
                                              switch (dayLog.status as string) {
@@ -234,6 +234,9 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                                case 'HOLIDAY': state = 'h'; break;
                                                case 'OVERTIME':
                                                case 'OT': state = 'o'; break;
+                                               case 'HALF_DAY_MORNING': state = 'm'; break;
+                                               case 'HALF_DAY_AFTERNOON': state = 'c'; break;
+                                               case 'HALF_DAY': state = 'c'; break;
                                                case 'FUTURE': state = 'f'; break;
                                                default: state = dayObj.state;
                                              }
@@ -243,7 +246,26 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                              if (isOvertimeLogTime(checkOutEvent.logTime)) {
                                                state = 'o';
                                              } else if (state === 'o') {
-                                               state = (dayLog?.status === 'LATE' || (checkInEvent && checkInEvent.logTime > '08:45')) ? 'l' : 'p';
+                                               if (dayLog?.status && (dayLog.status as string) !== 'OVERTIME') {
+                                                 switch (dayLog.status as string) {
+                                                   case 'HALF_DAY_AFTERNOON': state = 'c'; break;
+                                                   case 'HALF_DAY_MORNING': state = 'm'; break;
+                                                   case 'LATE': state = 'l'; break;
+                                                   default: state = 'p';
+                                                 }
+                                               } else {
+                                                 const isAfternoon = checkInEvent && checkInEvent.logTime >= '12:30';
+                                                 const isLate = isAfternoon
+                                                   ? (checkInEvent && checkInEvent.logTime > '13:45')
+                                                   : (checkInEvent && checkInEvent.logTime > '08:45');
+                                                 if (isLate) {
+                                                   state = 'l';
+                                                 } else if (isAfternoon) {
+                                                   state = 'c';
+                                                 } else {
+                                                   state = 'p';
+                                                 }
+                                               }
                                              }
                                            }
                                            return state;

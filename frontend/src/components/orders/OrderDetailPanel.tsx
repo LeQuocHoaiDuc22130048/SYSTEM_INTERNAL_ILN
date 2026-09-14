@@ -18,6 +18,7 @@ interface OrderDetailPanelProps {
   loadingTimeline: boolean;
   timeline: TimelineEvent[];
   handleCancelOrder?: () => void;
+  onClose?: () => void;
 }
 
 export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
@@ -36,6 +37,7 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
   loadingTimeline,
   timeline,
   handleCancelOrder,
+  onClose,
 }) => {
   const statusMeta = getStatusMeta(selectedOrder.status);
 
@@ -44,9 +46,22 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
     <div className="detail-scroller">
       <div className="detail-header">
         <div className="detail-title-row">
-          <div>
-            <span className="detail-order-code">{selectedOrder.orderCode}</span>
-            <h2 className="detail-device-title">{selectedOrder.deviceName}</h2>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+            {onClose && (
+              <button
+                type="button"
+                className="detail-close-btn"
+                onClick={onClose}
+                title="Đóng chi tiết"
+                aria-label="Đóng chi tiết"
+              >
+                <X size={18} />
+              </button>
+            )}
+            <div>
+              <span className="detail-order-code">{selectedOrder.orderCode}</span>
+              <h2 className="detail-device-title">{selectedOrder.deviceName}</h2>
+            </div>
           </div>
           <div className="detail-actions">
             <button className="btn-action-outline" onClick={() => openEditModal(selectedOrder)}>

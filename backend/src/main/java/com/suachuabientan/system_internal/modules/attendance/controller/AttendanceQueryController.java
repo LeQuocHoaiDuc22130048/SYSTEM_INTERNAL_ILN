@@ -222,12 +222,12 @@ public class AttendanceQueryController {
 
                         if (isOvertime) {
                             patternBuilder.append("o");
+                        } else if (isLate) {
+                            patternBuilder.append("l");
                         } else if (isHalfDayMorning) {
                             patternBuilder.append("m");
                         } else if (isHalfDayAfternoon) {
                             patternBuilder.append("c");
-                        } else if (isLate) {
-                            patternBuilder.append("l");
                         } else {
                             patternBuilder.append("p");
                         }
@@ -416,12 +416,12 @@ public class AttendanceQueryController {
 
                     if (isOvertime) {
                         status = "OVERTIME";
+                    } else if (isLate) {
+                        status = "LATE";
                     } else if (isHalfDayMorning) {
                         status = "HALF_DAY_MORNING";
                     } else if (isHalfDayAfternoon) {
                         status = "HALF_DAY_AFTERNOON";
-                    } else if (isLate) {
-                        status = "LATE";
                     } else {
                         status = "PRESENT";
                     }

@@ -12,6 +12,7 @@ import '../models/board_history_item.dart';
 import '../models/part.dart';
 import '../models/store_location.dart';
 import '../widgets/location_picker_dialog.dart';
+import '../widgets/modal_top_bar.dart';
 import 'scanner_page.dart';
 import 'location_management_page.dart';
 
@@ -1064,7 +1065,7 @@ class _WarehousePageState extends State<WarehousePage> {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
           borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -1073,17 +1074,8 @@ class _WarehousePageState extends State<WarehousePage> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+            const ModalTopBar(),
+            const SizedBox(height: 8),
             Text(
               'Thêm mới vào Kho',
               style: TextStyle(
@@ -2224,22 +2216,13 @@ class _WarehousePageState extends State<WarehousePage> {
             color: isDark ? AppColors.backgroundDark : Colors.white,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
+          padding: const EdgeInsets.fromLTRB(16, 6, 16, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark ? Colors.white24 : Colors.black12,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
+              const ModalTopBar(),
+              const SizedBox(height: 8),
 
               // Location Header Card
               Container(
@@ -3709,32 +3692,24 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
     ).isEmployee;
 
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Handle
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFE2E8F0),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ModalTopBar(),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                       // Icon and Title
               Row(
                 children: [
@@ -4036,131 +4011,135 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-
               // Actions
-              if (_isDone)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: AppColors.successLight,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.check_circle, color: AppColors.success),
-                      SizedBox(width: 8),
-                      Text(
-                        'Thao tác thành công!',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.success,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: Builder(
+                  builder: (context) {
+                    if (_isDone) {
+                      return Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.successLight,
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (_isLoading)
-                const Center(child: CircularProgressIndicator())
-              else if (!widget.fromScan)
-                // Mở từ click thẻ danh sách → chỉ hiện nút Đóng
-                // Gợi ý người dùng cần quét mã để thao tác
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
-                      margin: const EdgeInsets.only(bottom: 12),
-                      decoration: BoxDecoration(
-                        color: isDark
-                            ? Colors.amber.withOpacity(0.12)
-                            : const Color(0xFFFFFBEB),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: isDark
-                              ? Colors.amber.withOpacity(0.3)
-                              : const Color(0xFFFDE68A),
-                        ),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.qr_code_scanner,
-                            size: 18,
-                            color: isDark ? Colors.amber : const Color(0xFFD97706),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              'Quét mã QR linh kiện để thực hiện thao tác Lấy / Trả bo mạch.',
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.check_circle, color: AppColors.success),
+                            SizedBox(width: 8),
+                            Text(
+                              'Thao tác thành công!',
                               style: TextStyle(
-                                fontSize: 12,
-                                color: isDark ? Colors.amber.shade200 : const Color(0xFF92400E),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.success,
                               ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }
+                    if (_isLoading) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (!widget.fromScan) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                            margin: const EdgeInsets.only(bottom: 12),
+                            decoration: BoxDecoration(
+                              color: isDark
+                                  ? Colors.amber.withOpacity(0.12)
+                                  : const Color(0xFFFFFBEB),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.amber.withOpacity(0.3)
+                                    : const Color(0xFFFDE68A),
+                              ),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.qr_code_scanner,
+                                  size: 18,
+                                  color: isDark ? Colors.amber : const Color(0xFFD97706),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    'Quét mã QR linh kiện để thực hiện thao tác Lấy / Trả bo mạch.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark ? Colors.amber.shade200 : const Color(0xFF92400E),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text('Đóng'),
+                          ),
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text('Đóng'),
+                          ),
+                        ),
+                        if (widget.board.status == BoardStatus.available) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: _handleAction,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: const Text('Lấy bo mạch'),
                             ),
                           ),
                         ],
-                      ),
-                    ),
-                    OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: const Text('Đóng'),
-                    ),
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                        ),
-                        child: const Text('Đóng'),
-                      ),
-                    ),
-                    if (widget.board.status == BoardStatus.available) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _handleAction,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                        if (widget.board.status == BoardStatus.checkedOut) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final returnData = await _showReturnDialog();
+                                if (returnData == null) return;
+                                await _handleAction(returnData: returnData);
+                              },
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                              ),
+                              child: const Text('Trả bo mạch'),
+                            ),
                           ),
-                          child: const Text('Lấy bo mạch'),
-                        ),
-                      ),
-                    ],
-                    if (widget.board.status == BoardStatus.checkedOut) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            final returnData = await _showReturnDialog();
-                            if (returnData == null) return;
-                            await _handleAction(returnData: returnData);
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.success,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: const Text('Trả bo mạch'),
-                        ),
-                      ),
-                    ],
-                  ],
+                        ],
+                      ],
+                    );
+                  },
                 ),
+              ),
             ],
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildInfoRow(String label, String? value, {Widget? child}) {
@@ -4365,32 +4344,30 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
             : 'Đủ hàng';
 
     return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+      ),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.backgroundDark : Colors.white,
+        color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         borderRadius: const BorderRadius.only(
           topLeft: Radius.circular(20),
           topRight: Radius.circular(20),
         ),
       ),
-      padding: const EdgeInsets.all(20),
       child: SafeArea(
         top: false,
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Handle bar
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
+            const ModalTopBar(),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
 
             // Header
             Row(
@@ -4585,10 +4562,14 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
                   ),
                 ],
               ),
-          ],
+            ],
+          ),
         ),
       ),
-    );
+    ],
+  ),
+),
+);
   }
 
   Widget _buildSpecItem(String label, String value, bool isDark, {bool mono = false, Color? valueColor}) {

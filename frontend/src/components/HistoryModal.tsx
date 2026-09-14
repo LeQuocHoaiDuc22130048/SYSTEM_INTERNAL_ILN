@@ -78,12 +78,14 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
   };
 
-  const getModalDayStatusBadge = (status: string, checkOutTime?: string) => {
+  const getModalDayStatusBadge = (status: string, checkOutTime?: string, checkInTime?: string) => {
     let effectiveStatus = status;
     if (checkOutTime) {
       const isOt = isOvertimeLogTime(checkOutTime);
       if (effectiveStatus === 'OVERTIME' && !isOt) {
-        effectiveStatus = 'PRESENT';
+        const isAfternoon = checkInTime && checkInTime >= '12:30';
+        const isLate = isAfternoon ? (checkInTime > '13:45') : (checkInTime && checkInTime > '08:45');
+        effectiveStatus = isLate ? 'LATE' : isAfternoon ? 'HALF_DAY_AFTERNOON' : 'PRESENT';
       } else if (effectiveStatus === 'PRESENT' && isOt) {
         effectiveStatus = 'OVERTIME';
       }
@@ -274,7 +276,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                           </div>
                         </div>
                         <div className="day-right-side">
-                          {getModalDayStatusBadge(dayLog.status, checkOutEvent?.logTime)}
+                          {getModalDayStatusBadge(dayLog.status, checkOutEvent?.logTime, checkInEvent?.logTime)}
                           {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
                         </div>
                       </div>

@@ -398,6 +398,28 @@
   margin: 0;
 }
 
+.detail-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: white;
+  color: var(--color-text-light);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.detail-close-btn:hover {
+  background: var(--color-bg);
+  color: var(--color-text-dark);
+  border-color: var(--color-text);
+}
+
 .detail-actions {
   display: flex;
   gap: 8px;

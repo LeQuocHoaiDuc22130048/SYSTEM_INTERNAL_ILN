@@ -12,6 +12,7 @@ import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/modal_top_bar.dart';
 
 class DashboardPage extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
@@ -1292,24 +1293,13 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
         final badgeStyle = _getStatusBadgeStyle(dayLog.status, isDark);
         return SafeArea(
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: isDark
-                          ? const Color(0xFF475569)
-                          : const Color(0xFFCBD5E1),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
+                const ModalTopBar(),
+                const SizedBox(height: 8),
                 Row(
                   children: [
                     Expanded(
@@ -1645,19 +1635,9 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
           builder: (context, scrollController) {
             return Column(
               children: [
-                const SizedBox(height: 12),
-                Container(
-                  width: 40,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? const Color(0xFF475569)
-                        : const Color(0xFFCBD5E1),
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
+                const ModalTopBar(),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

@@ -630,6 +630,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
               loadingTimeline={loadingTimeline}
               timeline={timeline}
               handleCancelOrder={handleCancelOrder}
+              onClose={() => setSelectedOrder(null)}
             />
           ) : (
             <div className="detail-empty-state">

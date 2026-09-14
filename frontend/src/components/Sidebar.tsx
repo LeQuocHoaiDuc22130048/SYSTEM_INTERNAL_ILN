@@ -15,6 +15,7 @@ import {
   Users,
   ShieldCheck,
   LayoutDashboard,
+  X,
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { isAdminOrAbove, isManagerOrAbove as _isManagerOrAbove, getRoleLabel } from '../utils/permissions';
@@ -24,6 +25,8 @@ interface SidebarProps {
   setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts') => void;
   currentUser: UserInfo | null;
   handleLogout: () => void;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -31,6 +34,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   setActiveTab,
   currentUser,
   handleLogout,
+  isOpen = false,
+  onClose,
 }) => {
   // Trạng thái mở/đóng của các nhóm mục cha
   const [isAttendanceOpen, setIsAttendanceOpen] = useState<boolean>(true);
@@ -42,10 +47,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   const handleTabClick = (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts') => {
     setActiveTab(tab);
+    if (onClose) {
+      onClose();
+    }
   };
 
   return (
-    <aside className="sidebar">
+    <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
       {/* Header của Sidebar */}
       <div className="sidebar-header">
         <div className="brand">
@@ -55,6 +63,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
             <span className="brand-sub">Quản lý hệ thống</span>
           </div>
         </div>
+        {onClose && (
+          <button
+            type="button"
+            className="sidebar-close-btn"
+            onClick={onClose}
+            title="Ẩn thanh điều hướng"
+            aria-label="Ẩn thanh điều hướng"
+          >
+            <X size={20} />
+          </button>
+        )}
       </div>
 
         {/* Menu Items */}
