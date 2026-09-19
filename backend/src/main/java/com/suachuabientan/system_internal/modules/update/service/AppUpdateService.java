@@ -38,12 +38,26 @@ public class AppUpdateService {
 
     @Transactional(readOnly = true)
     public List<AppUpdate> getAllUpdates() {
+        return getAllUpdates(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AppUpdate> getAllUpdates(String platform) {
+        if (platform != null && !platform.isBlank() && !"ALL".equalsIgnoreCase(platform.trim())) {
+            return appUpdateRepository.findByPlatformIgnoreCaseAndIsDeletedFalseOrderByCreatedAtDesc(platform.trim());
+        }
         return appUpdateRepository.findByIsDeletedFalseOrderByCreatedAtDesc();
     }
 
     @Transactional(readOnly = true)
     public AppUpdate getLatestReleased() {
-        List<AppUpdate> released = appUpdateRepository.findLatestReleased();
+        return getLatestReleased("ANDROID");
+    }
+
+    @Transactional(readOnly = true)
+    public AppUpdate getLatestReleased(String platform) {
+        String targetPlatform = (platform != null && !platform.isBlank()) ? platform.trim().toUpperCase() : "ANDROID";
+        List<AppUpdate> released = appUpdateRepository.findLatestReleasedByPlatform(targetPlatform);
         if (released.isEmpty()) {
             return null;
         }
@@ -89,17 +103,35 @@ public class AppUpdateService {
 
     @Transactional
     public AppUpdate createUpdate(MultipartFile file, String version, String changelog, String downloadUrl, Boolean mandatory, String status) {
+        return createUpdate(file, "ANDROID", version, changelog, downloadUrl, mandatory, status);
+    }
+
+    @Transactional
+    public AppUpdate createUpdate(MultipartFile file, String platform, String version, String changelog, String downloadUrl, Boolean mandatory, String status) {
+        String normalizedPlatform = (platform != null && "ios".equalsIgnoreCase(platform.trim())) ? "IOS" : "ANDROID";
         String cleanVersion = version.trim().replaceAll("[^0-9.]", "");
-        String defaultUrl = "/api/v1/app-updates/download/system_internal_v" + cleanVersion + ".apk";
+        String ext = "IOS".equals(normalizedPlatform) ? ".ipa" : ".apk";
+        String defaultUrl = "/api/v1/app-updates/download/system_internal_v" + cleanVersion + ext;
         
         String resolvedUrl = (downloadUrl != null && !downloadUrl.trim().isEmpty()) ? downloadUrl.trim() : defaultUrl;
         if (file != null && !file.isEmpty()) {
-            resolvedUrl = saveReleaseFile(file, version);
+            String originalFilename = file.getOriginalFilename();
+            if ("IOS".equals(normalizedPlatform)) {
+                if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".ipa")) {
+                    throw new IllegalArgumentException("Tệp cài đặt cho iOS phải có định dạng .ipa");
+                }
+            } else {
+                if (originalFilename == null || !originalFilename.toLowerCase().endsWith(".apk")) {
+                    throw new IllegalArgumentException("Tệp cài đặt cho Android phải có định dạng .apk");
+                }
+            }
+            resolvedUrl = saveReleaseFile(file, normalizedPlatform, version);
         }
 
-        AppUpdate appUpdate = appUpdateRepository.findByVersionAndIsDeletedFalse(version.trim())
-                .orElseGet(() -> AppUpdate.builder().version(version.trim()).build());
+        AppUpdate appUpdate = appUpdateRepository.findByVersionAndPlatformIgnoreCaseAndIsDeletedFalse(version.trim(), normalizedPlatform)
+                .orElseGet(() -> AppUpdate.builder().version(version.trim()).platform(normalizedPlatform).build());
 
+        appUpdate.setPlatform(normalizedPlatform);
         appUpdate.setChangelog(changelog);
         appUpdate.setDownloadUrl(resolvedUrl);
         appUpdate.setMandatory(mandatory != null && mandatory);
@@ -118,10 +150,11 @@ public class AppUpdateService {
         return saved;
     }
 
-    private String saveReleaseFile(MultipartFile file, String version) {
+    private String saveReleaseFile(MultipartFile file, String platform, String version) {
         try {
             String cleanVersion = version.trim().replaceAll("[^0-9.]", "");
-            String filename = "system_internal_v" + cleanVersion + ".apk";
+            String ext = "IOS".equalsIgnoreCase(platform) ? ".ipa" : ".apk";
+            String filename = "system_internal_v" + cleanVersion + ext;
             
             Path targetDir = Paths.get(releaseDir).normalize();
             if (!Files.exists(targetDir)) {
@@ -134,12 +167,12 @@ public class AppUpdateService {
             }
             
             Files.copy(file.getInputStream(), targetPath, StandardCopyOption.REPLACE_EXISTING);
-            log.info("Đã lưu tệp APK cập nhật: {}", targetPath.toAbsolutePath());
+            log.info("Đã lưu tệp cài đặt {} cập nhật: {}", platform, targetPath.toAbsolutePath());
             
             return "/api/v1/app-updates/download/" + filename;
         } catch (IOException e) {
-            log.error("Lỗi khi lưu tệp APK cập nhật: {}", e.getMessage(), e);
-            throw new RuntimeException("Không thể lưu tệp APK cài đặt: " + e.getMessage());
+            log.error("Lỗi khi lưu tệp cài đặt cập nhật {}: {}", platform, e.getMessage(), e);
+            throw new RuntimeException("Không thể lưu tệp cài đặt: " + e.getMessage());
         }
     }
 
@@ -173,13 +206,14 @@ public class AppUpdateService {
             return;
         }
 
-        log.info("Bắt đầu phát hành hàng loạt thông báo cập nhật v{} cho {} người dùng", update.getVersion(), recipientIds.size());
+        String platformLabel = (update.getPlatform() != null && "IOS".equalsIgnoreCase(update.getPlatform())) ? "iOS" : "Android";
+        log.info("Bắt đầu phát hành hàng loạt thông báo cập nhật {} v{} cho {} người dùng", platformLabel, update.getVersion(), recipientIds.size());
         
         try {
             notificationService.sendToUsers(
                     recipientIds,
                     NotificationType.APP_UPDATE,
-                    "Có bản cập nhật mới (v" + update.getVersion() + ")",
+                    "Có bản cập nhật " + platformLabel + " mới (v" + update.getVersion() + ")",
                     update.getChangelog(),
                     "APP_UPDATE",
                     update.getId().toString(),

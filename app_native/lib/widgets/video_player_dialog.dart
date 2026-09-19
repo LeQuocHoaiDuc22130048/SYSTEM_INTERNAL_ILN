@@ -26,21 +26,24 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
   void initState() {
     super.initState();
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() {
-            _initialized = true;
+      ..initialize()
+          .then((_) {
+            if (mounted) {
+              setState(() {
+                _initialized = true;
+              });
+              _controller.play();
+              _controller.setLooping(true);
+            }
+          })
+          .catchError((error) {
+            if (mounted) {
+              setState(() {
+                _errorMessage =
+                    'Không thể phát video này. Vui lòng kiểm tra lại kết nối mạng.';
+              });
+            }
           });
-          _controller.play();
-          _controller.setLooping(true);
-        }
-      }).catchError((error) {
-        if (mounted) {
-          setState(() {
-            _errorMessage = 'Không thể phát video này. Vui lòng kiểm tra lại kết nối mạng.';
-          });
-        }
-      });
   }
 
   @override
@@ -66,9 +69,9 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.9),
+          color: Colors.black.withValues(alpha: 0.9),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
         ),
         clipBehavior: Clip.antiAlias,
         child: Column(
@@ -102,7 +105,7 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.1),
+                        color: Colors.white.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -121,7 +124,9 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
                 maxHeight: MediaQuery.of(context).size.height * 0.7,
               ),
               child: AspectRatio(
-                aspectRatio: _initialized ? _controller.value.aspectRatio : 16 / 9,
+                aspectRatio: _initialized
+                    ? _controller.value.aspectRatio
+                    : 16 / 9,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
@@ -149,7 +154,10 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
                             Text(
                               _errorMessage!,
                               textAlign: TextAlign.center,
-                              style: const TextStyle(color: Colors.white70, fontSize: 13),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 13,
+                              ),
                             ),
                           ],
                         ),
@@ -159,12 +167,17 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           CircularProgressIndicator(
-                            valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              AppColors.primary,
+                            ),
                           ),
                           SizedBox(height: 12),
                           Text(
                             'Đang tải video...',
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
@@ -172,7 +185,7 @@ class _VideoPlayerDialogState extends State<VideoPlayerDialog> {
                     if (_initialized && _showControls)
                       Positioned.fill(
                         child: Container(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           child: Stack(
                             children: [
                               // Play/Pause Center button

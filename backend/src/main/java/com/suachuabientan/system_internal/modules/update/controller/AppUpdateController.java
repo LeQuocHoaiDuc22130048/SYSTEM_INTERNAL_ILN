@@ -71,17 +71,30 @@ public class AppUpdateController {
             @RequestParam String version,
             @RequestParam(required = false, defaultValue = "android") String platform,
             HttpServletRequest request) {
-        AppUpdate latest = appUpdateService.getLatestReleased();
+        String normalizedPlatform = (platform != null && "ios".equalsIgnoreCase(platform.trim())) ? "IOS" : "ANDROID";
+        AppUpdate latest = appUpdateService.getLatestReleased(normalizedPlatform);
         
-        String currentLatestVersion = latest != null ? latest.getVersion() : latestVersion;
-        String currentDownloadUrl = latest != null ? latest.getDownloadUrl() : downloadUrl;
-        boolean currentMandatory = latest != null ? latest.getMandatory() : mandatory;
-        String currentChangelog = latest != null ? latest.getChangelog() : changelog;
+        String currentLatestVersion;
+        String currentDownloadUrl;
+        boolean currentMandatory;
+        String currentChangelog;
 
-        if ("ios".equalsIgnoreCase(platform)) {
-            currentDownloadUrl = (iosAppStoreUrl != null && !iosAppStoreUrl.isBlank())
-                    ? iosAppStoreUrl
-                    : "https://apps.apple.com/app/id6740000000";
+        if (latest != null) {
+            currentLatestVersion = latest.getVersion();
+            currentDownloadUrl = latest.getDownloadUrl();
+            currentMandatory = latest.getMandatory();
+            currentChangelog = latest.getChangelog();
+        } else {
+            currentLatestVersion = latestVersion;
+            currentMandatory = mandatory;
+            currentChangelog = changelog;
+            if ("IOS".equals(normalizedPlatform)) {
+                currentDownloadUrl = (iosAppStoreUrl != null && !iosAppStoreUrl.isBlank())
+                        ? iosAppStoreUrl
+                        : "https://apps.apple.com/app/id6740000000";
+            } else {
+                currentDownloadUrl = downloadUrl;
+            }
         }
 
         boolean updateAvailable = appUpdateService.isVersionNewer(currentLatestVersion, version);
@@ -101,7 +114,7 @@ public class AppUpdateController {
     public ResponseEntity<String> getIosManifest(
             @RequestParam(required = false) String version,
             HttpServletRequest request) {
-        AppUpdate latest = appUpdateService.getLatestReleased();
+        AppUpdate latest = appUpdateService.getLatestReleased("IOS");
         String targetVersion = (version != null && !version.isBlank())
                 ? version
                 : (latest != null ? latest.getVersion() : latestVersion);
@@ -175,14 +188,17 @@ public class AppUpdateController {
     @Operation(summary = "Lấy danh sách các bản cập nhật")
     @GetMapping
     @PreAuthorize(RoleExpressions.ADMIN_OR_ABOVE)
-    public ResponseEntity<ApiResponse<List<AppUpdate>>> getAllUpdates() {
-        return ResponseEntity.ok(ApiResponse.success(appUpdateService.getAllUpdates()));
+    public ResponseEntity<ApiResponse<List<AppUpdate>>> getAllUpdates(
+            @RequestParam(value = "platform", required = false) String platform
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(appUpdateService.getAllUpdates(platform)));
     }
 
     @Operation(summary = "Tạo mới bản cập nhật")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize(RoleExpressions.ADMIN_OR_ABOVE)
     public ResponseEntity<ApiResponse<AppUpdate>> createUpdate(
+            @RequestParam(value = "platform", defaultValue = "ANDROID") String platform,
             @RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file,
             @RequestParam("version") String version,
             @RequestParam("changelog") String changelog,
@@ -192,6 +208,7 @@ public class AppUpdateController {
     ) {
         AppUpdate created = appUpdateService.createUpdate(
             file,
+            platform,
             version,
             changelog,
             downloadUrl,

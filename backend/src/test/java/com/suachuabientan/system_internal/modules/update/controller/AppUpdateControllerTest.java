@@ -28,7 +28,7 @@ class AppUpdateControllerTest {
     void testIsVersionNewer_WithBuildMetadata_StripsBuildNumberAndComparesCorrectly() {
         // 1.1.4 > 1.1.3+8 (previously treated 1.1.3+8 as 1.1.38 which caused false)
         assertTrue(controller.isVersionNewer("1.1.4", "1.1.3+8"));
-        
+
         // 1.1.4 is NOT newer than 1.1.4+8 (same base version)
         assertFalse(controller.isVersionNewer("1.1.4", "1.1.4+8"));
 
@@ -53,5 +53,27 @@ class AppUpdateControllerTest {
         assertFalse(controller.isVersionNewer(null, "1.1.0"));
         assertFalse(controller.isVersionNewer("1.1.0", null));
         assertFalse(controller.isVersionNewer("", "1.1.0"));
+    }
+
+    @Test
+    void testCreateUpdate_ValidateFileExtension_RejectsMismatchedFiles() {
+        AppUpdateService service = new AppUpdateService(null, null, null);
+
+        org.springframework.mock.web.MockMultipartFile apkFile =
+            new org.springframework.mock.web.MockMultipartFile("file", "test.apk", "application/vnd.android.package-archive", "dummy".getBytes());
+        org.springframework.mock.web.MockMultipartFile ipaFile =
+            new org.springframework.mock.web.MockMultipartFile("file", "test.ipa", "application/octet-stream", "dummy".getBytes());
+
+        // iOS rejects .apk
+        IllegalArgumentException iosEx = assertThrows(IllegalArgumentException.class, () -> {
+            service.createUpdate(apkFile, "IOS", "1.2.0", "notes", null, false, "DRAFT");
+        });
+        assertTrue(iosEx.getMessage().contains(".ipa"));
+
+        // Android rejects .ipa
+        IllegalArgumentException androidEx = assertThrows(IllegalArgumentException.class, () -> {
+            service.createUpdate(ipaFile, "ANDROID", "1.2.0", "notes", null, false, "DRAFT");
+        });
+        assertTrue(androidEx.getMessage().contains(".apk"));
     }
 }

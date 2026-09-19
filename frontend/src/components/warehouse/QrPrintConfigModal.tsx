@@ -70,7 +70,9 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
       if (saved) {
         return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
       }
-    } catch (_) {}
+    } catch (_) {
+      // Missing storage access or invalid saved JSON: use the default configuration.
+    }
     return DEFAULT_CONFIG;
   });
 
@@ -267,7 +269,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
   const handleTestPrinterDriver = () => {
     setTestDriverStatus('Đang kiểm tra kết nối với Driver máy in...');
     setTimeout(() => {
-      let msg = '';
+      let msg: string;
       switch (config.printerDriver) {
         case 'tns_label_thermal':
           msg = '✅ Đã kết nối máy in nhiệt TNS_LABEL (Port USB001, Driver: LABEL). Sẵn sàng in tem 50x50 mm!';
@@ -301,7 +303,9 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
       localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
       setIsSavedNotice(true);
       setTimeout(() => setIsSavedNotice(false), 2500);
-    } catch (_) {}
+    } catch (_) {
+      // Storage may be disabled; keep the current configuration for this session.
+    }
   };
 
   const handleResetDefaults = () => {
@@ -843,6 +847,5 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
     </div>
   );
 };
-
 
 

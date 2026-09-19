@@ -281,7 +281,6 @@ export async function exportAttendanceExcel(
 
     // Cột AI: Lý do cập nhật & Ghi Chú
     const notesCell = row.getCell(notesColIndex);
-    let finalNote = '';
     const noteItems: string[] = [];
 
     if (emp.name === 'Nguyễn Kim Thy') {
@@ -298,7 +297,7 @@ export async function exportAttendanceExcel(
       noteItems.push(emp.notes.trim());
     }
 
-    finalNote = noteItems.join('\n');
+    const finalNote = noteItems.join('\n');
 
     notesCell.value = finalNote;
     notesCell.font = { name: 'Arial', size: 9 };
@@ -562,4 +561,3 @@ export async function exportEmployeeHistoryExcel(
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
-

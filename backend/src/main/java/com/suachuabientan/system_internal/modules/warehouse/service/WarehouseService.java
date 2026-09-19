@@ -439,13 +439,10 @@ public class WarehouseService {
 
     @Transactional(readOnly = true)
     public Page<CheckoutResponse> getHistory(UUID boardItemId, Pageable pageable) {
-        findBoardById(boardItemId); // Validate tồn tại
+        BoardItem item = findBoardById(boardItemId);
         return boardCheckoutRepository
                 .findByBoardItemIdAndIsDeletedFalseOrderByTakenAtDesc(boardItemId, pageable)
-                .map(checkout -> {
-                    BoardItem item = boardItemRepository.findByIdAndIsDeletedFalse(boardItemId).orElseThrow();
-                    return toCheckoutResponse(checkout, item);
-                });
+                .map(checkout -> toCheckoutResponse(checkout, item));
     }
 
     // Helpers

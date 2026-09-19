@@ -156,21 +156,25 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     return backend.repairOrders.where((order) {
       final matchesFilter =
           currentFilter == null || order.status == currentFilter;
-      final matchesSearch = query.isEmpty ||
+      final matchesSearch =
+          query.isEmpty ||
           order.orderNumber.toLowerCase().contains(query) ||
           order.deviceName.toLowerCase().contains(query) ||
           order.customerName.toLowerCase().contains(query) ||
           (order.customerPhone ?? '').contains(query) ||
           (order.serialNumber?.toLowerCase().contains(query) ?? false) ||
-          order.devices.any((d) => (d.serialNumber?.toLowerCase().contains(query) ?? false));
+          order.devices.any(
+            (d) => (d.serialNumber?.toLowerCase().contains(query) ?? false),
+          );
 
-      final matchesDate = selectedDate == null ||
+      final matchesDate =
+          selectedDate == null ||
           (order.createdAt.year == selectedDate.year &&
               order.createdAt.month == selectedDate.month &&
               order.createdAt.day == selectedDate.day);
 
-      final matchesWarranty = warrantyVal == null ||
-          order.underWarranty == warrantyVal;
+      final matchesWarranty =
+          warrantyVal == null || order.underWarranty == warrantyVal;
 
       return matchesFilter && matchesSearch && matchesDate && matchesWarranty;
     }).toList();
@@ -193,281 +197,313 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-                Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    wide ? 20 : 22,
-                    wide ? 22 : 16,
-                    wide ? 20 : 22,
-                    12,
-                  ),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 980),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                wide ? 20 : 22,
+                wide ? 22 : 16,
+                wide ? 20 : 22,
+                12,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 980),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'Đơn sửa chữa',
-                                      style: TextStyle(
-                                        fontSize: 24,
-                                        fontWeight: FontWeight.w700,
-                                        color: isDark
-                                            ? AppColors.textPrimaryDark
-                                            : AppColors.textPrimaryLight,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      '${orders.length} đơn tổng cộng',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: isDark
-                                            ? AppColors.textSecondaryDark
-                                            : AppColors.textSecondaryLight,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (!isEmployee)
-                                ElevatedButton.icon(
-                                  onPressed: () => _showCreateOrderSheet(context),
-                                  icon: const Icon(Icons.add, size: 18),
-                                  label: const Text('Tạo đơn'),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            onChanged: (value) =>
-                                _searchQuery.value = value,
-                            decoration: InputDecoration(
-                              hintText:
-                                  'Tìm theo mã đơn, số seri, thiết bị, khách...',
-                              prefixIcon: const Icon(
-                                Icons.search,
-                                size: 20,
-                              ),
-                              filled: true,
-                              fillColor: isDark
-                                  ? AppColors.surfaceDark
-                                  : Colors.white,
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 13,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (_dateFilter.value != null)
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: InputChip(
-                                      backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                                      selectedColor: AppColors.primary.withValues(alpha: 0.2),
-                                      side: const BorderSide(color: AppColors.primary),
-                                      avatar: const Icon(Icons.date_range, size: 14, color: AppColors.primary),
-                                      label: Text(
-                                        DateFormat('dd/MM/yyyy').format(_dateFilter.value!),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: isDark ? Colors.white : Colors.black87,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                      deleteIcon: const Icon(Icons.cancel, size: 16, color: AppColors.primary),
-                                      onDeleted: () {
-                                        setState(() {
-                                          _dateFilter.value = null;
-                                        });
-                                      },
-                                      onPressed: () => _showDatePickerDialog(context),
-                                    ),
-                                  )
-                                else
-                                  Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: ActionChip(
-                                      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-                                      side: BorderSide(
-                                        color: isDark ? AppColors.borderDark : AppColors.borderLight,
-                                      ),
-                                      avatar: Icon(
-                                        Icons.calendar_today,
-                                        size: 14,
-                                        color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                                      ),
-                                      label: Text(
-                                        DateFormat('dd/MM/yyyy').format(DateTime.now()),
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-                                        ),
-                                      ),
-                                      onPressed: () => _showDatePickerDialog(context),
-                                    ),
+                                Text(
+                                  'Đơn sửa chữa',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w700,
+                                    color: isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight,
                                   ),
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8.0),
-                                  child: _buildWarrantyFilterChip('Bảo hành', true),
                                 ),
-                                Padding(
-                                  padding: const EdgeInsets.only(right: 8.0),
-                                  child: _buildWarrantyFilterChip('Không BH', false),
-                                ),
-                                ...[
-                                  _buildFilterChip('Tất cả', null),
-                                  _buildFilterChip(
-                                    'Chưa kiểm tra',
-                                    RepairOrderStatus.pending,
-                                  ),
-                                  _buildFilterChip(
-                                    'Chờ kiểm tra',
-                                    RepairOrderStatus.waitingForCheck,
-                                  ),
-                                  _buildFilterChip(
-                                    'Đang kiểm tra',
-                                    RepairOrderStatus.checking,
-                                  ),
-                                  _buildFilterChip(
-                                    'Đã kiểm tra',
-                                    RepairOrderStatus.checked,
-                                  ),
-                                  _buildFilterChip(
-                                    'Đang sửa',
-                                    RepairOrderStatus.inProgress,
-                                  ),
-                                  _buildFilterChip(
-                                    'Hoàn thành',
-                                    RepairOrderStatus.completed,
-                                  ),
-                                  _buildFilterChip(
-                                    'Đã giao',
-                                    RepairOrderStatus.delivered,
-                                  ),
-                                  _buildFilterChip(
-                                    'Đã trả',
-                                    RepairOrderStatus.cancelled,
-                                  ),
-                                ]
-                                .map(
-                                  (child) => Padding(
-                                    padding: const EdgeInsets.only(
-                                      right: 8,
-                                    ),
-                                    child: child,
+                                const SizedBox(height: 4),
+                                Text(
+                                  '${orders.length} đơn tổng cộng',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
                                   ),
                                 ),
                               ],
                             ),
                           ),
+                          if (!isEmployee)
+                            ElevatedButton.icon(
+                              onPressed: () => _showCreateOrderSheet(context),
+                              icon: const Icon(Icons.add, size: 18),
+                              label: const Text('Tạo đơn'),
+                            ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 16),
+                      TextField(
+                        onChanged: (value) => _searchQuery.value = value,
+                        decoration: InputDecoration(
+                          hintText:
+                              'Tìm theo mã đơn, số seri, thiết bị, khách...',
+                          prefixIcon: const Icon(Icons.search, size: 20),
+                          filled: true,
+                          fillColor: isDark
+                              ? AppColors.surfaceDark
+                              : Colors.white,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 13,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            if (_dateFilter.value != null)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: InputChip(
+                                  backgroundColor: AppColors.primary.withValues(
+                                    alpha: 0.1,
+                                  ),
+                                  selectedColor: AppColors.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
+                                  side: const BorderSide(
+                                    color: AppColors.primary,
+                                  ),
+                                  avatar: const Icon(
+                                    Icons.date_range,
+                                    size: 14,
+                                    color: AppColors.primary,
+                                  ),
+                                  label: Text(
+                                    DateFormat(
+                                      'dd/MM/yyyy',
+                                    ).format(_dateFilter.value!),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark
+                                          ? Colors.white
+                                          : Colors.black87,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  deleteIcon: const Icon(
+                                    Icons.cancel,
+                                    size: 16,
+                                    color: AppColors.primary,
+                                  ),
+                                  onDeleted: () {
+                                    setState(() {
+                                      _dateFilter.value = null;
+                                    });
+                                  },
+                                  onPressed: () =>
+                                      _showDatePickerDialog(context),
+                                ),
+                              )
+                            else
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8.0),
+                                child: ActionChip(
+                                  backgroundColor: isDark
+                                      ? AppColors.surfaceDark
+                                      : Colors.white,
+                                  side: BorderSide(
+                                    color: isDark
+                                        ? AppColors.borderDark
+                                        : AppColors.borderLight,
+                                  ),
+                                  avatar: Icon(
+                                    Icons.calendar_today,
+                                    size: 14,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
+                                  ),
+                                  label: Text(
+                                    DateFormat(
+                                      'dd/MM/yyyy',
+                                    ).format(DateTime.now()),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark
+                                          ? AppColors.textPrimaryDark
+                                          : AppColors.textPrimaryLight,
+                                    ),
+                                  ),
+                                  onPressed: () =>
+                                      _showDatePickerDialog(context),
+                                ),
+                              ),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildWarrantyFilterChip('Bảo hành', true),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildWarrantyFilterChip(
+                                'Không BH',
+                                false,
+                              ),
+                            ),
+                            ...[
+                              _buildFilterChip('Tất cả', null),
+                              _buildFilterChip(
+                                'Chưa kiểm tra',
+                                RepairOrderStatus.pending,
+                              ),
+                              _buildFilterChip(
+                                'Chờ kiểm tra',
+                                RepairOrderStatus.waitingForCheck,
+                              ),
+                              _buildFilterChip(
+                                'Đang kiểm tra',
+                                RepairOrderStatus.checking,
+                              ),
+                              _buildFilterChip(
+                                'Đã kiểm tra',
+                                RepairOrderStatus.checked,
+                              ),
+                              _buildFilterChip(
+                                'Đang sửa',
+                                RepairOrderStatus.inProgress,
+                              ),
+                              _buildFilterChip(
+                                'Hoàn thành',
+                                RepairOrderStatus.completed,
+                              ),
+                              _buildFilterChip(
+                                'Đã giao',
+                                RepairOrderStatus.delivered,
+                              ),
+                              _buildFilterChip(
+                                'Đã trả',
+                                RepairOrderStatus.cancelled,
+                              ),
+                            ].map(
+                              (child) => Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: child,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Expanded(
-                  child: backend.isLoading
-                      ? const Center(child: CircularProgressIndicator())
-                      : backend.error != null
-                      ? _ErrorState(
-                          message: backend.error!,
-                          onRetry: () => context
+              ),
+            ),
+            Expanded(
+              child: backend.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : backend.error != null
+                  ? _ErrorState(
+                      message: backend.error!,
+                      onRetry: () => context
+                          .read<BackendDataProvider>()
+                          .loadRepairOrders(),
+                      isDark: isDark,
+                    )
+                  : AnimatedBuilder(
+                      animation: Listenable.merge([
+                        _searchQuery,
+                        _filter,
+                        _dateFilter,
+                        _warrantyFilter,
+                        _visibleCount,
+                      ]),
+                      builder: (context, _) {
+                        final filtered = _filteredOrders;
+                        final totalItems = filtered.length;
+                        final currentVisible = _visibleCount.value.clamp(
+                          0,
+                          totalItems,
+                        );
+
+                        final pageItems = filtered.sublist(
+                          0,
+                          currentVisible > totalItems
+                              ? totalItems
+                              : currentVisible,
+                        );
+
+                        if (filtered.isEmpty) {
+                          return RefreshIndicator(
+                            onRefresh: () => context
+                                .read<BackendDataProvider>()
+                                .loadRepairOrders(),
+                            child: ListView(
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              children: [
+                                SizedBox(
+                                  height: (screenSize.height - 200).clamp(
+                                    150.0,
+                                    600.0,
+                                  ),
+                                  child: _EmptyOrders(isDark: isDark),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
+                        return RefreshIndicator(
+                          onRefresh: () => context
                               .read<BackendDataProvider>()
                               .loadRepairOrders(),
-                          isDark: isDark,
-                        )
-                      : AnimatedBuilder(
-                          animation: Listenable.merge([
-                            _searchQuery,
-                            _filter,
-                            _dateFilter,
-                            _warrantyFilter,
-                            _visibleCount,
-                          ]),
-                          builder: (context, _) {
-                            final filtered = _filteredOrders;
-                            final totalItems = filtered.length;
-                            final currentVisible = _visibleCount.value.clamp(0, totalItems);
-
-                            final pageItems = filtered.sublist(
-                              0,
-                              currentVisible > totalItems ? totalItems : currentVisible,
-                            );
-
-                            if (filtered.isEmpty) {
-                              return RefreshIndicator(
-                                onRefresh: () => context
-                                    .read<BackendDataProvider>()
-                                    .loadRepairOrders(),
-                                child: ListView(
-                                  physics: const AlwaysScrollableScrollPhysics(),
-                                  children: [
-                                    SizedBox(
-                                      height: (screenSize.height - 200).clamp(150.0, 600.0),
-                                      child: _EmptyOrders(isDark: isDark),
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            padding: EdgeInsets.fromLTRB(
+                              wide ? 20 : 22,
+                              4,
+                              wide ? 20 : 22,
+                              24,
+                            ),
+                            itemCount: pageItems.length + 1,
+                            itemBuilder: (context, index) {
+                              if (index == pageItems.length) {
+                                return _buildInfiniteScrollFooter(
+                                  pageItems.length,
+                                  totalItems,
+                                  isDark,
+                                  wide,
+                                );
+                              }
+                              return Center(
+                                child: ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 980,
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _OrderCard(
+                                      order: pageItems[index],
+                                      isDark: isDark,
                                     ),
-                                  ],
+                                  ),
                                 ),
                               );
-                            }
-                            return RefreshIndicator(
-                              onRefresh: () => context
-                                  .read<BackendDataProvider>()
-                                  .loadRepairOrders(),
-                              child: ListView.builder(
-                                controller: _scrollController,
-                                physics: const AlwaysScrollableScrollPhysics(),
-                                padding: EdgeInsets.fromLTRB(
-                                  wide ? 20 : 22,
-                                  4,
-                                  wide ? 20 : 22,
-                                  24,
-                                ),
-                                itemCount: pageItems.length + 1,
-                                itemBuilder: (context, index) {
-                                  if (index == pageItems.length) {
-                                    return _buildInfiniteScrollFooter(
-                                      pageItems.length,
-                                      totalItems,
-                                      isDark,
-                                      wide,
-                                    );
-                                  }
-                                  return Center(
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        maxWidth: 980,
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(
-                                          bottom: 12,
-                                        ),
-                                        child: _OrderCard(
-                                          order: pageItems[index],
-                                          isDark: isDark,
-                                        ),
-                                      ),
-                                    ),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                        ),
-                ),
-              ],
+                            },
+                          ),
+                        );
+                      },
+                    ),
             ),
+          ],
+        ),
       ),
     );
   }
@@ -475,13 +511,26 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   Widget _buildWarrantyFilterChip(String label, bool? value) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final orders = context.watch<BackendDataProvider>().repairOrders;
-    
+
     return ValueListenableBuilder<RepairOrderStatus?>(
       valueListenable: _filter,
       builder: (context, currentStatusFilter, _) {
         final count = value == null
-            ? orders.where((order) => currentStatusFilter == null || order.status == currentStatusFilter).length
-            : orders.where((order) => order.underWarranty == value && (currentStatusFilter == null || order.status == currentStatusFilter)).length;
+            ? orders
+                  .where(
+                    (order) =>
+                        currentStatusFilter == null ||
+                        order.status == currentStatusFilter,
+                  )
+                  .length
+            : orders
+                  .where(
+                    (order) =>
+                        order.underWarranty == value &&
+                        (currentStatusFilter == null ||
+                            order.status == currentStatusFilter),
+                  )
+                  .length;
 
         return ValueListenableBuilder<bool?>(
           valueListenable: _warrantyFilter,
@@ -503,8 +552,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                 color: isSelected
                     ? Colors.white
                     : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -530,8 +579,21 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
       valueListenable: _warrantyFilter,
       builder: (context, currentWarrantyFilter, _) {
         final count = status == null
-            ? orders.where((order) => currentWarrantyFilter == null || order.underWarranty == currentWarrantyFilter).length
-            : orders.where((order) => order.status == status && (currentWarrantyFilter == null || order.underWarranty == currentWarrantyFilter)).length;
+            ? orders
+                  .where(
+                    (order) =>
+                        currentWarrantyFilter == null ||
+                        order.underWarranty == currentWarrantyFilter,
+                  )
+                  .length
+            : orders
+                  .where(
+                    (order) =>
+                        order.status == status &&
+                        (currentWarrantyFilter == null ||
+                            order.underWarranty == currentWarrantyFilter),
+                  )
+                  .length;
 
         return ValueListenableBuilder<RepairOrderStatus?>(
           valueListenable: _filter,
@@ -556,8 +618,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                 color: isSelected
                     ? Colors.white
                     : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight),
+                          ? AppColors.textSecondaryDark
+                          : AppColors.textSecondaryLight),
               ),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(20),
@@ -576,7 +638,11 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   }
 
   Widget _buildInfiniteScrollFooter(
-      int loadedCount, int totalCount, bool isDark, bool wide) {
+    int loadedCount,
+    int totalCount,
+    bool isDark,
+    bool wide,
+  ) {
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 980),
@@ -585,7 +651,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
           padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: (isDark ? AppColors.surfaceDark : Colors.white).withValues(alpha: 0.7),
+            color: (isDark ? AppColors.surfaceDark : Colors.white).withValues(
+              alpha: 0.7,
+            ),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isDark ? AppColors.borderDark : AppColors.borderLight,
@@ -599,7 +667,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
               fontSize: 13,
               fontStyle: FontStyle.italic,
               fontWeight: FontWeight.w500,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ),
@@ -699,21 +769,38 @@ class _OrderCard extends StatelessWidget {
                     if (order.devices.any((d) => d.underWarranty)) ...[
                       const SizedBox(height: 6),
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
-                          color: order.devices.any((d) => d.underWarranty && _isWarrantyValid(d.warrantyExpiry))
+                          color:
+                              order.devices.any(
+                                (d) =>
+                                    d.underWarranty &&
+                                    _isWarrantyValid(d.warrantyExpiry),
+                              )
                               ? AppColors.successLight
                               : AppColors.errorLight,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
-                          order.devices.any((d) => d.underWarranty && _isWarrantyValid(d.warrantyExpiry))
+                          order.devices.any(
+                                (d) =>
+                                    d.underWarranty &&
+                                    _isWarrantyValid(d.warrantyExpiry),
+                              )
                               ? 'Còn hạn'
                               : 'Hết hạn',
                           style: TextStyle(
                             fontSize: 9,
                             fontWeight: FontWeight.w600,
-                            color: order.devices.any((d) => d.underWarranty && _isWarrantyValid(d.warrantyExpiry))
+                            color:
+                                order.devices.any(
+                                  (d) =>
+                                      d.underWarranty &&
+                                      _isWarrantyValid(d.warrantyExpiry),
+                                )
                                 ? AppColors.success
                                 : AppColors.error,
                           ),
@@ -760,7 +847,8 @@ class _OrderCard extends StatelessWidget {
                     ).format(order.createdAt.toLocal()),
                     isDark: isDark,
                   ),
-                  if (order.serialNumber != null && order.serialNumber!.isNotEmpty)
+                  if (order.serialNumber != null &&
+                      order.serialNumber!.isNotEmpty)
                     _InfoLine(
                       icon: Icons.tag,
                       label: 'Số seri',
@@ -777,10 +865,8 @@ class _OrderCard extends StatelessWidget {
                   runSpacing: 10,
                   children: children
                       .map(
-                        (child) => SizedBox(
-                          width: (cardWidth - 64) / 2,
-                          child: child,
-                        ),
+                        (child) =>
+                            SizedBox(width: (cardWidth - 64) / 2, child: child),
                       )
                       .toList(),
                 );
@@ -843,9 +929,7 @@ class _InfoLine extends StatelessWidget {
     final valueStyle = TextStyle(
       fontSize: 13,
       fontWeight: FontWeight.w700,
-      color: isDark
-          ? AppColors.textPrimaryDark
-          : AppColors.textPrimaryLight,
+      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
     );
 
     return Padding(
@@ -864,16 +948,15 @@ class _InfoLine extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            '$label: ',
-            style: labelStyle,
-          ),
+          Text('$label: ', style: labelStyle),
           Expanded(
             child: Text(
               value,
               style: valueStyle,
               maxLines: maxLines,
-              overflow: maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
+              overflow: maxLines == null
+                  ? TextOverflow.clip
+                  : TextOverflow.ellipsis,
             ),
           ),
         ],
@@ -892,7 +975,9 @@ class _OrderDetailSheet extends StatelessWidget {
       context: context,
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Xóa đơn sửa chữa'),
-        content: Text('Bạn có chắc chắn muốn xóa đơn sửa chữa ${order.orderNumber}? Hành động này không thể hoàn tác.'),
+        content: Text(
+          'Bạn có chắc chắn muốn xóa đơn sửa chữa ${order.orderNumber}? Hành động này không thể hoàn tác.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogCtx),
@@ -906,7 +991,9 @@ class _OrderDetailSheet extends StatelessWidget {
             onPressed: () async {
               Navigator.pop(dialogCtx);
               try {
-                await context.read<BackendDataProvider>().deleteRepairOrder(order.id);
+                await context.read<BackendDataProvider>().deleteRepairOrder(
+                  order.id,
+                );
                 if (context.mounted) {
                   Navigator.pop(context);
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -960,291 +1047,305 @@ class _OrderDetailSheet extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-              Row(
-                children: [
-                  Container(
-                    width: 52,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.infoLight,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: const Icon(
-                      LucideIcons.wrench,
-                      size: 24,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    Row(
                       children: [
-                        Text(
-                          order.deviceName,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                            color: isDark
-                                ? AppColors.textPrimaryDark
-                                : AppColors.textPrimaryLight,
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            color: AppColors.infoLight,
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: const Icon(
+                            LucideIcons.wrench,
+                            size: 24,
+                            color: AppColors.primary,
                           ),
                         ),
-                        Text(
-                          order.orderNumber,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: AppColors.primary,
-                            fontWeight: FontWeight.w700,
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                order.deviceName,
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                  color: isDark
+                                      ? AppColors.textPrimaryDark
+                                      : AppColors.textPrimaryLight,
+                                ),
+                              ),
+                              Text(
+                                order.orderNumber,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.primary,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        StatusBadge(status: order.status),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    _DetailRow('Khách hàng', order.customerName),
+                    _DetailRow('SĐT khách', order.customerPhone ?? 'Chưa có'),
+                    if (order.devices.length <= 1) ...[
+                      _DetailRow(
+                        'Số seri',
+                        order.devices.isNotEmpty
+                            ? (order.devices.first.serialNumber ?? 'Không có')
+                            : (order.serialNumber ?? 'Không có'),
+                      ),
+                      _DetailRow('Bảo hành', () {
+                        final isUnderWarranty = order.devices.isNotEmpty
+                            ? order.devices.first.underWarranty
+                            : order.underWarranty;
+                        final expiry = order.devices.isNotEmpty
+                            ? order.devices.first.warrantyExpiry
+                            : null;
+                        if (!isUnderWarranty) return 'Không bảo hành';
+                        final isValid = _isWarrantyValid(expiry);
+                        final expiryStr = expiry != null
+                            ? DateFormat('dd/MM/yyyy').format(expiry)
+                            : 'Không rõ';
+                        return '$expiryStr (${isValid ? "Còn hạn" : "Hết hạn"})';
+                      }()),
+                      if (order.devices.isNotEmpty &&
+                          order.devices.first.description != null &&
+                          order.devices.first.description!.isNotEmpty)
+                        _DetailRow(
+                          'Mô tả lỗi',
+                          order.devices.first.description!,
+                        )
+                      else if (order.description != null &&
+                          order.description!.isNotEmpty)
+                        _DetailRow('Mô tả lỗi', order.description!),
+                    ],
+                    _DetailRow(
+                      'Người sửa (đơn)',
+                      order.assigneeNames.isNotEmpty
+                          ? order.assigneeNames.join('\n')
+                          : (order.assignedToName ?? 'Chưa phân công'),
+                    ),
+                    _DetailRow(
+                      'Ngày tạo',
+                      DateFormat(
+                        'dd/MM/yyyy HH:mm',
+                      ).format(order.createdAt.toLocal()),
+                    ),
+                    if (order.updatedAt != null)
+                      _DetailRow(
+                        'Cập nhật',
+                        DateFormat(
+                          'dd/MM/yyyy HH:mm',
+                        ).format(order.updatedAt!.toLocal()),
+                      ),
+                    if (order.notes != null && order.notes!.isNotEmpty)
+                      _DetailRow('Ghi chú', order.notes!),
+                    if (order.devices.length > 1) ...[
+                      const SizedBox(height: 20),
+                      // ── Danh sách thiết bị (Legacy) ─────────────────
+                      Text(
+                        'Thiết bị (${order.devices.length})',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      ...order.devices.asMap().entries.map(
+                        (e) => _DeviceDetailCard(
+                          isDark: isDark,
+                          index: e.key,
+                          deviceName: e.value.deviceName,
+                          serialNumber: e.value.serialNumber,
+                          underWarranty: e.value.underWarranty,
+                          warrantyExpiry: e.value.warrantyExpiry,
+                          description: e.value.description,
+                          assignedToName: e.value.assignedToName,
+                          statusLabel: e.value.statusLabel,
+                        ),
+                      ),
+                    ],
+
+                    if (order.media.isNotEmpty) ...[
+                      const SizedBox(height: 20),
+                      Text(
+                        'Đính kèm',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      GridView.builder(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: order.media.length,
+                        gridDelegate:
+                            const SliverGridDelegateWithFixedCrossAxisCount(
+                              crossAxisCount: 4,
+                              mainAxisSpacing: 8,
+                              crossAxisSpacing: 8,
+                              childAspectRatio: 1.0,
+                            ),
+                        itemBuilder: (context, index) {
+                          final media = order.media[index];
+                          final url = context
+                              .read<BackendDataProvider>()
+                              .api
+                              .resolveUrl(media.url);
+                          if (media.isVideo) {
+                            return GestureDetector(
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (context) => VideoPlayerDialog(
+                                    videoUrl: url,
+                                    title: media.caption ?? 'Video đính kèm',
+                                  ),
+                                );
+                              },
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  color: isDark
+                                      ? AppColors.surfaceDark
+                                      : Colors.grey[200],
+                                  child: const Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.play_circle_outline,
+                                        color: AppColors.primary,
+                                        size: 32,
+                                      ),
+                                      Positioned(
+                                        bottom: 4,
+                                        child: Text(
+                                          'VIDEO',
+                                          style: TextStyle(
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.bold,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            );
+                          }
+                          return GestureDetector(
+                            onTap: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => ImagePreviewDialog(
+                                  imageUrl: url,
+                                  caption: media.caption,
+                                ),
+                              );
+                            },
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.network(
+                                url,
+                                fit: BoxFit.cover,
+                                loadingBuilder:
+                                    (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        color: isDark
+                                            ? AppColors.surfaceDark
+                                            : Colors.grey[200],
+                                        child: const Center(
+                                          child: SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Container(
+                                    color: isDark
+                                        ? AppColors.surfaceDark
+                                        : Colors.grey[200],
+                                    child: const Center(
+                                      child: Icon(Icons.broken_image, size: 20),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                    if (canDelete) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: const BorderSide(color: AppColors.error),
+                          ),
+                          onPressed: () => _confirmDelete(context),
+                          icon: const Icon(Icons.delete_outline, size: 18),
+                          label: const Text('Xóa đơn hàng'),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Đóng'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final updated = await showModalBottomSheet<bool>(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) =>
+                                    _EditOrderSheet(order: order),
+                              );
+                              if (updated == true && context.mounted) {
+                                WidgetsBinding.instance.addPostFrameCallback((
+                                  _,
+                                ) {
+                                  if (context.mounted) {
+                                    Navigator.pop(context);
+                                  }
+                                });
+                              }
+                            },
+                            child: const Text('Chỉnh sửa'),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  StatusBadge(status: order.status),
-                ],
-              ),
-              const SizedBox(height: 22),
-              _DetailRow('Khách hàng', order.customerName),
-              _DetailRow('SĐT khách', order.customerPhone ?? 'Chưa có'),
-              if (order.devices.length <= 1) ...[
-                _DetailRow(
-                  'Số seri',
-                  order.devices.isNotEmpty
-                      ? (order.devices.first.serialNumber ?? 'Không có')
-                      : (order.serialNumber ?? 'Không có'),
-                ),
-                _DetailRow(
-                  'Bảo hành',
-                  () {
-                    final isUnderWarranty = order.devices.isNotEmpty
-                        ? order.devices.first.underWarranty
-                        : order.underWarranty;
-                    final expiry = order.devices.isNotEmpty
-                        ? order.devices.first.warrantyExpiry
-                        : null;
-                    if (!isUnderWarranty) return 'Không bảo hành';
-                    final isValid = _isWarrantyValid(expiry);
-                    final expiryStr = expiry != null
-                        ? DateFormat('dd/MM/yyyy').format(expiry)
-                        : 'Không rõ';
-                    return '$expiryStr (${isValid ? "Còn hạn" : "Hết hạn"})';
-                  }(),
-                ),
-                if (order.devices.isNotEmpty &&
-                    order.devices.first.description != null &&
-                    order.devices.first.description!.isNotEmpty)
-                  _DetailRow('Mô tả lỗi', order.devices.first.description!)
-                else if (order.description != null &&
-                    order.description!.isNotEmpty)
-                  _DetailRow('Mô tả lỗi', order.description!),
-              ],
-              _DetailRow(
-                'Người sửa (đơn)',
-                order.assigneeNames.isNotEmpty
-                    ? order.assigneeNames.join('\n')
-                    : (order.assignedToName ?? 'Chưa phân công'),
-              ),
-              _DetailRow(
-                'Ngày tạo',
-                DateFormat('dd/MM/yyyy HH:mm').format(order.createdAt.toLocal()),
-              ),
-              if (order.updatedAt != null)
-                _DetailRow(
-                  'Cập nhật',
-                  DateFormat('dd/MM/yyyy HH:mm').format(order.updatedAt!.toLocal()),
-                ),
-              if (order.notes != null && order.notes!.isNotEmpty)
-                _DetailRow(
-                  'Ghi chú',
-                  order.notes!,
-                ),
-              if (order.devices.length > 1) ...[
-                const SizedBox(height: 20),
-                // ── Danh sách thiết bị (Legacy) ─────────────────
-                Text(
-                  'Thiết bị (${order.devices.length})',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                ...order.devices.asMap().entries.map((e) => _DeviceDetailCard(
-                  isDark: isDark,
-                  index: e.key,
-                  deviceName: e.value.deviceName,
-                  serialNumber: e.value.serialNumber,
-                  underWarranty: e.value.underWarranty,
-                  warrantyExpiry: e.value.warrantyExpiry,
-                  description: e.value.description,
-                  assignedToName: e.value.assignedToName,
-                  statusLabel: e.value.statusLabel,
-                )),
-              ],
-
-              if (order.media.isNotEmpty) ...[
-                const SizedBox(height: 20),
-                Text(
-                  'Đính kèm',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: order.media.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 4,
-                    mainAxisSpacing: 8,
-                    crossAxisSpacing: 8,
-                    childAspectRatio: 1.0,
-                  ),
-                  itemBuilder: (context, index) {
-                    final media = order.media[index];
-                    final url = context
-                        .read<BackendDataProvider>()
-                        .api
-                        .resolveUrl(media.url);
-                    if (media.isVideo) {
-                      return GestureDetector(
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => VideoPlayerDialog(
-                              videoUrl: url,
-                              title: media.caption ?? 'Video đính kèm',
-                            ),
-                          );
-                        },
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            color: isDark ? AppColors.surfaceDark : Colors.grey[200],
-                            child: const Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Icon(
-                                  Icons.play_circle_outline,
-                                  color: AppColors.primary,
-                                  size: 32,
-                                ),
-                                Positioned(
-                                  bottom: 4,
-                                  child: Text(
-                                    'VIDEO',
-                                    style: TextStyle(
-                                      fontSize: 9,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-                    return GestureDetector(
-                      onTap: () {
-                        showDialog(
-                          context: context,
-                          builder: (context) => ImagePreviewDialog(
-                            imageUrl: url,
-                            caption: media.caption,
-                          ),
-                        );
-                      },
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          url,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return Container(
-                              color: isDark ? AppColors.surfaceDark : Colors.grey[200],
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                          errorBuilder: (context, error, stackTrace) {
-                            return Container(
-                              color: isDark ? AppColors.surfaceDark : Colors.grey[200],
-                              child: const Center(
-                                child: Icon(Icons.broken_image, size: 20),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ],
-              if (canDelete) ...[
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.error,
-                      side: const BorderSide(color: AppColors.error),
-                    ),
-                    onPressed: () => _confirmDelete(context),
-                    icon: const Icon(Icons.delete_outline, size: 18),
-                    label: const Text('Xóa đơn hàng'),
-                  ),
-                ),
-                const SizedBox(height: 16),
-              ],
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Đóng'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final updated = await showModalBottomSheet<bool>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => _EditOrderSheet(order: order),
-                        );
-                        if (updated == true && context.mounted) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          });
-                        }
-                      },
-                      child: const Text('Chỉnh sửa'),
-                    ),
-                  ),
-                ],
-              ),
                   ],
                 ),
               ),
@@ -1345,8 +1446,11 @@ class _DeviceDetailCard extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(Icons.precision_manufacturing_outlined,
-                    size: 16, color: AppColors.primary),
+                Icon(
+                  Icons.precision_manufacturing_outlined,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1364,7 +1468,10 @@ class _DeviceDetailCard extends StatelessWidget {
                   spacing: 6,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
                       decoration: BoxDecoration(
                         color: underWarranty
                             ? AppColors.infoLight
@@ -1376,13 +1483,18 @@ class _DeviceDetailCard extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
-                          color: underWarranty ? AppColors.primary : Colors.grey[600],
+                          color: underWarranty
+                              ? AppColors.primary
+                              : Colors.grey[600],
                         ),
                       ),
                     ),
                     if (underWarranty)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: _isWarrantyValid(warrantyExpiry)
                               ? AppColors.successLight
@@ -1390,7 +1502,9 @@ class _DeviceDetailCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
-                          _isWarrantyValid(warrantyExpiry) ? 'Còn hạn' : 'Hết hạn',
+                          _isWarrantyValid(warrantyExpiry)
+                              ? 'Còn hạn'
+                              : 'Hết hạn',
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
@@ -1429,7 +1543,9 @@ class _DeviceDetailCard extends StatelessWidget {
                   Icon(
                     Icons.calendar_today,
                     size: 14,
-                    color: !_isWarrantyValid(warrantyExpiry) ? AppColors.error : Colors.grey,
+                    color: !_isWarrantyValid(warrantyExpiry)
+                        ? AppColors.error
+                        : Colors.grey,
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -1438,8 +1554,12 @@ class _DeviceDetailCard extends StatelessWidget {
                       fontSize: 13,
                       color: !_isWarrantyValid(warrantyExpiry)
                           ? AppColors.error
-                          : (isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight),
-                      fontWeight: !_isWarrantyValid(warrantyExpiry) ? FontWeight.w600 : FontWeight.normal,
+                          : (isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight),
+                      fontWeight: !_isWarrantyValid(warrantyExpiry)
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                     ),
                   ),
                   if (!_isWarrantyValid(warrantyExpiry)) ...[
@@ -1461,7 +1581,11 @@ class _DeviceDetailCard extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.error_outline, size: 14, color: Colors.orange),
+                  const Icon(
+                    Icons.error_outline,
+                    size: 14,
+                    color: Colors.orange,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -1481,7 +1605,11 @@ class _DeviceDetailCard extends StatelessWidget {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.person_outline, size: 14, color: Colors.grey),
+                  const Icon(
+                    Icons.person_outline,
+                    size: 14,
+                    color: Colors.grey,
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     'Phụ trách: $assignedToName',
@@ -1670,7 +1798,8 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     }
   }
 
-  bool get _canAssign => context.read<AuthProvider>().can(AppPermission.assignRepairOrders);
+  bool get _canAssign =>
+      context.read<AuthProvider>().can(AppPermission.assignRepairOrders);
 
   String get _currentStatusBackendCode {
     switch (widget.order.status) {
@@ -1696,8 +1825,12 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   @override
   void initState() {
     super.initState();
-    _customerNameController = TextEditingController(text: widget.order.customerName);
-    _customerPhoneController = TextEditingController(text: widget.order.customerPhone ?? '');
+    _customerNameController = TextEditingController(
+      text: widget.order.customerName,
+    );
+    _customerPhoneController = TextEditingController(
+      text: widget.order.customerPhone ?? '',
+    );
     _noteController = TextEditingController(text: widget.order.notes ?? '');
 
     // Khởi tạo device entries từ dữ liệu đơn hiện tại
@@ -1795,8 +1928,10 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
       originalIds.add(widget.order.assignedToId!);
     }
 
-    bool infoChanged = _customerNameController.text.trim() != widget.order.customerName ||
-        _customerPhoneController.text.replaceAll(RegExp(r'\D'), '') != (widget.order.customerPhone ?? '').replaceAll(RegExp(r'\D'), '');
+    bool infoChanged =
+        _customerNameController.text.trim() != widget.order.customerName ||
+        _customerPhoneController.text.replaceAll(RegExp(r'\D'), '') !=
+            (widget.order.customerPhone ?? '').replaceAll(RegExp(r'\D'), '');
 
     if (!infoChanged) {
       if (_deviceEntries.length != widget.order.devices.length) {
@@ -1806,10 +1941,16 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
           final entry = _deviceEntries[i];
           final orig = widget.order.devices[i];
           if (entry.nameController.text.trim() != orig.deviceName ||
-              (entry.serialController.text.trim().isEmpty ? null : entry.serialController.text.trim()) != orig.serialNumber ||
+              (entry.serialController.text.trim().isEmpty
+                      ? null
+                      : entry.serialController.text.trim()) !=
+                  orig.serialNumber ||
               entry.underWarranty != orig.underWarranty ||
               entry.warrantyExpiry != orig.warrantyExpiry ||
-              (entry.descController.text.trim().isEmpty ? null : entry.descController.text.trim()) != orig.description ||
+              (entry.descController.text.trim().isEmpty
+                      ? null
+                      : entry.descController.text.trim()) !=
+                  orig.description ||
               entry.assignedToId != orig.assignedToId) {
             infoChanged = true;
             break;
@@ -1818,15 +1959,23 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
       }
     }
 
-    final assignmentChanged = _canAssign &&
-        (!originalIds.containsAll(_technicianIds) || !_technicianIds.containsAll(originalIds));
+    final assignmentChanged =
+        _canAssign &&
+        (!originalIds.containsAll(_technicianIds) ||
+            !_technicianIds.containsAll(originalIds));
 
-    final mediaChanged = _selectedMedias.isNotEmpty || _deletedMediaIds.isNotEmpty;
-    final statusChanged = _nextStatus != null && _nextStatus != _currentStatusBackendCode;
+    final mediaChanged =
+        _selectedMedias.isNotEmpty || _deletedMediaIds.isNotEmpty;
+    final statusChanged =
+        _nextStatus != null && _nextStatus != _currentStatusBackendCode;
     final note = _noteController.text.trim();
     final noteChanged = note != (widget.order.notes ?? '');
 
-    if (!assignmentChanged && !statusChanged && !infoChanged && !mediaChanged && !noteChanged) {
+    if (!assignmentChanged &&
+        !statusChanged &&
+        !infoChanged &&
+        !mediaChanged &&
+        !noteChanged) {
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text('Chưa có thay đổi để lưu.')));
@@ -1840,16 +1989,27 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
         await backend.updateRepairOrder(
           widget.order.id,
           customerName: _customerNameController.text.trim(),
-          customerPhone: _customerPhoneController.text.replaceAll(RegExp(r'\D'), ''),
-          devices: _deviceEntries.map((e) => RepairDevice(
-            id: '',
-            deviceName: e.nameController.text.trim(),
-            serialNumber: e.serialController.text.trim().isEmpty ? null : e.serialController.text.trim(),
-            underWarranty: e.underWarranty,
-            warrantyExpiry: e.underWarranty ? e.warrantyExpiry : null,
-            description: e.descController.text.trim().isEmpty ? null : e.descController.text.trim(),
-            assignedToId: e.assignedToId,
-          )).toList(),
+          customerPhone: _customerPhoneController.text.replaceAll(
+            RegExp(r'\D'),
+            '',
+          ),
+          devices: _deviceEntries
+              .map(
+                (e) => RepairDevice(
+                  id: '',
+                  deviceName: e.nameController.text.trim(),
+                  serialNumber: e.serialController.text.trim().isEmpty
+                      ? null
+                      : e.serialController.text.trim(),
+                  underWarranty: e.underWarranty,
+                  warrantyExpiry: e.underWarranty ? e.warrantyExpiry : null,
+                  description: e.descController.text.trim().isEmpty
+                      ? null
+                      : e.descController.text.trim(),
+                  assignedToId: e.assignedToId,
+                ),
+              )
+              .toList(),
           note: note,
           reload: !assignmentChanged && !statusChanged && !mediaChanged,
         );
@@ -1871,7 +2031,11 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
       }
       if (_deletedMediaIds.isNotEmpty) {
         for (final mediaId in _deletedMediaIds) {
-          await backend.deleteRepairMedia(widget.order.id, mediaId: mediaId, reload: false);
+          await backend.deleteRepairMedia(
+            widget.order.id,
+            mediaId: mediaId,
+            reload: false,
+          );
         }
       }
       if (_selectedMedias.isNotEmpty) {
@@ -1985,7 +2149,8 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     final technicians = backend.employees
         .where(
           (user) =>
-              (user.role == UserRole.employee || user.role == UserRole.technician) &&
+              (user.role == UserRole.employee ||
+                  user.role == UserRole.technician) &&
               user.status == UserStatus.active,
         )
         .toList();
@@ -2016,380 +2181,486 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                  Text(
-                    'Chỉnh sửa ${widget.order.orderNumber}',
-                    style: const TextStyle(
-                      fontSize: 19,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  _buildTextField(
-                    context,
-                    controller: _customerNameController,
-                    label: 'Tên khách hàng',
-                    hint: 'Nhập tên khách hàng',
-                    icon: Icons.person_outline,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    context,
-                    controller: _customerPhoneController,
-                    label: 'Số điện thoại',
-                    hint: '0901 234 567',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    required: false,
-                  ),
-                  const SizedBox(height: 16),
-                  // ── Danh sách thiết bị ─────────────────────
-                  Text(
-                    'Thiết bị sửa chữa',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ...List.generate(_deviceEntries.length, (index) {
-                    final entry = _deviceEntries[index];
-                    return _DeviceFormCard(
-                      key: ValueKey(entry.id),
-                      index: index,
-                      entry: entry,
-                      isDark: isDark,
-                      canAssign: _canAssign,
-                      technicians: technicians,
-                      canRemove: _deviceEntries.length > 1,
-                      onRemove: () => setState(() => _deviceEntries.removeAt(index)),
-                      onChanged: () => setState(() {}),
-                      orderCreatedAt: widget.order.createdAt,
-                    );
-                  }),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Nhân viên đang sửa chữa',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  if (widget.order.assigneeIds.isEmpty && widget.order.assignedToId == null)
-                    _AssignedTechnicianCard(
-                      name: 'Chưa phân công',
-                      employeeId: null,
-                      department: null,
-                      phone: null,
-                      isAssigned: false,
-                      isDark: isDark,
-                    )
-                  else ...[
-                    ...widget.order.assigneeIds.map((id) {
-                      final tech = backend.employees.firstWhere(
-                        (t) => t.id == id,
-                        orElse: () => User(
-                          id: id,
-                          name: widget.order.assigneeNames.length > widget.order.assigneeIds.indexOf(id)
-                              ? widget.order.assigneeNames[widget.order.assigneeIds.indexOf(id)]
-                              : 'Kỹ thuật viên',
-                          email: '',
-                          employeeId: '',
-                          role: UserRole.employee,
-                          status: UserStatus.active,
+                        Text(
+                          'Chỉnh sửa ${widget.order.orderNumber}',
+                          style: const TextStyle(
+                            fontSize: 19,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
-                      );
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 8.0),
-                        child: _AssignedTechnicianCard(
-                          name: tech.name,
-                          employeeId: tech.employeeId,
-                          department: tech.department,
-                          phone: tech.phone,
-                          isAssigned: true,
-                          isDark: isDark,
+                        const SizedBox(height: 20),
+                        _buildTextField(
+                          context,
+                          controller: _customerNameController,
+                          label: 'Tên khách hàng',
+                          hint: 'Nhập tên khách hàng',
+                          icon: Icons.person_outline,
                         ),
-                      );
-                    }),
-                    if (widget.order.assigneeIds.isEmpty && widget.order.assignedToId != null)
-                      _AssignedTechnicianCard(
-                        name: assignedTechnician?.name ?? widget.order.assignedToName ?? 'Kỹ thuật viên',
-                        employeeId: assignedTechnician?.employeeId,
-                        department: assignedTechnician?.department,
-                        phone: assignedTechnician?.phone,
-                        isAssigned: true,
-                        isDark: isDark,
-                      ),
-                  ],
-                  const SizedBox(height: 18),
-                  if (_canAssign) ...[
-                    const Text(
-                      'Phân công người sửa (Có thể chọn nhiều)',
-                      style: TextStyle(fontWeight: FontWeight.w600),
-                    ),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () async {
-                        final selected = await showDialog<Set<String>>(
-                          context: context,
-                          builder: (context) {
-                            return _TechnicianMultiSelectDialog(
-                              technicians: technicians,
-                              initialSelected: _technicianIds,
-                              isDark: isDark,
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          context,
+                          controller: _customerPhoneController,
+                          label: 'Số điện thoại',
+                          hint: '0901 234 567',
+                          icon: Icons.phone_outlined,
+                          keyboardType: TextInputType.phone,
+                          required: false,
+                        ),
+                        const SizedBox(height: 16),
+                        // ── Danh sách thiết bị ─────────────────────
+                        Text(
+                          'Thiết bị sửa chữa',
+                          style: TextStyle(
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        ...List.generate(_deviceEntries.length, (index) {
+                          final entry = _deviceEntries[index];
+                          return _DeviceFormCard(
+                            key: ValueKey(entry.id),
+                            index: index,
+                            entry: entry,
+                            isDark: isDark,
+                            canAssign: _canAssign,
+                            technicians: technicians,
+                            canRemove: _deviceEntries.length > 1,
+                            onRemove: () =>
+                                setState(() => _deviceEntries.removeAt(index)),
+                            onChanged: () => setState(() {}),
+                            orderCreatedAt: widget.order.createdAt,
+                          );
+                        }),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Nhân viên đang sửa chữa',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        if (widget.order.assigneeIds.isEmpty &&
+                            widget.order.assignedToId == null)
+                          _AssignedTechnicianCard(
+                            name: 'Chưa phân công',
+                            employeeId: null,
+                            department: null,
+                            phone: null,
+                            isAssigned: false,
+                            isDark: isDark,
+                          )
+                        else ...[
+                          ...widget.order.assigneeIds.map((id) {
+                            final tech = backend.employees.firstWhere(
+                              (t) => t.id == id,
+                              orElse: () => User(
+                                id: id,
+                                name:
+                                    widget.order.assigneeNames.length >
+                                        widget.order.assigneeIds.indexOf(id)
+                                    ? widget.order.assigneeNames[widget
+                                          .order
+                                          .assigneeIds
+                                          .indexOf(id)]
+                                    : 'Kỹ thuật viên',
+                                email: '',
+                                employeeId: '',
+                                role: UserRole.employee,
+                                status: UserStatus.active,
+                              ),
                             );
-                          },
-                        );
-                        if (selected != null) {
-                          setState(() {
-                            _technicianIds.clear();
-                            _technicianIds.addAll(selected);
-                          });
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[400]!),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _technicianIds.isEmpty
-                                  ? Text(
-                                      'Chọn nhân viên',
-                                      style: TextStyle(
-                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                      ),
-                                    )
-                                  : Wrap(
-                                      spacing: 6,
-                                      runSpacing: 6,
-                                      children: _technicianIds.map((id) {
-                                        final name = backend.employees.firstWhere((t) => t.id == id, orElse: () => User(id: id, name: 'Kỹ thuật viên', email: '', employeeId: '', role: UserRole.employee, status: UserStatus.active)).name;
-                                        return Chip(
-                                          label: Text(
-                                            name,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                          padding: EdgeInsets.zero,
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                          onDeleted: () {
-                                            setState(() {
-                                              _technicianIds.remove(id);
-                                            });
-                                          },
-                                        );
-                                      }).toList(),
-                                    ),
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: _AssignedTechnicianCard(
+                                name: tech.name,
+                                employeeId: tech.employeeId,
+                                department: tech.department,
+                                phone: tech.phone,
+                                isAssigned: true,
+                                isDark: isDark,
+                              ),
+                            );
+                          }),
+                          if (widget.order.assigneeIds.isEmpty &&
+                              widget.order.assignedToId != null)
+                            _AssignedTechnicianCard(
+                              name:
+                                  assignedTechnician?.name ??
+                                  widget.order.assignedToName ??
+                                  'Kỹ thuật viên',
+                              employeeId: assignedTechnician?.employeeId,
+                              department: assignedTechnician?.department,
+                              phone: assignedTechnician?.phone,
+                              isAssigned: true,
+                              isDark: isDark,
                             ),
-                            Icon(
-                              Icons.arrow_drop_down,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                        ],
+                        const SizedBox(height: 18),
+                        if (_canAssign) ...[
+                          const Text(
+                            'Phân công người sửa (Có thể chọn nhiều)',
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () async {
+                              final selected = await showDialog<Set<String>>(
+                                context: context,
+                                builder: (context) {
+                                  return _TechnicianMultiSelectDialog(
+                                    technicians: technicians,
+                                    initialSelected: _technicianIds,
+                                    isDark: isDark,
+                                  );
+                                },
+                              );
+                              if (selected != null) {
+                                setState(() {
+                                  _technicianIds.clear();
+                                  _technicianIds.addAll(selected);
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.grey[700]!
+                                      : Colors.grey[400]!,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _technicianIds.isEmpty
+                                        ? Text(
+                                            'Chọn nhân viên',
+                                            style: TextStyle(
+                                              color: isDark
+                                                  ? Colors.grey[400]
+                                                  : Colors.grey[600],
+                                            ),
+                                          )
+                                        : Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: _technicianIds.map((id) {
+                                              final name = backend.employees
+                                                  .firstWhere(
+                                                    (t) => t.id == id,
+                                                    orElse: () => User(
+                                                      id: id,
+                                                      name: 'Kỹ thuật viên',
+                                                      email: '',
+                                                      employeeId: '',
+                                                      role: UserRole.employee,
+                                                      status: UserStatus.active,
+                                                    ),
+                                                  )
+                                                  .name;
+                                              return Chip(
+                                                label: Text(
+                                                  name,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                padding: EdgeInsets.zero,
+                                                materialTapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                onDeleted: () {
+                                                  setState(() {
+                                                    _technicianIds.remove(id);
+                                                  });
+                                                },
+                                              );
+                                            }).toList(),
+                                          ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    color: isDark
+                                        ? Colors.grey[400]
+                                        : Colors.grey[600],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                        const Text(
+                          'Đính kèm hình ảnh hoặc video',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (widget.order.media
+                                .where((m) => !_deletedMediaIds.contains(m.id))
+                                .isNotEmpty ||
+                            _selectedMedias.isNotEmpty) ...[
+                          SizedBox(
+                            height: 120,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              children: [
+                                ...widget.order.media
+                                    .where(
+                                      (m) => !_deletedMediaIds.contains(m.id),
+                                    )
+                                    .map((m) {
+                                      final url = backend.api.resolveUrl(m.url);
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          right: 8.0,
+                                        ),
+                                        child: Stack(
+                                          children: [
+                                            ClipRRect(
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                              child: m.isVideo
+                                                  ? Container(
+                                                      width: 120,
+                                                      height: 120,
+                                                      color: AppColors.infoLight
+                                                          .withValues(
+                                                            alpha: 0.2,
+                                                          ),
+                                                      child: const Column(
+                                                        mainAxisAlignment:
+                                                            MainAxisAlignment
+                                                                .center,
+                                                        children: [
+                                                          Icon(
+                                                            Icons
+                                                                .play_circle_outline,
+                                                            size: 36,
+                                                            color: AppColors
+                                                                .primary,
+                                                          ),
+                                                          SizedBox(height: 4),
+                                                          Text(
+                                                            'Video',
+                                                            style: TextStyle(
+                                                              fontSize: 12,
+                                                            ),
+                                                          ),
+                                                        ],
+                                                      ),
+                                                    )
+                                                  : Image.network(
+                                                      url,
+                                                      width: 120,
+                                                      height: 120,
+                                                      fit: BoxFit.cover,
+                                                      errorBuilder:
+                                                          (
+                                                            context,
+                                                            error,
+                                                            stackTrace,
+                                                          ) => Container(
+                                                            width: 120,
+                                                            height: 120,
+                                                            color: Colors
+                                                                .grey[300],
+                                                            child: const Icon(
+                                                              Icons
+                                                                  .broken_image,
+                                                            ),
+                                                          ),
+                                                    ),
+                                            ),
+                                            Positioned(
+                                              top: 4,
+                                              right: 4,
+                                              child: GestureDetector(
+                                                onTap: () => setState(
+                                                  () => _deletedMediaIds.add(
+                                                    m.id,
+                                                  ),
+                                                ),
+                                                child: Container(
+                                                  padding: const EdgeInsets.all(
+                                                    2,
+                                                  ),
+                                                  decoration:
+                                                      const BoxDecoration(
+                                                        color: Colors.black54,
+                                                        shape: BoxShape.circle,
+                                                      ),
+                                                  child: const Icon(
+                                                    Icons.delete,
+                                                    color: Colors.red,
+                                                    size: 16,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                ..._selectedMedias.asMap().entries.map((e) {
+                                  final index = e.key;
+                                  final file = e.value;
+                                  final isVideo = _isVideo(file.path);
+                                  return Padding(
+                                    padding: const EdgeInsets.only(right: 8.0),
+                                    child: Stack(
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
+                                          child: isVideo
+                                              ? Container(
+                                                  width: 120,
+                                                  height: 120,
+                                                  color: AppColors.infoLight
+                                                      .withValues(alpha: 0.2),
+                                                  child: const Column(
+                                                    mainAxisAlignment:
+                                                        MainAxisAlignment
+                                                            .center,
+                                                    children: [
+                                                      Icon(
+                                                        Icons
+                                                            .play_circle_outline,
+                                                        size: 36,
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                      SizedBox(height: 4),
+                                                      Text(
+                                                        'Video mới',
+                                                        style: TextStyle(
+                                                          fontSize: 11,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                )
+                                              : Image.file(
+                                                  File(file.path),
+                                                  width: 120,
+                                                  height: 120,
+                                                  fit: BoxFit.cover,
+                                                ),
+                                        ),
+                                        Positioned(
+                                          top: 4,
+                                          right: 4,
+                                          child: GestureDetector(
+                                            onTap: () => setState(
+                                              () => _selectedMedias.removeAt(
+                                                index,
+                                              ),
+                                            ),
+                                            child: Container(
+                                              padding: const EdgeInsets.all(2),
+                                              decoration: const BoxDecoration(
+                                                color: Colors.black54,
+                                                shape: BoxShape.circle,
+                                              ),
+                                              child: const Icon(
+                                                Icons.close,
+                                                color: Colors.white,
+                                                size: 16,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _pickImage(ImageSource.camera),
+                              icon: const Icon(Icons.camera_alt, size: 18),
+                              label: const Text('Chụp ảnh'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _pickMultiImages,
+                              icon: const Icon(Icons.photo_library, size: 18),
+                              label: const Text('Chọn nhiều ảnh'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _pickVideo,
+                              icon: const Icon(
+                                Icons.videocam_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('Chọn video'),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                  ],
-                  const Text(
-                    'Đính kèm hình ảnh hoặc video',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (widget.order.media.where((m) => !_deletedMediaIds.contains(m.id)).isNotEmpty || _selectedMedias.isNotEmpty) ...[
-                    SizedBox(
-                      height: 120,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        children: [
-                          ...widget.order.media.where((m) => !_deletedMediaIds.contains(m.id)).map((m) {
-                            final url = backend.api.resolveUrl(m.url);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: m.isVideo
-                                        ? Container(
-                                            width: 120,
-                                            height: 120,
-                                            color: AppColors.infoLight.withOpacity(0.2),
-                                            child: const Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(Icons.play_circle_outline, size: 36, color: AppColors.primary),
-                                                SizedBox(height: 4),
-                                                Text('Video', style: TextStyle(fontSize: 12)),
-                                              ],
-                                            ),
-                                          )
-                                        : Image.network(
-                                            url,
-                                            width: 120,
-                                            height: 120,
-                                            fit: BoxFit.cover,
-                                            errorBuilder: (context, error, stackTrace) => Container(
-                                              width: 120,
-                                              height: 120,
-                                              color: Colors.grey[300],
-                                              child: const Icon(Icons.broken_image),
-                                            ),
-                                          ),
-                                  ),
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() => _deletedMediaIds.add(m.id)),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(2),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.black54,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.delete,
-                                          color: Colors.red,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                          ..._selectedMedias.asMap().entries.map((e) {
-                            final index = e.key;
-                            final file = e.value;
-                            final isVideo = _isVideo(file.path);
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 8.0),
-                              child: Stack(
-                                children: [
-                                  ClipRRect(
-                                    borderRadius: BorderRadius.circular(8),
-                                    child: isVideo
-                                        ? Container(
-                                            width: 120,
-                                            height: 120,
-                                            color: AppColors.infoLight.withOpacity(0.2),
-                                            child: const Column(
-                                              mainAxisAlignment: MainAxisAlignment.center,
-                                              children: [
-                                                Icon(Icons.play_circle_outline, size: 36, color: AppColors.primary),
-                                                SizedBox(height: 4),
-                                                Text('Video mới', style: TextStyle(fontSize: 11)),
-                                              ],
-                                            ),
-                                          )
-                                        : Image.file(
-                                            File(file.path),
-                                            width: 120,
-                                            height: 120,
-                                            fit: BoxFit.cover,
-                                          ),
-                                  ),
-                                  Positioned(
-                                    top: 4,
-                                    right: 4,
-                                    child: GestureDetector(
-                                      onTap: () => setState(() => _selectedMedias.removeAt(index)),
-                                      child: Container(
-                                        padding: const EdgeInsets.all(2),
-                                        decoration: const BoxDecoration(
-                                          color: Colors.black54,
-                                          shape: BoxShape.circle,
-                                        ),
-                                        child: const Icon(
-                                          Icons.close,
-                                          color: Colors.white,
-                                          size: 16,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _pickImage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt, size: 18),
-                        label: const Text('Chụp ảnh'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _pickMultiImages,
-                        icon: const Icon(Icons.photo_library, size: 18),
-                        label: const Text('Chọn nhiều ảnh'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _pickVideo,
-                        icon: const Icon(Icons.videocam_outlined, size: 18),
-                        label: const Text('Chọn video'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  const Text(
-                    'Cập nhật trạng thái',
-                    style: TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  const SizedBox(height: 8),
-                  DropdownButtonFormField<String>(
-                    initialValue: _nextStatus,
-                    items: statuses
-                        .map(
-                          (status) => DropdownMenuItem(
-                            value: status.key,
-                            child: Text(status.value),
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Cập nhật trạng thái',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          initialValue: _nextStatus,
+                          items: statuses
+                              .map(
+                                (status) => DropdownMenuItem(
+                                  value: status.key,
+                                  child: Text(status.value),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) =>
+                              setState(() => _nextStatus = value),
+                          decoration: const InputDecoration(
+                            hintText: 'Chọn trạng thái',
+                            border: OutlineInputBorder(),
                           ),
-                        )
-                        .toList(),
-                    onChanged: (value) => setState(() => _nextStatus = value),
-                    decoration: const InputDecoration(
-                      hintText: 'Chọn trạng thái',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: _noteController,
-                    maxLines: 2,
-                    decoration: const InputDecoration(
-                      labelText: 'Ghi chú',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 22),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _saving ? null : _save,
-                      child: _saving
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Text('Lưu thay đổi'),
-                    ),
-                  ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextField(
+                          controller: _noteController,
+                          maxLines: 2,
+                          decoration: const InputDecoration(
+                            labelText: 'Ghi chú',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                        const SizedBox(height: 22),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _saving ? null : _save,
+                            child: _saving
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Lưu thay đổi'),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2502,7 +2773,9 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     _deviceEntries.add(_DeviceFormEntry()); // Ít nhất 1 thiết bị
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        final canAssign = context.read<AuthProvider>().can(AppPermission.assignRepairOrders);
+        final canAssign = context.read<AuthProvider>().can(
+          AppPermission.assignRepairOrders,
+        );
         if (canAssign) {
           final backend = context.read<BackendDataProvider>();
           if (backend.employees.isEmpty) {
@@ -2557,16 +2830,27 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     try {
       final order = await backend.createRepairOrder(
         customerName: _customerNameController.text.trim(),
-        customerPhone: _customerPhoneController.text.replaceAll(RegExp(r'\D'), ''),
-        devices: _deviceEntries.map((e) => RepairDevice(
-          id: '',
-          deviceName: e.nameController.text.trim(),
-          serialNumber: e.serialController.text.trim().isEmpty ? null : e.serialController.text.trim(),
-          underWarranty: e.underWarranty,
-          warrantyExpiry: e.underWarranty ? e.warrantyExpiry : null,
-          description: e.descController.text.trim().isEmpty ? null : e.descController.text.trim(),
-          assignedToId: e.assignedToId,
-        )).toList(),
+        customerPhone: _customerPhoneController.text.replaceAll(
+          RegExp(r'\D'),
+          '',
+        ),
+        devices: _deviceEntries
+            .map(
+              (e) => RepairDevice(
+                id: '',
+                deviceName: e.nameController.text.trim(),
+                serialNumber: e.serialController.text.trim().isEmpty
+                    ? null
+                    : e.serialController.text.trim(),
+                underWarranty: e.underWarranty,
+                warrantyExpiry: e.underWarranty ? e.warrantyExpiry : null,
+                description: e.descController.text.trim().isEmpty
+                    ? null
+                    : e.descController.text.trim(),
+                assignedToId: e.assignedToId,
+              ),
+            )
+            .toList(),
       );
       for (final media in _selectedMedias) {
         await backend.uploadRepairMedia(
@@ -2617,13 +2901,16 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canAssign = context.watch<AuthProvider>().can(AppPermission.assignRepairOrders);
+    final canAssign = context.watch<AuthProvider>().can(
+      AppPermission.assignRepairOrders,
+    );
     final technicians = context
         .watch<BackendDataProvider>()
         .employees
         .where(
           (user) =>
-              (user.role == UserRole.employee || user.role == UserRole.technician) &&
+              (user.role == UserRole.employee ||
+                  user.role == UserRole.technician) &&
               user.status == UserStatus.active,
         )
         .toList();
@@ -2655,244 +2942,289 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                       children: [
                         Text(
                           'Tạo đơn sửa chữa mới',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  _buildTextField(
-                    context,
-                    controller: _customerNameController,
-                    label: 'Tên khách hàng',
-                    hint: 'Nhập tên khách hàng',
-                    icon: Icons.person_outline,
-                  ),
-                  const SizedBox(height: 16),
-                  _buildTextField(
-                    context,
-                    controller: _customerPhoneController,
-                    label: 'Số điện thoại',
-                    hint: '0901 234 567',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                    required: false,
-                  ),
-                  const SizedBox(height: 16),
-                  // ── Danh sách thiết bị ─────────────────────
-                  ...List.generate(_deviceEntries.length, (index) {
-                    final entry = _deviceEntries[index];
-                    return _DeviceFormCard(
-                      key: ValueKey(entry.id),
-                      index: index,
-                      entry: entry,
-                      isDark: isDark,
-                      canAssign: canAssign,
-                      technicians: technicians,
-                      canRemove: _deviceEntries.length > 1,
-                      onRemove: () => setState(() => _deviceEntries.removeAt(index)),
-                      onChanged: () => setState(() {}),
-                      orderCreatedAt: null,
-                    );
-                  }),
-                  if (canAssign) ...[
-                    const SizedBox(height: 16),
-                    Text(
-                      'Phân công người sửa (Có thể chọn nhiều)',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : AppColors.textPrimaryLight,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    InkWell(
-                      onTap: () async {
-                        final selected = await showDialog<Set<String>>(
-                          context: context,
-                          builder: (context) {
-                            return _TechnicianMultiSelectDialog(
-                              technicians: technicians,
-                              initialSelected: _technicianIds,
-                              isDark: isDark,
-                            );
-                          },
-                        );
-                        if (selected != null) {
-                          setState(() {
-                            _technicianIds.clear();
-                            _technicianIds.addAll(selected);
-                          });
-                        }
-                      },
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                        decoration: BoxDecoration(
-                          border: Border.all(color: isDark ? Colors.grey[700]! : Colors.grey[400]!),
-                          borderRadius: BorderRadius.circular(4),
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
                         ),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: _technicianIds.isEmpty
-                                  ? Text(
-                                      'Chọn nhân viên (không bắt buộc)',
-                                      style: TextStyle(
-                                        color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                      ),
-                                    )
-                                  : Wrap(
-                                      spacing: 6,
-                                      runSpacing: 6,
-                                      children: _technicianIds.map((id) {
-                                        final name = technicians.firstWhere((t) => t.id == id, orElse: () => User(id: id, name: 'Kỹ thuật viên', email: '', employeeId: '', role: UserRole.employee, status: UserStatus.active)).name;
-                                        return Chip(
-                                          label: Text(
-                                            name,
-                                            style: const TextStyle(fontSize: 12),
-                                          ),
-                                          padding: EdgeInsets.zero,
-                                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                          onDeleted: () {
-                                            setState(() {
-                                              _technicianIds.remove(id);
-                                            });
-                                          },
-                                        );
-                                      }).toList(),
-                                    ),
+                        const SizedBox(height: 24),
+                        _buildTextField(
+                          context,
+                          controller: _customerNameController,
+                          label: 'Tên khách hàng',
+                          hint: 'Nhập tên khách hàng',
+                          icon: Icons.person_outline,
+                        ),
+                        const SizedBox(height: 16),
+                        _buildTextField(
+                          context,
+                          controller: _customerPhoneController,
+                          label: 'Số điện thoại',
+                          hint: '0901 234 567',
+                          icon: Icons.phone_outlined,
+                          keyboardType: TextInputType.phone,
+                          required: false,
+                        ),
+                        const SizedBox(height: 16),
+                        // ── Danh sách thiết bị ─────────────────────
+                        ...List.generate(_deviceEntries.length, (index) {
+                          final entry = _deviceEntries[index];
+                          return _DeviceFormCard(
+                            key: ValueKey(entry.id),
+                            index: index,
+                            entry: entry,
+                            isDark: isDark,
+                            canAssign: canAssign,
+                            technicians: technicians,
+                            canRemove: _deviceEntries.length > 1,
+                            onRemove: () =>
+                                setState(() => _deviceEntries.removeAt(index)),
+                            onChanged: () => setState(() {}),
+                            orderCreatedAt: null,
+                          );
+                        }),
+                        if (canAssign) ...[
+                          const SizedBox(height: 16),
+                          Text(
+                            'Phân công người sửa (Có thể chọn nhiều)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
                             ),
-                            Icon(
-                              Icons.arrow_drop_down,
-                              color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          ),
+                          const SizedBox(height: 8),
+                          InkWell(
+                            onTap: () async {
+                              final selected = await showDialog<Set<String>>(
+                                context: context,
+                                builder: (context) {
+                                  return _TechnicianMultiSelectDialog(
+                                    technicians: technicians,
+                                    initialSelected: _technicianIds,
+                                    isDark: isDark,
+                                  );
+                                },
+                              );
+                              if (selected != null) {
+                                setState(() {
+                                  _technicianIds.clear();
+                                  _technicianIds.addAll(selected);
+                                });
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 14,
+                              ),
+                              decoration: BoxDecoration(
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.grey[700]!
+                                      : Colors.grey[400]!,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: _technicianIds.isEmpty
+                                        ? Text(
+                                            'Chọn nhân viên (không bắt buộc)',
+                                            style: TextStyle(
+                                              color: isDark
+                                                  ? Colors.grey[400]
+                                                  : Colors.grey[600],
+                                            ),
+                                          )
+                                        : Wrap(
+                                            spacing: 6,
+                                            runSpacing: 6,
+                                            children: _technicianIds.map((id) {
+                                              final name = technicians
+                                                  .firstWhere(
+                                                    (t) => t.id == id,
+                                                    orElse: () => User(
+                                                      id: id,
+                                                      name: 'Kỹ thuật viên',
+                                                      email: '',
+                                                      employeeId: '',
+                                                      role: UserRole.employee,
+                                                      status: UserStatus.active,
+                                                    ),
+                                                  )
+                                                  .name;
+                                              return Chip(
+                                                label: Text(
+                                                  name,
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                                padding: EdgeInsets.zero,
+                                                materialTapTargetSize:
+                                                    MaterialTapTargetSize
+                                                        .shrinkWrap,
+                                                onDeleted: () {
+                                                  setState(() {
+                                                    _technicianIds.remove(id);
+                                                  });
+                                                },
+                                              );
+                                            }).toList(),
+                                          ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_drop_down,
+                                    color: isDark
+                                        ? Colors.grey[400]
+                                        : Colors.grey[600],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 16),
+
+                        Text(
+                          'Đính kèm hình ảnh hoặc video',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (_selectedMedias.isNotEmpty) ...[
+                          SizedBox(
+                            height: 120,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: _selectedMedias.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(width: 8),
+                              itemBuilder: (context, index) {
+                                final file = _selectedMedias[index];
+                                final isVideo = _isVideo(file.path);
+                                return Stack(
+                                  children: [
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: isVideo
+                                          ? Container(
+                                              width: 120,
+                                              height: 120,
+                                              color: AppColors.infoLight
+                                                  .withValues(alpha: 0.2),
+                                              child: const Column(
+                                                mainAxisAlignment:
+                                                    MainAxisAlignment.center,
+                                                children: [
+                                                  Icon(
+                                                    Icons.play_circle_outline,
+                                                    size: 36,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                  SizedBox(height: 4),
+                                                  Text(
+                                                    'Video',
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : Image.file(
+                                              File(file.path),
+                                              width: 120,
+                                              height: 120,
+                                              fit: BoxFit.cover,
+                                            ),
+                                    ),
+                                    Positioned(
+                                      top: 4,
+                                      right: 4,
+                                      child: GestureDetector(
+                                        onTap: () => setState(
+                                          () => _selectedMedias.removeAt(index),
+                                        ),
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(
+                                            color: Colors.black54,
+                                            shape: BoxShape.circle,
+                                          ),
+                                          child: const Icon(
+                                            Icons.close,
+                                            color: Colors.white,
+                                            size: 16,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            OutlinedButton.icon(
+                              onPressed: () => _pickImage(ImageSource.camera),
+                              icon: const Icon(Icons.camera_alt, size: 18),
+                              label: const Text('Chụp ảnh'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _pickMultiImages,
+                              icon: const Icon(Icons.photo_library, size: 18),
+                              label: const Text('Chọn nhiều ảnh'),
+                            ),
+                            OutlinedButton.icon(
+                              onPressed: _pickVideo,
+                              icon: const Icon(
+                                Icons.videocam_outlined,
+                                size: 18,
+                              ),
+                              label: const Text('Chọn video'),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 16),
-
-                  Text(
-                    'Đính kèm hình ảnh hoặc video',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : AppColors.textPrimaryLight,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  if (_selectedMedias.isNotEmpty) ...[
-                    SizedBox(
-                      height: 120,
-                      child: ListView.separated(
-                        scrollDirection: Axis.horizontal,
-                        itemCount: _selectedMedias.length,
-                        separatorBuilder: (context, index) => const SizedBox(width: 8),
-                        itemBuilder: (context, index) {
-                          final file = _selectedMedias[index];
-                          final isVideo = _isVideo(file.path);
-                          return Stack(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(8),
-                                child: isVideo
-                                    ? Container(
-                                        width: 120,
-                                        height: 120,
-                                        color: AppColors.infoLight.withOpacity(0.2),
-                                        child: const Column(
-                                          mainAxisAlignment: MainAxisAlignment.center,
-                                          children: [
-                                            Icon(Icons.play_circle_outline, size: 36, color: AppColors.primary),
-                                            SizedBox(height: 4),
-                                            Text('Video', style: TextStyle(fontSize: 12)),
-                                          ],
-                                        ),
-                                      )
-                                    : Image.file(
-                                        File(file.path),
-                                        width: 120,
-                                        height: 120,
-                                        fit: BoxFit.cover,
+                        const SizedBox(height: 32),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _createOrder,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    height: 20,
+                                    width: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white,
                                       ),
-                              ),
-                              Positioned(
-                                top: 4,
-                                right: 4,
-                                child: GestureDetector(
-                                  onTap: () => setState(() => _selectedMedias.removeAt(index)),
-                                  child: Container(
-                                    padding: const EdgeInsets.all(2),
-                                    decoration: const BoxDecoration(
-                                      color: Colors.black54,
-                                      shape: BoxShape.circle,
                                     ),
-                                    child: const Icon(
-                                      Icons.close,
-                                      color: Colors.white,
-                                      size: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      OutlinedButton.icon(
-                        onPressed: () => _pickImage(ImageSource.camera),
-                        icon: const Icon(Icons.camera_alt, size: 18),
-                        label: const Text('Chụp ảnh'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _pickMultiImages,
-                        icon: const Icon(Icons.photo_library, size: 18),
-                        label: const Text('Chọn nhiều ảnh'),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: _pickVideo,
-                        icon: const Icon(Icons.videocam_outlined, size: 18),
-                        label: const Text('Chọn video'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _isLoading ? null : _createOrder,
-                      style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: _isLoading
-                          ? const SizedBox(
-                              height: 20,
-                              width: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(
-                                  Colors.white,
-                                ),
-                              ),
-                            )
-                          : const Text('Tạo đơn hàng'),
-                    ),
-                  ),
+                                  )
+                                : const Text('Tạo đơn hàng'),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -2998,10 +3330,12 @@ class _TechnicianMultiSelectDialog extends StatefulWidget {
   });
 
   @override
-  State<_TechnicianMultiSelectDialog> createState() => _TechnicianMultiSelectDialogState();
+  State<_TechnicianMultiSelectDialog> createState() =>
+      _TechnicianMultiSelectDialogState();
 }
 
-class _TechnicianMultiSelectDialogState extends State<_TechnicianMultiSelectDialog> {
+class _TechnicianMultiSelectDialogState
+    extends State<_TechnicianMultiSelectDialog> {
   final Set<String> _selected = <String>{};
 
   @override
@@ -3018,12 +3352,21 @@ class _TechnicianMultiSelectDialogState extends State<_TechnicianMultiSelectDial
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: widget.technicians.isEmpty
-              ? [const Padding(padding: EdgeInsets.all(16), child: Text('Không có kỹ thuật viên khả dụng.'))]
+              ? [
+                  const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Text('Không có kỹ thuật viên khả dụng.'),
+                  ),
+                ]
               : widget.technicians.map((tech) {
                   final isChecked = _selected.contains(tech.id);
                   return CheckboxListTile(
                     title: Text(tech.name),
-                    subtitle: Text(tech.employeeId.isNotEmpty ? tech.employeeId : tech.role.label),
+                    subtitle: Text(
+                      tech.employeeId.isNotEmpty
+                          ? tech.employeeId
+                          : tech.role.label,
+                    ),
                     value: isChecked,
                     onChanged: (bool? checked) {
                       setState(() {
@@ -3110,14 +3453,14 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
   DateTime _calculateExpiry(DateTime startDate, int months) {
     int targetYear = startDate.year;
     int targetMonth = startDate.month + months;
-    
+
     final tempDate = DateTime(targetYear, targetMonth);
     final actualYear = tempDate.year;
     final actualMonth = tempDate.month;
-    
+
     final lastDay = DateTime(actualYear, actualMonth + 1, 0).day;
     final day = startDate.day > lastDay ? lastDay : startDate.day;
-    
+
     return DateTime(actualYear, actualMonth, day);
   }
 
@@ -3125,8 +3468,8 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
     if (expiry == null) return false;
     final expected = _calculateExpiry(startDate, months);
     return expiry.year == expected.year &&
-           expiry.month == expected.month &&
-           expiry.day == expected.day;
+        expiry.month == expected.month &&
+        expiry.day == expected.day;
   }
 
   @override
@@ -3137,276 +3480,350 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-            // Tên thiết bị
-            TextFormField(
-              controller: entry.nameController,
-              decoration: InputDecoration(
-                labelText: 'Tên thiết bị *',
-                hintText: 'Biến tần Yaskawa, Delta...',
-                prefixIcon: const Icon(Icons.devices_outlined, size: 20),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 14),
-              ),
-              validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
-              onChanged: (_) => widget.onChanged(),
+        // Tên thiết bị
+        TextFormField(
+          controller: entry.nameController,
+          decoration: InputDecoration(
+            labelText: 'Tên thiết bị *',
+            hintText: 'Biến tần Yaskawa, Delta...',
+            prefixIcon: const Icon(Icons.devices_outlined, size: 20),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 14,
             ),
-            const SizedBox(height: 12),
-            // Số seri
-            TextFormField(
-              controller: entry.serialController,
-              decoration: InputDecoration(
-                labelText: 'Số seri',
-                hintText: 'Nhập số seri (nếu có)',
-                prefixIcon: const Icon(Icons.tag, size: 20),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 14),
-              ),
-              onChanged: (_) => widget.onChanged(),
+          ),
+          validator: (v) => (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
+          onChanged: (_) => widget.onChanged(),
+        ),
+        const SizedBox(height: 12),
+        // Số seri
+        TextFormField(
+          controller: entry.serialController,
+          decoration: InputDecoration(
+            labelText: 'Số seri',
+            hintText: 'Nhập số seri (nếu có)',
+            prefixIcon: const Icon(Icons.tag, size: 20),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 14,
             ),
-            const SizedBox(height: 12),
-            // Bảo hành switch
-            SwitchListTile(
-              title: const Text('Bảo hành', style: TextStyle(fontSize: 14)),
-              subtitle: Text(
-                entry.underWarranty ? 'Có bảo hành' : 'Không bảo hành',
-                style: const TextStyle(fontSize: 12),
-              ),
-              value: entry.underWarranty,
-              onChanged: (v) {
+          ),
+          onChanged: (_) => widget.onChanged(),
+        ),
+        const SizedBox(height: 12),
+        // Bảo hành switch
+        SwitchListTile(
+          title: const Text('Bảo hành', style: TextStyle(fontSize: 14)),
+          subtitle: Text(
+            entry.underWarranty ? 'Có bảo hành' : 'Không bảo hành',
+            style: const TextStyle(fontSize: 12),
+          ),
+          value: entry.underWarranty,
+          onChanged: (v) {
+            setState(() {
+              entry.underWarranty = v;
+              if (!v) {
+                entry.warrantyExpiry = null;
+              }
+            });
+            widget.onChanged();
+          },
+          activeThumbColor: AppColors.primary,
+          contentPadding: EdgeInsets.zero,
+        ),
+        if (entry.underWarranty) ...[
+          const SizedBox(height: 8),
+          // Chọn ngày bắt đầu bảo hành
+          InkWell(
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate:
+                    entry.warrantyStartDate ??
+                    widget.orderCreatedAt ??
+                    DateTime.now(),
+                firstDate: DateTime(2000),
+                lastDate: DateTime(2100),
+                builder: (context, child) {
+                  return Theme(
+                    data: isDark ? ThemeData.dark() : ThemeData.light(),
+                    child: child!,
+                  );
+                },
+              );
+              if (picked != null) {
                 setState(() {
-                  entry.underWarranty = v;
-                  if (!v) {
-                    entry.warrantyExpiry = null;
-                  }
+                  entry.warrantyStartDate = picked;
                 });
                 widget.onChanged();
-              },
-              activeColor: AppColors.primary,
-              contentPadding: EdgeInsets.zero,
-            ),
-            if (entry.underWarranty) ...[
-              const SizedBox(height: 8),
-              // Chọn ngày bắt đầu bảo hành
-              InkWell(
-                onTap: () async {
-                  final picked = await showDatePicker(
-                    context: context,
-                    initialDate: entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(),
-                    firstDate: DateTime(2000),
-                    lastDate: DateTime(2100),
-                    builder: (context, child) {
-                      return Theme(
-                        data: isDark ? ThemeData.dark() : ThemeData.light(),
-                        child: child!,
-                      );
-                    },
-                  );
-                  if (picked != null) {
-                    setState(() {
-                      entry.warrantyStartDate = picked;
-                    });
-                    widget.onChanged();
-                  }
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(10),
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_month, size: 20, color: AppColors.primary),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          entry.warrantyStartDate != null
-                              ? 'Ngày bảo hành: ${DateFormat('dd/MM/yyyy').format(entry.warrantyStartDate!)}'
-                              : 'Ngày bảo hành: Ngày tạo đơn (${DateFormat('dd/MM/yyyy').format(widget.orderCreatedAt ?? DateTime.now())})',
-                          style: TextStyle(
-                            color: isDark ? Colors.white : Colors.black87,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                      if (entry.warrantyStartDate != null)
-                        GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              entry.warrantyStartDate = null;
-                            });
-                            widget.onChanged();
-                          },
-                          child: const Icon(Icons.clear, size: 18, color: Colors.grey),
-                        ),
-                    ],
-                  ),
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
                 ),
+                borderRadius: BorderRadius.circular(10),
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
               ),
-              const SizedBox(height: 12),
-              // Nút chọn hạn
-              Row(
+              child: Row(
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.av_timer, size: 16),
-                      label: const Text('Hạn 6 tháng', style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        side: BorderSide(
-                          color: _isMatchingShortcut(entry.warrantyExpiry, entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 6)
-                              ? AppColors.primary
-                              : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                        ),
-                        foregroundColor: _isMatchingShortcut(entry.warrantyExpiry, entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 6)
-                            ? AppColors.primary
-                            : (isDark ? Colors.white70 : Colors.black87),
-                        backgroundColor: _isMatchingShortcut(entry.warrantyExpiry, entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 6)
-                            ? AppColors.primary.withValues(alpha: 0.1)
-                            : Colors.transparent,
-                      ),
-                      onPressed: () {
-                        setState(() {
-                          entry.warrantyExpiry = _calculateExpiry(entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 6);
-                        });
-                        widget.onChanged();
-                      },
-                    ),
+                  const Icon(
+                    Icons.calendar_month,
+                    size: 20,
+                    color: AppColors.primary,
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.history, size: 16),
-                      label: const Text('Hạn 12 tháng', style: TextStyle(fontSize: 12)),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        side: BorderSide(
-                          color: _isMatchingShortcut(entry.warrantyExpiry, entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 12)
-                              ? AppColors.primary
-                              : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
-                        ),
-                        foregroundColor: _isMatchingShortcut(entry.warrantyExpiry, entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 12)
-                            ? AppColors.primary
-                            : (isDark ? Colors.white70 : Colors.black87),
-                        backgroundColor: _isMatchingShortcut(entry.warrantyExpiry, entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 12)
-                            ? AppColors.primary.withValues(alpha: 0.1)
-                            : Colors.transparent,
+                    child: Text(
+                      entry.warrantyStartDate != null
+                          ? 'Ngày bảo hành: ${DateFormat('dd/MM/yyyy').format(entry.warrantyStartDate!)}'
+                          : 'Ngày bảo hành: Ngày tạo đơn (${DateFormat('dd/MM/yyyy').format(widget.orderCreatedAt ?? DateTime.now())})',
+                      style: TextStyle(
+                        color: isDark ? Colors.white : Colors.black87,
+                        fontSize: 14,
                       ),
-                      onPressed: () {
+                    ),
+                  ),
+                  if (entry.warrantyStartDate != null)
+                    GestureDetector(
+                      onTap: () {
                         setState(() {
-                          entry.warrantyExpiry = _calculateExpiry(entry.warrantyStartDate ?? widget.orderCreatedAt ?? DateTime.now(), 12);
+                          entry.warrantyStartDate = null;
                         });
                         widget.onChanged();
                       },
+                      child: const Icon(
+                        Icons.clear,
+                        size: 18,
+                        color: Colors.grey,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Nút chọn hạn
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.av_timer, size: 16),
+                  label: const Text(
+                    'Hạn 6 tháng',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    side: BorderSide(
+                      color:
+                          _isMatchingShortcut(
+                            entry.warrantyExpiry,
+                            entry.warrantyStartDate ??
+                                widget.orderCreatedAt ??
+                                DateTime.now(),
+                            6,
+                          )
+                          ? AppColors.primary
+                          : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    ),
+                    foregroundColor:
+                        _isMatchingShortcut(
+                          entry.warrantyExpiry,
+                          entry.warrantyStartDate ??
+                              widget.orderCreatedAt ??
+                              DateTime.now(),
+                          6,
+                        )
+                        ? AppColors.primary
+                        : (isDark ? Colors.white70 : Colors.black87),
+                    backgroundColor:
+                        _isMatchingShortcut(
+                          entry.warrantyExpiry,
+                          entry.warrantyStartDate ??
+                              widget.orderCreatedAt ??
+                              DateTime.now(),
+                          6,
+                        )
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      entry.warrantyExpiry = _calculateExpiry(
+                        entry.warrantyStartDate ??
+                            widget.orderCreatedAt ??
+                            DateTime.now(),
+                        6,
+                      );
+                    });
+                    widget.onChanged();
+                  },
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.history, size: 16),
+                  label: const Text(
+                    'Hạn 12 tháng',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    side: BorderSide(
+                      color:
+                          _isMatchingShortcut(
+                            entry.warrantyExpiry,
+                            entry.warrantyStartDate ??
+                                widget.orderCreatedAt ??
+                                DateTime.now(),
+                            12,
+                          )
+                          ? AppColors.primary
+                          : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                    ),
+                    foregroundColor:
+                        _isMatchingShortcut(
+                          entry.warrantyExpiry,
+                          entry.warrantyStartDate ??
+                              widget.orderCreatedAt ??
+                              DateTime.now(),
+                          12,
+                        )
+                        ? AppColors.primary
+                        : (isDark ? Colors.white70 : Colors.black87),
+                    backgroundColor:
+                        _isMatchingShortcut(
+                          entry.warrantyExpiry,
+                          entry.warrantyStartDate ??
+                              widget.orderCreatedAt ??
+                              DateTime.now(),
+                          12,
+                        )
+                        ? AppColors.primary.withValues(alpha: 0.1)
+                        : Colors.transparent,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      entry.warrantyExpiry = _calculateExpiry(
+                        entry.warrantyStartDate ??
+                            widget.orderCreatedAt ??
+                            DateTime.now(),
+                        12,
+                      );
+                    });
+                    widget.onChanged();
+                  },
+                ),
+              ),
+            ],
+          ),
+          if (entry.warrantyExpiry != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                border: Border.all(
+                  color: !_isWarrantyValid(entry.warrantyExpiry)
+                      ? AppColors.error
+                      : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                ),
+                borderRadius: BorderRadius.circular(10),
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 20,
+                    color: !_isWarrantyValid(entry.warrantyExpiry)
+                        ? AppColors.error
+                        : AppColors.primary,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Text(
+                          'Hạn bảo hành: ${DateFormat('dd/MM/yyyy').format(entry.warrantyExpiry!)}',
+                          style: TextStyle(
+                            color: !_isWarrantyValid(entry.warrantyExpiry)
+                                ? AppColors.error
+                                : (isDark ? Colors.white : Colors.black87),
+                            fontSize: 14,
+                            fontWeight: !_isWarrantyValid(entry.warrantyExpiry)
+                                ? FontWeight.w600
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        if (!_isWarrantyValid(entry.warrantyExpiry)) ...[
+                          const SizedBox(width: 6),
+                          const Text(
+                            '(Hết hạn)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: AppColors.error,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        entry.warrantyExpiry = null;
+                      });
+                      widget.onChanged();
+                    },
+                    child: const Icon(
+                      Icons.clear,
+                      size: 18,
+                      color: Colors.grey,
                     ),
                   ),
                 ],
               ),
-              if (entry.warrantyExpiry != null) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: !_isWarrantyValid(entry.warrantyExpiry)
-                            ? AppColors.error
-                            : (isDark ? Colors.grey[700]! : Colors.grey[300]!)),
-                    borderRadius: BorderRadius.circular(10),
-                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.calendar_today,
-                        size: 20,
-                        color: !_isWarrantyValid(entry.warrantyExpiry)
-                            ? AppColors.error
-                            : AppColors.primary,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Row(
-                          children: [
-                            Text(
-                              'Hạn bảo hành: ${DateFormat('dd/MM/yyyy').format(entry.warrantyExpiry!)}',
-                              style: TextStyle(
-                                color: !_isWarrantyValid(entry.warrantyExpiry)
-                                    ? AppColors.error
-                                    : (isDark ? Colors.white : Colors.black87),
-                                fontSize: 14,
-                                fontWeight: !_isWarrantyValid(entry.warrantyExpiry)
-                                    ? FontWeight.w600
-                                    : FontWeight.normal,
-                              ),
-                            ),
-                            if (!_isWarrantyValid(entry.warrantyExpiry)) ...[
-                              const SizedBox(width: 6),
-                              const Text(
-                                '(Hết hạn)',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.error,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () {
-                          setState(() {
-                            entry.warrantyExpiry = null;
-                          });
-                          widget.onChanged();
-                        },
-                        child: const Icon(Icons.clear, size: 18, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-              const SizedBox(height: 12),
-            ] else
-              const SizedBox(height: 8),
-            // Tình trạng lỗi
-            TextFormField(
-              controller: entry.descController,
-              maxLines: 2,
-              decoration: InputDecoration(
-                labelText: 'Tình trạng lỗi',
-                hintText: 'Mô tả lỗi thiết bị',
-                prefixIcon: const Icon(Icons.error_outline, size: 20),
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(10)),
-                filled: true,
-                fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 14),
-              ),
-              onChanged: (_) => widget.onChanged(),
             ),
           ],
-        );
-      }
-    }
-
-
+          const SizedBox(height: 12),
+        ] else
+          const SizedBox(height: 8),
+        // Tình trạng lỗi
+        TextFormField(
+          controller: entry.descController,
+          maxLines: 2,
+          decoration: InputDecoration(
+            labelText: 'Tình trạng lỗi',
+            hintText: 'Mô tả lỗi thiết bị',
+            prefixIcon: const Icon(Icons.error_outline, size: 20),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 14,
+            ),
+          ),
+          onChanged: (_) => widget.onChanged(),
+        ),
+      ],
+    );
+  }
+}

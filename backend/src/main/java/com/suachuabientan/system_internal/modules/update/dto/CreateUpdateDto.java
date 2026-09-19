@@ -18,5 +18,8 @@ public record CreateUpdateDto(
     Boolean mandatory,
 
     @Size(max = 20, message = "Trạng thái không vượt quá 20 ký tự")
-    String status
+    String status,
+
+    @Size(max = 20, message = "Nền tảng không vượt quá 20 ký tự")
+    String platform
 ) {}

@@ -166,7 +166,7 @@ class FaceAiHandler(BaseHTTPRequestHandler):
                         "status": "UP",
                         "modelLoaded": True,
                         "faceModelLoaded": True,
-                        "miniFasNetLoaded": True,
+                        "miniFasNetLoaded": False,
                         "embeddingDimension": 512,
                         "implementation": "insightface-onnxruntime",
                         "modelName": MODEL_NAME,
@@ -206,14 +206,12 @@ class FaceAiHandler(BaseHTTPRequestHandler):
 
             if self.path == "/api/v1/faces/liveness":
                 _decode_image(request)
+                # Face embeddings cannot establish liveness; no anti-spoof model is loaded.
                 _json_response(
                     self,
-                    200,
+                    503,
                     {
-                        "live": True,
-                        "isLive": True,
-                        "score": 1.0,
-                        "implementation": "insightface-liveness-placeholder",
+                        "error": "Liveness detection is unavailable: no anti-spoof model is loaded",
                     },
                 )
                 return

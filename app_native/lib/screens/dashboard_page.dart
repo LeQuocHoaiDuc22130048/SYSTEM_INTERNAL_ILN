@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -31,9 +30,9 @@ class _DashboardPageState extends State<DashboardPage> {
       final auth = context.read<AuthProvider>();
       if (!auth.isManagerOrAbove) {
         context.read<BackendDataProvider>().loadMyAttendance(
-              employeeId: auth.currentUser?.id,
-              notify: true,
-            );
+          employeeId: auth.currentUser?.id,
+          notify: true,
+        );
       }
     });
   }
@@ -53,8 +52,8 @@ class _DashboardPageState extends State<DashboardPage> {
           onRefresh: () async {
             final auth = Provider.of<AuthProvider>(context, listen: false);
             await context.read<BackendDataProvider>().loadAll(
-                  isManagerOrAbove: auth.isManagerOrAbove,
-                );
+              isManagerOrAbove: auth.isManagerOrAbove,
+            );
           },
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
@@ -83,11 +82,11 @@ class _DashboardPageState extends State<DashboardPage> {
                                 physics: const NeverScrollableScrollPhysics(),
                                 gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
-                                  crossAxisCount: wide ? 4 : 2,
-                                  mainAxisSpacing: wide ? 20 : 10,
-                                  crossAxisSpacing: wide ? 12 : 10,
-                                  mainAxisExtent: wide ? 112 : 98,
-                                ),
+                                      crossAxisCount: wide ? 4 : 2,
+                                      mainAxisSpacing: wide ? 20 : 10,
+                                      crossAxisSpacing: wide ? 12 : 10,
+                                      mainAxisExtent: wide ? 112 : 98,
+                                    ),
                                 itemBuilder: (context, index) {
                                   final stat = stats[index];
                                   return _DashboardStatCard(
@@ -105,7 +104,10 @@ class _DashboardPageState extends State<DashboardPage> {
                           const SizedBox(height: 20),
                           _TodayAttendanceCard(isDark: isDark),
                           const SizedBox(height: 20),
-                          _RecentOrdersCard(isDark: isDark, onNavigateToTab: widget.onNavigateToTab),
+                          _RecentOrdersCard(
+                            isDark: isDark,
+                            onNavigateToTab: widget.onNavigateToTab,
+                          ),
                         ],
                       ),
               ),
@@ -124,8 +126,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final workDaysDisplay = summary != null
         ? (summary.workDays % 1 == 0
-            ? summary.workDays.toInt().toString()
-            : summary.workDays.toString())
+              ? summary.workDays.toInt().toString()
+              : summary.workDays.toString())
         : '0';
 
     return Column(
@@ -191,7 +193,10 @@ class _DashboardPageState extends State<DashboardPage> {
           onNavigateToTab: widget.onNavigateToTab,
         ),
         const SizedBox(height: 20),
-        _RecentOrdersCard(isDark: isDark, onNavigateToTab: widget.onNavigateToTab),
+        _RecentOrdersCard(
+          isDark: isDark,
+          onNavigateToTab: widget.onNavigateToTab,
+        ),
       ],
     );
   }
@@ -243,7 +248,9 @@ class _DashboardHeader extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.successLight.withValues(alpha: 0.65),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+              border: Border.all(
+                color: AppColors.success.withValues(alpha: 0.3),
+              ),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -296,8 +303,7 @@ class _DashboardStat {
     required this.color,
     required this.background,
     this.helper,
-    this.trend,
-  });
+  }) : trend = null;
 }
 
 List<_DashboardStat> _buildDashboardStats(BuildContext context) {
@@ -334,7 +340,8 @@ List<_DashboardStat> _buildDashboardStats(BuildContext context) {
     ),
     _DashboardStat(
       label: 'Bo mạch sẵn sàng',
-      value: '${boards.where((b) => b.status == BoardStatus.available).length}/${boards.length}',
+      value:
+          '${boards.where((b) => b.status == BoardStatus.available).length}/${boards.length}',
       icon: LucideIcons.microchip,
       color: AppColors.purple,
       background: AppColors.purpleLight,
@@ -605,8 +612,11 @@ class _WeeklyOrdersChart extends StatelessWidget {
   List<_WeeklyOrderStat> _buildWeeklyOrderStats(List<RepairOrder> orders) {
     final now = DateTime.now();
     return List.generate(7, (index) {
-      final day = DateTime(now.year, now.month, now.day)
-          .subtract(Duration(days: 6 - index));
+      final day = DateTime(
+        now.year,
+        now.month,
+        now.day,
+      ).subtract(Duration(days: 6 - index));
       final dayOrders = orders.where((order) {
         final created = order.createdAt;
         return created.year == day.year &&
@@ -675,21 +685,9 @@ class _StatusRatioCard extends StatelessWidget {
                       startDegreeOffset: -80,
                       sections: [
                         _pie(stats.pending, AppColors.chartPending, wide),
-                        _pie(
-                          stats.inProgress,
-                          AppColors.chartInProgress,
-                          wide,
-                        ),
-                        _pie(
-                          stats.completed,
-                          AppColors.chartCompleted,
-                          wide,
-                        ),
-                        _pie(
-                          stats.delivered,
-                          AppColors.chartDelivered,
-                          wide,
-                        ),
+                        _pie(stats.inProgress, AppColors.chartInProgress, wide),
+                        _pie(stats.completed, AppColors.chartCompleted, wide),
+                        _pie(stats.delivered, AppColors.chartDelivered, wide),
                       ],
                     ),
                   ),
@@ -852,13 +850,18 @@ class _StatusStats {
 
   factory _StatusStats.fromOrders(List<RepairOrder> orders) {
     return _StatusStats(
-      pending: orders.where((o) => o.status == RepairOrderStatus.pending).length,
-      inProgress:
-          orders.where((o) => o.status == RepairOrderStatus.inProgress).length,
-      completed:
-          orders.where((o) => o.status == RepairOrderStatus.completed).length,
-      delivered:
-          orders.where((o) => o.status == RepairOrderStatus.delivered).length,
+      pending: orders
+          .where((o) => o.status == RepairOrderStatus.pending)
+          .length,
+      inProgress: orders
+          .where((o) => o.status == RepairOrderStatus.inProgress)
+          .length,
+      completed: orders
+          .where((o) => o.status == RepairOrderStatus.completed)
+          .length,
+      delivered: orders
+          .where((o) => o.status == RepairOrderStatus.delivered)
+          .length,
     );
   }
 }
@@ -942,14 +945,14 @@ class _PersonalAttendanceCard extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
 
   const _PersonalAttendanceCard({
-    super.key,
     required this.isDark,
     required this.wide,
     this.onNavigateToTab,
   });
 
   @override
-  State<_PersonalAttendanceCard> createState() => _PersonalAttendanceCardState();
+  State<_PersonalAttendanceCard> createState() =>
+      _PersonalAttendanceCardState();
 }
 
 class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
@@ -980,10 +983,10 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
     });
     final auth = context.read<AuthProvider>();
     context.read<BackendDataProvider>().loadMyAttendance(
-          employeeId: auth.currentUser?.id,
-          year: _selectedYear,
-          month: _selectedMonth,
-        );
+      employeeId: auth.currentUser?.id,
+      year: _selectedYear,
+      month: _selectedMonth,
+    );
   }
 
   @override
@@ -998,7 +1001,8 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
     final allDays = history?.days ?? [];
     final relevantDays = allDays
         .where(
-            (d) => (!isCurrentMonth || d.day <= now.day) && d.status != 'FUTURE')
+          (d) => (!isCurrentMonth || d.day <= now.day) && d.status != 'FUTURE',
+        )
         .toList();
     final displayDays = relevantDays.reversed.toList();
 
@@ -1029,8 +1033,10 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _SectionTitle('Lịch làm việc trong tháng',
-                          isDark: widget.isDark),
+                      _SectionTitle(
+                        'Lịch làm việc trong tháng',
+                        isDark: widget.isDark,
+                      ),
                       const SizedBox(height: 3),
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -1059,8 +1065,8 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                                 color: isCurrentMonth
                                     ? AppColors.primary
                                     : (widget.isDark
-                                        ? AppColors.textPrimaryDark
-                                        : AppColors.textPrimaryLight),
+                                          ? AppColors.textPrimaryDark
+                                          : AppColors.textPrimaryLight),
                               ),
                             ),
                           ),
@@ -1096,7 +1102,9 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                     label: const Text('Xem tất cả'),
                     style: TextButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 8, vertical: 4),
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       visualDensity: VisualDensity.compact,
                     ),
                   ),
@@ -1106,12 +1114,13 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
           if (summary != null) ...[
             Divider(
               height: 1,
-              color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+              color: widget.isDark
+                  ? AppColors.borderDark
+                  : AppColors.borderLight,
             ),
             Padding(
               padding: const EdgeInsets.all(14),
-              child: _buildSummaryChips(
-                  summary, widget.isDark),
+              child: _buildSummaryChips(summary, widget.isDark),
             ),
           ],
           Divider(
@@ -1165,8 +1174,7 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                     dayLog: dayLog,
                     isDark: widget.isDark,
                     isToday: isToday,
-                    onTap: () => _showDayDetail(
-                        context, dayLog, widget.isDark),
+                    onTap: () => _showDayDetail(context, dayLog, widget.isDark),
                   );
                 }),
                 if (displayDays.length > 7)
@@ -1174,8 +1182,7 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     child: Center(
                       child: TextButton(
-                        onPressed: () =>
-                            _showAllHistoryModal(
+                        onPressed: () => _showAllHistoryModal(
                           context,
                           history,
                           widget.isDark,
@@ -1331,7 +1338,9 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                     ),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: badgeStyle.bg,
                         borderRadius: BorderRadius.circular(8),
@@ -1351,7 +1360,9 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                 const SizedBox(height: 16),
                 Container(
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 14, vertical: 12),
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: isDark
                         ? const Color(0xFF1E293B)
@@ -1477,8 +1488,11 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                     ),
                     child: Row(
                       children: [
-                        const Icon(LucideIcons.info,
-                            size: 16, color: AppColors.primary),
+                        const Icon(
+                          LucideIcons.info,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
@@ -1529,7 +1543,9 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                     return Container(
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 14, vertical: 10),
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: isDark
                             ? const Color(0xFF1E293B)
@@ -1575,7 +1591,9 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
                           const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 2),
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: isDark
                                   ? const Color(0xFF334155)
@@ -1742,15 +1760,15 @@ class _DailyHistoryRow extends StatelessWidget {
                 color: isToday
                     ? AppColors.primary.withValues(alpha: 0.12)
                     : (isDark
-                        ? const Color(0xFF1E293B)
-                        : const Color(0xFFF1F5F9)),
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9)),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: isToday
                       ? AppColors.primary
                       : (isDark
-                          ? const Color(0xFF334155)
-                          : const Color(0xFFE2E8F0)),
+                            ? const Color(0xFF334155)
+                            : const Color(0xFFE2E8F0)),
                   width: isToday ? 1.5 : 1.0,
                 ),
               ),
@@ -1764,8 +1782,8 @@ class _DailyHistoryRow extends StatelessWidget {
                       color: isToday
                           ? AppColors.primary
                           : (isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight),
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight),
                     ),
                   ),
                   Text(
@@ -1776,8 +1794,8 @@ class _DailyHistoryRow extends StatelessWidget {
                       color: isToday
                           ? AppColors.primary
                           : (isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight),
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight),
                     ),
                   ),
                 ],
@@ -1791,8 +1809,11 @@ class _DailyHistoryRow extends StatelessWidget {
                   Row(
                     children: [
                       if (dayLog.hasCheckIn) ...[
-                        const Icon(LucideIcons.arrowDownRight,
-                            size: 13, color: Color(0xFF10B981)),
+                        const Icon(
+                          LucideIcons.arrowDownRight,
+                          size: 13,
+                          color: Color(0xFF10B981),
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           dayLog.checkIn!,
@@ -1805,8 +1826,11 @@ class _DailyHistoryRow extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        const Icon(LucideIcons.arrowUpRight,
-                            size: 13, color: Color(0xFF3B82F6)),
+                        const Icon(
+                          LucideIcons.arrowUpRight,
+                          size: 13,
+                          color: Color(0xFF3B82F6),
+                        ),
                         const SizedBox(width: 3),
                         Text(
                           dayLog.checkOut ?? '--:--',
@@ -1823,8 +1847,8 @@ class _DailyHistoryRow extends StatelessWidget {
                           dayLog.status == 'HOLIDAY'
                               ? 'Nghỉ cuối tuần / Lễ'
                               : (dayLog.status == 'LEAVE'
-                                  ? 'Nghỉ phép'
-                                  : 'Chưa có bản ghi'),
+                                    ? 'Nghỉ phép'
+                                    : 'Chưa có bản ghi'),
                           style: TextStyle(
                             fontSize: 13,
                             fontStyle: FontStyle.italic,
@@ -1854,9 +1878,14 @@ class _DailyHistoryRow extends StatelessWidget {
                       if (dayLog.overtimeHours > 0) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 5,
+                            vertical: 1,
+                          ),
                           decoration: BoxDecoration(
-                            color: const Color(0xFF8B5CF6).withValues(alpha: 0.15),
+                            color: const Color(
+                              0xFF8B5CF6,
+                            ).withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -1930,11 +1959,7 @@ class _BadgeStyle {
   final Color fg;
   final Color border;
 
-  const _BadgeStyle({
-    required this.bg,
-    required this.fg,
-    required this.border,
-  });
+  const _BadgeStyle({required this.bg, required this.fg, required this.border});
 }
 
 _BadgeStyle _getStatusBadgeStyle(String status, bool isDark) {

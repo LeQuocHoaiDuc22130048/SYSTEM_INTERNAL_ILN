@@ -32,18 +32,21 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
   }
 
   void _showAddEditDialog([StoreLocation? location]) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     final codeCtrl = TextEditingController(text: location?.code ?? '');
     final nameCtrl = TextEditingController(text: location?.name ?? '');
     final descCtrl = TextEditingController(text: location?.description ?? '');
-    final qrCtrl = TextEditingController(text: location?.qrCode ?? location?.code ?? '');
+    final qrCtrl = TextEditingController(
+      text: location?.qrCode ?? location?.code ?? '',
+    );
     final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
       builder: (dlgContext) => StatefulBuilder(
-        builder: (context, setDlgState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        builder: (_, setDlgState) => AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Container(
@@ -61,7 +64,10 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
               const SizedBox(width: 10),
               Text(
                 location == null ? 'Thêm Vị Trí Mới' : 'Sửa Vị Trí Kho',
-                style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
@@ -78,7 +84,9 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                       labelText: 'Mã vị trí (Code) *',
                       hintText: 'VD: LOC-A1, KE-01, NGAN-02...',
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập mã vị trí' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Vui lòng nhập mã vị trí'
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -87,7 +95,9 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                       labelText: 'Tên vị trí / Kệ kho *',
                       hintText: 'VD: Kệ A - Tầng 1 (Công suất)',
                     ),
-                    validator: (v) => (v == null || v.trim().isEmpty) ? 'Vui lòng nhập tên vị trí' : null,
+                    validator: (v) => (v == null || v.trim().isEmpty)
+                        ? 'Vui lòng nhập tên vị trí'
+                        : null,
                   ),
                   const SizedBox(height: 12),
                   TextFormField(
@@ -157,7 +167,10 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                 } catch (e) {
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: AppColors.error),
+                      SnackBar(
+                        content: Text('❌ Lỗi: $e'),
+                        backgroundColor: AppColors.error,
+                      ),
                     );
                   }
                 } finally {
@@ -181,7 +194,10 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
           children: [
             Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 28),
             SizedBox(width: 8),
-            Text('Xác nhận xóa vị trí', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              'Xác nhận xóa vị trí',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ],
         ),
         content: Text(
@@ -199,7 +215,9 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
               setState(() => _isLoading = true);
 
               try {
-                await context.read<BackendDataProvider>().deleteStoreLocation(location.id);
+                await context.read<BackendDataProvider>().deleteStoreLocation(
+                  location.id,
+                );
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('✅ Đã xóa vị trí ${location.name}')),
@@ -208,14 +226,20 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
               } catch (e) {
                 if (mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('❌ Không thể xóa: $e'), backgroundColor: AppColors.error),
+                    SnackBar(
+                      content: Text('❌ Không thể xóa: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
                   );
                 }
               } finally {
                 if (mounted) setState(() => _isLoading = false);
               }
             },
-            child: const Text('Xác nhận xóa', style: TextStyle(color: Colors.white)),
+            child: const Text(
+              'Xác nhận xóa',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -238,7 +262,10 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Quản Lý Vị Trí Kho / Kệ', style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Quản Lý Vị Trí Kho / Kệ',
+          style: TextStyle(fontWeight: FontWeight.bold),
+        ),
         actions: [
           IconButton(
             icon: const Icon(LucideIcons.plus),
@@ -266,8 +293,13 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                         },
                       )
                     : null,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               onChanged: (val) => setState(() => _searchQuery = val),
             ),
@@ -284,14 +316,18 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                   style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
                   ),
                 ),
                 TextButton.icon(
                   onPressed: () => _showAddEditDialog(),
                   icon: const Icon(Icons.add, size: 16),
                   label: const Text('Thêm mới', style: TextStyle(fontSize: 13)),
-                  style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ],
             ),
@@ -302,7 +338,8 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : RefreshIndicator(
-                    onRefresh: () => context.read<BackendDataProvider>().loadLocations(),
+                    onRefresh: () =>
+                        context.read<BackendDataProvider>().loadLocations(),
                     child: filteredLocations.isEmpty
                         ? ListView(
                             physics: const AlwaysScrollableScrollPhysics(),
@@ -313,7 +350,11 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                   child: Column(
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(LucideIcons.mapPin, size: 56, color: Colors.grey),
+                                      const Icon(
+                                        LucideIcons.mapPin,
+                                        size: 56,
+                                        color: Colors.grey,
+                                      ),
                                       const SizedBox(height: 16),
                                       Text(
                                         _searchQuery.isNotEmpty
@@ -322,7 +363,9 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.bold,
-                                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                          color: isDark
+                                              ? AppColors.textPrimaryDark
+                                              : AppColors.textPrimaryLight,
                                         ),
                                       ),
                                       const SizedBox(height: 6),
@@ -332,7 +375,9 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                             : 'Bấm "+ Thêm mới" để tạo kệ hoặc ngăn kéo đầu tiên',
                                         style: TextStyle(
                                           fontSize: 13,
-                                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                          color: isDark
+                                              ? AppColors.textSecondaryDark
+                                              : AppColors.textSecondaryLight,
                                         ),
                                       ),
                                     ],
@@ -356,24 +401,35 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                 shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(12),
                                   side: BorderSide(
-                                    color: isDark ? Colors.white12 : Colors.black12,
+                                    color: isDark
+                                        ? Colors.white12
+                                        : Colors.black12,
                                   ),
                                 ),
                                 child: Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Container(
-                                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
                                             decoration: BoxDecoration(
-                                              color: AppColors.info.withValues(alpha: 0.12),
-                                              borderRadius: BorderRadius.circular(6),
+                                              color: AppColors.info.withValues(
+                                                alpha: 0.12,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
                                               border: Border.all(
-                                                color: AppColors.info.withValues(alpha: 0.3),
+                                                color: AppColors.info
+                                                    .withValues(alpha: 0.3),
                                               ),
                                             ),
                                             child: Text(
@@ -389,7 +445,8 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                           const SizedBox(width: 10),
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   loc.name,
@@ -398,15 +455,20 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                                     fontSize: 15,
                                                   ),
                                                 ),
-                                                if (loc.description != null && loc.description!.isNotEmpty) ...[
+                                                if (loc.description != null &&
+                                                    loc
+                                                        .description!
+                                                        .isNotEmpty) ...[
                                                   const SizedBox(height: 2),
                                                   Text(
                                                     loc.description!,
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       color: isDark
-                                                          ? AppColors.textSecondaryDark
-                                                          : AppColors.textSecondaryLight,
+                                                          ? AppColors
+                                                                .textSecondaryDark
+                                                          : AppColors
+                                                                .textSecondaryLight,
                                                     ),
                                                   ),
                                                 ],
@@ -414,7 +476,10 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                             ),
                                           ),
                                           PopupMenuButton<String>(
-                                            icon: const Icon(Icons.more_vert, size: 20),
+                                            icon: const Icon(
+                                              Icons.more_vert,
+                                              size: 20,
+                                            ),
                                             padding: EdgeInsets.zero,
                                             onSelected: (val) {
                                               if (val == 'edit') {
@@ -428,7 +493,10 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                                 value: 'edit',
                                                 child: Row(
                                                   children: [
-                                                    Icon(Icons.edit_outlined, size: 18),
+                                                    Icon(
+                                                      Icons.edit_outlined,
+                                                      size: 18,
+                                                    ),
                                                     SizedBox(width: 8),
                                                     Text('Sửa vị trí'),
                                                   ],
@@ -438,9 +506,18 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                                 value: 'delete',
                                                 child: Row(
                                                   children: [
-                                                    Icon(Icons.delete_outline, size: 18, color: AppColors.error),
+                                                    Icon(
+                                                      Icons.delete_outline,
+                                                      size: 18,
+                                                      color: AppColors.error,
+                                                    ),
                                                     SizedBox(width: 8),
-                                                    Text('Xóa vị trí', style: TextStyle(color: AppColors.error)),
+                                                    Text(
+                                                      'Xóa vị trí',
+                                                      style: TextStyle(
+                                                        color: AppColors.error,
+                                                      ),
+                                                    ),
                                                   ],
                                                 ),
                                               ),
@@ -450,14 +527,17 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                       ),
                                       const Divider(height: 16),
                                       Row(
-                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.spaceBetween,
                                         children: [
                                           Row(
                                             children: [
                                               Icon(
                                                 LucideIcons.boxes,
                                                 size: 14,
-                                                color: partCount > 0 ? AppColors.success : Colors.grey,
+                                                color: partCount > 0
+                                                    ? AppColors.success
+                                                    : Colors.grey,
                                               ),
                                               const SizedBox(width: 4),
                                               Text(
@@ -470,19 +550,33 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                                   color: partCount > 0
                                                       ? AppColors.success
                                                       : (isDark
-                                                          ? AppColors.textSecondaryDark
-                                                          : AppColors.textSecondaryLight),
+                                                            ? AppColors
+                                                                  .textSecondaryDark
+                                                            : AppColors
+                                                                  .textSecondaryLight),
                                                 ),
                                               ),
                                             ],
                                           ),
                                           TextButton.icon(
-                                            onPressed: () => _showAddEditDialog(loc),
-                                            icon: const Icon(Icons.edit, size: 14),
-                                            label: const Text('Chỉnh sửa', style: TextStyle(fontSize: 12)),
+                                            onPressed: () =>
+                                                _showAddEditDialog(loc),
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              size: 14,
+                                            ),
+                                            label: const Text(
+                                              'Chỉnh sửa',
+                                              style: TextStyle(fontSize: 12),
+                                            ),
                                             style: TextButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                              visualDensity: VisualDensity.compact,
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 8,
+                                                    vertical: 4,
+                                                  ),
+                                              visualDensity:
+                                                  VisualDensity.compact,
                                             ),
                                           ),
                                         ],

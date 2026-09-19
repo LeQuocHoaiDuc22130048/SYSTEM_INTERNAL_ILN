@@ -347,65 +347,7 @@ public class PartService {
                 Part savedPart = partRepository.save(existingPart);
 
                 // Nếu có số lượng hoặc vị trí thì cập nhật / cộng dồn kho
-                BigDecimal importQty = item.quantity() != null ? item.quantity() : BigDecimal.ZERO;
-                if (importQty.compareTo(BigDecimal.ZERO) > 0 || StringUtils.hasText(item.storeLocationCode())) {
-                    String locCode = StringUtils.hasText(item.storeLocationCode()) ? item.storeLocationCode().trim() : "DEFAULT";
-                    StoreLocation location = storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(locCode)
-                            .or(() -> storeLocationRepository.findByCodeOrQrCode(locCode))
-                            .orElseGet(() -> {
-                                StoreLocation newLoc = StoreLocation.builder()
-                                        .code(locCode)
-                                        .name(locCode)
-                                        .qrCode(locCode)
-                                        .description("Tự động tạo từ nhập kho hàng loạt")
-                                        .isFull(false)
-                                        .onlySinglePart(false)
-                                        .build();
-                                newLoc.setCreatedBy(userId);
-                                return storeLocationRepository.save(newLoc);
-                            });
-
-                    PartLot lot = partLotRepository.findByPartIdAndStoreLocationIdAndIsDeletedFalse(savedPart.getId(), location.getId())
-                            .orElse(null);
-
-                    if (lot != null) {
-                        lot.setAmount(lot.getAmount().add(importQty));
-                        lot.setUpdatedBy(userId);
-                        partLotRepository.save(lot);
-                    } else {
-                        lot = PartLot.builder()
-                                .partId(savedPart.getId())
-                                .storeLocationId(location.getId())
-                                .amount(importQty)
-                                .origin("NEW")
-                                .condition(StringUtils.hasText(item.condition()) ? item.condition() : "TESTED_OK")
-                                .instockUnknown(false)
-                                .needsRefill(false)
-                                .lotCode("LOT-" + savedPart.getIpn() + "-" + System.currentTimeMillis())
-                                .build();
-                        lot.setCreatedBy(userId);
-                        partLotRepository.save(lot);
-                    }
-
-                    if (importQty.compareTo(BigDecimal.ZERO) > 0) {
-                        String movementCode = "PN-" + java.time.LocalDate.now().toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
-                        stockMovementRepository.save(StockMovement.builder()
-                                .movementCode(movementCode)
-                                .partId(savedPart.getId())
-                                .partLotId(lot.getId())
-                                .storageLocationId(location.getId())
-                                .toLocationId(location.getId())
-                                .movementType(StockMovementType.IMPORT)
-                                .quantity(importQty)
-                                .amount(importQty)
-                                .movementStatus("COMPLETED")
-                                .refType("BULK_IMPORT")
-                                .refId(lot.getId())
-                                .purpose("Nhập kho linh kiện hàng loạt từ Excel")
-                                .note("Cộng dồn số lượng: " + importQty)
-                                .build());
-                    }
-                }
+                applyBulkImportStock(savedPart, item, userId, true);
 
                 importedParts.add(toResponse(savedPart));
                 updatedCount++;
@@ -432,56 +374,7 @@ public class PartService {
                 Part savedPart = partRepository.save(newPart);
 
                 // Khởi tạo Lô và Vị trí nếu có
-                BigDecimal importQty = item.quantity() != null ? item.quantity() : BigDecimal.ZERO;
-                if (importQty.compareTo(BigDecimal.ZERO) > 0 || StringUtils.hasText(item.storeLocationCode())) {
-                    String locCode = StringUtils.hasText(item.storeLocationCode()) ? item.storeLocationCode().trim() : "DEFAULT";
-                    StoreLocation location = storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(locCode)
-                            .or(() -> storeLocationRepository.findByCodeOrQrCode(locCode))
-                            .orElseGet(() -> {
-                                StoreLocation newLoc = StoreLocation.builder()
-                                        .code(locCode)
-                                        .name(locCode)
-                                        .qrCode(locCode)
-                                        .description("Tự động tạo từ nhập kho hàng loạt")
-                                        .isFull(false)
-                                        .onlySinglePart(false)
-                                        .build();
-                                newLoc.setCreatedBy(userId);
-                                return storeLocationRepository.save(newLoc);
-                            });
-
-                    PartLot lot = PartLot.builder()
-                            .partId(savedPart.getId())
-                            .storeLocationId(location.getId())
-                            .amount(importQty)
-                            .origin("NEW")
-                            .condition(StringUtils.hasText(item.condition()) ? item.condition() : "TESTED_OK")
-                            .instockUnknown(false)
-                            .needsRefill(false)
-                            .lotCode("LOT-" + savedPart.getIpn() + "-" + System.currentTimeMillis())
-                            .build();
-                    lot.setCreatedBy(userId);
-                    partLotRepository.save(lot);
-
-                    if (importQty.compareTo(BigDecimal.ZERO) > 0) {
-                        String movementCode = "PN-" + java.time.LocalDate.now().toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
-                        stockMovementRepository.save(StockMovement.builder()
-                                .movementCode(movementCode)
-                                .partId(savedPart.getId())
-                                .partLotId(lot.getId())
-                                .storageLocationId(location.getId())
-                                .toLocationId(location.getId())
-                                .movementType(StockMovementType.IMPORT)
-                                .quantity(importQty)
-                                .amount(importQty)
-                                .movementStatus("COMPLETED")
-                                .refType("BULK_IMPORT")
-                                .refId(lot.getId())
-                                .purpose("Nhập kho linh kiện hàng loạt từ Excel")
-                                .note("Nhập ban đầu: " + importQty)
-                                .build());
-                    }
-                }
+                applyBulkImportStock(savedPart, item, userId, false);
 
                 importedParts.add(toResponse(savedPart));
                 successCount++;
@@ -499,6 +392,71 @@ public class PartService {
                 errors,
                 importedParts
         );
+    }
+
+    private void applyBulkImportStock(Part savedPart, BulkImportPartItemRequest item, UUID userId, boolean isUpdate) {
+        BigDecimal importQty = item.quantity() != null ? item.quantity() : BigDecimal.ZERO;
+        if (importQty.compareTo(BigDecimal.ZERO) <= 0 && !StringUtils.hasText(item.storeLocationCode())) {
+            return;
+        }
+
+        String locCode = StringUtils.hasText(item.storeLocationCode()) ? item.storeLocationCode().trim() : "DEFAULT";
+        StoreLocation location = storeLocationRepository.findByCodeIgnoreCaseAndIsDeletedFalse(locCode)
+                .or(() -> storeLocationRepository.findByCodeOrQrCode(locCode))
+                .orElseGet(() -> {
+                    StoreLocation newLoc = StoreLocation.builder()
+                            .code(locCode)
+                            .name(locCode)
+                            .qrCode(locCode)
+                            .description("Tự động tạo từ nhập kho hàng loạt")
+                            .isFull(false)
+                            .onlySinglePart(false)
+                            .build();
+                    newLoc.setCreatedBy(userId);
+                    return storeLocationRepository.save(newLoc);
+                });
+
+        PartLot lot = isUpdate
+                ? partLotRepository.findByPartIdAndStoreLocationIdAndIsDeletedFalse(savedPart.getId(), location.getId()).orElse(null)
+                : null;
+
+        if (lot != null) {
+            lot.setAmount(lot.getAmount().add(importQty));
+            lot.setUpdatedBy(userId);
+            partLotRepository.save(lot);
+        } else {
+            lot = PartLot.builder()
+                    .partId(savedPart.getId())
+                    .storeLocationId(location.getId())
+                    .amount(importQty)
+                    .origin("NEW")
+                    .condition(StringUtils.hasText(item.condition()) ? item.condition() : "TESTED_OK")
+                    .instockUnknown(false)
+                    .needsRefill(false)
+                    .lotCode("LOT-" + savedPart.getIpn() + "-" + System.currentTimeMillis())
+                    .build();
+            lot.setCreatedBy(userId);
+            partLotRepository.save(lot);
+        }
+
+        if (importQty.compareTo(BigDecimal.ZERO) > 0) {
+            String movementCode = "PN-" + java.time.LocalDate.now().toString().replace("-", "") + "-" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
+            stockMovementRepository.save(StockMovement.builder()
+                    .movementCode(movementCode)
+                    .partId(savedPart.getId())
+                    .partLotId(lot.getId())
+                    .storageLocationId(location.getId())
+                    .toLocationId(location.getId())
+                    .movementType(StockMovementType.IMPORT)
+                    .quantity(importQty)
+                    .amount(importQty)
+                    .movementStatus("COMPLETED")
+                    .refType("BULK_IMPORT")
+                    .refId(lot.getId())
+                    .purpose("Nhập kho linh kiện hàng loạt từ Excel")
+                    .note(isUpdate ? "Cộng dồn số lượng: " + importQty : "Nhập ban đầu: " + importQty)
+                    .build());
+        }
     }
 
     // ── 1. Quét QR Vị trí Kho ──────────────────────────────────────────
@@ -667,6 +625,10 @@ public class PartService {
     // ── 2. Lấy Linh Kiện Out Kho ─────────────────────────────────────
     @Transactional
     public PartCheckoutHistoryResponse checkoutPart(UUID partId, PartCheckoutRequest request, UUID userId) {
+        if (request.quantity() == null || request.quantity().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BusinessException("Số lượng xuất kho phải lớn hơn 0");
+        }
+
         Part part = partRepository.findByIdAndIsDeletedFalse(partId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy linh kiện: " + partId));
 
@@ -675,10 +637,16 @@ public class PartService {
 
         PartLot lot;
         if (request.partLotId() != null) {
-            lot = partLotRepository.findByIdAndIsDeletedFalse(request.partLotId())
+            lot = partLotRepository.findByIdForUpdate(request.partLotId())
                     .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy lô linh kiện: " + request.partLotId()));
+            if (!lot.getPartId().equals(part.getId())) {
+                throw new BusinessException("Lô linh kiện không thuộc về linh kiện này");
+            }
+            if (lot.getStoreLocationId() != null && !lot.getStoreLocationId().equals(location.getId())) {
+                throw new BusinessException("Lô linh kiện không nằm tại vị trí kho được chọn");
+            }
         } else {
-            lot = partLotRepository.findByPartIdAndStoreLocationIdAndIsDeletedFalse(part.getId(), location.getId())
+            lot = partLotRepository.findByPartIdAndStoreLocationIdForUpdate(part.getId(), location.getId())
                     .orElseThrow(() -> new BusinessException("Không tìm thấy linh kiện tại vị trí kho " + location.getCode()));
         }
 

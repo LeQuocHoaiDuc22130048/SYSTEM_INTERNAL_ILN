@@ -30,6 +30,10 @@ public class AppUpdate extends BaseEntity {
     @Builder.Default
     private String status = "DRAFT"; // DRAFT, RELEASED
 
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String platform = "ANDROID"; // ANDROID, IOS
+
     @Column(name = "released_at")
     private Instant releasedAt;
 }

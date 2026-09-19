@@ -337,7 +337,7 @@ class BackendDataProvider extends ChangeNotifier {
       body: {
         'repairOrderId': repairOrderId,
         'note': note,
-        if (quantity != null) 'quantity': quantity,
+        'quantity': ?quantity,
         if (repairBrand != null && repairBrand.isNotEmpty)
           'repairBrand': repairBrand,
       },
@@ -411,7 +411,9 @@ class BackendDataProvider extends ChangeNotifier {
   }
 
   Future<Map<String, dynamic>> scanLocationQr(String codeOrQr) async {
-    final res = await api.get('/api/v1/parts/locations/scan/${Uri.encodeComponent(codeOrQr.trim())}');
+    final res = await api.get(
+      '/api/v1/parts/locations/scan/${Uri.encodeComponent(codeOrQr.trim())}',
+    );
     if (res is Map<String, dynamic>) {
       return res;
     }
@@ -448,7 +450,9 @@ class BackendDataProvider extends ChangeNotifier {
     try {
       final data = await api.get('/api/v1/parts/locations');
       if (data is List) {
-        locations = data.map((e) => StoreLocation.fromJson(e as Map<String, dynamic>)).toList();
+        locations = data
+            .map((e) => StoreLocation.fromJson(e as Map<String, dynamic>))
+            .toList();
       } else {
         locations = _content(data).map(StoreLocation.fromJson).toList();
       }
@@ -468,11 +472,14 @@ class BackendDataProvider extends ChangeNotifier {
     final body = <String, dynamic>{
       'code': code.trim(),
       'name': name.trim(),
-      if (description != null && description.trim().isNotEmpty) 'description': description.trim(),
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
       if (qrCode != null && qrCode.trim().isNotEmpty) 'qrCode': qrCode.trim(),
     };
     final res = await api.post('/api/v1/parts/locations', body: body);
-    final created = StoreLocation.fromJson(res is Map<String, dynamic> ? res : <String, dynamic>{});
+    final created = StoreLocation.fromJson(
+      res is Map<String, dynamic> ? res : <String, dynamic>{},
+    );
     if (reload) await loadLocations();
     return created;
   }
@@ -492,7 +499,9 @@ class BackendDataProvider extends ChangeNotifier {
       if (qrCode != null) 'qrCode': qrCode.trim(),
     };
     final res = await api.patch('/api/v1/parts/locations/$id', body: body);
-    final updated = StoreLocation.fromJson(res is Map<String, dynamic> ? res : <String, dynamic>{});
+    final updated = StoreLocation.fromJson(
+      res is Map<String, dynamic> ? res : <String, dynamic>{},
+    );
     if (reload) await loadLocations();
     return updated;
   }

@@ -56,6 +56,7 @@ class AuthServiceTest {
     @Mock private UserRegistrationRequestRepository userRegistrationRequestRepository;
     @Mock private NotificationService notificationService;
     @Mock private PasswordResetOtpRepository passwordResetOtpRepository;
+    @Mock private PasswordResetOtpService passwordResetOtpService;
     @Mock private RbacService rbacService;
 
     private AuthService authService;
@@ -74,6 +75,7 @@ class AuthServiceTest {
                 userRegistrationRequestRepository,
                 notificationService,
                 passwordResetOtpRepository,
+                passwordResetOtpService,
                 rbacService);
         user = new UserEntity();
         user.setId(UUID.randomUUID());
@@ -134,7 +136,9 @@ class AuthServiceTest {
     void forgotPasswordRejectsIncorrectOtpWithoutChangingPassword() {
         when(userRepository.findByUsernameAndIsDeletedFalse("employee"))
                 .thenReturn(Optional.of(user));
+        UUID otpId = UUID.randomUUID();
         PasswordResetOtp otp = PasswordResetOtp.builder()
+                .id(otpId)
                 .userId(user.getId())
                 .codeHash("otp-hash")
                 .expiresAt(Instant.now().plusSeconds(300))
@@ -150,8 +154,8 @@ class AuthServiceTest {
                 new ForgotPasswordRequest("employee", "0123456789", "000000",
                         "NewPassword123!", "NewPassword123!")));
 
-        assertEquals(1, otp.getAttempts());
-        verify(passwordResetOtpRepository).save(otp);
+        verify(passwordResetOtpService).recordFailedAttempt(otpId);
+        verify(passwordResetOtpRepository, never()).save(any(PasswordResetOtp.class));
         verify(userRepository, never()).save(any(UserEntity.class));
     }
 
@@ -213,7 +217,6 @@ class AuthServiceTest {
 
         verify(userRepository).save(testUser);
         verify(refreshTokenRepository).revokeAllByUserId(userId);
-        verify(notificationService).clearDeviceToken(userId);
     }
 
     @Test

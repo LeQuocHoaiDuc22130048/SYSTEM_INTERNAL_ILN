@@ -62,6 +62,7 @@ public class AuthService {
     private final UserRegistrationRequestRepository userRegistrationRequestRepository;
     private final NotificationService notificationService;
     private final PasswordResetOtpRepository passwordResetOtpRepository;
+    private final PasswordResetOtpService passwordResetOtpService;
     private final RbacService rbacService;
 
     /**
@@ -211,11 +212,7 @@ public class AuthService {
         }
 
         if (!passwordEncoder.matches(request.otp(), otp.getCodeHash())) {
-            otp.setAttempts(otp.getAttempts() + 1);
-            if (otp.getAttempts() >= 5) {
-                otp.setUsed(true);
-            }
-            passwordResetOtpRepository.save(otp);
+            passwordResetOtpService.recordFailedAttempt(otp.getId());
             throw new BusinessException("Ma OTP khong dung", 400);
         }
 
@@ -367,7 +364,6 @@ public class AuthService {
         userRepository.save(user);
 
         refreshTokenRepository.revokeAllByUserId(user.getId());
-        notificationService.clearDeviceToken(user.getId());
 
         log.warn("Tài khoản đã tự yêu cầu xóa và vô hiệu hóa thành công: userId={}, username={}, reason={}",
                 user.getId(), user.getUsername(), request.reason());
@@ -388,7 +384,6 @@ public class AuthService {
         userRepository.save(user);
 
         refreshTokenRepository.revokeAllByUserId(targetUserId);
-        notificationService.clearDeviceToken(targetUserId);
         log.info("Xoá tài khoản (soft): userId={}, by={}", targetUserId, performedByUserId);
     }
 

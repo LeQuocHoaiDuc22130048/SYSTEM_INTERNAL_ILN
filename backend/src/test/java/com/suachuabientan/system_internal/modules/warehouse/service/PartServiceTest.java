@@ -1,5 +1,6 @@
 package com.suachuabientan.system_internal.modules.warehouse.service;
 
+import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
@@ -112,7 +113,7 @@ class PartServiceTest {
 
         when(partRepository.findByIdAndIsDeletedFalse(partId)).thenReturn(Optional.of(part));
         when(storeLocationRepository.findByIdAndIsDeletedFalse(locationId)).thenReturn(Optional.of(location));
-        when(partLotRepository.findByPartIdAndStoreLocationIdAndIsDeletedFalse(partId, locationId)).thenReturn(Optional.of(lot));
+        when(partLotRepository.findByPartIdAndStoreLocationIdForUpdate(partId, locationId)).thenReturn(Optional.of(lot));
 
         PartCheckout checkout = PartCheckout.builder()
                 .partId(partId)
@@ -278,5 +279,187 @@ class PartServiceTest {
                 eq(p1.getId().toString()),
                 eq(true)
         );
+    }
+
+    // ── REGRESSION TESTS: BUG 1 (Negative and Zero Quantity) ──────────
+
+    @Test
+    @DisplayName("Bug 1: Xuất kho với số lượng âm (-5) phải bị từ chối bằng BusinessException")
+    void checkoutPart_NegativeQuantity_ThrowsBusinessException() {
+        PartCheckoutRequest request = new PartCheckoutRequest(
+                locationId,
+                lotId,
+                new BigDecimal("-5"),
+                "Test negative checkout",
+                null,
+                null
+        );
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                partService.checkoutPart(partId, request, userId)
+        );
+        assertTrue(ex.getMessage().contains("lớn hơn 0"), "Ngoại lệ phải thông báo số lượng phải lớn hơn 0");
+    }
+
+    @Test
+    @DisplayName("Bug 1 Edge Case: Xuất kho với số lượng bằng 0 phải bị từ chối bằng BusinessException")
+    void checkoutPart_ZeroQuantity_ThrowsBusinessException() {
+        PartCheckoutRequest request = new PartCheckoutRequest(
+                locationId,
+                lotId,
+                BigDecimal.ZERO,
+                "Test zero checkout",
+                null,
+                null
+        );
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                partService.checkoutPart(partId, request, userId)
+        );
+        assertTrue(ex.getMessage().contains("lớn hơn 0"), "Ngoại lệ phải thông báo số lượng phải lớn hơn 0");
+    }
+
+    // ── REGRESSION TESTS: BUG 2 (Mismatched Lot - Part or Location) ───
+
+    @Test
+    @DisplayName("Bug 2: Xuất kho Part A nhưng truyền partLotId của Part B phải bị từ chối bằng BusinessException")
+    void checkoutPart_LotBelongsToDifferentPart_ThrowsBusinessException() {
+        Part partA = Part.builder().ipn("PART-A").name("Part A").minAmount(BigDecimal.ZERO).build();
+        partA.setId(partId);
+        StoreLocation location = StoreLocation.builder().code("LOC-01").name("Location 1").build();
+        location.setId(locationId);
+
+        UUID otherPartId = UUID.randomUUID();
+        PartLot lotB = PartLot.builder()
+                .partId(otherPartId)
+                .storeLocationId(locationId)
+                .amount(new BigDecimal("10"))
+                .build();
+        lotB.setId(lotId);
+
+        when(partRepository.findByIdAndIsDeletedFalse(partId)).thenReturn(Optional.of(partA));
+        when(storeLocationRepository.findByIdAndIsDeletedFalse(locationId)).thenReturn(Optional.of(location));
+        when(partLotRepository.findByIdForUpdate(lotId)).thenReturn(Optional.of(lotB));
+
+        PartCheckoutRequest request = new PartCheckoutRequest(
+                locationId,
+                lotId,
+                BigDecimal.ONE,
+                "Test mismatched part",
+                null,
+                null
+        );
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                partService.checkoutPart(partId, request, userId)
+        );
+        assertTrue(ex.getMessage().contains("không thuộc về linh kiện"),
+                "Ngoại lệ phải thông báo lô linh kiện không thuộc về linh kiện này");
+    }
+
+    @Test
+    @DisplayName("Bug 2: Xuất kho tại Location A nhưng truyền partLotId nằm tại Location B phải bị từ chối bằng BusinessException")
+    void checkoutPart_LotBelongsToDifferentLocation_ThrowsBusinessException() {
+        Part part = Part.builder().ipn("PART-A").name("Part A").minAmount(BigDecimal.ZERO).build();
+        part.setId(partId);
+        StoreLocation locationA = StoreLocation.builder().code("LOC-A").name("Location A").build();
+        locationA.setId(locationId);
+
+        UUID otherLocationId = UUID.randomUUID();
+        PartLot lotInOtherLoc = PartLot.builder()
+                .partId(partId)
+                .storeLocationId(otherLocationId)
+                .amount(new BigDecimal("10"))
+                .build();
+        lotInOtherLoc.setId(lotId);
+
+        when(partRepository.findByIdAndIsDeletedFalse(partId)).thenReturn(Optional.of(part));
+        when(storeLocationRepository.findByIdAndIsDeletedFalse(locationId)).thenReturn(Optional.of(locationA));
+        when(partLotRepository.findByIdForUpdate(lotId)).thenReturn(Optional.of(lotInOtherLoc));
+
+        PartCheckoutRequest request = new PartCheckoutRequest(
+                locationId,
+                lotId,
+                BigDecimal.ONE,
+                "Test mismatched location",
+                null,
+                null
+        );
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                partService.checkoutPart(partId, request, userId)
+        );
+        assertTrue(ex.getMessage().contains("vị trí kho"),
+                "Ngoại lệ phải thông báo lô linh kiện không nằm tại vị trí kho được chọn");
+    }
+
+    // ── REGRESSION TESTS: BUG 3 (Pessimistic Locking Query) ───────────
+
+    @Test
+    @DisplayName("Bug 3: Khi xuất kho với partLotId, phải dùng khóa bi quan findByIdForUpdate để chống race condition")
+    void checkoutPart_WithPartLotId_UsesPessimisticLockQuery() {
+        Part part = Part.builder().ipn("IPN-01").name("Test Part").minAmount(BigDecimal.ZERO).build();
+        part.setId(partId);
+        StoreLocation location = StoreLocation.builder().code("LOC-01").name("Location 1").build();
+        location.setId(locationId);
+        PartLot lot = PartLot.builder().partId(partId).storeLocationId(locationId).amount(new BigDecimal("10")).build();
+        lot.setId(lotId);
+
+        when(partRepository.findByIdAndIsDeletedFalse(partId)).thenReturn(Optional.of(part));
+        when(storeLocationRepository.findByIdAndIsDeletedFalse(locationId)).thenReturn(Optional.of(location));
+        when(partLotRepository.findByIdForUpdate(lotId)).thenReturn(Optional.of(lot));
+
+        PartCheckout checkout = PartCheckout.builder().partId(partId).partLotId(lotId).storeLocationId(locationId)
+                .quantity(new BigDecimal("7")).checkoutStatus(CheckoutStatus.OPEN).build();
+        checkout.setId(UUID.randomUUID());
+        when(partCheckoutRepository.save(any(PartCheckout.class))).thenReturn(checkout);
+
+        PartCheckoutRequest request = new PartCheckoutRequest(
+                locationId,
+                lotId,
+                new BigDecimal("7"),
+                "Checkout 7",
+                null,
+                null
+        );
+
+        partService.checkoutPart(partId, request, userId);
+
+        verify(partLotRepository, times(1)).findByIdForUpdate(lotId);
+        verify(partLotRepository, never()).findByIdAndIsDeletedFalse(any());
+    }
+
+    @Test
+    @DisplayName("Bug 3: Khi xuất kho không có partLotId, phải dùng khóa bi quan findByPartIdAndStoreLocationIdForUpdate")
+    void checkoutPart_WithoutPartLotId_UsesPessimisticLockQuery() {
+        Part part = Part.builder().ipn("IPN-01").name("Test Part").minAmount(BigDecimal.ZERO).build();
+        part.setId(partId);
+        StoreLocation location = StoreLocation.builder().code("LOC-01").name("Location 1").build();
+        location.setId(locationId);
+        PartLot lot = PartLot.builder().partId(partId).storeLocationId(locationId).amount(new BigDecimal("10")).build();
+        lot.setId(lotId);
+
+        when(partRepository.findByIdAndIsDeletedFalse(partId)).thenReturn(Optional.of(part));
+        when(storeLocationRepository.findByIdAndIsDeletedFalse(locationId)).thenReturn(Optional.of(location));
+        when(partLotRepository.findByPartIdAndStoreLocationIdForUpdate(partId, locationId)).thenReturn(Optional.of(lot));
+
+        PartCheckout checkout = PartCheckout.builder().partId(partId).partLotId(lotId).storeLocationId(locationId)
+                .quantity(new BigDecimal("7")).checkoutStatus(CheckoutStatus.OPEN).build();
+        checkout.setId(UUID.randomUUID());
+        when(partCheckoutRepository.save(any(PartCheckout.class))).thenReturn(checkout);
+
+        PartCheckoutRequest request = new PartCheckoutRequest(
+                locationId,
+                null,
+                new BigDecimal("7"),
+                "Checkout 7",
+                null,
+                null
+        );
+
+        partService.checkoutPart(partId, request, userId);
+
+        verify(partLotRepository, times(1)).findByPartIdAndStoreLocationIdForUpdate(partId, locationId);
+        verify(partLotRepository, never()).findByPartIdAndStoreLocationIdAndIsDeletedFalse(any(), any());
     }
 }

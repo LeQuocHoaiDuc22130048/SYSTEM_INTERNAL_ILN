@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
   QrCode,
@@ -51,19 +51,7 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState<boolean>(false);
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      if (initialCode) {
-        setCodeOrQr(initialCode);
-        fetchLocationData(initialCode);
-      } else {
-        setCodeOrQr('');
-        setScanResult(null);
-      }
-    }
-  }, [isOpen, initialCode]);
-
-  const fetchLocationData = async (targetCode: string) => {
+  const fetchLocationData = useCallback(async (targetCode: string) => {
     if (!targetCode.trim()) {
       showToast('Vui lòng nhập hoặc quét mã QR vị trí');
       return;
@@ -89,7 +77,19 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
     } finally {
       setLoading(false);
     }
-  };
+  }, [showToast]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialCode) {
+        setCodeOrQr(initialCode);
+        fetchLocationData(initialCode);
+      } else {
+        setCodeOrQr('');
+        setScanResult(null);
+      }
+    }
+  }, [isOpen, initialCode, fetchLocationData]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();

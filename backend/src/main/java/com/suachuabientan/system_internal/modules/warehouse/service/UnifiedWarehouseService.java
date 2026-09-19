@@ -1,5 +1,6 @@
 package com.suachuabientan.system_internal.modules.warehouse.service;
 
+import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
 import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
 import com.suachuabientan.system_internal.modules.warehouse.dto.request.AdjustStockRequest;
@@ -59,9 +60,10 @@ public class UnifiedWarehouseService {
         String reqStatus = (status != null && !status.trim().isEmpty()) ? status.trim().toUpperCase() : "ALL";
         String reqLoc = (location != null && !location.trim().isEmpty()) ? location.trim().toLowerCase() : null;
 
-        Map<UUID, String> locationNameMap = storeLocationRepository.findAll().stream()
+        List<StoreLocation> locations = storeLocationRepository.findAll();
+        Map<UUID, String> locationNameMap = locations.stream()
                 .collect(Collectors.toMap(StoreLocation::getId, StoreLocation::getName, (a, b) -> a));
-        Map<UUID, String> locationCodeMap = storeLocationRepository.findAll().stream()
+        Map<UUID, String> locationCodeMap = locations.stream()
                 .collect(Collectors.toMap(StoreLocation::getId, StoreLocation::getCode, (a, b) -> a));
         
         Map<UUID, String> categoryMap = new HashMap<>();
@@ -303,30 +305,21 @@ public class UnifiedWarehouseService {
     public Object checkoutUnifiedItem(UUID id, String itemType, Map<String, Object> payload, UUID userId) {
         if ("BOARD".equalsIgnoreCase(itemType)) {
             int qty = payload.get("quantity") instanceof Number n ? n.intValue() : 1;
-            String repairBrand = payload.get("repairBrand") != null ? payload.get("repairBrand").toString() : null;
-            UUID repairOrderId = null;
-            if (payload.get("repairOrderId") != null) {
-                try {
-                    repairOrderId = UUID.fromString(payload.get("repairOrderId").toString());
-                } catch (Exception ignored) {}
+            if (qty <= 0) {
+                throw new BusinessException("Số lượng xuất kho phải lớn hơn 0");
             }
+            String repairBrand = payload.get("repairBrand") != null ? payload.get("repairBrand").toString() : null;
+            UUID repairOrderId = parseUuid(payload.get("repairOrderId"));
             String note = payload.get("note") != null ? payload.get("note").toString() : null;
             CheckoutRequest req = new CheckoutRequest(repairOrderId, note, qty, repairBrand);
             return warehouseService.checkout(id, req, userId);
         } else {
             BigDecimal qty = payload.get("quantity") instanceof Number n ? BigDecimal.valueOf(n.doubleValue()) : BigDecimal.ONE;
-            UUID storeLocId = null;
-            UUID lotId = null;
-            if (payload.get("storeLocationId") != null) {
-                try {
-                    storeLocId = UUID.fromString(payload.get("storeLocationId").toString());
-                } catch (Exception ignored) {}
+            if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BusinessException("Số lượng xuất kho phải lớn hơn 0");
             }
-            if (payload.get("partLotId") != null) {
-                try {
-                    lotId = UUID.fromString(payload.get("partLotId").toString());
-                } catch (Exception ignored) {}
-            }
+            UUID storeLocId = parseUuid(payload.get("storeLocationId"));
+            UUID lotId = parseUuid(payload.get("partLotId"));
             if (storeLocId == null) {
                 List<PartLot> lots = partLotRepository.findByPartIdAndIsDeletedFalse(id);
                 if (!lots.isEmpty()) {
@@ -336,12 +329,7 @@ public class UnifiedWarehouseService {
             }
 
             String purpose = payload.get("purpose") != null ? payload.get("purpose").toString() : "Lấy linh kiện sửa chữa";
-            UUID repairOrderId = null;
-            if (payload.get("repairOrderId") != null) {
-                try {
-                    repairOrderId = UUID.fromString(payload.get("repairOrderId").toString());
-                } catch (Exception ignored) {}
-            }
+            UUID repairOrderId = parseUuid(payload.get("repairOrderId"));
             String notes = payload.get("note") != null ? payload.get("note").toString() : null;
 
             PartCheckoutRequest req = new PartCheckoutRequest(
@@ -353,6 +341,15 @@ public class UnifiedWarehouseService {
                     notes
             );
             return partService.checkoutPart(id, req, userId);
+        }
+    }
+
+    private UUID parseUuid(Object value) {
+        if (value == null) return null;
+        try {
+            return UUID.fromString(value.toString());
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
