@@ -102,7 +102,7 @@ public class JwtUtil {
     public boolean isAccessToken(String token) {
         try {
             return "access".equals(extractAllClaims(token).get("type", String.class));
-        } catch (Exception e) {
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }
@@ -110,7 +110,7 @@ public class JwtUtil {
     public boolean isRefreshToken(String token) {
         try {
             return "refresh".equals(extractAllClaims(token).get("type", String.class));
-        } catch (Exception e) {
+        } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
     }

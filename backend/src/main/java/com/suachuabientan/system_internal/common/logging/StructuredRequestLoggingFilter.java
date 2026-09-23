@@ -37,6 +37,9 @@ public class StructuredRequestLoggingFilter extends OncePerRequestFilter {
         MDC.put("method", request.getMethod());
         MDC.put("path", request.getRequestURI());
         MDC.put("client_ip", clientIp(request));
+        putHeader("device_id", request, "X-Device-Id");
+        putHeader("app_version", request, "X-App-Version");
+        putHeader("platform", request, "X-Platform");
         response.setHeader(REQUEST_ID_HEADER, requestId);
         response.setHeader(CORRELATION_ID_HEADER, requestId);
 
@@ -81,6 +84,13 @@ public class StructuredRequestLoggingFilter extends OncePerRequestFilter {
         if (principal instanceof CustomUserDetails userDetails) {
             MDC.put("user_id", userDetails.getUserId().toString());
             MDC.put("user_role", userDetails.getRole());
+        }
+    }
+
+    private void putHeader(String key, HttpServletRequest request, String header) {
+        String value = request.getHeader(header);
+        if (StringUtils.hasText(value)) {
+            MDC.put(key, value.length() > 120 ? value.substring(0, 120) : value);
         }
     }
 }
