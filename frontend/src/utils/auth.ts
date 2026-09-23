@@ -7,14 +7,34 @@ export const LATE_GRACE_MINUTES = 15;
 /** Số ngày công chuẩn trong tháng */
 export const STANDARD_WORK_DAYS = 26;
 
+const CLIENT_VERSION = '0.0.0';
+
+function requestId(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+}
+
+export function getDiagnosticHeaders(): Record<string, string> {
+  return {
+    'X-Request-Id': requestId(),
+    'X-App-Version': CLIENT_VERSION,
+    'X-Platform': 'WEB',
+    'X-Device-Id': 'web-browser',
+  };
+}
+
 /**
  * Tạo Authorization headers từ access token lưu trong localStorage.
  * Trả về object headers sẵn sàng truyền vào fetch().
  */
 export function getAuthHeaders(): Record<string, string> {
   const token = localStorage.getItem('accessToken');
-  if (!token) return {};
-  return { Authorization: `Bearer ${token}` };
+  return {
+    ...getDiagnosticHeaders(),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
 }
 
 /**
@@ -140,4 +160,3 @@ export function setupFetchInterceptor() {
     return response;
   };
 }
-

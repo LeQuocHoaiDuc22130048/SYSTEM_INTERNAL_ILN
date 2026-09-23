@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
@@ -32,6 +33,14 @@ class ApiClient {
        _customBaseUrl = baseUrl;
 
   static const Duration _timeout = Duration(seconds: 12);
+  static const String _appVersion = String.fromEnvironment(
+    'APP_VERSION',
+    defaultValue: '1.1.25',
+  );
+  static const String _deviceId = String.fromEnvironment(
+    'DEVICE_ID',
+    defaultValue: 'flutter-mobile',
+  );
 
   static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
@@ -162,6 +171,7 @@ class ApiClient {
       request: (requestUri) async {
         final request = http.MultipartRequest('POST', requestUri)
           ..headers.addAll({
+            ..._diagnosticHeaders(),
             if (accessToken != null) 'Authorization': 'Bearer $accessToken',
           })
           ..fields.addAll(fields)
@@ -204,7 +214,18 @@ class ApiClient {
   Map<String, String> _headers() {
     return {
       'Content-Type': 'application/json',
+      ..._diagnosticHeaders(),
       if (accessToken != null) 'Authorization': 'Bearer $accessToken',
+    };
+  }
+
+  Map<String, String> _diagnosticHeaders() {
+    final requestId = '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+    return {
+      'X-Request-Id': requestId,
+      'X-Device-Id': _deviceId,
+      'X-App-Version': _appVersion,
+      'X-Platform': defaultTargetPlatform.name.toUpperCase(),
     };
   }
 
