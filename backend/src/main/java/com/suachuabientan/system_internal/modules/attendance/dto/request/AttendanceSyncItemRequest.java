@@ -3,6 +3,7 @@ package com.suachuabientan.system_internal.modules.attendance.dto.request;
 import com.suachuabientan.system_internal.modules.attendance.enums.AttendanceType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
@@ -18,7 +19,7 @@ public record AttendanceSyncItemRequest(
         List<Double> faceEmbedding,
         String faceImageBase64,
         String imageContentType,
-        String deviceId,
+        @Size(max = 100, message = "Device ID tối đa 100 ký tự") String deviceId,
         String note
 ) {
 }

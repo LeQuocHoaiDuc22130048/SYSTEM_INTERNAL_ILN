@@ -3,4 +3,5 @@
 // ignore: deprecated_member_use
 import 'dart:html' as html;
 
-Future<bool> hasInternetConnection() async => html.window.navigator.onLine ?? true;
+Future<bool> hasInternetConnection() async =>
+    html.window.navigator.onLine ?? true;

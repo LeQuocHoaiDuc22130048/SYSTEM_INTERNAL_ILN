@@ -27,7 +27,10 @@ class StoreLocation {
       description: json['description']?.toString(),
       qrCode: json['qrCode']?.toString(),
       isFull: json['isFull'] == true,
-      itemCount: (json['itemCount'] as num?)?.toInt() ?? (json['totalPartTypes'] as num?)?.toInt() ?? 0,
+      itemCount:
+          (json['itemCount'] as num?)?.toInt() ??
+          (json['totalPartTypes'] as num?)?.toInt() ??
+          0,
       totalQuantity: (json['totalQuantity'] as num?)?.toDouble() ?? 0.0,
     );
   }

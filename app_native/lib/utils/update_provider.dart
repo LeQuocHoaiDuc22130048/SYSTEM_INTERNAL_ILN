@@ -72,9 +72,12 @@ class UpdateProvider with ChangeNotifier {
   String _downloadStatus = '';
   String get downloadStatus => _downloadStatus;
 
-  Future<void> checkForUpdate(BuildContext context, {required bool manual}) async {
+  Future<void> checkForUpdate(
+    BuildContext context, {
+    required bool manual,
+  }) async {
     if (_isChecking || _isDownloading) return;
-    
+
     _isChecking = true;
     notifyListeners();
 
@@ -101,7 +104,10 @@ class UpdateProvider with ChangeNotifier {
         notifyListeners();
 
         if (context.mounted) {
-          final notificationProvider = Provider.of<NotificationProvider>(context, listen: false);
+          final notificationProvider = Provider.of<NotificationProvider>(
+            context,
+            listen: false,
+          );
           if (_updateInfo!.updateAvailable) {
             notificationProvider.setUpdateNotification(
               latestVersion: _updateInfo!.latestVersion,
@@ -120,7 +126,8 @@ class UpdateProvider with ChangeNotifier {
                 payload: jsonEncode({
                   'id': 'app_update_notification',
                   'type': 'APP_UPDATE',
-                  'title': 'Có bản cập nhật mới (v${_updateInfo!.latestVersion})',
+                  'title':
+                      'Có bản cập nhật mới (v${_updateInfo!.latestVersion})',
                   'body': _updateInfo!.changelog,
                 }),
               );
@@ -128,7 +135,10 @@ class UpdateProvider with ChangeNotifier {
           } else {
             notificationProvider.clearUpdateNotification();
             if (manual) {
-              _showSnackBar(context, 'Bạn đang sử dụng phiên bản mới nhất ($currentVersion)');
+              _showSnackBar(
+                context,
+                'Bạn đang sử dụng phiên bản mới nhất ($currentVersion)',
+              );
             }
           }
         }
@@ -138,7 +148,11 @@ class UpdateProvider with ChangeNotifier {
         Navigator.pop(context); // Close loading dialog
       }
       if (manual && context.mounted) {
-        _showSnackBar(context, 'Lỗi kiểm tra cập nhật: ${e.toString()}', isError: true);
+        _showSnackBar(
+          context,
+          'Lỗi kiểm tra cập nhật: ${e.toString()}',
+          isError: true,
+        );
       }
     } finally {
       _isChecking = false;
@@ -161,7 +175,9 @@ class UpdateProvider with ChangeNotifier {
               Text(
                 'Đang kiểm tra cập nhật...',
                 style: TextStyle(
-                  color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : AppColors.textPrimaryLight,
                 ),
               ),
             ],
@@ -193,26 +209,30 @@ class UpdateProvider with ChangeNotifier {
       int downloadedBytes = 0;
       final List<int> bytes = [];
 
-      await response.stream.listen(
-        (chunk) {
-          bytes.addAll(chunk);
-          downloadedBytes += chunk.length;
-          if (contentLength > 0) {
-            _downloadProgress = downloadedBytes / contentLength;
-            final double mbDownloaded = downloadedBytes / (1024 * 1024);
-            final double mbTotal = contentLength / (1024 * 1024);
-            _downloadStatus = 'Đang tải: ${(_downloadProgress * 100).toStringAsFixed(0)}% (${mbDownloaded.toStringAsFixed(1)} MB / ${mbTotal.toStringAsFixed(1)} MB)';
-          } else {
-            final double mbDownloaded = downloadedBytes / (1024 * 1024);
-            _downloadStatus = 'Đang tải: ${mbDownloaded.toStringAsFixed(1)} MB';
-          }
-          notifyListeners();
-        },
-        onError: (e) {
-          throw e;
-        },
-        cancelOnError: true,
-      ).asFuture();
+      await response.stream
+          .listen(
+            (chunk) {
+              bytes.addAll(chunk);
+              downloadedBytes += chunk.length;
+              if (contentLength > 0) {
+                _downloadProgress = downloadedBytes / contentLength;
+                final double mbDownloaded = downloadedBytes / (1024 * 1024);
+                final double mbTotal = contentLength / (1024 * 1024);
+                _downloadStatus =
+                    'Đang tải: ${(_downloadProgress * 100).toStringAsFixed(0)}% (${mbDownloaded.toStringAsFixed(1)} MB / ${mbTotal.toStringAsFixed(1)} MB)';
+              } else {
+                final double mbDownloaded = downloadedBytes / (1024 * 1024);
+                _downloadStatus =
+                    'Đang tải: ${mbDownloaded.toStringAsFixed(1)} MB';
+              }
+              notifyListeners();
+            },
+            onError: (e) {
+              throw e;
+            },
+            cancelOnError: true,
+          )
+          .asFuture();
 
       _downloadStatus = 'Đang chuẩn bị file cài đặt...';
       notifyListeners();
@@ -246,7 +266,11 @@ class UpdateProvider with ChangeNotifier {
       }
     } catch (e) {
       if (context.mounted) {
-        _showSnackBar(context, 'Lỗi tải/cài đặt cập nhật: ${e.toString()}', isError: true);
+        _showSnackBar(
+          context,
+          'Lỗi tải/cài đặt cập nhật: ${e.toString()}',
+          isError: true,
+        );
       }
     } finally {
       _isDownloading = false;
@@ -269,7 +293,8 @@ class UpdateProvider with ChangeNotifier {
   Future<void> _openAppStore(BuildContext context, AppUpdateInfo info) async {
     try {
       final rawUrl = info.downloadUrl.trim();
-      final targetUrl = rawUrl.isNotEmpty &&
+      final targetUrl =
+          rawUrl.isNotEmpty &&
               (rawUrl.startsWith('http://') ||
                   rawUrl.startsWith('https://') ||
                   rawUrl.startsWith('itms-apps://'))
@@ -314,7 +339,9 @@ class UpdateProvider with ChangeNotifier {
               canPop: !info.mandatory && !isDownloading,
               child: Dialog(
                 backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
                   child: Column(
@@ -342,7 +369,9 @@ class UpdateProvider with ChangeNotifier {
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
                           ),
                         ),
                       ),
@@ -352,7 +381,9 @@ class UpdateProvider with ChangeNotifier {
                           'Phiên bản hiện tại: v$currentVersion | Phiên bản mới: v${info.latestVersion}',
                           style: TextStyle(
                             fontSize: 13,
-                            color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                            color: isDark
+                                ? AppColors.textSecondaryDark
+                                : AppColors.textSecondaryLight,
                           ),
                         ),
                       ),
@@ -362,7 +393,9 @@ class UpdateProvider with ChangeNotifier {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 15,
-                          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -371,10 +404,14 @@ class UpdateProvider with ChangeNotifier {
                         constraints: const BoxConstraints(maxHeight: 120),
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: isDark ? AppColors.backgroundDark : AppColors.backgroundLight,
+                          color: isDark
+                              ? AppColors.backgroundDark
+                              : AppColors.backgroundLight,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+                            color: isDark
+                                ? AppColors.borderDark
+                                : AppColors.borderLight,
                           ),
                         ),
                         child: SingleChildScrollView(
@@ -385,7 +422,9 @@ class UpdateProvider with ChangeNotifier {
                             style: TextStyle(
                               fontSize: 14,
                               height: 1.4,
-                              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
                             ),
                           ),
                         ),
@@ -397,7 +436,9 @@ class UpdateProvider with ChangeNotifier {
                           margin: const EdgeInsets.only(bottom: 16),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.blue.withValues(alpha: isDark ? 0.15 : 0.08),
+                            color: Colors.blue.withValues(
+                              alpha: isDark ? 0.15 : 0.08,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: Colors.blue.withValues(alpha: 0.3),
@@ -405,7 +446,11 @@ class UpdateProvider with ChangeNotifier {
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.apple, size: 22, color: Colors.blue),
+                              const Icon(
+                                Icons.apple,
+                                size: 22,
+                                color: Colors.blue,
+                              ),
                               const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
@@ -413,7 +458,9 @@ class UpdateProvider with ChangeNotifier {
                                   style: TextStyle(
                                     fontSize: 12,
                                     height: 1.35,
-                                    color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                                    color: isDark
+                                        ? AppColors.textPrimaryDark
+                                        : AppColors.textPrimaryLight,
                                   ),
                                 ),
                               ),
@@ -427,16 +474,22 @@ class UpdateProvider with ChangeNotifier {
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
                           ),
                         ),
                         const SizedBox(height: 10),
                         ClipRRect(
                           borderRadius: BorderRadius.circular(8),
                           child: LinearProgressIndicator(
-                            value: downloadProgress > 0 ? downloadProgress : null,
+                            value: downloadProgress > 0
+                                ? downloadProgress
+                                : null,
                             minHeight: 8,
-                            backgroundColor: isDark ? AppColors.borderDark : AppColors.borderLight,
+                            backgroundColor: isDark
+                                ? AppColors.borderDark
+                                : AppColors.borderLight,
                             color: AppColors.primary,
                           ),
                         ),
@@ -450,7 +503,9 @@ class UpdateProvider with ChangeNotifier {
                                 child: Text(
                                   'Để sau',
                                   style: TextStyle(
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
                                   ),
                                 ),
                               ),
@@ -480,7 +535,11 @@ class UpdateProvider with ChangeNotifier {
     );
   }
 
-  void _showSnackBar(BuildContext context, String message, {bool isError = false}) {
+  void _showSnackBar(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),

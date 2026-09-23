@@ -33,11 +33,17 @@ class RepairDevice {
       deviceType: json['deviceType']?.toString(),
       serialNumber: json['serialNumber']?.toString(),
       underWarranty: json['underWarranty'] == true,
-      warrantyExpiry: json['warrantyExpiry'] != null ? DateTime.tryParse(json['warrantyExpiry'].toString()) : null,
+      warrantyExpiry: json['warrantyExpiry'] != null
+          ? DateTime.tryParse(json['warrantyExpiry'].toString())
+          : null,
       description: json['description']?.toString(),
       status: _statusFromString(json['status']?.toString()),
-      assignedToId: assignedTo is Map<String, dynamic> ? assignedTo['id']?.toString() : null,
-      assignedToName: assignedTo is Map<String, dynamic> ? assignedTo['fullName']?.toString() : null,
+      assignedToId: assignedTo is Map<String, dynamic>
+          ? assignedTo['id']?.toString()
+          : null,
+      assignedToName: assignedTo is Map<String, dynamic>
+          ? assignedTo['fullName']?.toString()
+          : null,
     );
   }
 
@@ -71,7 +77,9 @@ class RepairDevice {
       deviceType: deviceType ?? this.deviceType,
       serialNumber: serialNumber ?? this.serialNumber,
       underWarranty: underWarranty ?? this.underWarranty,
-      warrantyExpiry: warrantyExpiry != null ? warrantyExpiry() : this.warrantyExpiry,
+      warrantyExpiry: warrantyExpiry != null
+          ? warrantyExpiry()
+          : this.warrantyExpiry,
       description: description ?? this.description,
       status: status ?? this.status,
       assignedToId: assignedToId ?? this.assignedToId,

@@ -32,14 +32,18 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(action == 'APPROVE' ? 'Đã duyệt tài khoản.' : 'Đã từ chối tài khoản.'),
+          content: Text(
+            action == 'APPROVE'
+                ? 'Đã duyệt tài khoản.'
+                : 'Đã từ chối tài khoản.',
+          ),
         ),
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(error.toString())),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(error.toString())));
     }
   }
 
@@ -57,7 +61,8 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
           : const Color(0xFFF8FAFC),
       body: SafeArea(
         child: RefreshIndicator(
-          onRefresh: () => context.read<BackendDataProvider>().loadPendingUsers(),
+          onRefresh: () =>
+              context.read<BackendDataProvider>().loadPendingUsers(),
           child: SingleChildScrollView(
             physics: const AlwaysScrollableScrollPhysics(),
             padding: EdgeInsets.fromLTRB(
@@ -67,84 +72,84 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
               12,
             ),
             child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 800),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Duyệt tài khoản',
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 800),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Duyệt tài khoản',
+                              style: TextStyle(
+                                fontSize: 24,
+                                fontWeight: FontWeight.w700,
+                                color: isDark
+                                    ? AppColors.textPrimaryDark
+                                    : const Color(0xFF1E293B),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '${pendingUsers.length} tài khoản chờ phê duyệt',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isDark
+                                    ? AppColors.textSecondaryDark
+                                    : const Color(0xFF64748B),
+                              ),
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: const Text(
+                            'Chờ duyệt',
                             style: TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : const Color(0xFF1E293B),
+                              color: Color(0xFF92400E),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${pendingUsers.length} tài khoản chờ phê duyệt',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : const Color(0xFF64748B),
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
                         ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: const Text(
-                          'Chờ duyệt',
-                          style: TextStyle(
-                            color: Color(0xFF92400E),
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 32),
-                  if (backend.isLoading)
-                    const Center(child: CircularProgressIndicator())
-                  else if (backend.error != null)
-                    _buildErrorState(isDark, backend.error!)
-                  else if (pendingUsers.isEmpty)
-                    _buildEmptyState(isDark)
-                  else
-                    ...pendingUsers.map(
-                      (user) => Padding(
-                        padding: const EdgeInsets.only(bottom: 20),
-                        child: _buildApprovalCard(
-                          context,
-                          user: user,
-                          initials: _initials(user.name),
-                          isDark: isDark,
-                        ),
-                      ),
+                      ],
                     ),
-                ],
+                    const SizedBox(height: 32),
+                    if (backend.isLoading)
+                      const Center(child: CircularProgressIndicator())
+                    else if (backend.error != null)
+                      _buildErrorState(isDark, backend.error!)
+                    else if (pendingUsers.isEmpty)
+                      _buildEmptyState(isDark)
+                    else
+                      ...pendingUsers.map(
+                        (user) => Padding(
+                          padding: const EdgeInsets.only(bottom: 20),
+                          child: _buildApprovalCard(
+                            context,
+                            user: user,
+                            initials: _initials(user.name),
+                            isDark: isDark,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
@@ -241,13 +246,21 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
           const SizedBox(height: 20),
           Row(
             children: [
-              _buildInfoItem(LucideIcons.briefcase, user.department ?? '-', isDark),
+              _buildInfoItem(
+                LucideIcons.briefcase,
+                user.department ?? '-',
+                isDark,
+              ),
               const SizedBox(width: 24),
               _buildInfoItem(LucideIcons.phone, user.phone ?? '-', isDark),
             ],
           ),
           const SizedBox(height: 12),
-          _buildInfoItem(LucideIcons.clock, 'Mã NV: ${user.employeeId.isEmpty ? 'Chưa có' : user.employeeId}', isDark),
+          _buildInfoItem(
+            LucideIcons.clock,
+            'Mã NV: ${user.employeeId.isEmpty ? 'Chưa có' : user.employeeId}',
+            isDark,
+          ),
           const SizedBox(height: 20),
           Container(
             width: double.infinity,
@@ -359,7 +372,8 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
           ),
           const SizedBox(height: 16),
           OutlinedButton.icon(
-            onPressed: () => context.read<BackendDataProvider>().loadPendingUsers(),
+            onPressed: () =>
+                context.read<BackendDataProvider>().loadPendingUsers(),
             icon: const Icon(Icons.refresh, size: 18),
             label: const Text('Thử lại'),
           ),
@@ -373,7 +387,9 @@ class _AccountApprovalPageState extends State<AccountApprovalPage> {
       child: Text(
         'Không có tài khoản chờ duyệt',
         style: TextStyle(
-          color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+          color: isDark
+              ? AppColors.textPrimaryDark
+              : AppColors.textPrimaryLight,
           fontWeight: FontWeight.w600,
         ),
       ),

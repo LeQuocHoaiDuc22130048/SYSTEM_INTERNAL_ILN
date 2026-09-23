@@ -4,11 +4,7 @@ class ImagePreviewDialog extends StatelessWidget {
   final String imageUrl;
   final String? caption;
 
-  const ImagePreviewDialog({
-    super.key,
-    required this.imageUrl,
-    this.caption,
-  });
+  const ImagePreviewDialog({super.key, required this.imageUrl, this.caption});
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +33,9 @@ class ImagePreviewDialog extends StatelessWidget {
                     if (loadingProgress == null) return child;
                     return const Center(
                       child: CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          Colors.white70,
+                        ),
                       ),
                     );
                   },
@@ -54,7 +52,10 @@ class ImagePreviewDialog extends StatelessWidget {
                           SizedBox(height: 8),
                           Text(
                             'Không thể hiển thị hình ảnh này.',
-                            style: TextStyle(color: Colors.white70, fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),

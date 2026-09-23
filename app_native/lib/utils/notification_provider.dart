@@ -113,17 +113,17 @@ class NotificationProvider extends ChangeNotifier {
         clickNotification(notification);
       });
 
-      FirebaseMessaging.instance.getInitialMessage().then((message) {
-        if (message != null && apiHasToken) {
-          _log('FCM getInitialMessage triggered');
-          final notification = _parseNotificationFromPayload(
-            message.data,
-            defaultTitle: message.notification?.title,
-            defaultBody: message.notification?.body,
-          );
-          clickNotification(notification);
-        }
-      });
+      final initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
+      if (initialMessage != null && apiHasToken) {
+        _log('FCM getInitialMessage triggered');
+        final notification = _parseNotificationFromPayload(
+          initialMessage.data,
+          defaultTitle: initialMessage.notification?.title,
+          defaultBody: initialMessage.notification?.body,
+        );
+        clickNotification(notification);
+      }
 
       _tokenRefreshSub ??= FirebaseMessaging.instance.onTokenRefresh.listen(
         (token) => _uploadDeviceToken(token),
@@ -254,8 +254,9 @@ class NotificationProvider extends ChangeNotifier {
         _updateNotification = _updateNotification!.copyWith(isRead: true);
         notifications = notifications
             .map(
-              (item) =>
-                  item.id == notification.id ? item.copyWith(isRead: true) : item,
+              (item) => item.id == notification.id
+                  ? item.copyWith(isRead: true)
+                  : item,
             )
             .toList();
         unreadCount = notifications.where((item) => !item.isRead).length;

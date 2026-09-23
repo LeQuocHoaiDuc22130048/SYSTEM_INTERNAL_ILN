@@ -121,7 +121,8 @@ class _MainScreenState extends State<MainScreen> {
       case MainTabs.warehouse:
         return const WarehousePage();
       case MainTabs.attendance:
-        return (context.read<AuthProvider>().isAttendanceAccount && !Platform.isIOS)
+        return (context.read<AuthProvider>().isAttendanceAccount &&
+                !Platform.isIOS)
             ? _buildAttendanceOnlyScaffold()
             : DashboardPage(onNavigateToTab: _setCurrentIndex);
       case MainTabs.messages:

@@ -60,9 +60,9 @@ class Part {
     final lotsList = json['lots'] as List?;
     final parsedLots = lotsList != null
         ? lotsList
-            .whereType<Map<String, dynamic>>()
-            .map((l) => PartLot.fromJson(l))
-            .toList()
+              .whereType<Map<String, dynamic>>()
+              .map((l) => PartLot.fromJson(l))
+              .toList()
         : <PartLot>[];
     return Part(
       id: json['id']?.toString() ?? '',

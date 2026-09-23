@@ -34,11 +34,9 @@ class EmployeeManagementPage extends StatelessWidget {
           ),
         ),
         body: const TabBarView(
-          physics: NeverScrollableScrollPhysics(), // Prevent horizontal swipe issues
-          children: [
-            EmployeesPage(),
-            AccountApprovalPage(),
-          ],
+          physics:
+              NeverScrollableScrollPhysics(), // Prevent horizontal swipe issues
+          children: [EmployeesPage(), AccountApprovalPage()],
         ),
       ),
     );

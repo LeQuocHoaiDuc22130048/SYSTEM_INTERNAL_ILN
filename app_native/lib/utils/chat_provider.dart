@@ -19,6 +19,7 @@ class ChatProvider extends ChangeNotifier {
   List<ChatMessage> activeMessages = [];
   bool isLoadingMessages = false;
   String? messagesError;
+  int _messagesRequestId = 0;
 
   StreamSubscription? _messageStreamSubscription;
 
@@ -122,6 +123,7 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> loadMessages(String conversationId) async {
+    final requestId = ++_messagesRequestId;
     activeConversationId = conversationId;
     isLoadingMessages = true;
     messagesError = null;
@@ -134,14 +136,26 @@ class ChatProvider extends ChangeNotifier {
       );
       if (data is Map<String, dynamic> && data['content'] is List) {
         final content = data['content'] as List;
-        activeMessages = content.map((m) => ChatMessage.fromJson(m)).toList();
+        if (requestId == _messagesRequestId &&
+            activeConversationId == conversationId) {
+          activeMessages = content.map((m) => ChatMessage.fromJson(m)).toList();
+        }
       }
-      await markAsRead(conversationId);
+      if (requestId == _messagesRequestId &&
+          activeConversationId == conversationId) {
+        await markAsRead(conversationId);
+      }
     } catch (e) {
-      messagesError = e.toString();
+      if (requestId == _messagesRequestId &&
+          activeConversationId == conversationId) {
+        messagesError = e.toString();
+      }
     } finally {
-      isLoadingMessages = false;
-      notifyListeners();
+      if (requestId == _messagesRequestId &&
+          activeConversationId == conversationId) {
+        isLoadingMessages = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -332,10 +346,7 @@ class ChatProvider extends ChangeNotifier {
     return _messagesFromPage(data);
   }
 
-  Future<void> setNotificationsMuted(
-    String conversationId,
-    bool muted,
-  ) async {
+  Future<void> setNotificationsMuted(String conversationId, bool muted) async {
     final data = muted
         ? await api.put('/api/v1/conversations/$conversationId/mute')
         : await api.delete('/api/v1/conversations/$conversationId/mute');
@@ -373,7 +384,10 @@ class ChatProvider extends ChangeNotifier {
           .toList();
     }
     if (data is List) {
-      return data.whereType<Map<String, dynamic>>().map(ChatMessage.fromJson).toList();
+      return data
+          .whereType<Map<String, dynamic>>()
+          .map(ChatMessage.fromJson)
+          .toList();
     }
     return const [];
   }

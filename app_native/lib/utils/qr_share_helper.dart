@@ -91,7 +91,9 @@ class QrShareHelper {
     if (qrData.trim().isEmpty) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Mã QR trống, không thể tạo tem in PDF!')),
+          const SnackBar(
+            content: Text('Mã QR trống, không thể tạo tem in PDF!'),
+          ),
         );
       }
       return false;
@@ -144,7 +146,10 @@ class QrShareHelper {
                   ],
                   pw.Container(
                     width: double.infinity,
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 4,
+                      vertical: 2,
+                    ),
                     decoration: pw.BoxDecoration(
                       color: PdfColors.grey200,
                       border: pw.Border.all(color: PdfColors.black, width: 0.5),
@@ -192,13 +197,22 @@ class QrShareHelper {
       final origin = _getSharePositionOrigin(context);
 
       // Ưu tiên dùng OpenFilex để Android/iOS gọi hộp thoại "Mở bằng Eleph-label / ứng dụng in" trực tiếp
-      final openResult = await OpenFilex.open(file.path, type: 'application/pdf');
+      final openResult = await OpenFilex.open(
+        file.path,
+        type: 'application/pdf',
+      );
 
       if (openResult.type != ResultType.done) {
         // Fallback mở Share Sheet nếu OpenFilex không khởi chạy
         // ignore: deprecated_member_use
         Share.shareXFiles(
-          [XFile(file.path, mimeType: 'application/pdf', name: 'label_$sanitizedFilename.pdf')],
+          [
+            XFile(
+              file.path,
+              mimeType: 'application/pdf',
+              name: 'label_$sanitizedFilename.pdf',
+            ),
+          ],
           text: 'In tem nhãn PDF',
           subject: 'Chia sẻ PDF sang Eleph-label',
           sharePositionOrigin: origin,
@@ -209,9 +223,9 @@ class QrShareHelper {
     } catch (e) {
       debugPrint('Lỗi khi tạo PDF tem in: $e');
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi khi tạo PDF tem in: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Lỗi khi tạo PDF tem in: $e')));
       }
       return false;
     }
@@ -272,7 +286,10 @@ class QrShareHelper {
       final canvas = Canvas(recorder);
 
       final bgPaint = Paint()..color = Colors.white;
-      canvas.drawRect(const Rect.fromLTWH(0, 0, canvasWidth, canvasHeight), bgPaint);
+      canvas.drawRect(
+        const Rect.fromLTWH(0, 0, canvasWidth, canvasHeight),
+        bgPaint,
+      );
 
       final borderPaint = Paint()
         ..color = Colors.black87
@@ -361,7 +378,10 @@ class QrShareHelper {
       );
 
       final picture = recorder.endRecording();
-      final img = await picture.toImage(canvasWidth.toInt(), canvasHeight.toInt());
+      final img = await picture.toImage(
+        canvasWidth.toInt(),
+        canvasHeight.toInt(),
+      );
       final byteData = await img.toByteData(format: ui.ImageByteFormat.png);
 
       if (byteData == null) {
@@ -440,8 +460,5 @@ class QrShareHelper {
   static Future<void> copyAndLaunchOpenLabel({
     required BuildContext context,
     required String qrData,
-  }) => copyAndLaunchElephLabel(
-    context: context,
-    qrData: qrData,
-  );
+  }) => copyAndLaunchElephLabel(context: context, qrData: qrData);
 }

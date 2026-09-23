@@ -35,7 +35,7 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
-    @Value("${app.cors.allowed-origin-patterns:${app.cors.allowed-origins:*}}")
+    @Value("${app.cors.allowed-origin-patterns:${app.cors.allowed-origins:}}")
     private String allowedOriginPatterns;
 
     @Value("${app.security.require-https:true}")
@@ -69,12 +69,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/forgot-password").permitAll()
                         .requestMatchers("/api/v1/auth/forgot-password/otp").permitAll()
                         .requestMatchers("/ws/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/message-media/**").permitAll()
-                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/repair-media/**").permitAll()
-                        .requestMatchers("/api/v1/app-updates/**").permitAll()
+                        .requestMatchers("/api/v1/app-updates/check").permitAll()
+                        .requestMatchers("/api/v1/app-updates/ios/manifest.plist").permitAll()
+                        .requestMatchers("/api/v1/app-updates/download/**").permitAll()
                         .requestMatchers("/privacy-policy", "/api/v1/privacy-policy").permitAll()
-                        // Swagger — chỉ dev
-                        .requestMatchers("/swagger-ui/**", "/api-docs/**").permitAll()
                         // Actuator health check
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/health").permitAll()

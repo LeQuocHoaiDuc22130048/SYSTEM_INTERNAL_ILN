@@ -36,7 +36,8 @@ class AttendanceRecord {
     final type = json['type']?.toString();
     return AttendanceRecord(
       id: json['id']?.toString() ?? '',
-      employeeId: json['employeeCode']?.toString() ??
+      employeeId:
+          json['employeeCode']?.toString() ??
           json['employeeId']?.toString() ??
           '',
       employeeName: employeeName.isEmpty ? 'Nhân viên' : employeeName,
@@ -58,7 +59,8 @@ class AttendanceRecord {
     final date = _dateFromJson(json['date']) ?? checkIn ?? DateTime.now();
     return AttendanceRecord(
       id: firstRecord?['id']?.toString() ?? date.toIso8601String(),
-      employeeId: firstRecord?['employeeCode']?.toString() ??
+      employeeId:
+          firstRecord?['employeeCode']?.toString() ??
           firstRecord?['employeeId']?.toString() ??
           '',
       employeeName: firstRecord?['employeeName']?.toString() ?? 'Nhân viên',
@@ -187,13 +189,17 @@ class DailyHistoryLog {
     String? inStr = json['checkIn']?.toString();
     String? outStr = json['checkOut']?.toString();
     if (inStr == null || inStr.isEmpty) {
-      final inEvents = eventsList.where((e) => e.type == 'IN' || e.type == 'CHECK_IN');
+      final inEvents = eventsList.where(
+        (e) => e.type == 'IN' || e.type == 'CHECK_IN',
+      );
       if (inEvents.isNotEmpty) {
         inStr = inEvents.first.time;
       }
     }
     if (outStr == null || outStr.isEmpty) {
-      final outEvents = eventsList.where((e) => e.type == 'OUT' || e.type == 'CHECK_OUT');
+      final outEvents = eventsList.where(
+        (e) => e.type == 'OUT' || e.type == 'CHECK_OUT',
+      );
       if (outEvents.isNotEmpty) {
         outStr = outEvents.last.time;
       }
@@ -274,10 +280,15 @@ class EmployeeHistoryData {
     }
     final emp = json['employee'] as Map<String, dynamic>?;
     return EmployeeHistoryData(
-      employeeId: emp?['id']?.toString() ?? json['employeeId']?.toString() ?? '',
-      employeeName: emp?['name']?.toString() ?? json['employeeName']?.toString() ?? '',
-      department: emp?['dept']?.toString() ?? json['department']?.toString() ?? '',
-      summary: AttendanceSummary.fromJson(json['summary'] as Map<String, dynamic>?),
+      employeeId:
+          emp?['id']?.toString() ?? json['employeeId']?.toString() ?? '',
+      employeeName:
+          emp?['name']?.toString() ?? json['employeeName']?.toString() ?? '',
+      department:
+          emp?['dept']?.toString() ?? json['department']?.toString() ?? '',
+      summary: AttendanceSummary.fromJson(
+        json['summary'] as Map<String, dynamic>?,
+      ),
       days: daysList,
     );
   }
@@ -329,4 +340,3 @@ class MyTodayAttendance {
     return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
   }
 }
-

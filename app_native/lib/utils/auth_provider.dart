@@ -11,7 +11,8 @@ class AuthProvider extends ChangeNotifier {
   final _secureStorage = const FlutterSecureStorage();
 
   AuthProvider({ApiClient? apiClient})
-      : api = apiClient ?? ApiClient(secureStorage: const FlutterSecureStorage()) {
+    : api =
+          apiClient ?? ApiClient(secureStorage: const FlutterSecureStorage()) {
     api.onSessionExpired = _expireSession;
   }
 
@@ -193,17 +194,15 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
-  Future<void> deleteAccount({
-    required String password,
-    String? reason,
-  }) async {
+  Future<void> deleteAccount({required String password, String? reason}) async {
     await _run(() async {
       _log('Delete account started for username=${_currentUser?.username}');
       await api.delete(
         '/api/v1/auth/me',
         body: {
           'password': password,
-          if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+          if (reason != null && reason.trim().isNotEmpty)
+            'reason': reason.trim(),
         },
       );
 
@@ -317,7 +316,9 @@ class AuthProvider extends ChangeNotifier {
         if (cachedUserJson != null) {
           try {
             _currentUser = User.fromJson(jsonDecode(cachedUserJson));
-            _log('Loaded cached user profile offline: username=${_currentUser?.username}');
+            _log(
+              'Loaded cached user profile offline: username=${_currentUser?.username}',
+            );
           } catch (e) {
             _log('Failed to parse cached user: $e');
           }

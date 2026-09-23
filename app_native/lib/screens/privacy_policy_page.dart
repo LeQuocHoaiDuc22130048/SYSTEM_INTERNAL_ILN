@@ -23,9 +23,9 @@ class PrivacyPolicyPage extends StatelessWidget {
       }
     } catch (_) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Lỗi khi mở trình duyệt')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Lỗi khi mở trình duyệt')));
       }
     }
   }
@@ -110,7 +110,10 @@ class PrivacyPolicyPage extends StatelessWidget {
                   label: const Text('Xem bản Web trực tuyến'),
                   onPressed: () => _openWebPolicy(context),
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -157,10 +160,7 @@ class PrivacyPolicyPage extends StatelessWidget {
               const Expanded(
                 child: Text(
                   'Quy định bảo vệ dữ liệu',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
             ],
@@ -170,7 +170,9 @@ class PrivacyPolicyPage extends StatelessWidget {
             'Hệ thống System Internal cam kết bảo mật toàn diện thông tin cá nhân và dữ liệu sinh trắc học của bạn.',
             style: TextStyle(
               fontSize: 13,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
               height: 1.5,
             ),
           ),
@@ -219,7 +221,9 @@ class PrivacyPolicyPage extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               height: 1.6,
-              color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : AppColors.textPrimaryLight,
             ),
           ),
         ],

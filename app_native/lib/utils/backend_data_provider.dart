@@ -29,6 +29,22 @@ class BackendDataProvider extends ChangeNotifier {
   bool isLoading = false;
   String? error;
 
+  void clear() {
+    employees = [];
+    pendingUsers = [];
+    repairOrders = [];
+    boards = [];
+    parts = [];
+    locations = [];
+    attendanceRecords = [];
+    myAttendanceHistory = null;
+    myTodayAttendance = null;
+    isLoadingMyAttendance = false;
+    isLoading = false;
+    error = null;
+    notifyListeners();
+  }
+
   Future<void> loadAll({bool isManagerOrAbove = false}) async {
     isLoading = true;
     error = null;

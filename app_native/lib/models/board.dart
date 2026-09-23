@@ -118,7 +118,6 @@ class Board {
     );
   }
 
-
   static BoardStatus _statusFromBackend(String? status) {
     switch (status) {
       case 'AVAILABLE':

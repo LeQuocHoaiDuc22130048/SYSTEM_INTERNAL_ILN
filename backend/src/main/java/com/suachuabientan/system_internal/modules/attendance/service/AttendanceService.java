@@ -32,7 +32,11 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -63,6 +67,7 @@ public class AttendanceService {
     private final FaceRecognitionService faceRecognitionService;
     private final NotificationService notificationService;
     private final FaceRecognitionMonitoringService faceRecognitionMonitoringService;
+    private final PlatformTransactionManager transactionManager;
 
     @Value("${app.attendance.face.match-threshold}")
     private double faceMatchThreshold;
@@ -257,8 +262,9 @@ public class AttendanceService {
         return toAttendanceResponse(saved, employee);
     }
 
-    @Transactional
     public AttendanceSyncResponse syncOfflineLogs(AttendanceSyncRequest request, UUID syncedByUserId) {
+        TransactionTemplate itemTransaction = new TransactionTemplate(transactionManager);
+        itemTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
         List<AttendanceSyncItemResponse> results = new ArrayList<>();
         int synced = 0;
         int skipped = 0;
@@ -267,89 +273,27 @@ public class AttendanceService {
         for (AttendanceSyncItemRequest item : request.logs()) {
             long itemStartedAt = System.nanoTime();
             try {
-                var existingByDeviceLog = attendanceRecordRepository
-                        .findByDeviceLogIdAndIsDeletedFalse(item.localLogId());
-                if (existingByDeviceLog.isPresent()) {
-                    AttendanceRecord existing = existingByDeviceLog.get();
-                    results.add(new AttendanceSyncItemResponse(
-                            item.localLogId(),
-                            "SKIPPED",
-                            existing.getId(),
-                            "Duplicate device log"));
-                    logAttendanceDecision(
-                            "attendance.offline_sync",
-                            item.employeeId(),
-                            item.deviceId(),
-                            item.confidenceScore(),
-                            elapsedMs(itemStartedAt),
-                            "SKIPPED_DEVICE_LOG_DUPLICATE",
-                            item.type().name(),
-                            existing.getId());
+                AttendanceSyncItemResponse result = itemTransaction.execute(
+                        status -> syncOfflineLog(item, syncedByUserId, itemStartedAt));
+                results.add(result);
+                if ("SYNCED".equals(result.status())) {
+                    synced++;
+                } else {
                     skipped++;
-                    continue;
                 }
-
-                UserEntity employee = findUserForOfflineSync(item);
-                Instant mobileCheckTime = mobileCheckTime(item);
-                Instant dedupFrom = mobileCheckTime.minus(OFFLINE_DEDUP_WINDOW);
-                Instant dedupTo = mobileCheckTime.plus(OFFLINE_DEDUP_WINDOW);
-                List<AttendanceRecord> dedupCandidates = attendanceRecordRepository.findDedupCandidates(
-                        item.employeeId(),
-                        item.type().name(),
-                        dedupFrom,
-                        dedupTo);
-                if (!dedupCandidates.isEmpty()) {
-                    AttendanceRecord duplicate = dedupCandidates.getFirst();
-                    results.add(new AttendanceSyncItemResponse(
-                            item.localLogId(),
-                            "SKIPPED",
-                            duplicate.getId(),
-                            "Duplicate employee timestamp within 2 minutes"));
-                    logAttendanceDecision(
-                            "attendance.offline_sync",
-                            item.employeeId(),
-                            item.deviceId(),
-                            item.confidenceScore(),
-                            elapsedMs(itemStartedAt),
-                            "SKIPPED_NEARBY_DUPLICATE",
-                            item.type().name(),
-                            duplicate.getId());
-                    skipped++;
-                    continue;
-                }
-
-                double serverConfidence = verifyOfflineFaceEmbedding(employee, item, syncedByUserId);
-                Instant serverCheckTime = Instant.now();
-                AttendanceRecord record = AttendanceRecord.builder()
-                        .employeeId(item.employeeId())
-                        .type(item.type())
-                        .checkTime(serverCheckTime)
-                        .mobileCheckTime(mobileCheckTime)
-                        .confidenceScore(serverConfidence)
-                        .deviceId(item.deviceId())
-                        .deviceLogId(item.localLogId())
-                        .faceImagePath(null)
-                        .note(item.note())
-                        .isValid(true)
-                        .build();
-
-                AttendanceRecord saved = attendanceRecordRepository.save(record);
-                logAttendanceDecision(
-                        "attendance.offline_sync",
-                        employee.getId(),
-                        item.deviceId(),
-                        serverConfidence,
-                        elapsedMs(itemStartedAt),
-                        "SYNCED",
-                        item.type().name(),
-                        saved.getId());
-                results.add(new AttendanceSyncItemResponse(
-                        item.localLogId(),
-                        "SYNCED",
-                        saved.getId(),
-                        null));
-                synced++;
             } catch (Exception error) {
+                if (error instanceof DataIntegrityViolationException
+                        || error.getCause() instanceof DataIntegrityViolationException) {
+                    var existing = attendanceRecordRepository
+                            .findByDeviceLogIdAndIsDeletedFalse(item.localLogId());
+                    if (existing.isPresent()) {
+                        results.add(new AttendanceSyncItemResponse(
+                                item.localLogId(), "SKIPPED", existing.get().getId(),
+                                "Duplicate device log"));
+                        skipped++;
+                        continue;
+                    }
+                }
                 results.add(new AttendanceSyncItemResponse(
                         item.localLogId(),
                         "FAILED",
@@ -369,6 +313,79 @@ public class AttendanceService {
         }
 
         return new AttendanceSyncResponse(request.logs().size(), synced, skipped, failed, results);
+    }
+
+    private AttendanceSyncItemResponse syncOfflineLog(
+            AttendanceSyncItemRequest item,
+            UUID syncedByUserId,
+            long itemStartedAt) {
+        var existingByDeviceLog = attendanceRecordRepository
+                .findByDeviceLogIdAndIsDeletedFalse(item.localLogId());
+        if (existingByDeviceLog.isPresent()) {
+            AttendanceRecord existing = existingByDeviceLog.get();
+            logAttendanceDecision(
+                    "attendance.offline_sync",
+                    item.employeeId(),
+                    item.deviceId(),
+                    item.confidenceScore(),
+                    elapsedMs(itemStartedAt),
+                    "SKIPPED_DEVICE_LOG_DUPLICATE",
+                    item.type().name(),
+                    existing.getId());
+            return new AttendanceSyncItemResponse(
+                    item.localLogId(), "SKIPPED", existing.getId(), "Duplicate device log");
+        }
+
+        UserEntity employee = findUserForOfflineSync(item);
+        Instant mobileCheckTime = mobileCheckTime(item);
+        Instant dedupFrom = mobileCheckTime.minus(OFFLINE_DEDUP_WINDOW);
+        Instant dedupTo = mobileCheckTime.plus(OFFLINE_DEDUP_WINDOW);
+        List<AttendanceRecord> dedupCandidates = attendanceRecordRepository.findDedupCandidates(
+                item.employeeId(),
+                item.type().name(),
+                dedupFrom,
+                dedupTo);
+        if (!dedupCandidates.isEmpty()) {
+            AttendanceRecord duplicate = dedupCandidates.getFirst();
+            logAttendanceDecision(
+                    "attendance.offline_sync",
+                    item.employeeId(),
+                    item.deviceId(),
+                    item.confidenceScore(),
+                    elapsedMs(itemStartedAt),
+                    "SKIPPED_NEARBY_DUPLICATE",
+                    item.type().name(),
+                    duplicate.getId());
+            return new AttendanceSyncItemResponse(
+                    item.localLogId(), "SKIPPED", duplicate.getId(),
+                    "Duplicate employee timestamp within 2 minutes");
+        }
+
+        double serverConfidence = verifyOfflineFaceEmbedding(employee, item, syncedByUserId);
+        AttendanceRecord record = AttendanceRecord.builder()
+                .employeeId(item.employeeId())
+                .type(item.type())
+                .checkTime(Instant.now())
+                .mobileCheckTime(mobileCheckTime)
+                .confidenceScore(serverConfidence)
+                .deviceId(item.deviceId())
+                .deviceLogId(item.localLogId())
+                .faceImagePath(null)
+                .note(item.note())
+                .isValid(true)
+                .build();
+
+        AttendanceRecord saved = attendanceRecordRepository.saveAndFlush(record);
+        logAttendanceDecision(
+                "attendance.offline_sync",
+                employee.getId(),
+                item.deviceId(),
+                serverConfidence,
+                elapsedMs(itemStartedAt),
+                "SYNCED",
+                item.type().name(),
+                saved.getId());
+        return new AttendanceSyncItemResponse(item.localLogId(), "SYNCED", saved.getId(), null);
     }
 
     private UserEntity findUserForOfflineSync(AttendanceSyncItemRequest item) {

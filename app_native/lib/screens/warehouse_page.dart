@@ -5,7 +5,6 @@ import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../utils/network_provider.dart';
-import '../utils/pending_sync_provider.dart';
 import '../widgets/status_badge.dart';
 import '../models/board.dart';
 import '../models/board_history_item.dart';
@@ -3665,43 +3664,49 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
     if (!mounted) return;
     final isReturn = widget.board.status == BoardStatus.checkedOut;
 
+    if (!isOnline) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Thao tác kho yêu cầu kết nối mạng. Vui lòng kiểm tra lại kết nối.',
+            ),
+          ),
+        );
+        setState(() {
+          _isLoading = false;
+        });
+      }
+      return;
+    }
+
     try {
-      if (isOnline) {
-        if (isReturn) {
-          final returnType = (returnData?['returnType'] as String?) ?? 'FULL';
-          final returnQuantity = returnData?['returnQuantity'] as int?;
-          final reason = returnData?['reason'] as String?;
-          final notes = returnData?['notes'] as String?;
-          await context.read<BackendDataProvider>().returnBoard(
-            widget.board.id,
-            checkoutId: widget.board.checkoutId,
-            returnType: returnType,
-            returnQuantity: returnQuantity,
-            reason: reason,
-            notes: notes,
-          );
-        } else {
-          final checkoutData = await _showCheckoutFormDialog();
-          if (!mounted) return;
-          if (checkoutData == null) {
-            setState(() => _isLoading = false);
-            return;
-          }
-          await context.read<BackendDataProvider>().checkoutBoard(
-            widget.board.id,
-            quantity: (checkoutData['quantity'] as num?)?.toInt(),
-            repairBrand: checkoutData['repairBrand'] as String?,
-            repairOrderId: checkoutData['repairOrderId'] as String?,
-            note: checkoutData['note'] as String?,
-          );
+      if (isReturn) {
+        final returnType = (returnData?['returnType'] as String?) ?? 'FULL';
+        final returnQuantity = returnData?['returnQuantity'] as int?;
+        final reason = returnData?['reason'] as String?;
+        final notes = returnData?['notes'] as String?;
+        await context.read<BackendDataProvider>().returnBoard(
+          widget.board.id,
+          checkoutId: widget.board.checkoutId,
+          returnType: returnType,
+          returnQuantity: returnQuantity,
+          reason: reason,
+          notes: notes,
+        );
+      } else {
+        final checkoutData = await _showCheckoutFormDialog();
+        if (!mounted) return;
+        if (checkoutData == null) {
+          setState(() => _isLoading = false);
+          return;
         }
-      } else if (mounted) {
-        context.read<PendingSyncProvider>().addAction(
-          type: isReturn
-              ? PendingSyncType.boardReturn
-              : PendingSyncType.boardCheckout,
-          title: isReturn ? 'Trả bo mạch' : 'Lấy bo mạch',
-          description: '${widget.board.name} - ${widget.board.qrCode}',
+        await context.read<BackendDataProvider>().checkoutBoard(
+          widget.board.id,
+          quantity: (checkoutData['quantity'] as num?)?.toInt(),
+          repairBrand: checkoutData['repairBrand'] as String?,
+          repairOrderId: checkoutData['repairOrderId'] as String?,
+          note: checkoutData['note'] as String?,
         );
       }
     } catch (e) {

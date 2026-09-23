@@ -3,11 +3,7 @@ class SenderInfo {
   final String fullName;
   final String? avatarUrl;
 
-  SenderInfo({
-    required this.userId,
-    required this.fullName,
-    this.avatarUrl,
-  });
+  SenderInfo({required this.userId, required this.fullName, this.avatarUrl});
 
   factory SenderInfo.fromJson(Map<String, dynamic> json) {
     return SenderInfo(
@@ -105,7 +101,9 @@ class ChatMessage {
           .toList(),
       parentMessageId: json['parentMessageId']?.toString(),
       parentMessage: json['parentMessage'] != null
-          ? ParentMessageInfo.fromJson(json['parentMessage'] as Map<String, dynamic>)
+          ? ParentMessageInfo.fromJson(
+              json['parentMessage'] as Map<String, dynamic>,
+            )
           : null,
     );
   }

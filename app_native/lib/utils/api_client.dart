@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
@@ -18,11 +19,17 @@ enum TokenRefreshResult { success, rejected, unavailable }
 class ApiClient {
   final http.Client _client;
   final FlutterSecureStorage? _secureStorage;
+  final String? _customBaseUrl;
   VoidCallback? onSessionExpired;
 
-  ApiClient({http.Client? client, this.onSessionExpired, FlutterSecureStorage? secureStorage})
-    : _client = client ?? http.Client(),
-      _secureStorage = secureStorage;
+  ApiClient({
+    http.Client? client,
+    this.onSessionExpired,
+    FlutterSecureStorage? secureStorage,
+    String? baseUrl,
+  }) : _client = client ?? http.Client(),
+       _secureStorage = secureStorage,
+       _customBaseUrl = baseUrl;
 
   static const Duration _timeout = Duration(seconds: 12);
 
@@ -40,13 +47,7 @@ class ApiClient {
 
   static List<String> get _baseUrlCandidates {
     if (_configuredBaseUrl.isEmpty) {
-      throw StateError(
-        'API_BASE_URL is required. For local development run Flutter with '
-        '--dart-define=API_BASE_URL=http://<backend-host>:8080 '
-        '--dart-define=ALLOW_INSECURE_API=true. '
-        'Production must use HTTPS because biometric face data must never be '
-        'sent over HTTP.',
-      );
+      return const ['https://127.0.0.1:8080'];
     }
     final candidates = _configuredBaseUrl
         .split(',')
@@ -57,6 +58,15 @@ class ApiClient {
       _assertHttpsBaseUrl(candidate);
     }
     return candidates;
+  }
+
+  List<String> get _effectiveBaseUrlCandidates {
+    final customUrl = _customBaseUrl;
+    if (customUrl != null && customUrl.isNotEmpty) {
+      _assertHttpsBaseUrl(customUrl);
+      return [customUrl];
+    }
+    return _baseUrlCandidates;
   }
 
   String? _accessToken;
@@ -94,15 +104,19 @@ class ApiClient {
     try {
       _accessToken = await storage.read(key: 'access_token');
       _refreshToken = await storage.read(key: 'refresh_token');
-      _log('Loaded persisted tokens: access=${_accessToken != null}, refresh=${_refreshToken != null}');
+      _log(
+        'Loaded persisted tokens: access=${_accessToken != null}, refresh=${_refreshToken != null}',
+      );
     } catch (e) {
       _log('Error loading persisted tokens: $e');
     }
   }
-  bool _isRefreshing = false;
+
+  Completer<TokenRefreshResult>? _refreshCompleter;
   String? _lastSuccessfulBaseUrl;
 
-  String get activeBaseUrl => _lastSuccessfulBaseUrl ?? baseUrl;
+  String get activeBaseUrl =>
+      _lastSuccessfulBaseUrl ?? (_customBaseUrl ?? baseUrl);
 
   Uri uri(String path, [Map<String, dynamic>? queryParameters]) {
     final normalizedPath = path.startsWith('/') ? path : '/$path';
@@ -211,9 +225,13 @@ class ApiClient {
     Object? lastConnectionError;
     Stopwatch? stopwatch;
 
+    final candidatesList = _effectiveBaseUrlCandidates;
     final candidates = _lastSuccessfulBaseUrl != null
-        ? [_lastSuccessfulBaseUrl!, ..._baseUrlCandidates.where((u) => u != _lastSuccessfulBaseUrl)]
-        : _baseUrlCandidates;
+        ? [
+            _lastSuccessfulBaseUrl!,
+            ...candidatesList.where((u) => u != _lastSuccessfulBaseUrl),
+          ]
+        : candidatesList;
 
     for (final candidateBaseUrl in candidates) {
       requestUri = uriFor(candidateBaseUrl, path, queryParameters);
@@ -298,8 +316,13 @@ class ApiClient {
   }
 
   Future<TokenRefreshResult> _tryRefreshToken() async {
-    if (_isRefreshing) return TokenRefreshResult.unavailable;
-    _isRefreshing = true;
+    if (_refreshCompleter != null) {
+      _log('Waiting for in-flight token refresh...');
+      return _refreshCompleter!.future;
+    }
+    final completer = Completer<TokenRefreshResult>();
+    _refreshCompleter = completer;
+
     _log('Attempting to refresh token...');
     try {
       final refreshUri = Uri.parse('$activeBaseUrl/api/v1/auth/refresh');
@@ -320,20 +343,25 @@ class ApiClient {
             accessToken = data['accessToken']?.toString();
             refreshToken = data['refreshToken']?.toString();
             _log('Token refresh successful!');
+            completer.complete(TokenRefreshResult.success);
             return TokenRefreshResult.success;
           }
         }
       }
       _log('Token refresh failed: status=${response.statusCode}');
       if (response.statusCode == 401 || response.statusCode == 403) {
+        completer.complete(TokenRefreshResult.rejected);
         return TokenRefreshResult.rejected;
       }
+      completer.complete(TokenRefreshResult.unavailable);
+      return TokenRefreshResult.unavailable;
     } catch (e) {
       _log('Token refresh error: $e');
+      completer.complete(TokenRefreshResult.unavailable);
+      return TokenRefreshResult.unavailable;
     } finally {
-      _isRefreshing = false;
+      _refreshCompleter = null;
     }
-    return TokenRefreshResult.unavailable;
   }
 
   Uri uriFor(

@@ -271,117 +271,128 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
             continue;
           }
           final file = await controller.takePicture();
-          final isEnrollment = _mode == AttendanceMode.enrollment;
-          if (!isEnrollment) {
-            _logFaceAuth('frame_captured', {
-              'online': !offline,
-              'blink_confirmed': _offlineBlinkConfirmed,
-            });
-          }
-          final faceResult = await _faceDetector
-              .detectPrimaryFaceFromFileWithQuality(
-                file.path,
-                requireOpenEyes:
-                    !isEnrollment &&
-                    !(offline &&
-                        _mode == AttendanceMode.verification &&
-                        !_offlineBlinkConfirmed),
-                requireBothEyesLandmarks: !isEnrollment,
-                maxYawDegrees: isEnrollment ? _enrollmentMaxYawDegrees : 12.0,
-                maxRollDegrees: isEnrollment ? _enrollmentMaxRollDegrees : 12.0,
-              );
-          final detected = faceResult.detectedFace;
-          if (detected == null) {
-            final enrollmentMessage =
-                isEnrollment && _isWaitingForSideEnrollmentSample()
-                ? 'Quay nhẹ mặt 10-20 độ, vẫn nhìn thấy rõ khuôn mặt trong khung hình.'
-                : null;
-            if (enrollmentMessage != null) {
-              _setStatus(enrollmentMessage);
-            } else {
-              _setStatus(
-                faceResult.message ?? 'Cần 1 khuôn mặt chính diện, mắt mở',
-              );
-            }
-            if (_mode == AttendanceMode.verification) {
-              _logFaceAuth('quality_rejected', {
-                'reason': faceResult.message,
+          try {
+            final isEnrollment = _mode == AttendanceMode.enrollment;
+            if (!isEnrollment) {
+              _logFaceAuth('frame_captured', {
                 'online': !offline,
+                'blink_confirmed': _offlineBlinkConfirmed,
               });
-              await _databaseService.recordAttendanceSecurityEvent(
-                reason: 'QUALITY_REJECTED',
-                detail: faceResult.message,
-              );
             }
-          } else {
-            if (offline &&
-                _mode == AttendanceMode.verification &&
-                !_offlineBlinkConfirmed) {
-              _trackOfflineBlink(detected.face);
-              _logFaceAuth('offline_blink_required', {
-                'closed_seen': _offlineBlinkClosedSeen,
-              });
-              _setStatus(
-                _offlineBlinkClosedSeen
-                    ? 'Mở mắt để hoàn tất kiểm tra chống giả mạo'
-                    : 'Đang offline. Vui lòng nhấp mắt để xác minh',
-              );
-              continue;
-            }
-            if (_mode == AttendanceMode.verification &&
-                !await _allowAttendanceAttempt()) {
-              continue;
-            }
-            if (!_isVerifyingFace) {
-              _isVerifyingFace = true;
-              _setStatus('Đang xác minh khuôn mặt...');
-              await Future<void>.delayed(const Duration(milliseconds: 1400));
-              _isVerifyingFace = false;
-            }
-            final livenessPassed = await _verifyLiveness(detected);
-            if (!livenessPassed) {
-              _resetOfflineBlink();
-              continue;
-            }
-            final alignedFaceImageBase64 = _encodeAlignedFace(detected);
-            final serverFaceImageBase64 = _encodeServerFaceImage(file.path);
-            final useServerInference = !offline;
-            if (_mode == AttendanceMode.enrollment) {
-              if (useServerInference) {
-                await _handleServerEnrollment(
-                  faceImageBase64: serverFaceImageBase64,
-                  metrics: faceResult.metrics,
+            final faceResult = await _faceDetector
+                .detectPrimaryFaceFromFileWithQuality(
+                  file.path,
+                  requireOpenEyes:
+                      !isEnrollment &&
+                      !(offline &&
+                          _mode == AttendanceMode.verification &&
+                          !_offlineBlinkConfirmed),
+                  requireBothEyesLandmarks: !isEnrollment,
+                  maxYawDegrees: isEnrollment ? _enrollmentMaxYawDegrees : 12.0,
+                  maxRollDegrees: isEnrollment
+                      ? _enrollmentMaxRollDegrees
+                      : 12.0,
                 );
+            final detected = faceResult.detectedFace;
+            if (detected == null) {
+              final enrollmentMessage =
+                  isEnrollment && _isWaitingForSideEnrollmentSample()
+                  ? 'Quay nhẹ mặt 10-20 độ, vẫn nhìn thấy rõ khuôn mặt trong khung hình.'
+                  : null;
+              if (enrollmentMessage != null) {
+                _setStatus(enrollmentMessage);
               } else {
-                // Đăng ký khuôn mặt yêu cầu kết nối server để lưu faceEncoding
-                // vào database. Nếu chỉ lưu offline local thì server vẫn có
-                // faceEnrolled=false và sẽ báo "chưa đăng ký" khi chấm công.
                 _setStatus(
-                  'Đăng ký khuôn mặt cần kết nối mạng để lưu lên server. '
-                  'Vui lòng kết nối WiFi hoặc dữ liệu di động rồi thử lại.',
-                  showSnackBar: true,
-                  snackColor: AppColors.error,
+                  faceResult.message ?? 'Cần 1 khuôn mặt chính diện, mắt mở',
+                );
+              }
+              if (_mode == AttendanceMode.verification) {
+                _logFaceAuth('quality_rejected', {
+                  'reason': faceResult.message,
+                  'online': !offline,
+                });
+                await _databaseService.recordAttendanceSecurityEvent(
+                  reason: 'QUALITY_REJECTED',
+                  detail: faceResult.message,
                 );
               }
             } else {
-              if (useServerInference) {
-                await _handleServerVerification(
-                  faceImageBase64: serverFaceImageBase64,
+              if (offline &&
+                  _mode == AttendanceMode.verification &&
+                  !_offlineBlinkConfirmed) {
+                _trackOfflineBlink(detected.face);
+                _logFaceAuth('offline_blink_required', {
+                  'closed_seen': _offlineBlinkClosedSeen,
+                });
+                _setStatus(
+                  _offlineBlinkClosedSeen
+                      ? 'Mở mắt để hoàn tất kiểm tra chống giả mạo'
+                      : 'Đang offline. Vui lòng nhấp mắt để xác minh',
                 );
-              } else {
-                final alignedFace = _embeddingService.alignFace(
-                  frame: detected.frame,
-                  face: detected.face,
-                );
-                final embedding = await _embeddingService
-                    .extractEmbeddingFromAligned(alignedFace);
-                await _handleVerificationEmbedding(
-                  embedding,
-                  faceImageBase64: alignedFaceImageBase64,
-                );
+                continue;
               }
-              _resetOfflineBlink();
+              if (_mode == AttendanceMode.verification &&
+                  !await _allowAttendanceAttempt()) {
+                continue;
+              }
+              if (!_isVerifyingFace) {
+                _isVerifyingFace = true;
+                _setStatus('Đang xác minh khuôn mặt...');
+                await Future<void>.delayed(const Duration(milliseconds: 1400));
+                _isVerifyingFace = false;
+              }
+              final livenessPassed = await _verifyLiveness(detected);
+              if (!livenessPassed) {
+                _resetOfflineBlink();
+                continue;
+              }
+              final alignedFaceImageBase64 = _encodeAlignedFace(detected);
+              final serverFaceImageBase64 = _encodeServerFaceImage(file.path);
+              final useServerInference = !offline;
+              if (_mode == AttendanceMode.enrollment) {
+                if (useServerInference) {
+                  await _handleServerEnrollment(
+                    faceImageBase64: serverFaceImageBase64,
+                    metrics: faceResult.metrics,
+                  );
+                } else {
+                  // Đăng ký khuôn mặt yêu cầu kết nối server để lưu faceEncoding
+                  // vào database. Nếu chỉ lưu offline local thì server vẫn có
+                  // faceEnrolled=false và sẽ báo "chưa đăng ký" khi chấm công.
+                  _setStatus(
+                    'Đăng ký khuôn mặt cần kết nối mạng để lưu lên server. '
+                    'Vui lòng kết nối WiFi hoặc dữ liệu di động rồi thử lại.',
+                    showSnackBar: true,
+                    snackColor: AppColors.error,
+                  );
+                }
+              } else {
+                if (useServerInference) {
+                  await _handleServerVerification(
+                    faceImageBase64: serverFaceImageBase64,
+                  );
+                } else {
+                  final alignedFace = _embeddingService.alignFace(
+                    frame: detected.frame,
+                    face: detected.face,
+                  );
+                  final embedding = await _embeddingService
+                      .extractEmbeddingFromAligned(alignedFace);
+                  await _handleVerificationEmbedding(
+                    embedding,
+                    faceImageBase64: alignedFaceImageBase64,
+                  );
+                }
+                _resetOfflineBlink();
+              }
             }
+          } finally {
+            try {
+              final tmpFile = File(file.path);
+              if (await tmpFile.exists()) {
+                await tmpFile.delete();
+              }
+            } catch (_) {}
           }
         } catch (error, stackTrace) {
           _isVerifyingFace = false;
@@ -532,8 +543,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     );
     return true;
   }
-
-
 
   EnrollmentVariationSlot? _nextEnrollmentSlot(FaceQualityMetrics metrics) {
     final collectedSlots = _collectedEnrollmentSlots();
@@ -830,7 +839,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     return null;
   }
 
-
   Future<void> _showEnrollmentSampleAccepted({
     required String acceptedMessage,
     required String nextInstruction,
@@ -847,7 +855,6 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       _status = nextInstruction;
     });
   }
-
 
   double? _roundScore(double? value) {
     if (value == null) return null;
@@ -1071,8 +1078,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       final displayStatusText = synced > 0
           ? widget.showMatchedEmployeeInfo
                 ? (isOut
-                    ? 'Xin cảm ơn ${match.employee.name}'
-                    : 'Xin chào ${match.employee.name}')
+                      ? 'Xin cảm ơn ${match.employee.name}'
+                      : 'Xin chào ${match.employee.name}')
                 : (isOut ? 'Chấm công về thành công' : 'Chấm công thành công')
           : nearbyDuplicate
           ? 'Đã có bản ghi gần thời điểm này'
@@ -1080,8 +1087,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           ? 'Server từ chối chấm công. Vui lòng chấm lại.'
           : widget.showMatchedEmployeeInfo
           ? (isOut
-              ? 'Chấm công tạm - chờ xác nhận: Xin cảm ơn ${match.employee.name}'
-              : 'Chấm công tạm - chờ xác nhận: Xin chào ${match.employee.name}')
+                ? 'Chấm công tạm - chờ xác nhận: Xin cảm ơn ${match.employee.name}'
+                : 'Chấm công tạm - chờ xác nhận: Xin chào ${match.employee.name}')
           : 'Chấm công tạm - chờ xác nhận';
       _setStatus(
         displayStatusText,

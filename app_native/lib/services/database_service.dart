@@ -274,7 +274,6 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
-
   Future<Database> get database async {
     if (_db != null) return _db!;
 

@@ -135,7 +135,7 @@ class FaceAiHandler(BaseHTTPRequestHandler):
                     "status": "UP",
                     "modelLoaded": True,
                     "faceModelLoaded": True,
-                    "miniFasNetLoaded": True,
+                    "miniFasNetLoaded": False,
                     "embeddingDimension": EMBEDDING_DIMENSION,
                     "implementation": "dev-stdlib-fallback",
                 },
@@ -177,11 +177,9 @@ class FaceAiHandler(BaseHTTPRequestHandler):
                 _decode_image(request)
                 _json_response(
                     self,
-                    200,
+                    503,
                     {
-                        "live": True,
-                        "isLive": True,
-                        "score": 1.0,
+                        "error": "Liveness detection is unavailable: no anti-spoof model is loaded",
                         "implementation": "dev-stdlib-fallback",
                     },
                 )

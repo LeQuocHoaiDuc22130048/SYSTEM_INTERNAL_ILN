@@ -71,7 +71,10 @@ class ModalTopBar extends StatelessWidget {
                   icon: const Icon(Icons.close, size: 22),
                   tooltip: 'Đóng',
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  constraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
                   color: isDark
                       ? AppColors.textPrimaryDark
                       : AppColors.textPrimaryLight,
@@ -80,10 +83,7 @@ class ModalTopBar extends StatelessWidget {
               ),
             ),
             if (trailing != null)
-              Align(
-                alignment: Alignment.centerRight,
-                child: trailing!,
-              ),
+              Align(alignment: Alignment.centerRight, child: trailing!),
           ],
         ),
       ),

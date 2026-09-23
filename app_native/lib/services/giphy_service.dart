@@ -20,12 +20,14 @@ class GiphyItem {
 
   factory GiphyItem.fromJson(Map<String, dynamic> json) {
     final images = json['images'] as Map<String, dynamic>? ?? {};
-    final preview = _imageUrl(images, 'fixed_width_small') ??
+    final preview =
+        _imageUrl(images, 'fixed_width_small') ??
         _imageUrl(images, 'fixed_height_small') ??
         _imageUrl(images, 'downsized') ??
         _imageUrl(images, 'original') ??
         '';
-    final media = _imageUrl(images, 'downsized_medium') ??
+    final media =
+        _imageUrl(images, 'downsized_medium') ??
         _imageUrl(images, 'fixed_height') ??
         _imageUrl(images, 'original') ??
         preview;

@@ -30,7 +30,7 @@ class _ScannerPageState extends State<ScannerPage> {
             controller: controller,
             onDetect: (capture) {
               if (_isScanned) return;
-              
+
               final List<Barcode> barcodes = capture.barcodes;
               if (barcodes.isNotEmpty) {
                 final String? code = barcodes.first.rawValue;
@@ -43,10 +43,10 @@ class _ScannerPageState extends State<ScannerPage> {
               }
             },
           ),
-          
+
           // Scanner Overlay
           _buildOverlay(context),
-          
+
           // Controls
           Positioned(
             top: MediaQuery.paddingOf(context).top + 16,
@@ -75,13 +75,15 @@ class _ScannerPageState extends State<ScannerPage> {
                   ),
                 ),
                 _buildCircleButton(
-                  icon: controller.torchEnabled ? LucideIcons.zap : LucideIcons.zapOff,
+                  icon: controller.torchEnabled
+                      ? LucideIcons.zap
+                      : LucideIcons.zapOff,
                   onPressed: () => controller.toggleTorch(),
                 ),
               ],
             ),
           ),
-          
+
           // Instructions
           Positioned(
             bottom: MediaQuery.paddingOf(context).bottom + 40,
@@ -89,7 +91,10 @@ class _ScannerPageState extends State<ScannerPage> {
             right: 0,
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 12,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(20),
@@ -106,7 +111,10 @@ class _ScannerPageState extends State<ScannerPage> {
     );
   }
 
-  Widget _buildCircleButton({required IconData icon, required VoidCallback onPressed}) {
+  Widget _buildCircleButton({
+    required IconData icon,
+    required VoidCallback onPressed,
+  }) {
     return Container(
       decoration: BoxDecoration(
         color: Colors.black.withValues(alpha: 0.5),
@@ -122,7 +130,7 @@ class _ScannerPageState extends State<ScannerPage> {
   Widget _buildOverlay(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final scanArea = size.width * 0.7;
-    
+
     return Stack(
       children: [
         // Semi-transparent background with a hole
@@ -152,7 +160,7 @@ class _ScannerPageState extends State<ScannerPage> {
             ],
           ),
         ),
-        
+
         // Scan frame corners
         Center(
           child: Container(
@@ -161,9 +169,7 @@ class _ScannerPageState extends State<ScannerPage> {
             decoration: BoxDecoration(
               border: Border.all(color: Colors.transparent),
             ),
-            child: CustomPaint(
-              painter: _ScannerFramePainter(),
-            ),
+            child: CustomPaint(painter: _ScannerFramePainter()),
           ),
         ),
       ],
@@ -188,7 +194,10 @@ class _ScannerFramePainter extends CustomPainter {
       Path()
         ..moveTo(0, length)
         ..lineTo(0, radius)
-        ..arcToPoint(const Offset(radius, 0), radius: const Radius.circular(radius))
+        ..arcToPoint(
+          const Offset(radius, 0),
+          radius: const Radius.circular(radius),
+        )
         ..lineTo(length, 0),
       paint,
     );
@@ -198,7 +207,10 @@ class _ScannerFramePainter extends CustomPainter {
       Path()
         ..moveTo(size.width - length, 0)
         ..lineTo(size.width - radius, 0)
-        ..arcToPoint(Offset(size.width, radius), radius: const Radius.circular(radius))
+        ..arcToPoint(
+          Offset(size.width, radius),
+          radius: const Radius.circular(radius),
+        )
         ..lineTo(size.width, length),
       paint,
     );
@@ -208,7 +220,10 @@ class _ScannerFramePainter extends CustomPainter {
       Path()
         ..moveTo(0, size.height - length)
         ..lineTo(0, size.height - radius)
-        ..arcToPoint(Offset(radius, size.height), radius: const Radius.circular(radius))
+        ..arcToPoint(
+          Offset(radius, size.height),
+          radius: const Radius.circular(radius),
+        )
         ..lineTo(length, size.height),
       paint,
     );
@@ -218,7 +233,10 @@ class _ScannerFramePainter extends CustomPainter {
       Path()
         ..moveTo(size.width - length, size.height)
         ..lineTo(size.width - radius, size.height)
-        ..arcToPoint(Offset(size.width, size.height - radius), radius: const Radius.circular(radius))
+        ..arcToPoint(
+          Offset(size.width, size.height - radius),
+          radius: const Radius.circular(radius),
+        )
         ..lineTo(size.width, size.height - length),
       paint,
     );

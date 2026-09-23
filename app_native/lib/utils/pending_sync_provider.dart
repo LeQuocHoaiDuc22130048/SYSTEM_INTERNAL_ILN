@@ -4,12 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import 'network_provider.dart';
 
-enum PendingSyncType {
-  faceAttendance,
-  qrScan,
-  boardCheckout,
-  boardReturn,
-}
+enum PendingSyncType { faceAttendance, qrScan, boardCheckout, boardReturn }
 
 class PendingSyncAction {
   final String id;
@@ -32,7 +27,8 @@ class PendingSyncProvider extends ChangeNotifier {
   NetworkProvider? _network;
   bool _isSyncing = false;
 
-  List<PendingSyncAction> get pendingActions => List.unmodifiable(_pendingActions);
+  List<PendingSyncAction> get pendingActions =>
+      List.unmodifiable(_pendingActions);
   int get pendingCount => _pendingActions.length;
   bool get hasPending => _pendingActions.isNotEmpty;
   bool get isSyncing => _isSyncing;
@@ -64,7 +60,10 @@ class PendingSyncProvider extends ChangeNotifier {
 
   Future<void> _syncWhenOnline() async {
     final network = _network;
-    if (network == null || !network.isOnline || _pendingActions.isEmpty || _isSyncing) {
+    if (network == null ||
+        !network.isOnline ||
+        _pendingActions.isEmpty ||
+        _isSyncing) {
       return;
     }
 

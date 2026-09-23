@@ -26,7 +26,10 @@ class OfflineBanner extends StatelessWidget {
                 bottom: false,
                 child: AnimatedSwitcher(
                   duration: const Duration(milliseconds: 220),
-                  child: network.isOffline || pendingSync.hasPending || pendingSync.isSyncing
+                  child:
+                      network.isOffline ||
+                          pendingSync.hasPending ||
+                          pendingSync.isSyncing
                       ? _SyncNotice(
                           isOffline: network.isOffline,
                           pendingCount: pendingSync.pendingCount,
@@ -58,17 +61,17 @@ class _SyncNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     final message = isOffline
         ? pendingCount > 0
-            ? 'Mất internet. $pendingCount thay đổi sẽ được đồng bộ khi có mạng.'
-            : 'Thiết bị đang mất kết nối internet. Vui lòng kiểm tra mạng và thử lại.'
+              ? 'Mất internet. $pendingCount thay đổi sẽ được đồng bộ khi có mạng.'
+              : 'Thiết bị đang mất kết nối internet. Vui lòng kiểm tra mạng và thử lại.'
         : isSyncing
-            ? 'Đang đồng bộ các thay đổi đã ghi nhận...'
-            : '$pendingCount thay đổi đang chờ đồng bộ.';
+        ? 'Đang đồng bộ các thay đổi đã ghi nhận...'
+        : '$pendingCount thay đổi đang chờ đồng bộ.';
     final color = isOffline ? AppColors.error : AppColors.warning;
     final icon = isOffline
         ? LucideIcons.wifiOff
         : isSyncing
-            ? LucideIcons.refreshCw
-            : LucideIcons.cloudUpload;
+        ? LucideIcons.refreshCw
+        : LucideIcons.cloudUpload;
 
     return Material(
       color: Colors.transparent,

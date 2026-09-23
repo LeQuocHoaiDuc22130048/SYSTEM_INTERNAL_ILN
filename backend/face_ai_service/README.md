@@ -42,9 +42,9 @@ Endpoints:
 - `POST /api/v1/faces/quality`
 - `POST /api/v1/faces/liveness`
 
-The real recognition service does not implement an anti-spoof model. Its liveness
-endpoint returns HTTP 503 for a decodable image instead of claiming it is live;
-invalid images still return HTTP 400. Health reports `miniFasNetLoaded: false`,
+Neither local service implements an anti-spoof model. Both liveness endpoints
+return HTTP 503 for accepted image payloads instead of claiming they are live;
+invalid payloads still return HTTP 400. Health reports `miniFasNetLoaded: false`,
 which the backend health check treats as unavailable. Embedding comparison at
 `/verify` does not enforce liveness and is not proof of a live person.
 

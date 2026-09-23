@@ -166,11 +166,7 @@ class StatCard extends StatelessWidget {
                   color: colors['icon'],
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: colors['iconFg'],
-                ),
+                child: Icon(icon, size: 20, color: colors['iconFg']),
               ),
             ],
           ),

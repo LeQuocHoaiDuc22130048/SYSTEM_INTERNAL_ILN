@@ -21,7 +21,9 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
     builder: (dlgContext) => StatefulBuilder(
       builder: (context, setDlgState) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: [
               Container(
@@ -30,10 +32,17 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
                   color: AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.add_location_alt_rounded, color: AppColors.primary, size: 20),
+                child: const Icon(
+                  Icons.add_location_alt_rounded,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
               ),
               const SizedBox(width: 10),
-              const Text('Thêm Vị Trí Kho Mới', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              const Text(
+                'Thêm Vị Trí Kho Mới',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+              ),
             ],
           ),
           content: SingleChildScrollView(
@@ -54,7 +63,10 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
                     hintText: 'VD: K-A1, KE-02, BIN-B3...',
                     prefixIcon: Icon(Icons.qr_code, size: 18),
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -66,7 +78,10 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
                     hintText: 'VD: Kệ A1 - Tầng 2, Hộp tụ điện...',
                     prefixIcon: Icon(Icons.label_outline, size: 18),
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -77,7 +92,10 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
                     labelText: 'Mô tả thêm (Tùy chọn)',
                     hintText: 'Ghi chú vị trí, khu vực...',
                     border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 12,
+                    ),
                   ),
                 ),
               ],
@@ -96,7 +114,11 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
                       final name = nameCtrl.text.trim();
                       if (code.isEmpty || name.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Vui lòng nhập đầy đủ Mã và Tên vị trí kho')),
+                          const SnackBar(
+                            content: Text(
+                              'Vui lòng nhập đầy đủ Mã và Tên vị trí kho',
+                            ),
+                          ),
                         );
                         return;
                       }
@@ -114,7 +136,9 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
                         Navigator.pop(dlgContext, created);
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text('Đã tạo vị trí "${created.name} (${created.code})" thành công'),
+                            content: Text(
+                              'Đã tạo vị trí "${created.name} (${created.code})" thành công',
+                            ),
                             backgroundColor: AppColors.success,
                           ),
                         );
@@ -122,12 +146,22 @@ Future<StoreLocation?> showCreateStoreLocationDialog(
                         if (!context.mounted) return;
                         setDlgState(() => isSubmitting = false);
                         ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(content: Text('Lỗi: $e'), backgroundColor: AppColors.error),
+                          SnackBar(
+                            content: Text('Lỗi: $e'),
+                            backgroundColor: AppColors.error,
+                          ),
                         );
                       }
                     },
               child: isSubmitting
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                   : const Text('Tạo vị trí'),
             ),
           ],
@@ -173,7 +207,9 @@ Future<StoreLocation?> showStoreLocationPicker(
               height: MediaQuery.of(context).size.height * 0.75,
               decoration: BoxDecoration(
                 color: isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(20),
+                ),
               ),
               padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
               child: Column(
@@ -182,7 +218,11 @@ Future<StoreLocation?> showStoreLocationPicker(
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: AppColors.primary, size: 22),
+                      const Icon(
+                        Icons.location_on,
+                        color: AppColors.primary,
+                        size: 22,
+                      ),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
@@ -190,13 +230,17 @@ Future<StoreLocation?> showStoreLocationPicker(
                           style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
                           ),
                         ),
                       ),
                       TextButton.icon(
                         onPressed: () async {
-                          final newLoc = await showCreateStoreLocationDialog(sheetContext);
+                          final newLoc = await showCreateStoreLocationDialog(
+                            sheetContext,
+                          );
                           if (newLoc != null) {
                             if (sheetContext.mounted) {
                               Navigator.pop(sheetContext, newLoc);
@@ -207,7 +251,10 @@ Future<StoreLocation?> showStoreLocationPicker(
                         label: const Text('Thêm vị trí'),
                         style: TextButton.styleFrom(
                           foregroundColor: AppColors.primary,
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
                         ),
                       ),
                     ],
@@ -227,8 +274,13 @@ Future<StoreLocation?> showStoreLocationPicker(
                             hintText: 'Tìm theo mã hoặc tên vị trí...',
                             prefixIcon: const Icon(Icons.search, size: 18),
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 10,
+                            ),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                             suffixIcon: filterText.isNotEmpty
                                 ? IconButton(
                                     icon: const Icon(Icons.clear, size: 16),
@@ -250,23 +302,33 @@ Future<StoreLocation?> showStoreLocationPicker(
                         onPressed: () async {
                           final scanned = await Navigator.push<String>(
                             context,
-                            MaterialPageRoute(builder: (_) => const ScannerPage()),
+                            MaterialPageRoute(
+                              builder: (_) => const ScannerPage(),
+                            ),
                           );
                           if (scanned != null && scanned.trim().isNotEmpty) {
                             final code = scanned.trim();
-                            final matched = locations.cast<StoreLocation?>().firstWhere(
-                              (l) =>
-                                  l?.code.toUpperCase() == code.toUpperCase() ||
-                                  l?.qrCode?.toUpperCase() == code.toUpperCase(),
-                              orElse: () => null,
-                            );
+                            final matched = locations
+                                .cast<StoreLocation?>()
+                                .firstWhere(
+                                  (l) =>
+                                      l?.code.toUpperCase() ==
+                                          code.toUpperCase() ||
+                                      l?.qrCode?.toUpperCase() ==
+                                          code.toUpperCase(),
+                                  orElse: () => null,
+                                );
                             if (matched != null) {
                               if (sheetContext.mounted) {
                                 Navigator.pop(sheetContext, matched);
                               }
                             } else {
                               if (sheetContext.mounted) {
-                                final created = await showCreateStoreLocationDialog(sheetContext, initialCode: code);
+                                final created =
+                                    await showCreateStoreLocationDialog(
+                                      sheetContext,
+                                      initialCode: code,
+                                    );
                                 if (created != null && sheetContext.mounted) {
                                   Navigator.pop(sheetContext, created);
                                 }
@@ -284,28 +346,41 @@ Future<StoreLocation?> showStoreLocationPicker(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.location_off_outlined, size: 48, color: Colors.grey.shade400),
+                                Icon(
+                                  Icons.location_off_outlined,
+                                  size: 48,
+                                  color: Colors.grey.shade400,
+                                ),
                                 const SizedBox(height: 8),
                                 Text(
                                   filterText.isEmpty
                                       ? 'Chưa có vị trí kho nào được tạo'
                                       : 'Không tìm thấy vị trí phù hợp',
                                   style: TextStyle(
-                                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                    color: isDark
+                                        ? AppColors.textSecondaryDark
+                                        : AppColors.textSecondaryLight,
                                   ),
                                 ),
                                 const SizedBox(height: 12),
                                 ElevatedButton.icon(
                                   onPressed: () async {
-                                    final newLoc = await showCreateStoreLocationDialog(
-                                      sheetContext,
-                                      initialCode: filterText.isNotEmpty ? filterText.toUpperCase() : null,
-                                    );
-                                    if (newLoc != null && sheetContext.mounted) {
+                                    final newLoc =
+                                        await showCreateStoreLocationDialog(
+                                          sheetContext,
+                                          initialCode: filterText.isNotEmpty
+                                              ? filterText.toUpperCase()
+                                              : null,
+                                        );
+                                    if (newLoc != null &&
+                                        sheetContext.mounted) {
                                       Navigator.pop(sheetContext, newLoc);
                                     }
                                   },
-                                  icon: const Icon(Icons.add_location_alt_outlined, size: 16),
+                                  icon: const Icon(
+                                    Icons.add_location_alt_outlined,
+                                    size: 16,
+                                  ),
                                   label: const Text('Tạo vị trí này ngay'),
                                 ),
                               ],
@@ -313,28 +388,40 @@ Future<StoreLocation?> showStoreLocationPicker(
                           )
                         : ListView.separated(
                             itemCount: filtered.length,
-                            separatorBuilder: (_, _) => const Divider(height: 1),
+                            separatorBuilder: (_, _) =>
+                                const Divider(height: 1),
                             itemBuilder: (ctx, index) {
                               final loc = filtered[index];
-                              final isSelected = (currentId != null && loc.id == currentId) ||
-                                  (currentCode != null && loc.code.toLowerCase() == currentCode.toLowerCase());
+                              final isSelected =
+                                  (currentId != null && loc.id == currentId) ||
+                                  (currentCode != null &&
+                                      loc.code.toLowerCase() ==
+                                          currentCode.toLowerCase());
 
                               return ListTile(
                                 selected: isSelected,
-                                selectedTileColor: AppColors.primary.withValues(alpha: 0.08),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                selectedTileColor: AppColors.primary.withValues(
+                                  alpha: 0.08,
+                                ),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
                                 leading: Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
                                     color: isSelected
                                         ? AppColors.primary
-                                        : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
+                                        : (isDark
+                                              ? const Color(0xFF334155)
+                                              : const Color(0xFFF1F5F9)),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
                                     Icons.location_on,
                                     size: 18,
-                                    color: isSelected ? Colors.white : AppColors.primary,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : AppColors.primary,
                                   ),
                                 ),
                                 title: Row(
@@ -343,15 +430,22 @@ Future<StoreLocation?> showStoreLocationPicker(
                                       child: Text(
                                         loc.name,
                                         style: TextStyle(
-                                          fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                                          fontWeight: isSelected
+                                              ? FontWeight.bold
+                                              : FontWeight.w600,
                                           fontSize: 14,
                                         ),
                                       ),
                                     ),
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(alpha: 0.12),
+                                        color: AppColors.primary.withValues(
+                                          alpha: 0.12,
+                                        ),
                                         borderRadius: BorderRadius.circular(4),
                                       ),
                                       child: Text(
@@ -366,19 +460,27 @@ Future<StoreLocation?> showStoreLocationPicker(
                                     ),
                                   ],
                                 ),
-                                subtitle: loc.description != null && loc.description!.isNotEmpty
+                                subtitle:
+                                    loc.description != null &&
+                                        loc.description!.isNotEmpty
                                     ? Text(
                                         loc.description!,
                                         style: TextStyle(
                                           fontSize: 12,
-                                          color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                                          color: isDark
+                                              ? AppColors.textSecondaryDark
+                                              : AppColors.textSecondaryLight,
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
                                       )
                                     : null,
                                 trailing: isSelected
-                                    ? const Icon(Icons.check_circle, color: AppColors.primary, size: 20)
+                                    ? const Icon(
+                                        Icons.check_circle,
+                                        color: AppColors.primary,
+                                        size: 20,
+                                      )
                                     : null,
                                 onTap: () => Navigator.pop(sheetContext, loc),
                               );
@@ -416,12 +518,14 @@ class LocationPickerField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final hasSelection = selectedLocation != null || (fallbackCode != null && fallbackCode!.trim().isNotEmpty);
+    final hasSelection =
+        selectedLocation != null ||
+        (fallbackCode != null && fallbackCode!.trim().isNotEmpty);
     final displayText = selectedLocation != null
         ? '${selectedLocation!.name} (${selectedLocation!.code})'
         : (fallbackCode != null && fallbackCode!.trim().isNotEmpty
-            ? fallbackCode!
-            : hint);
+              ? fallbackCode!
+              : hint);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -434,7 +538,9 @@ class LocationPickerField extends StatelessWidget {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : AppColors.textSecondaryLight,
               ),
             ),
             InkWell(
@@ -447,11 +553,19 @@ class LocationPickerField extends StatelessWidget {
               child: const Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.add_circle_outline, size: 14, color: AppColors.primary),
+                  Icon(
+                    Icons.add_circle_outline,
+                    size: 14,
+                    color: AppColors.primary,
+                  ),
                   SizedBox(width: 4),
                   Text(
                     'Thêm vị trí mới',
-                    style: TextStyle(fontSize: 11, color: AppColors.primary, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
@@ -495,9 +609,13 @@ class LocationPickerField extends StatelessWidget {
                     displayText,
                     style: TextStyle(
                       fontSize: 13,
-                      fontWeight: hasSelection ? FontWeight.w600 : FontWeight.normal,
+                      fontWeight: hasSelection
+                          ? FontWeight.w600
+                          : FontWeight.normal,
                       color: hasSelection
-                          ? (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight)
+                          ? (isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight)
                           : Colors.grey,
                     ),
                     maxLines: 1,

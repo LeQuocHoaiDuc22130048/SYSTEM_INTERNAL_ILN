@@ -25,29 +25,29 @@ void main() {
   const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-    if (methodCall.method == 'write') {
-      final String key = methodCall.arguments['key'];
-      final String value = methodCall.arguments['value'];
-      mockSecureStorage[key] = value;
-      return null;
-    } else if (methodCall.method == 'read') {
-      final String key = methodCall.arguments['key'];
-      return mockSecureStorage[key];
-    } else if (methodCall.method == 'delete') {
-      final String key = methodCall.arguments['key'];
-      mockSecureStorage.remove(key);
-      return null;
-    } else if (methodCall.method == 'readAll') {
-      return mockSecureStorage;
-    } else if (methodCall.method == 'deleteAll') {
-      mockSecureStorage.clear();
-      return null;
-    } else if (methodCall.method == 'containsKey') {
-      final String key = methodCall.arguments['key'];
-      return mockSecureStorage.containsKey(key);
-    }
-    return null;
-  });
+        if (methodCall.method == 'write') {
+          final String key = methodCall.arguments['key'];
+          final String value = methodCall.arguments['value'];
+          mockSecureStorage[key] = value;
+          return null;
+        } else if (methodCall.method == 'read') {
+          final String key = methodCall.arguments['key'];
+          return mockSecureStorage[key];
+        } else if (methodCall.method == 'delete') {
+          final String key = methodCall.arguments['key'];
+          mockSecureStorage.remove(key);
+          return null;
+        } else if (methodCall.method == 'readAll') {
+          return mockSecureStorage;
+        } else if (methodCall.method == 'deleteAll') {
+          mockSecureStorage.clear();
+          return null;
+        } else if (methodCall.method == 'containsKey') {
+          final String key = methodCall.arguments['key'];
+          return mockSecureStorage.containsKey(key);
+        }
+        return null;
+      });
 
   testWidgets('renders dashboard shell', (WidgetTester tester) async {
     mockSecureStorage.clear();
@@ -57,39 +57,37 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     final auth = AuthProvider(
       apiClient: ApiClient(
-        client: MockClient(
-          (request) async {
-            if (request.url.path == '/api/v1/auth/login') {
-              return http.Response(
-                jsonEncode({
-                  'accessToken': 'widget-test-token',
-                  'refreshToken': 'widget-test-refresh-token',
-                  'userInfo': {
-                    'id': '123',
-                    'username': 'minh',
-                    'fullName': 'Minh',
-                    'role': 'EMPLOYEE',
-                    'status': 'ACTIVE',
-                  }
-                }),
-                200,
-              );
-            }
-            if (request.url.path == '/api/v1/employees/me') {
-              return http.Response(
-                jsonEncode({
+        client: MockClient((request) async {
+          if (request.url.path == '/api/v1/auth/login') {
+            return http.Response(
+              jsonEncode({
+                'accessToken': 'widget-test-token',
+                'refreshToken': 'widget-test-refresh-token',
+                'userInfo': {
                   'id': '123',
                   'username': 'minh',
                   'fullName': 'Minh',
                   'role': 'EMPLOYEE',
                   'status': 'ACTIVE',
-                }),
-                200,
-              );
-            }
-            return http.Response(jsonEncode({'data': []}), 200);
-          },
-        ),
+                },
+              }),
+              200,
+            );
+          }
+          if (request.url.path == '/api/v1/employees/me') {
+            return http.Response(
+              jsonEncode({
+                'id': '123',
+                'username': 'minh',
+                'fullName': 'Minh',
+                'role': 'EMPLOYEE',
+                'status': 'ACTIVE',
+              }),
+              200,
+            );
+          }
+          return http.Response(jsonEncode({'data': []}), 200);
+        }),
       ),
     );
     await auth.login(username: 'minh', password: 'password');
@@ -99,9 +97,7 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
           ChangeNotifierProvider.value(value: auth),
-          ChangeNotifierProvider(
-            create: (_) => UpdateProvider(api: auth.api),
-          ),
+          ChangeNotifierProvider(create: (_) => UpdateProvider(api: auth.api)),
           ChangeNotifierProvider(
             create: (_) => BackendDataProvider(api: auth.api),
           ),

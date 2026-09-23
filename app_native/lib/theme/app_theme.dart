@@ -59,9 +59,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
 
@@ -96,18 +94,9 @@ class AppTheme {
         fontWeight: FontWeight.w500,
         color: AppColors.textPrimaryLight,
       ),
-      bodyLarge: TextStyle(
-        fontSize: 16,
-        color: AppColors.textPrimaryLight,
-      ),
-      bodyMedium: TextStyle(
-        fontSize: 14,
-        color: AppColors.textSecondaryLight,
-      ),
-      bodySmall: TextStyle(
-        fontSize: 12,
-        color: AppColors.textSecondaryLight,
-      ),
+      bodyLarge: TextStyle(fontSize: 16, color: AppColors.textPrimaryLight),
+      bodyMedium: TextStyle(fontSize: 14, color: AppColors.textSecondaryLight),
+      bodySmall: TextStyle(fontSize: 12, color: AppColors.textSecondaryLight),
     ),
   );
 
@@ -168,9 +157,7 @@ class AppTheme {
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
     ),
 
@@ -205,18 +192,9 @@ class AppTheme {
         fontWeight: FontWeight.w500,
         color: AppColors.textPrimaryDark,
       ),
-      bodyLarge: TextStyle(
-        fontSize: 16,
-        color: AppColors.textPrimaryDark,
-      ),
-      bodyMedium: TextStyle(
-        fontSize: 14,
-        color: AppColors.textSecondaryDark,
-      ),
-      bodySmall: TextStyle(
-        fontSize: 12,
-        color: AppColors.textSecondaryDark,
-      ),
+      bodyLarge: TextStyle(fontSize: 16, color: AppColors.textPrimaryDark),
+      bodyMedium: TextStyle(fontSize: 14, color: AppColors.textSecondaryDark),
+      bodySmall: TextStyle(fontSize: 12, color: AppColors.textSecondaryDark),
     ),
   );
 }

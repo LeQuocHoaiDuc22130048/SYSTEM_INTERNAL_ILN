@@ -52,7 +52,8 @@ class AttendanceServiceTest {
                 userRepository,
                 faceRecognitionService,
                 notificationService,
-                faceRecognitionMonitoringService);
+                faceRecognitionMonitoringService,
+                org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class));
         employeeId = UUID.randomUUID();
         employee = new UserEntity();
         employee.setId(employeeId);

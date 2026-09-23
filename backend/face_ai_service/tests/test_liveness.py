@@ -87,5 +87,35 @@ class LivenessTest(unittest.TestCase):
         self.assertEqual("DOWN", body["status"])
 
 
+class FallbackLivenessTest(unittest.TestCase):
+    request = LivenessTest.request
+
+    @classmethod
+    def setUpClass(cls):
+        path = Path(__file__).resolve().parents[1] / "simple_face_ai_service.py"
+        spec = importlib.util.spec_from_file_location("fallback_under_test", path)
+        cls.service = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.service)
+
+    def test_payload_cannot_pass_without_liveness_model(self):
+        status, body = self.request("POST", "/api/v1/faces/liveness", {
+            "imageBase64": "c3ludGhldGlj", "imageContentType": "image/png",
+        })
+        self.assertEqual(503, status)
+        self.assertNotEqual(True, body.get("live"))
+        self.assertNotEqual(True, body.get("isLive"))
+        self.assertTrue(body.get("error"))
+
+    def test_health_does_not_advertise_missing_liveness_model(self):
+        status, body = self.request("GET", "/health")
+        self.assertEqual(200, status)
+        self.assertFalse(body["miniFasNetLoaded"])
+
+    def test_invalid_payload_returns_bad_request(self):
+        status, body = self.request("POST", "/api/v1/faces/liveness")
+        self.assertEqual(400, status)
+        self.assertTrue(body.get("error"))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -15,7 +15,7 @@ Chi tiết về toàn bộ các màn hình, luồng UX, bộ lọc, thành phầ
   - `dashboard_page.dart`: Tổng quan KPI, chỉ số & thao tác nhanh.
   - `repair_orders_page.dart`: Quản lý đơn sửa chữa, phân công KTV, timeline & xuất kho.
   - `warehouse_page.dart`: Quản lý kho PartDB, lô hàng, mượn/trả bo mạch & quét QR.
-  - `attendance_screen.dart` & `face_attendance_page.dart`: Chấm công khuôn mặt Face AI (Mobile GPS & Kiosk mode).
+  - `attendance_screen.dart`: Chấm công khuôn mặt Face AI (Mobile GPS & Kiosk mode).
   - `messages_page.dart`: Nhắn tin nội bộ Real-time (STOMP WebSocket).
   - `notifications_page.dart`: Trung tâm thông báo hệ thống & Deep Linking.
   - `employees_page.dart` & `account_approval_page.dart`: Quản lý nhân sự & Duyệt tài khoản PENDING.

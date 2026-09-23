@@ -3,7 +3,15 @@ import '../theme/app_colors.dart';
 import 'app_permission.dart';
 
 // {{START_USER_ROLE_ENUM}}
-enum UserRole { superAdmin, admin, manager, technician, warehouse, employee, attendance }
+enum UserRole {
+  superAdmin,
+  admin,
+  manager,
+  technician,
+  warehouse,
+  employee,
+  attendance,
+}
 // {{END_USER_ROLE_ENUM}}
 
 enum UserStatus { active, suspended, pending }
@@ -268,14 +276,11 @@ extension UserRolePermissions on UserRole {
       case UserRole.technician:
         return technicianPermissions;
       case UserRole.warehouse:
-        return {
-          ...employeePermissions,
-          AppPermission.viewNotifications,
-        };
+        return {...employeePermissions, AppPermission.viewNotifications};
       case UserRole.employee:
         return employeePermissions;
       case UserRole.attendance:
-        return const { AppPermission.viewAttendance };
+        return const {AppPermission.viewAttendance};
     }
     // {{END_ROLE_PERMISSIONS_SWITCH}}
   }

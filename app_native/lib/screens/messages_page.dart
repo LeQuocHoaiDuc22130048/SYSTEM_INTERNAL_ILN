@@ -518,7 +518,6 @@ class _MentionSuggestion {
 }
 
 class _ChatDetailPage extends StatefulWidget {
-
   final ChatConversation conversation;
   final bool isDark;
   final VoidCallback onBack;
@@ -616,10 +615,7 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
   }
 
   void _sendLike() {
-    context.read<ChatProvider>().sendMessage(
-      widget.conversation.id,
-      '👍',
-    );
+    context.read<ChatProvider>().sendMessage(widget.conversation.id, '👍');
   }
 
   Future<void> _pickCamera() async {
@@ -673,7 +669,9 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
     final newText = '$before$inserted$after';
     _controller.value = TextEditingValue(
       text: newText,
-      selection: TextSelection.collapsed(offset: before.length + inserted.length),
+      selection: TextSelection.collapsed(
+        offset: before.length + inserted.length,
+      ),
     );
     setState(() => _mentionQuery = null);
   }
@@ -690,17 +688,25 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
     final currentUserId = context.read<AuthProvider>().currentUser?.id;
     final List<_MentionSuggestion> suggestions = [];
     if ('all'.startsWith(query) || 'tất cả'.contains(query)) {
-      suggestions.add(const _MentionSuggestion(userId: '__all__', displayName: 'All', subtitle: 'Nhắc tất cả thành viên'));
+      suggestions.add(
+        const _MentionSuggestion(
+          userId: '__all__',
+          displayName: 'All',
+          subtitle: 'Nhắc tất cả thành viên',
+        ),
+      );
     }
     for (final member in widget.conversation.members) {
       if (member.userId == currentUserId) continue; // skip self
       if (member.fullName.toLowerCase().contains(query) ||
           (member.employeeCode?.toLowerCase().contains(query) ?? false)) {
-        suggestions.add(_MentionSuggestion(
-          userId: member.userId,
-          displayName: member.fullName,
-          subtitle: member.employeeCode,
-        ));
+        suggestions.add(
+          _MentionSuggestion(
+            userId: member.userId,
+            displayName: member.fullName,
+            subtitle: member.employeeCode,
+          ),
+        );
       }
     }
     if (suggestions.isEmpty) return const SizedBox.shrink();
@@ -730,11 +736,8 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
         shrinkWrap: true,
         padding: const EdgeInsets.symmetric(vertical: 4),
         itemCount: suggestions.length,
-        separatorBuilder: (context, idx) => Divider(
-          height: 1,
-          color: borderColor,
-          indent: 52,
-        ),
+        separatorBuilder: (context, idx) =>
+            Divider(height: 1, color: borderColor, indent: 52),
         itemBuilder: (context, index) {
           final s = suggestions[index];
           final isAll = s.userId == '__all__';
@@ -748,13 +751,23 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                     radius: 16,
                     backgroundColor: isAll
                         ? AppColors.primary
-                        : Colors.primaries[
-                            s.displayName.hashCode.abs() % Colors.primaries.length],
+                        : Colors.primaries[s.displayName.hashCode.abs() %
+                              Colors.primaries.length],
                     child: isAll
-                        ? const Icon(Icons.people, color: Colors.white, size: 16)
+                        ? const Icon(
+                            Icons.people,
+                            color: Colors.white,
+                            size: 16,
+                          )
                         : Text(
-                            s.displayName.isNotEmpty ? s.displayName[0].toUpperCase() : '?',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            s.displayName.isNotEmpty
+                                ? s.displayName[0].toUpperCase()
+                                : '?',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                   ),
                   const SizedBox(width: 10),
@@ -768,20 +781,23 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                           style: TextStyle(
                             fontWeight: FontWeight.w600,
                             fontSize: 13,
-                            color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
+                            color: isDark
+                                ? AppColors.textPrimaryDark
+                                : AppColors.textPrimaryLight,
                           ),
                         ),
-                        if (s.subtitle != null && s.subtitle!.isNotEmpty) ...
-                          [
-                            const SizedBox(height: 1),
-                            Text(
-                              s.subtitle!,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                              ),
+                        if (s.subtitle != null && s.subtitle!.isNotEmpty) ...[
+                          const SizedBox(height: 1),
+                          Text(
+                            s.subtitle!,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
                             ),
-                          ],
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -873,8 +889,10 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
   Widget _buildReplyPreviewBar() {
     final msg = _replyingToMessage!;
     final isDark = widget.isDark;
-    
-    String displayContent = msg.isRecalled ? 'Tin nhắn đã bị thu hồi' : msg.content;
+
+    String displayContent = msg.isRecalled
+        ? 'Tin nhắn đã bị thu hồi'
+        : msg.content;
     if (!msg.isRecalled && displayContent.isEmpty) {
       if (msg.messageType == 'IMAGE') {
         displayContent = 'Đã gửi một hình ảnh';
@@ -921,8 +939,12 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 11,
-                    color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
-                    fontStyle: msg.isRecalled ? FontStyle.italic : FontStyle.normal,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                    fontStyle: msg.isRecalled
+                        ? FontStyle.italic
+                        : FontStyle.normal,
                   ),
                 ),
               ],
@@ -1427,7 +1449,8 @@ class _GiphyPickerSheetState extends State<_GiphyPickerSheet> {
       } else if (error is GiphyException) {
         errorMsg = 'Lỗi Giphy: ${error.message}';
         if (error.message.contains('401')) {
-          errorMsg = 'Lỗi Giphy (401 Unauthorized): API Key không hợp lệ hoặc đã hết hạn.';
+          errorMsg =
+              'Lỗi Giphy (401 Unauthorized): API Key không hợp lệ hoặc đã hết hạn.';
         }
       }
       setState(() => _error = errorMsg);
@@ -1552,7 +1575,8 @@ class _ConversationSearchPage extends StatefulWidget {
   });
 
   @override
-  State<_ConversationSearchPage> createState() => _ConversationSearchPageState();
+  State<_ConversationSearchPage> createState() =>
+      _ConversationSearchPageState();
 }
 
 class _ConversationSearchPageState extends State<_ConversationSearchPage> {
@@ -1583,7 +1607,9 @@ class _ConversationSearchPageState extends State<_ConversationSearchPage> {
       );
       if (mounted) setState(() => _results = results);
     } catch (error) {
-      if (mounted) setState(() => _error = 'Không thể tìm tin nhắn. Vui lòng thử lại.');
+      if (mounted) {
+        setState(() => _error = 'Không thể tìm tin nhắn. Vui lòng thử lại.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1591,11 +1617,19 @@ class _ConversationSearchPageState extends State<_ConversationSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final background = widget.isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final background = widget.isDark
+        ? AppColors.backgroundDark
+        : AppColors.backgroundLight;
     final surface = widget.isDark ? AppColors.surfaceDark : Colors.white;
-    final textPrimaryColor = widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondaryColor = widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
-    final inputBg = widget.isDark ? AppColors.borderDark : const Color(0xFFF1F5F9);
+    final textPrimaryColor = widget.isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSecondaryColor = widget.isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final inputBg = widget.isDark
+        ? AppColors.borderDark
+        : const Color(0xFFF1F5F9);
 
     return Scaffold(
       backgroundColor: background,
@@ -1603,12 +1637,20 @@ class _ConversationSearchPageState extends State<_ConversationSearchPage> {
         backgroundColor: surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.primary),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: AppColors.primary,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Tìm kiếm tin nhắn',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimaryColor),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: textPrimaryColor,
+          ),
         ),
         centerTitle: true,
       ),
@@ -1632,10 +1674,19 @@ class _ConversationSearchPageState extends State<_ConversationSearchPage> {
                       style: TextStyle(color: textPrimaryColor, fontSize: 14),
                       decoration: InputDecoration(
                         hintText: 'Nhập từ khóa cần tìm...',
-                        hintStyle: TextStyle(color: textSecondaryColor, fontSize: 14),
-                        prefixIcon: Icon(Icons.search, color: textSecondaryColor, size: 20),
+                        hintStyle: TextStyle(
+                          color: textSecondaryColor,
+                          fontSize: 14,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          color: textSecondaryColor,
+                          size: 20,
+                        ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 10,
+                        ),
                       ),
                     ),
                   ),
@@ -1664,87 +1715,128 @@ class _ConversationSearchPageState extends State<_ConversationSearchPage> {
             child: _loading
                 ? const Center(child: CircularProgressIndicator())
                 : !_hasSearched
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search,
+                          size: 60,
+                          color: textSecondaryColor.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Nhập từ khóa tin nhắn để tìm kiếm',
+                          style: TextStyle(
+                            color: textSecondaryColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : _results.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.search_off,
+                          size: 60,
+                          color: textSecondaryColor.withValues(alpha: 0.5),
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Không tìm thấy tin nhắn nào',
+                          style: TextStyle(
+                            color: textSecondaryColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: _results.length,
+                    separatorBuilder: (context, index) => Divider(
+                      color: widget.isDark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight,
+                      height: 1,
+                    ),
+                    itemBuilder: (context, index) {
+                      final message = _results[index];
+                      final senderAvatarText = message.sender.fullName.isEmpty
+                          ? '?'
+                          : message.sender.fullName
+                                .trim()
+                                .split(' ')
+                                .last[0]
+                                .toUpperCase();
+                      final senderHash = message.sender.fullName.hashCode;
+                      final senderColor =
+                          Colors.primaries[senderHash.abs() %
+                              Colors.primaries.length];
+
+                      return ListTile(
+                        leading: Container(
+                          width: 38,
+                          height: 38,
+                          decoration: BoxDecoration(
+                            color: senderColor,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Center(
+                            child: Text(
+                              senderAvatarText,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                        title: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            Icon(Icons.search, size: 60, color: textSecondaryColor.withValues(alpha: 0.5)),
-                            const SizedBox(height: 12),
                             Text(
-                              'Nhập từ khóa tin nhắn để tìm kiếm',
-                              style: TextStyle(color: textSecondaryColor, fontSize: 14),
+                              message.sender.fullName,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: textPrimaryColor,
+                              ),
+                            ),
+                            Text(
+                              DateFormat(
+                                'dd/MM HH:mm',
+                              ).format(message.sentAt.toLocal()),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: textSecondaryColor,
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    : _results.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.search_off, size: 60, color: textSecondaryColor.withValues(alpha: 0.5)),
-                                const SizedBox(height: 12),
-                                Text(
-                                  'Không tìm thấy tin nhắn nào',
-                                  style: TextStyle(color: textSecondaryColor, fontSize: 14),
-                                ),
-                              ],
+                        subtitle: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            message.content.isEmpty
+                                ? '[${message.messageType}]'
+                                : message.content,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: textPrimaryColor.withValues(alpha: 0.9),
                             ),
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            itemCount: _results.length,
-                            separatorBuilder: (context, index) => Divider(color: widget.isDark ? AppColors.borderDark : AppColors.borderLight, height: 1),
-                            itemBuilder: (context, index) {
-                              final message = _results[index];
-                              final senderAvatarText = message.sender.fullName.isEmpty
-                                  ? '?'
-                                  : message.sender.fullName.trim().split(' ').last[0].toUpperCase();
-                              final senderHash = message.sender.fullName.hashCode;
-                              final senderColor = Colors.primaries[senderHash.abs() % Colors.primaries.length];
-
-                              return ListTile(
-                                leading: Container(
-                                  width: 38,
-                                  height: 38,
-                                  decoration: BoxDecoration(
-                                    color: senderColor,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Center(
-                                    child: Text(
-                                      senderAvatarText,
-                                      style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                                    ),
-                                  ),
-                                ),
-                                title: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Text(
-                                      message.sender.fullName,
-                                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textPrimaryColor),
-                                    ),
-                                    Text(
-                                      DateFormat('dd/MM HH:mm').format(message.sentAt.toLocal()),
-                                      style: TextStyle(fontSize: 11, color: textSecondaryColor),
-                                    ),
-                                  ],
-                                ),
-                                subtitle: Padding(
-                                  padding: const EdgeInsets.only(top: 4),
-                                  child: Text(
-                                    message.content.isEmpty
-                                        ? '[${message.messageType}]'
-                                        : message.content,
-                                    style: TextStyle(fontSize: 13, color: textPrimaryColor.withValues(alpha: 0.9)),
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              );
-                            },
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
                           ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -1762,7 +1854,8 @@ class _ConversationGalleryPage extends StatefulWidget {
   });
 
   @override
-  State<_ConversationGalleryPage> createState() => _ConversationGalleryPageState();
+  State<_ConversationGalleryPage> createState() =>
+      _ConversationGalleryPageState();
 }
 
 class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
@@ -1785,10 +1878,19 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
     });
     try {
       final chatProvider = context.read<ChatProvider>();
-      final media = await chatProvider.loadGallery(widget.conversationId, 'MEDIA');
-      final links = await chatProvider.loadGallery(widget.conversationId, 'LINKS');
-      final files = await chatProvider.loadGallery(widget.conversationId, 'FILES');
-      
+      final media = await chatProvider.loadGallery(
+        widget.conversationId,
+        'MEDIA',
+      );
+      final links = await chatProvider.loadGallery(
+        widget.conversationId,
+        'LINKS',
+      );
+      final files = await chatProvider.loadGallery(
+        widget.conversationId,
+        'FILES',
+      );
+
       if (mounted) {
         setState(() {
           _mediaItems = media;
@@ -1797,7 +1899,11 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
         });
       }
     } catch (error) {
-      if (mounted) setState(() => _error = 'Không thể tải kho tài nguyên. Vui lòng thử lại.');
+      if (mounted) {
+        setState(
+          () => _error = 'Không thể tải kho tài nguyên. Vui lòng thử lại.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -1805,10 +1911,16 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
 
   @override
   Widget build(BuildContext context) {
-    final background = widget.isDark ? AppColors.backgroundDark : AppColors.backgroundLight;
+    final background = widget.isDark
+        ? AppColors.backgroundDark
+        : AppColors.backgroundLight;
     final surface = widget.isDark ? AppColors.surfaceDark : Colors.white;
-    final textPrimaryColor = widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondaryColor = widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimaryColor = widget.isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSecondaryColor = widget.isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
 
     return DefaultTabController(
       length: 3,
@@ -1818,12 +1930,20 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
           backgroundColor: surface,
           elevation: 0,
           leading: IconButton(
-            icon: Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.primary),
+            icon: Icon(
+              Icons.arrow_back_ios_new,
+              size: 20,
+              color: AppColors.primary,
+            ),
             onPressed: () => Navigator.pop(context),
           ),
           title: Text(
             'Ảnh, file & liên kết',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: textPrimaryColor),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: textPrimaryColor,
+            ),
           ),
           centerTitle: true,
           bottom: TabBar(
@@ -1831,7 +1951,10 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
             unselectedLabelColor: textSecondaryColor,
             indicatorColor: AppColors.primary,
             indicatorSize: TabBarIndicatorSize.tab,
-            labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            labelStyle: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 14,
+            ),
             tabs: const [
               Tab(text: 'Media'),
               Tab(text: 'Liên kết'),
@@ -1842,30 +1965,36 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(_error!, style: const TextStyle(color: Colors.red)),
-                        const SizedBox(height: 12),
-                        ElevatedButton(onPressed: _loadAll, child: const Text('Thử lại')),
-                      ],
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(_error!, style: const TextStyle(color: Colors.red)),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: _loadAll,
+                      child: const Text('Thử lại'),
                     ),
-                  )
-                : TabBarView(
-                    children: [
-                      _buildMediaTab(),
-                      _buildLinksTab(),
-                      _buildFilesTab(),
-                    ],
-                  ),
+                  ],
+                ),
+              )
+            : TabBarView(
+                children: [
+                  _buildMediaTab(),
+                  _buildLinksTab(),
+                  _buildFilesTab(),
+                ],
+              ),
       ),
     );
   }
 
   Widget _buildMediaTab() {
     if (_mediaItems.isEmpty) {
-      return _buildEmptyState(Icons.image_not_supported_outlined, 'Chưa có file phương tiện nào');
+      return _buildEmptyState(
+        Icons.image_not_supported_outlined,
+        'Chưa có file phương tiện nào',
+      );
     }
     final provider = context.read<ChatProvider>();
     return GridView.builder(
@@ -1878,9 +2007,11 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
       itemCount: _mediaItems.length,
       itemBuilder: (context, index) {
         final item = _mediaItems[index];
-        final mediaUrl = item.mediaUrl == null ? null : provider.mediaUrl(item.mediaUrl!);
+        final mediaUrl = item.mediaUrl == null
+            ? null
+            : provider.mediaUrl(item.mediaUrl!);
         if (mediaUrl == null) return const SizedBox.shrink();
-        
+
         return InkWell(
           onTap: () => launchUrl(
             Uri.parse(mediaUrl),
@@ -1906,19 +2037,26 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
     if (_linkItems.isEmpty) {
       return _buildEmptyState(Icons.link_off, 'Chưa có liên kết chia sẻ nào');
     }
-    final textPrimaryColor = widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondaryColor = widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimaryColor = widget.isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSecondaryColor = widget.isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
     final provider = context.read<ChatProvider>();
 
     return ListView.separated(
       padding: const EdgeInsets.all(12),
       itemCount: _linkItems.length,
-      separatorBuilder: (context, index) => Divider(color: widget.isDark ? AppColors.borderDark : AppColors.borderLight, height: 1),
+      separatorBuilder: (context, index) => Divider(
+        color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+        height: 1,
+      ),
       itemBuilder: (context, index) {
         final item = _linkItems[index];
         final target = _firstLink(item.content) ?? item.mediaUrl;
         final resolved = target == null ? null : provider.mediaUrl(target);
-        
+
         return ListTile(
           contentPadding: EdgeInsets.zero,
           leading: Container(
@@ -1932,7 +2070,11 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
           ),
           title: Text(
             item.content.isEmpty ? (target ?? 'Liên kết') : item.content,
-            style: TextStyle(color: textPrimaryColor, fontSize: 14, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              color: textPrimaryColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
@@ -1943,9 +2085,9 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
           onTap: resolved == null
               ? null
               : () => launchUrl(
-                    Uri.parse(resolved),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                  Uri.parse(resolved),
+                  mode: LaunchMode.externalApplication,
+                ),
         );
       },
     );
@@ -1953,22 +2095,34 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
 
   Widget _buildFilesTab() {
     if (_fileItems.isEmpty) {
-      return _buildEmptyState(Icons.folder_off_outlined, 'Chưa có file tài liệu nào');
+      return _buildEmptyState(
+        Icons.folder_off_outlined,
+        'Chưa có file tài liệu nào',
+      );
     }
-    final textPrimaryColor = widget.isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight;
-    final textSecondaryColor = widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textPrimaryColor = widget.isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+    final textSecondaryColor = widget.isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
     final provider = context.read<ChatProvider>();
 
     return ListView.separated(
       padding: const EdgeInsets.all(12),
       itemCount: _fileItems.length,
-      separatorBuilder: (context, index) => Divider(color: widget.isDark ? AppColors.borderDark : AppColors.borderLight, height: 1),
+      separatorBuilder: (context, index) => Divider(
+        color: widget.isDark ? AppColors.borderDark : AppColors.borderLight,
+        height: 1,
+      ),
       itemBuilder: (context, index) {
         final item = _fileItems[index];
         final filename = item.mediaUrl?.split('/').last ?? 'Tài liệu đính kèm';
-        final resolved = item.mediaUrl == null ? null : provider.mediaUrl(item.mediaUrl!);
+        final resolved = item.mediaUrl == null
+            ? null
+            : provider.mediaUrl(item.mediaUrl!);
         final ext = filename.split('.').last.toLowerCase();
-        
+
         Color iconColor = Colors.orange;
         IconData iconData = Icons.insert_drive_file;
         if (ext == 'pdf') {
@@ -1995,7 +2149,11 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
           ),
           title: Text(
             filename,
-            style: TextStyle(color: textPrimaryColor, fontSize: 14, fontWeight: FontWeight.w500),
+            style: TextStyle(
+              color: textPrimaryColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
@@ -2006,21 +2164,27 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
           onTap: resolved == null
               ? null
               : () => launchUrl(
-                    Uri.parse(resolved),
-                    mode: LaunchMode.externalApplication,
-                  ),
+                  Uri.parse(resolved),
+                  mode: LaunchMode.externalApplication,
+                ),
         );
       },
     );
   }
 
   Widget _buildEmptyState(IconData icon, String message) {
-    final textSecondaryColor = widget.isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight;
+    final textSecondaryColor = widget.isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 54, color: textSecondaryColor.withValues(alpha: 0.4)),
+          Icon(
+            icon,
+            size: 54,
+            color: textSecondaryColor.withValues(alpha: 0.4),
+          ),
           const SizedBox(height: 12),
           Text(
             message,
@@ -2063,7 +2227,11 @@ class _PinnedMessageBanner extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.push_pin_outlined, size: 16, color: AppColors.primary),
+          const Icon(
+            Icons.push_pin_outlined,
+            size: 16,
+            color: AppColors.primary,
+          ),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
@@ -2282,7 +2450,10 @@ class _OutgoingMessage extends StatelessWidget {
               child: GestureDetector(
                 onLongPress: () => _showOutgoingActions(context),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 11,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.primary,
                     borderRadius: BorderRadius.circular(12),
@@ -2936,7 +3107,11 @@ class _ChatDetailInfoPage extends StatelessWidget {
         backgroundColor: surface,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, size: 20, color: AppColors.primary),
+          icon: Icon(
+            Icons.arrow_back_ios_new,
+            size: 20,
+            color: AppColors.primary,
+          ),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
@@ -2995,10 +3170,7 @@ class _ChatDetailInfoPage extends StatelessWidget {
               conversation.type == 'GROUP'
                   ? '${conversation.members.length} thành viên'
                   : 'Đang hoạt động',
-              style: TextStyle(
-                fontSize: 13,
-                color: textSecondaryColor,
-              ),
+              style: TextStyle(fontSize: 13, color: textSecondaryColor),
             ),
             const SizedBox(height: 28),
             Row(
@@ -3086,8 +3258,9 @@ class _ChatDetailInfoPage extends StatelessWidget {
                       ? '?'
                       : member.fullName.trim().split(' ').last[0].toUpperCase();
                   final memberHash = member.fullName.hashCode;
-                  final memberColor = Colors.primaries[memberHash.abs() % Colors.primaries.length];
-                  
+                  final memberColor = Colors
+                      .primaries[memberHash.abs() % Colors.primaries.length];
+
                   return ListTile(
                     leading: Container(
                       width: 36,
@@ -3117,10 +3290,7 @@ class _ChatDetailInfoPage extends StatelessWidget {
                     ),
                     subtitle: Text(
                       member.isAdmin ? 'Quản trị viên' : 'Thành viên',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: textSecondaryColor,
-                      ),
+                      style: TextStyle(fontSize: 12, color: textSecondaryColor),
                     ),
                   );
                 },
@@ -3136,7 +3306,9 @@ class _ChatDetailInfoPage extends StatelessWidget {
             _buildMenuItem(
               icon: conversation.type == 'GROUP' ? Icons.logout : Icons.block,
               iconColor: Colors.red,
-              title: conversation.type == 'GROUP' ? 'Rời khỏi nhóm' : 'Chặn người dùng',
+              title: conversation.type == 'GROUP'
+                  ? 'Rời khỏi nhóm'
+                  : 'Chặn người dùng',
               onTap: () {},
             ),
             const SizedBox(height: 32),
@@ -3183,10 +3355,7 @@ class _ChatDetailInfoPage extends StatelessWidget {
       ),
       title: Text(
         title,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
       ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
@@ -3210,9 +3379,7 @@ class _ChatDetailInfoPage extends StatelessWidget {
     required String label,
     required VoidCallback onTap,
   }) {
-    final circleBg = isDark
-        ? AppColors.borderDark
-        : const Color(0xFFF1F5F9);
+    final circleBg = isDark ? AppColors.borderDark : const Color(0xFFF1F5F9);
 
     return InkWell(
       onTap: onTap,
@@ -3222,10 +3389,7 @@ class _ChatDetailInfoPage extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
-              color: circleBg,
-              shape: BoxShape.circle,
-            ),
+            decoration: BoxDecoration(color: circleBg, shape: BoxShape.circle),
             child: Icon(
               icon,
               color: isDark ? Colors.white : AppColors.textPrimaryLight,
@@ -3237,7 +3401,9 @@ class _ChatDetailInfoPage extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12,
-              color: isDark ? AppColors.textSecondaryDark : AppColors.textSecondaryLight,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : AppColors.textSecondaryLight,
             ),
           ),
         ],
@@ -3268,20 +3434,22 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
 
   void _initializeController() {
     _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..initialize().then((_) {
-        if (mounted) {
-          setState(() {
-            _initialized = true;
+      ..initialize()
+          .then((_) {
+            if (mounted) {
+              setState(() {
+                _initialized = true;
+              });
+            }
+          })
+          .catchError((error) {
+            debugPrint('Error initializing video player: $error');
+            if (mounted) {
+              setState(() {
+                _hasError = true;
+              });
+            }
           });
-        }
-      }).catchError((error) {
-        debugPrint('Error initializing video player: $error');
-        if (mounted) {
-          setState(() {
-            _hasError = true;
-          });
-        }
-      });
   }
 
   @override
@@ -3345,10 +3513,8 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
         onTap: () {
           showDialog(
             context: context,
-            builder: (context) => VideoPlayerDialog(
-              videoUrl: widget.videoUrl,
-              title: 'Video',
-            ),
+            builder: (context) =>
+                VideoPlayerDialog(videoUrl: widget.videoUrl, title: 'Video'),
           );
         },
         child: Container(
@@ -3375,7 +3541,9 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.5),
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.2),
+                  ),
                 ),
                 child: const Icon(
                   Icons.play_arrow_rounded,
@@ -3410,7 +3578,9 @@ class _ReplyPreviewWidget extends StatelessWidget {
         ? Colors.white.withValues(alpha: 0.9)
         : (isDark ? Colors.white70 : Colors.black87);
 
-    String displayContent = parentMessage.isRecalled ? 'Tin nhắn đã bị thu hồi' : parentMessage.content;
+    String displayContent = parentMessage.isRecalled
+        ? 'Tin nhắn đã bị thu hồi'
+        : parentMessage.content;
     if (!parentMessage.isRecalled && displayContent.isEmpty) {
       if (parentMessage.messageType == 'IMAGE') {
         displayContent = 'Đã gửi một hình ảnh';
@@ -3430,18 +3600,15 @@ class _ReplyPreviewWidget extends StatelessWidget {
         color: isOutgoing
             ? Colors.black.withValues(alpha: 0.1)
             : (isDark
-                ? Colors.white.withValues(alpha: 0.05)
-                : Colors.black.withValues(alpha: 0.03)),
+                  ? Colors.white.withValues(alpha: 0.05)
+                  : Colors.black.withValues(alpha: 0.03)),
         borderRadius: BorderRadius.circular(4),
       ),
       child: IntrinsicHeight(
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              width: 3,
-              color: barColor,
-            ),
+            Container(width: 3, color: barColor),
             const SizedBox(width: 8),
             Flexible(
               child: Column(
@@ -3464,7 +3631,9 @@ class _ReplyPreviewWidget extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 11,
                       color: textColor,
-                      fontStyle: parentMessage.isRecalled ? FontStyle.italic : FontStyle.normal,
+                      fontStyle: parentMessage.isRecalled
+                          ? FontStyle.italic
+                          : FontStyle.normal,
                     ),
                   ),
                 ],

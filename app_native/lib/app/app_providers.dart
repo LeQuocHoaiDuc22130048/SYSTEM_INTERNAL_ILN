@@ -30,8 +30,13 @@ class AppProviders extends StatelessWidget {
         ChangeNotifierProxyProvider<AuthProvider, BackendDataProvider>(
           create: (context) =>
               BackendDataProvider(api: context.read<AuthProvider>().api),
-          update: (_, auth, previous) =>
-              previous ?? BackendDataProvider(api: auth.api),
+          update: (_, auth, previous) {
+            final provider = previous ?? BackendDataProvider(api: auth.api);
+            if (!auth.isAuthenticated) {
+              provider.clear();
+            }
+            return provider;
+          },
         ),
         ChangeNotifierProxyProvider<AuthProvider, NotificationProvider>(
           create: (context) =>

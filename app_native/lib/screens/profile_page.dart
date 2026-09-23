@@ -226,7 +226,10 @@ class _ProfilePageState extends State<ProfilePage> {
                   : AppColors.textSecondaryLight,
             ),
             onTap: () {
-              context.read<UpdateProvider>().checkForUpdate(context, manual: true);
+              context.read<UpdateProvider>().checkForUpdate(
+                context,
+                manual: true,
+              );
             },
           ),
           Divider(
@@ -275,10 +278,7 @@ class _ProfilePageState extends State<ProfilePage> {
             color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
           ListTile(
-            leading: const Icon(
-              LucideIcons.logOut,
-              color: Colors.redAccent,
-            ),
+            leading: const Icon(LucideIcons.logOut, color: Colors.redAccent),
             title: const Text(
               'Đăng xuất',
               style: TextStyle(
@@ -298,16 +298,10 @@ class _ProfilePageState extends State<ProfilePage> {
             color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
           ListTile(
-            leading: const Icon(
-              LucideIcons.userX,
-              color: Colors.red,
-            ),
+            leading: const Icon(LucideIcons.userX, color: Colors.red),
             title: const Text(
               'Xóa tài khoản',
-              style: TextStyle(
-                color: Colors.red,
-                fontWeight: FontWeight.w600,
-              ),
+              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
               'Vô hiệu hóa vĩnh viễn tài khoản và dữ liệu',
@@ -520,9 +514,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: const Text('Hủy'),
                   ),
                   FilledButton(
-                    onPressed: isSaving
-                        ? null
-                        : () => submit(setDialogState),
+                    onPressed: isSaving ? null : () => submit(setDialogState),
                     child: isSaving
                         ? const SizedBox(
                             width: 18,
@@ -572,9 +564,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
-              _showSnackBar(
-                'Đổi mật khẩu thành công. Vui lòng đăng nhập lại.',
-              );
+              _showSnackBar('Đổi mật khẩu thành công. Vui lòng đăng nhập lại.');
             } on ApiException catch (error) {
               if (dialogContext.mounted) {
                 _showSnackBar(error.message, isError: true);
@@ -647,7 +637,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                 ),
                 actions: [
-                   TextButton(
+                  TextButton(
                     onPressed: isSaving
                         ? null
                         : () {
@@ -657,9 +647,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: const Text('Hủy'),
                   ),
                   FilledButton(
-                    onPressed: isSaving
-                        ? null
-                        : () => submit(setDialogState),
+                    onPressed: isSaving ? null : () => submit(setDialogState),
                     child: isSaving
                         ? const SizedBox(
                             width: 18,
@@ -713,11 +701,11 @@ class _ProfilePageState extends State<ProfilePage> {
               await context.read<NotificationProvider>().prepareForLogout();
               if (!mounted) return;
               await context.read<AuthProvider>().deleteAccount(
-                    password: passwordController.text,
-                    reason: reasonController.text.trim().isEmpty
-                        ? null
-                        : reasonController.text.trim(),
-                  );
+                password: passwordController.text,
+                reason: reasonController.text.trim().isEmpty
+                    ? null
+                    : reasonController.text.trim(),
+              );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -775,7 +763,9 @@ class _ProfilePageState extends State<ProfilePage> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red.withValues(alpha: isDark ? 0.15 : 0.08),
+                            color: Colors.red.withValues(
+                              alpha: isDark ? 0.15 : 0.08,
+                            ),
                             borderRadius: BorderRadius.circular(10),
                             border: Border.all(
                               color: Colors.red.withValues(alpha: 0.3),
@@ -798,10 +788,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                 '• Mọi quyền truy cập hệ thống và phiên đăng nhập sẽ bị chấm dứt ngay lập tức.\n'
                                 '• Dữ liệu tài khoản cá nhân và thông báo đẩy sẽ bị hủy bỏ hoàn toàn.\n'
                                 '• Tài khoản sẽ bị vô hiệu hóa theo đúng quy trình bảo mật nội bộ.',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  height: 1.4,
-                                ),
+                                style: TextStyle(fontSize: 12, height: 1.4),
                               ),
                             ],
                           ),

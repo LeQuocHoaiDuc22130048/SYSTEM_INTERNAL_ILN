@@ -24,7 +24,9 @@ class ConversationMemberInfo {
       employeeCode: json['employeeCode']?.toString(),
       avatarUrl: json['avatarUrl']?.toString(),
       isAdmin: json['isAdmin'] == true,
-      role: json['role']?.toString() ?? (json['isAdmin'] == true ? 'ADMIN' : 'MEMBER'),
+      role:
+          json['role']?.toString() ??
+          (json['isAdmin'] == true ? 'ADMIN' : 'MEMBER'),
       canChat: json['canChat'] != false,
     );
   }

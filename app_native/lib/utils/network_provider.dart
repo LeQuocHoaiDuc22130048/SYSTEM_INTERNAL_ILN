@@ -9,10 +9,16 @@ class NetworkProvider extends ChangeNotifier {
   bool _hasChecked = false;
   bool _isChecking = false;
   Timer? _timer;
+  final Future<bool> Function() _checker;
 
-  NetworkProvider() {
-    checkNow();
-    _timer = Timer.periodic(const Duration(seconds: 5), (_) => checkNow());
+  NetworkProvider({bool autoPoll = true, Future<bool> Function()? checker})
+    : _checker = checker ?? hasInternetConnection {
+    if (autoPoll) {
+      checkNow();
+      _timer = Timer.periodic(const Duration(seconds: 5), (_) => checkNow());
+    } else {
+      _hasChecked = true;
+    }
   }
 
   bool get isOnline => _isOnline;
@@ -23,16 +29,19 @@ class NetworkProvider extends ChangeNotifier {
     if (_isChecking) return _isOnline;
     _isChecking = true;
 
-    final nextStatus = await hasInternetConnection();
-    _isChecking = false;
+    try {
+      final nextStatus = await _checker();
 
-    if (!_hasChecked || nextStatus != _isOnline) {
-      _hasChecked = true;
-      _isOnline = nextStatus;
-      notifyListeners();
+      if (!_hasChecked || nextStatus != _isOnline) {
+        _hasChecked = true;
+        _isOnline = nextStatus;
+        notifyListeners();
+      }
+
+      return _isOnline;
+    } finally {
+      _isChecking = false;
     }
-
-    return _isOnline;
   }
 
   @override

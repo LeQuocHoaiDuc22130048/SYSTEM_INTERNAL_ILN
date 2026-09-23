@@ -38,11 +38,15 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
     if (type == 'NEW_MESSAGE' || refType == 'CONVERSATION') {
       widget.onNavigateToTab!(4, refId: refId);
-    } else if (type.startsWith('ORDER_') || type.startsWith('NEW_REPAIR_') || refType == 'REPAIR_ORDER') {
+    } else if (type.startsWith('ORDER_') ||
+        type.startsWith('NEW_REPAIR_') ||
+        refType == 'REPAIR_ORDER') {
       widget.onNavigateToTab!(1, refId: refId);
     } else if (type.startsWith('ACCOUNT_') || refType == 'USER') {
       widget.onNavigateToTab!(6, subTab: 1); // 1 = Account Approval tab
-    } else if (type.startsWith('PART_') || refType == 'PART' || refType == 'WAREHOUSE') {
+    } else if (type.startsWith('PART_') ||
+        refType == 'PART' ||
+        refType == 'WAREHOUSE') {
       widget.onNavigateToTab!(2, refId: refId); // 2 = Warehouse tab
     }
   }
