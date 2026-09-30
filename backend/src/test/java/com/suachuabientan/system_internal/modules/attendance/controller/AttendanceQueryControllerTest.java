@@ -306,8 +306,28 @@ class AttendanceQueryControllerTest {
                 .build();
         recOut4.setIsDeleted(false);
 
+        // 2026-06-05: IN at 13:30, OUT at 21:00 -> Full day (1.0 cong) at the threshold
+        java.time.Instant checkIn5 = java.time.LocalDateTime.of(2026, 6, 5, 13, 30).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+        java.time.Instant checkOut5 = java.time.LocalDateTime.of(2026, 6, 5, 21, 0).atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).toInstant();
+
+        AttendanceRecord recIn5 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.IN)
+                .checkTime(checkIn5)
+                .isValid(true)
+                .build();
+        recIn5.setIsDeleted(false);
+
+        AttendanceRecord recOut5 = AttendanceRecord.builder()
+                .employeeId(empId)
+                .type(AttendanceType.OUT)
+                .checkTime(checkOut5)
+                .isValid(true)
+                .build();
+        recOut5.setIsDeleted(false);
+
         when(attendanceRecordRepository.findByCheckTimeBetween(any(), any()))
-                .thenReturn(java.util.List.of(recIn1, recOut1, recIn2, recOut2, recIn3, recOut3, recIn4, recOut4));
+                .thenReturn(java.util.List.of(recIn1, recOut1, recIn2, recOut2, recIn3, recOut3, recIn4, recOut4, recIn5, recOut5));
         when(workScheduleRepository.findByWorkDateBetween(any(), any()))
                 .thenReturn(Collections.emptyList());
 
@@ -316,8 +336,10 @@ class AttendanceQueryControllerTest {
                 .param("month", "6"))
                 .andExpect(status().isOk())
                 .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].lateCount").value(1))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].overtimeHours").value(4.0))
-                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].workDays").value(3.0));
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].overtimeHours").value(7.5))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].workDays").value(4.0))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].absentDays").value(21))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].leavedays").value(0));
     }
 
     @Test

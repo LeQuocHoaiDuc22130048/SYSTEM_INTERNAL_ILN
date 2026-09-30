@@ -164,14 +164,8 @@ public class AttendanceQueryController {
                     patternBuilder.append("h");
                 } else {
                     if (dayRecords.isEmpty()) {
-                        // Check if it's leave day
-                        if (d == 10 || d == 12) {
-                            patternBuilder.append("v");
-                            leaveDays++;
-                        } else {
-                            patternBuilder.append("a");
-                            absentDays++;
-                        }
+                        patternBuilder.append("a");
+                        absentDays++;
                     } else {
                         LocalTime inTime = checkIn != null ? checkIn.atZone(ZONE).toLocalTime() : null;
                         LocalTime outTime = checkOut != null ? checkOut.atZone(ZONE).toLocalTime() : null;
@@ -184,6 +178,11 @@ public class AttendanceQueryController {
                                 && (inTime == null || inTime.isBefore(LocalTime.of(12, 30)));
                         boolean isHalfDayAfternoon = inTime != null && !inTime.isBefore(LocalTime.of(12, 30))
                                 && !isHalfDayMorning;
+                        boolean isFullDayAfternoon = isHalfDayAfternoon
+                                && checkIn != null
+                                && checkOut != null
+                                && outTime != null
+                                && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
 
                         boolean isLate = false;
                         if (isHalfDayAfternoon) {
@@ -236,7 +235,7 @@ public class AttendanceQueryController {
                             lateCount++;
                         }
 
-                        if (isHalfDayMorning || isHalfDayAfternoon) {
+                        if (isHalfDayMorning || (isHalfDayAfternoon && !isFullDayAfternoon)) {
                             workDays += 0.5;
                         } else {
                             workDays += 1.0;
@@ -347,12 +346,8 @@ public class AttendanceQueryController {
                 status = "HOLIDAY";
             } else {
                 if (dayRecords.isEmpty()) {
-                    if (d == 10 || d == 12) {
-                        status = "LEAVE";
-                    } else {
-                        status = "ABSENT";
-                        absentDays++;
-                    }
+                    status = "ABSENT";
+                    absentDays++;
                 } else {
                     checkIn = dayRecords.stream()
                             .filter(r -> r.getType() == AttendanceType.IN)
@@ -377,6 +372,11 @@ public class AttendanceQueryController {
                             && (inTime == null || inTime.isBefore(LocalTime.of(12, 30)));
                     boolean isHalfDayAfternoon = inTime != null && !inTime.isBefore(LocalTime.of(12, 30))
                             && !isHalfDayMorning;
+                    boolean isFullDayAfternoon = isHalfDayAfternoon
+                            && checkIn != null
+                            && checkOut != null
+                            && outTime != null
+                            && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
 
                     boolean isLate = false;
                     if (isHalfDayAfternoon) {
@@ -430,7 +430,7 @@ public class AttendanceQueryController {
                         lateCount++;
                     }
 
-                    if (isHalfDayMorning || isHalfDayAfternoon) {
+                    if (isHalfDayMorning || (isHalfDayAfternoon && !isFullDayAfternoon)) {
                         workDays += 0.5;
                     } else {
                         workDays += 1.0;

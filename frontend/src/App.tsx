@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { EmployeeMonthlyStats, UserInfo } from './mockData';
 import './App.css';
+import { normalizeMonthlyResponse } from './utils/employee';
 
 import { LoginScreen } from './components/LoginScreen';
 import { Header } from './components/Header';
@@ -211,7 +212,7 @@ function App() {
       }
       const apiData = await response.json();
       if (apiData?.data?.employees) {
-        setEmployees(apiData.data.employees);
+        setEmployees(normalizeMonthlyResponse(apiData.data.employees));
         setDataSource('api');
         setConnectionError(null);
       } else {

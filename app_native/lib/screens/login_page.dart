@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import '../app/app_routes.dart';
 import '../theme/app_colors.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
@@ -27,6 +28,22 @@ class _LoginPageState extends State<LoginPage> {
   String _error = '';
   bool _loading = false;
   bool _checkingAutoLogin = true;
+  bool _showAuthModal = false;
+
+  void _openAuthModal({required bool isLogin}) {
+    setState(() {
+      _isLogin = isLogin;
+      _showAuthModal = true;
+      _error = '';
+    });
+  }
+
+  void _closeAuthModal() {
+    setState(() {
+      _showAuthModal = false;
+      _error = '';
+    });
+  }
 
   @override
   void initState() {
@@ -47,7 +64,9 @@ class _LoginPageState extends State<LoginPage> {
           isManagerOrAbove: auth.isManagerOrAbove,
         );
       }
-      Navigator.of(context).pushReplacementNamed('/dashboard');
+      final targetRoute =
+          auth.isAttendanceAccount ? AppRoutes.dashboard : AppRoutes.home;
+      Navigator.of(context).pushReplacementNamed(targetRoute);
     } else {
       setState(() {
         _checkingAutoLogin = false;
@@ -188,7 +207,9 @@ class _LoginPageState extends State<LoginPage> {
           isManagerOrAbove: auth.isManagerOrAbove,
         );
       }
-      Navigator.of(context).pushReplacementNamed('/dashboard');
+      final targetRoute =
+          auth.isAttendanceAccount ? AppRoutes.dashboard : AppRoutes.home;
+      Navigator.of(context).pushReplacementNamed(targetRoute);
     } on ApiException catch (error) {
       if (!mounted) return;
       setState(() {
@@ -507,96 +528,58 @@ class _LoginPageState extends State<LoginPage> {
       );
     }
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        children: [
-          const LoginBackground(),
-          Scaffold(
-            backgroundColor: Colors.transparent,
-            resizeToAvoidBottomInset: true,
-            body: SafeArea(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final width = constraints.maxWidth;
-                  final availableHeight = constraints.maxHeight;
+    return PopScope(
+      canPop: !_showAuthModal,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_showAuthModal) {
+          _closeAuthModal();
+        }
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        body: Stack(
+          children: [
+            const LoginBackground(),
+            Scaffold(
+              backgroundColor: Colors.transparent,
+              resizeToAvoidBottomInset: true,
+              body: SafeArea(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final width = constraints.maxWidth;
+                    final availableHeight = constraints.maxHeight;
 
-                  final isDesktop = width >= 1024;
-                  final isTablet = width >= 640 && width < 1024;
-                  final isMobile = width < 640;
-                  final isShort = availableHeight < 600;
+                    final isDesktop = width >= 1024;
+                    final isTablet = width >= 640 && width < 1024;
+                    final isMobile = width < 640;
+                    final isShort = availableHeight < 620;
 
-                  // Determine branding scale
-                  double brandingScale = 1.0;
-                  if (isMobile) {
-                    brandingScale = isShort ? 0.45 : 0.65;
-                  } else if (isTablet) {
-                    brandingScale = 0.9;
-                  }
+                    // Determine branding scale (prominent hero logo)
+                    double brandingScale = 1.0;
+                    if (isMobile) {
+                      brandingScale = isShort ? 0.75 : 1.0;
+                    } else if (isTablet) {
+                      brandingScale = 1.15;
+                    }
 
-                  return SingleChildScrollView(
-                    physics: const ClampingScrollPhysics(),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(minHeight: availableHeight),
-                      child: Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: isDesktop ? 60 : (isTablet ? 40 : 20),
-                          vertical: 20,
-                        ),
-                        child: Center(
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth: isDesktop
-                                  ? 1100
-                                  : (isTablet ? 500 : 400),
-                            ),
-                            child: isDesktop
-                                ? Row(
-                                    children: [
-                                      Expanded(
-                                        child: _buildBrandingSection(
-                                          scale: 1.1,
-                                          isMobile: false,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 80),
-                                      Expanded(
-                                        child: Center(
-                                          child: ConstrainedBox(
-                                            constraints: const BoxConstraints(
-                                              maxWidth: 450,
-                                            ),
-                                            child: _buildFormCard(
-                                              isDesktop: true,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      _buildBrandingSection(
-                                        scale: brandingScale,
-                                        isMobile: isMobile,
-                                        isShort: isShort,
-                                      ),
-                                      SizedBox(height: isShort ? 16 : 24),
-                                      _buildFormCard(isDesktop: false),
-                                      const SizedBox(height: 20),
-                                    ],
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
+                    if (isDesktop) {
+                      return _buildDesktopLayout(
+                        availableHeight: availableHeight,
+                      );
+                    }
+
+                    return _buildMobileLayout(
+                      availableHeight: availableHeight,
+                      brandingScale: brandingScale,
+                      isShort: isShort,
+                    );
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -610,105 +593,808 @@ class _LoginPageState extends State<LoginPage> {
       mainAxisAlignment: MainAxisAlignment.center,
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(
-              width: 250 * scale,
-              height: 250 * scale,
-              child: Image.asset(
-                'assets/images/app_logo.png',
-                fit: BoxFit.contain,
+        // Brand Wordmark Pill with Live Status Indicator (Stitch style)
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 20,
+            vertical: isMobile ? 6 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 14,
               ),
-            )
-            .animate(target: 1)
-            .fadeIn(duration: 600.ms)
-            .scale(begin: const Offset(0.8, 0.8), duration: 600.ms),
-        if (!isShort) ...[
-          SizedBox(height: 24 * scale),
-          Text(
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
                 'INVERTER LIKE NEW',
-                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: isMobile ? 28 * scale : 40 * scale,
-                  fontWeight: FontWeight.w800,
+                  fontSize: isMobile ? 13.5 : 15,
+                  fontWeight: FontWeight.w700,
                   color: Colors.white,
-                  letterSpacing: -0.5,
+                  letterSpacing: 0.9,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: AppColors.success,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.success,
+                      blurRadius: 6,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
               )
-              .animate(target: 1)
-              .fadeIn(duration: 600.ms, delay: 100.ms)
-              .slideY(begin: 0.3, end: 0, duration: 600.ms, delay: 100.ms),
-          SizedBox(height: 12 * scale),
-          Text(
-                'Internal Management System',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: isMobile ? 12 * scale : 16 * scale,
-                  color: Colors.white.withValues(alpha: 0.7),
-                  letterSpacing: 0.2,
-                  fontWeight: FontWeight.w500,
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .scale(
+                    begin: const Offset(0.85, 0.85),
+                    end: const Offset(1.25, 1.25),
+                    duration: 900.ms,
+                  )
+                  .fade(begin: 0.5, end: 1.0, duration: 900.ms),
+            ],
+          ),
+        )
+            .animate(target: 1)
+            .fadeIn(duration: 500.ms)
+            .slideY(begin: -0.3, end: 0, duration: 500.ms),
+
+        SizedBox(height: isShort ? 10 : 20 * scale),
+
+        // Hero Stage with 3D Logo Levitation, Breathing Halo Glow and Floating Badges
+        SizedBox(
+          width: 320 * scale,
+          height: 280 * scale,
+          child: Stack(
+            alignment: Alignment.center,
+            clipBehavior: Clip.none,
+            children: [
+              // Breathing glowing halo behind the logo (matching Stitch @keyframes logoGlow)
+              Container(
+                width: 220 * scale,
+                height: 220 * scale,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF38BDF8).withValues(alpha: 0.50),
+                      const Color(0xFF2563EB).withValues(alpha: 0.28),
+                      Colors.transparent,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00F2FE).withValues(alpha: 0.40),
+                      blurRadius: 55 * scale,
+                      spreadRadius: 20 * scale,
+                    ),
+                  ],
                 ),
               )
-              .animate(target: 1)
-              .fadeIn(duration: 600.ms, delay: 200.ms)
-              .slideY(begin: 0.3, end: 0, duration: 600.ms, delay: 200.ms),
-        ],
+                  .animate(
+                    onPlay: (controller) => controller.repeat(reverse: true),
+                  )
+                  .scale(
+                    begin: const Offset(0.92, 0.92),
+                    end: const Offset(1.10, 1.10),
+                    duration: 2500.ms,
+                    curve: Curves.easeInOut,
+                  )
+                  .fade(
+                    begin: 0.40,
+                    end: 0.85,
+                    duration: 2500.ms,
+                    curve: Curves.easeInOut,
+                  ),
+
+              // 3D Logo with levitation & subtle tilt (matching Stitch @keyframes logoLevitate)
+              SizedBox(
+                width: 270 * scale,
+                height: 270 * scale,
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  fit: BoxFit.contain,
+                ),
+              )
+                  .animate(
+                    onPlay: (controller) => controller.repeat(reverse: true),
+                  )
+                  .moveY(
+                    begin: 0,
+                    end: -8 * scale,
+                    duration: 2200.ms,
+                    curve: Curves.easeInOut,
+                  )
+                  .rotate(
+                    begin: 0,
+                    end: 0.012,
+                    duration: 2200.ms,
+                    curve: Curves.easeInOut,
+                  ),
+
+              if (!isShort) ...[
+                // Floating Badge 1 (Top-Right): 100% Bảo mật (matching Stitch badgeFloatA)
+                Positioned(
+                  top: -4 * scale,
+                  right: -10 * scale,
+                  child:
+                      _buildFloatingBadge(
+                            icon: LucideIcons.shieldCheck,
+                            iconColor: const Color(0xFF2563EB),
+                            iconBg: const Color(0xFFDBEAFE),
+                            text: '100% Bảo mật',
+                            scale: scale,
+                          )
+                          .animate(onPlay: (c) => c.repeat(reverse: true))
+                          .moveY(
+                            begin: 0,
+                            end: -6 * scale,
+                            duration: 2400.ms,
+                            curve: Curves.easeInOut,
+                          )
+                          .scale(
+                            begin: const Offset(1.0, 1.0),
+                            end: const Offset(1.03, 1.03),
+                            duration: 2400.ms,
+                            curve: Curves.easeInOut,
+                          ),
+                ),
+
+                // Floating Badge 2 (Bottom-Left): Truy cập nhanh (matching Stitch badgeFloatB)
+                Positioned(
+                  bottom: 4 * scale,
+                  left: -14 * scale,
+                  child:
+                      _buildFloatingBadge(
+                            icon: LucideIcons.zap,
+                            iconColor: const Color(0xFFD97706),
+                            iconBg: const Color(0xFFFEF3C7),
+                            text: 'Truy cập nhanh',
+                            scale: scale,
+                          )
+                          .animate(onPlay: (c) => c.repeat(reverse: true))
+                          .moveY(
+                            begin: 0,
+                            end: 6 * scale,
+                            duration: 2700.ms,
+                            curve: Curves.easeInOut,
+                          )
+                          .scale(
+                            begin: const Offset(1.0, 1.0),
+                            end: const Offset(0.97, 0.97),
+                            duration: 2700.ms,
+                            curve: Curves.easeInOut,
+                          ),
+                ),
+              ],
+            ],
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildFormCard({required bool isDesktop}) {
+  Widget _buildFloatingBadge({
+    required IconData icon,
+    required Color iconColor,
+    required Color iconBg,
+    required String text,
+    required double scale,
+  }) {
+    final effectiveScale = scale.clamp(0.75, 1.0);
     return Container(
-          padding: EdgeInsets.all(isDesktop ? 40 : 24),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 40,
-                spreadRadius: 10,
-              ),
-            ],
+      padding: EdgeInsets.symmetric(
+        horizontal: 10 * effectiveScale,
+        vertical: 6 * effectiveScale,
+      ),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withValues(alpha: 0.18),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
           ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 22 * effectiveScale,
+            height: 22 * effectiveScale,
+            decoration: BoxDecoration(
+              color: iconBg,
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Icon(
+                icon,
+                size: 13 * effectiveScale,
+                color: iconColor,
+              ),
+            ),
+          ),
+          SizedBox(width: 6 * effectiveScale),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 11 * effectiveScale,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF1E293B),
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopLayout({required double availableHeight}) {
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(minHeight: availableHeight),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 24),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1100),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _buildBrandingSection(
+                      scale: 1.1,
+                      isMobile: false,
+                    ),
+                  ),
+                  const SizedBox(width: 70),
+                  Expanded(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 460),
+                        child: AnimatedCrossFade(
+                          crossFadeState: _showAuthModal
+                              ? CrossFadeState.showSecond
+                              : CrossFadeState.showFirst,
+                          duration: const Duration(milliseconds: 280),
+                          firstChild: _buildDesktopWelcomeCard(),
+                          secondChild: _buildDesktopFormCard(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMobileLayout({
+    required double availableHeight,
+    required double brandingScale,
+    required bool isShort,
+  }) {
+    final modalHeightRatio = isShort ? 0.74 : 0.70;
+    const welcomeActionsHeight = 175.0;
+
+    return Stack(
+      children: [
+        // Hero Logo Section: smoothly animates from full screen center to compact top frame above modal
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: _showAuthModal
+              ? (availableHeight * modalHeightRatio)
+              : welcomeActionsHeight,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _showAuthModal ? _closeAuthModal : null,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Center(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: AnimatedScale(
+                    scale: _showAuthModal ? 0.75 : 1.0,
+                    duration: const Duration(milliseconds: 320),
+                    curve: Curves.easeOutCubic,
+                    child: _buildBrandingSection(
+                      scale: brandingScale,
+                      isMobile: true,
+                      isShort: isShort || _showAuthModal,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+
+        // Bottom Action Section with Login and Sign Up buttons (slides down & fades out when modal opens)
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          left: 24,
+          right: 24,
+          bottom: _showAuthModal ? -220 : 16,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            opacity: _showAuthModal ? 0.0 : 1.0,
+            child: IgnorePointer(
+              ignoring: _showAuthModal,
+              child: _buildWelcomeActions(isMobile: true),
+            ),
+          ),
+        ),
+
+        // Bottom Sheet Auth Modal (sliding from bottom, capped so logo remains visible above)
+        AnimatedPositioned(
+          duration: const Duration(milliseconds: 320),
+          curve: Curves.easeOutCubic,
+          left: 0,
+          right: 0,
+          bottom: _showAuthModal ? 0 : -availableHeight,
+          child: GestureDetector(
+            onVerticalDragEnd: (details) {
+              if (details.primaryVelocity != null &&
+                  details.primaryVelocity! > 240) {
+                _closeAuthModal();
+              }
+            },
+            child: _buildMobileBottomSheet(
+              maxHeight: availableHeight * modalHeightRatio,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Welcome Action Section matching Stitch Start / Welcome Screen
+  Widget _buildWelcomeActions({required bool isMobile}) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Primary Button: Login (White pill with blue text, Stitch style)
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: ElevatedButton(
+            key: const Key('btn-welcome-login'),
+            onPressed: () => _openAuthModal(isLogin: true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: const Color(0xFF2563EB),
+              elevation: 4,
+              shadowColor: const Color(0xFF0F172A).withValues(alpha: 0.35),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Đăng nhập',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+
+        // Secondary Button: Sign Up (Outlined translucent pill, Stitch style)
+        SizedBox(
+          width: double.infinity,
+          height: 52,
+          child: OutlinedButton(
+            key: const Key('btn-welcome-register'),
+            onPressed: () => _openAuthModal(isLogin: false),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: Colors.white.withValues(alpha: 0.12),
+              foregroundColor: Colors.white,
+              side: BorderSide(
+                color: Colors.white.withValues(alpha: 0.85),
+                width: 1.8,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Đăng ký',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 8),
+
+        // Privacy Policy Link
+        Center(
+          child: TextButton.icon(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+              );
+            },
+            icon: Icon(
+              LucideIcons.shieldCheck,
+              size: 14,
+              color: Colors.white.withValues(alpha: 0.8),
+            ),
+            label: Text(
+              'Chính sách bảo mật',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withValues(alpha: 0.8),
+                decoration: TextDecoration.underline,
+                decorationColor: Colors.white.withValues(alpha: 0.8),
+              ),
+            ),
+          ),
+        ),
+
+        // iOS Home Bar Indicator (Stitch style)
+        Center(
+          child: Container(
+            width: 120,
+            height: 4,
+            margin: const EdgeInsets.only(top: 6, bottom: 4),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.35),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDesktopWelcomeCard() {
+    return Container(
+      padding: const EdgeInsets.all(40),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 40,
+            spreadRadius: 2,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.shieldCheck, size: 14, color: Color(0xFF2563EB)),
+                SizedBox(width: 6),
+                Text(
+                  'Cổng Đăng Nhập Nội Bộ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Chào mừng bạn đến với hệ thống',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF0F172A),
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Hệ thống quản lý dịch vụ & kho linh kiện Inverter Like New. Vui lòng đăng nhập hoặc đăng ký tài khoản để tiếp tục.',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF64748B),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 32),
+          // Primary Login Button
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: ElevatedButton(
+              onPressed: () => _openAuthModal(isLogin: true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                elevation: 4,
+                shadowColor: const Color(0xFF2563EB).withValues(alpha: 0.4),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Đăng nhập ngay',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(LucideIcons.arrowRight, size: 18),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          // Secondary Sign up Button
+          SizedBox(
+            width: double.infinity,
+            height: 52,
+            child: OutlinedButton(
+              onPressed: () => _openAuthModal(isLogin: false),
+              style: OutlinedButton.styleFrom(
+                backgroundColor: const Color(0xFFF8FAFC),
+                foregroundColor: const Color(0xFF1E293B),
+                side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.5),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    'Đăng ký tài khoản mới',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  Icon(LucideIcons.userPlus, size: 18),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          Center(
+            child: TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                );
+              },
+              icon: const Icon(
+                LucideIcons.shieldCheck,
+                size: 14,
+                color: Color(0xFF64748B),
+              ),
+              label: const Text(
+                'Chính sách bảo mật & Điều khoản',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF64748B),
+                  decoration: TextDecoration.underline,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDesktopFormCard() {
+    return Container(
+      padding: const EdgeInsets.all(36),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.18),
+            blurRadius: 40,
+            spreadRadius: 2,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: _buildAuthFormContent(isDesktop: true),
+    );
+  }
+
+  Widget _buildMobileBottomSheet({required double maxHeight}) {
+    return Container(
+      constraints: BoxConstraints(maxHeight: maxHeight),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 36,
+            spreadRadius: 2,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Drag handle (Stitch style)
+            Center(
+              child: Container(
+                width: 44,
+                height: 4.5,
+                margin: const EdgeInsets.only(top: 12, bottom: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(3),
+                ),
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(24, 6, 24, 20),
+                child: _buildAuthFormContent(isDesktop: false),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAuthFormContent({required bool isDesktop}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _isLogin ? 'Đăng nhập' : 'Đăng ký tài khoản',
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF0F172A),
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _isLogin
+                        ? 'Nhập thông tin tài khoản để tiếp tục'
+                        : 'Điền thông tin để đăng ký tài khoản mới',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            InkWell(
+              key: const Key('btn-auth-close'),
+              onTap: _closeAuthModal,
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 34,
+                height: 34,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFF1F5F9),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  LucideIcons.x,
+                  size: 18,
+                  color: Color(0xFF475569),
+                ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 22),
+
+        AnimatedSize(
+          duration: const Duration(milliseconds: 280),
+          curve: Curves.easeInOut,
+          alignment: Alignment.topCenter,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                _isLogin ? 'Đăng nhập' : 'Đăng ký tài khoản',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _isLogin
-                    ? 'Nhập thông tin tài khoản để tiếp tục'
-                    : 'Điền thông tin để đăng ký tài khoản mới',
-                style: TextStyle(
-                  fontSize: 14,
-                  color: Colors.blue[100]?.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 32),
-
               if (!_isLogin) ...[
                 _buildInputField(
                   label: 'Họ và tên',
                   hint: 'Nhập họ và tên...',
                   controller: _fullNameController,
                   icon: LucideIcons.user,
-                ),
-                const SizedBox(height: 20),
+                )
+                    .animate()
+                    .fadeIn(duration: 220.ms)
+                    .slideY(begin: -0.08, end: 0),
+                const SizedBox(height: 16),
                 _buildInputField(
                   label: 'Số điện thoại',
                   hint: 'Nhập số điện thoại...',
                   controller: _phoneController,
                   icon: LucideIcons.phone,
                   keyboardType: TextInputType.phone,
-                ),
-                const SizedBox(height: 20),
+                )
+                    .animate()
+                    .fadeIn(duration: 220.ms)
+                    .slideY(begin: -0.08, end: 0),
+                const SizedBox(height: 16),
               ],
 
               _buildInputField(
@@ -717,7 +1403,7 @@ class _LoginPageState extends State<LoginPage> {
                 controller: _usernameController,
                 icon: LucideIcons.user,
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
 
               _buildInputField(
                 label: 'Mật khẩu',
@@ -726,55 +1412,55 @@ class _LoginPageState extends State<LoginPage> {
                 icon: LucideIcons.lock,
                 isPassword: true,
               ),
-              if (_isLogin) ...[
-                const SizedBox(height: 8),
-                _buildForgotPasswordButton(),
-              ],
-              const SizedBox(height: 24),
-
-              // Error Message
-              if (_error.isNotEmpty) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: AppColors.error.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        LucideIcons.circleAlert,
-                        size: 18,
-                        color: Color(0xFFFCA5A5),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          _error,
-                          style: const TextStyle(
-                            color: Color(0xFFFCA5A5),
-                            fontSize: 13,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ).animate(target: 1).fadeIn().shake(),
-                const SizedBox(height: 24),
-              ],
-
-              _buildSubmitButton(),
-              const SizedBox(height: 24),
-              _buildToggleModeButton(),
             ],
           ),
-        )
-        .animate(target: 1)
-        .fadeIn(duration: 600.ms, delay: 300.ms)
-        .slideY(begin: 0.2, end: 0);
+        ),
+
+        if (_isLogin) ...[
+          const SizedBox(height: 6),
+          _buildForgotPasswordButton(),
+        ],
+        const SizedBox(height: 20),
+
+        // Error Message
+        if (_error.isNotEmpty) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: const Color(0xFFFCA5A5),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  LucideIcons.circleAlert,
+                  size: 18,
+                  color: Color(0xFFDC2626),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _error,
+                    style: const TextStyle(
+                      color: Color(0xFFDC2626),
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ).animate(target: 1).fadeIn().shake(),
+          const SizedBox(height: 20),
+        ],
+
+        _buildSubmitButton(),
+        const SizedBox(height: 20),
+        _buildToggleModeButton(),
+      ],
+    );
   }
 
   Widget _buildInputField({
@@ -792,24 +1478,25 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         Text(
           label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Colors.blue[100],
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            color: Color(0xFF334155),
+            letterSpacing: 0.1,
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         TextField(
           controller: controller,
           obscureText: isPassword && (obscurePassword ?? !_showPassword),
           keyboardType: keyboardType,
-          style: const TextStyle(color: Colors.white, fontSize: 15),
+          style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15),
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: Icon(
               icon,
-              size: 20,
-              color: Colors.blue[200]?.withValues(alpha: 0.5),
+              size: 19,
+              color: const Color(0xFF94A3B8),
             ),
             suffixIcon: isPassword
                 ? IconButton(
@@ -818,40 +1505,40 @@ class _LoginPageState extends State<LoginPage> {
                           ? LucideIcons.eye
                           : LucideIcons.eyeOff,
                       size: 18,
-                      color: Colors.blue[200]?.withValues(alpha: 0.5),
+                      color: const Color(0xFF94A3B8),
                     ),
-                    onPressed:
-                        onTogglePassword ??
+                    onPressed: onTogglePassword ??
                         () => setState(() => _showPassword = !_showPassword),
                   )
                 : null,
-            hintStyle: TextStyle(
-              color: Colors.blue[200]?.withValues(alpha: 0.3),
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 14,
             ),
             filled: true,
-            fillColor: Colors.white.withValues(alpha: 0.05),
+            fillColor: const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
               ),
             ),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
-              borderSide: BorderSide(
-                color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
               ),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 1.5,
+                color: Color(0xFF2563EB),
+                width: 1.8,
               ),
             ),
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
-              vertical: 16,
+              vertical: 14,
             ),
           ),
         ),
@@ -864,49 +1551,78 @@ class _LoginPageState extends State<LoginPage> {
       alignment: Alignment.centerRight,
       child: TextButton.icon(
         onPressed: _loading ? null : _showForgotPasswordDialog,
-        icon: const Icon(LucideIcons.keyRound, size: 16),
-        label: const Text('Quên mật khẩu?'),
+        icon: const Icon(LucideIcons.keyRound, size: 15, color: Color(0xFF2563EB)),
+        label: const Text(
+          'Quên mật khẩu?',
+          style: TextStyle(
+            color: Color(0xFF2563EB),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         style: TextButton.styleFrom(
-          foregroundColor: Colors.blue[100],
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         ),
       ),
     );
   }
 
   Widget _buildSubmitButton() {
-    return SizedBox(
+    return Container(
       width: double.infinity,
-      height: 54,
+      height: 50,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        gradient: const LinearGradient(
+          colors: [
+            Color(0xFF2563EB),
+            Color(0xFF4F46E5),
+          ],
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: ElevatedButton(
+        key: const Key('btn-auth-submit'),
         onPressed: _loading
             ? null
             : (_isLogin ? _handleLogin : _handleRegister),
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
           foregroundColor: Colors.white,
-          elevation: 8,
-          shadowColor: AppColors.primary.withValues(alpha: 0.4),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(14),
           ),
         ),
         child: _loading
             ? const SizedBox(
-                width: 24,
-                height: 24,
+                width: 22,
+                height: 22,
                 child: CircularProgressIndicator(
                   strokeWidth: 2.5,
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
-            : Text(
-                _isLogin ? 'Đăng nhập' : 'Đăng ký',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    _isLogin ? 'Đăng nhập' : 'Đăng ký',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Icon(LucideIcons.arrowRight, size: 18),
+                ],
               ),
       ),
     );
@@ -917,28 +1633,28 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         Row(
           children: [
-            Expanded(
-              child: Divider(color: Colors.white.withValues(alpha: 0.1)),
+            const Expanded(
+              child: Divider(color: Color(0xFFE2E8F0)),
             ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 14),
               child: Text(
                 'hoặc',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.blue[100]?.withValues(alpha: 0.5),
+                  color: Color(0xFF94A3B8),
                 ),
               ),
             ),
-            Expanded(
-              child: Divider(color: Colors.white.withValues(alpha: 0.1)),
+            const Expanded(
+              child: Divider(color: Color(0xFFE2E8F0)),
             ),
           ],
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
         SizedBox(
           width: double.infinity,
-          height: 54,
+          height: 48,
           child: OutlinedButton(
             onPressed: () {
               setState(() {
@@ -947,19 +1663,26 @@ class _LoginPageState extends State<LoginPage> {
               });
             },
             style: OutlinedButton.styleFrom(
-              foregroundColor: Colors.white,
-              side: BorderSide(color: Colors.white.withValues(alpha: 0.2)),
+              foregroundColor: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFFF8FAFC),
+              side: const BorderSide(color: Color(0xFFCBD5E1)),
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(14),
               ),
             ),
             child: Text(
-              _isLogin ? 'Đăng ký tài khoản mới' : 'Đã có tài khoản? Đăng nhập',
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              _isLogin
+                  ? 'Chưa có tài khoản? Đăng ký ngay'
+                  : 'Đã có tài khoản? Đăng nhập',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF2563EB),
+              ),
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         Center(
           child: TextButton.icon(
             onPressed: () {
@@ -967,18 +1690,18 @@ class _LoginPageState extends State<LoginPage> {
                 MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
               );
             },
-            icon: Icon(
+            icon: const Icon(
               LucideIcons.shieldCheck,
               size: 14,
-              color: Colors.white.withValues(alpha: 0.7),
+              color: Color(0xFF64748B),
             ),
-            label: Text(
+            label: const Text(
               'Chính sách bảo mật',
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Color(0xFF64748B),
                 decoration: TextDecoration.underline,
-                decorationColor: Colors.white.withValues(alpha: 0.7),
+                decorationColor: Color(0xFF64748B),
               ),
             ),
           ),
@@ -1043,13 +1766,26 @@ class LoginBackground extends StatelessWidget {
                 color: Colors.blue.withValues(alpha: 0.1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.1),
+                    color: Colors.blue.withValues(alpha: 0.12),
                     blurRadius: 120,
                     spreadRadius: 40,
                   ),
                 ],
               ),
-            ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(0.95, 0.95),
+                  end: const Offset(1.12, 1.12),
+                  duration: 5000.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(
+                  begin: 0.7,
+                  end: 1.0,
+                  duration: 5000.ms,
+                  curve: Curves.easeInOut,
+                ),
           ),
           Positioned(
             bottom: -size.height * 0.2,
@@ -1062,13 +1798,26 @@ class LoginBackground extends StatelessWidget {
                 color: Colors.indigo.withValues(alpha: 0.1),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.indigo.withValues(alpha: 0.1),
+                    color: Colors.indigo.withValues(alpha: 0.12),
                     blurRadius: 120,
                     spreadRadius: 40,
                   ),
                 ],
               ),
-            ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(1.12, 1.12),
+                  end: const Offset(0.95, 0.95),
+                  duration: 5500.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(
+                  begin: 0.6,
+                  end: 1.0,
+                  duration: 5500.ms,
+                  curve: Curves.easeInOut,
+                ),
           ),
           Positioned(
             top: size.height / 2 - 250,
@@ -1087,7 +1836,20 @@ class LoginBackground extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(0.95, 0.95),
+                  end: const Offset(1.08, 1.08),
+                  duration: 4000.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(
+                  begin: 0.8,
+                  end: 1.0,
+                  duration: 4000.ms,
+                  curve: Curves.easeInOut,
+                ),
           ),
           Positioned.fill(child: CustomPaint(painter: GridPainter())),
         ],

@@ -32,6 +32,19 @@ class DashboardMobileAppBar extends StatelessWidget
       backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
+      leading: Navigator.canPop(context)
+          ? IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new_rounded,
+                size: 20,
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : const Color(0xFF1E293B),
+              ),
+              onPressed: () => Navigator.of(context).maybePop(),
+              tooltip: 'Quay lại Trang chủ',
+            )
+          : null,
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

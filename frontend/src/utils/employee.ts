@@ -39,12 +39,24 @@ export function normalizeHistoryResponse(data: any): any {
     ...data,
     days: data.days.map((day: any) => ({
       ...day,
+      status: day.status === 'LEAVE' ? 'ABSENT' : day.status,
       events: day.events.map((evt: any) => ({
         ...evt,
         type: evt.type === 'IN' ? 'CHECK_IN' : evt.type === 'OUT' ? 'CHECK_OUT' : evt.type,
       })),
     })),
   };
+}
+
+/** Chuẩn hóa response tháng cũ: nghỉ phép hard-code trước đây nay là vắng. */
+export function normalizeMonthlyResponse(data: any): any[] {
+  return (data ?? []).map((employee: any) => ({
+    ...employee,
+    leavedays: 0,
+    dailyPattern: typeof employee.dailyPattern === 'string'
+      ? employee.dailyPattern.replace(/v/g, 'a')
+      : employee.dailyPattern,
+  }));
 }
 
 /** Map ký tự trạng thái ngày → nhãn tiếng Việt hiển thị trong mini-bar */

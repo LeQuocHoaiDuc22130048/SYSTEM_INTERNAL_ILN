@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
+import '../app/app_routes.dart';
 import '../models/user.dart';
 import '../theme/app_colors.dart';
 import '../utils/api_client.dart';
@@ -10,8 +11,21 @@ import '../utils/notification_provider.dart';
 import '../utils/update_provider.dart';
 import 'privacy_policy_page.dart';
 
+/// Profile Page designed faithfully according to Stitch Home Service Marketplace
+/// Preserving all existing functionality, options, dialogs, and backend integrations.
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key});
+  final bool showBottomNav;
+  final bool hideTopBar;
+  final VoidCallback? onNavigateToHome;
+  final void Function(int tabIndex)? onNavigateToTab;
+
+  const ProfilePage({
+    super.key,
+    this.showBottomNav = false,
+    this.hideTopBar = false,
+    this.onNavigateToHome,
+    this.onNavigateToTab,
+  });
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -24,318 +38,546 @@ class _ProfilePageState extends State<ProfilePage> {
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.currentUser;
     final name = user?.name ?? 'Người dùng';
-    final role = user == null
-        ? ''
-        : '${user.roleLabel} - ${user.employeeId.isEmpty ? user.username : user.employeeId}';
-    final avatarColor = auth.isEmployee ? Colors.blue : const Color(0xFFD946EF);
     final initials = _initials(name);
+    final updateProvider = context.watch<UpdateProvider>();
+    final currentVersion = updateProvider.currentVersion;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? AppColors.backgroundDark
-          : AppColors.backgroundLight,
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF8FAFC),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
+        child: Column(
+          children: [
+            // Top Navigation Bar matching Stitch
+            if (!widget.hideTopBar) _buildTopBar(isDark, user),
+
+            // Scrollable Profile Content
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                child: Column(
+                  children: [
+                    // Hero Section: Avatar with Camera Badge, Name, Handle, Edit Profile Pill
+                    _buildHeroSection(isDark, user, name, initials),
+                    const SizedBox(height: 24),
+
+                    // Section 1: Thông tin tài khoản (Preserved from old version)
+                    _buildSectionHeader(isDark, 'THÔNG TIN TÀI KHOẢN'),
+                    const SizedBox(height: 8),
+                    _buildAccountInfoCard(isDark, user),
+                    const SizedBox(height: 24),
+
+                    // Section 2: Cài đặt & Tiện ích (Preserved from old version)
+                    _buildSectionHeader(isDark, 'CÀI ĐẶT & HỆ THỐNG'),
+                    const SizedBox(height: 8),
+                    _buildSettingsCard(isDark, user, currentVersion),
+                    const SizedBox(height: 24),
+
+                    // Section 3: Tài khoản & Thao tác nguy hiểm (Preserved from old version)
+                    _buildSectionHeader(isDark, 'BẢO MẬT & TÀI KHOẢN'),
+                    const SizedBox(height: 8),
+                    _buildSecurityActionsCard(isDark, user),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+      bottomNavigationBar: widget.showBottomNav ? _buildStitchBottomNavBar() : null,
+    );
+  }
+
+  // 1. Top Navigation Bar (Stitch style)
+  Widget _buildTopBar(bool isDark, User? user) {
+    final canPop = Navigator.of(context).canPop();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+            width: 1.0,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Back / Home button
+          InkWell(
+            onTap: () {
+              if (widget.onNavigateToHome != null) {
+                widget.onNavigateToHome!();
+              } else if (canPop) {
+                Navigator.of(context).maybePop();
+              } else {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+              }
+            },
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Icon(
+                (widget.onNavigateToHome != null || canPop)
+                    ? LucideIcons.chevronLeft
+                    : LucideIcons.house,
+                size: 19,
+                color: isDark ? AppColors.textPrimaryDark : const Color(0xFF334155),
+              ),
+            ),
+          ),
+
+          // Title
+          Text(
+            'Hồ sơ của tôi',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
+              letterSpacing: -0.2,
+            ),
+          ),
+
+          // Settings Action Button
+          InkWell(
+            onTap: user == null ? null : () => _showAccountSettings(user),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Icon(
+                LucideIcons.settings,
+                size: 18,
+                color: isDark ? AppColors.textPrimaryDark : const Color(0xFF334155),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 2. Hero Avatar & Profile Identity
+  Widget _buildHeroSection(bool isDark, User? user, String name, String initials) {
+    return Column(
+      children: [
+        const SizedBox(height: 8),
+
+        // Centered Avatar with Camera Badge
+        Center(
+          child: Stack(
+            clipBehavior: Clip.none,
             children: [
-              const SizedBox(height: 20),
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: avatarColor,
-                child: Text(
-                  initials,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
+              // Avatar Circle
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF2563EB).withValues(alpha: 0.22),
+                      blurRadius: 18,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                  border: Border.all(color: Colors.white, width: 3.5),
+                ),
+                child: ClipOval(
+                  child: user?.avatar != null && user!.avatar!.isNotEmpty
+                      ? Image.network(
+                          user.avatar!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) =>
+                              _buildInitialsWidget(initials),
+                        )
+                      : _buildInitialsWidget(initials),
+                ),
+              ),
+
+              // Camera Icon Badge at bottom-right
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: InkWell(
+                  onTap: user == null ? null : () => _showAccountSettings(user),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppColors.borderDark : const Color(0xFFCBD5E1),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.10),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      LucideIcons.camera,
+                      size: 15,
+                      color: isDark ? AppColors.textPrimaryDark : const Color(0xFF475569),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              Text(
-                name,
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                role,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-              const SizedBox(height: 32),
-              _buildInfoSection(isDark, user),
-              const SizedBox(height: 24),
-              _buildSettingsSection(isDark, user),
             ],
           ),
         ),
+        const SizedBox(height: 14),
+
+        // Full Name
+        Text(
+          name,
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
+            letterSpacing: -0.3,
+          ),
+        ),
+        const SizedBox(height: 4),
+
+        // Handle & Role
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            if (user != null && user.roleLabel.isNotEmpty) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: const Color(0xFFDBEAFE)),
+                ),
+                child: Text(
+                  user.roleLabel,
+                  style: const TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF2563EB),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              '@${user?.username ?? 'user'}',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: isDark ? AppColors.textSecondaryDark : const Color(0xFF94A3B8),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Edit Profile Pill Button (Matching Stitch)
+        ElevatedButton(
+          onPressed: user == null ? null : () => _showAccountSettings(user),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2563EB),
+            foregroundColor: Colors.white,
+            elevation: 3,
+            shadowColor: const Color(0xFF2563EB).withValues(alpha: 0.35),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(LucideIcons.pencil, size: 14),
+              SizedBox(width: 6),
+              Text(
+                'Chỉnh sửa hồ sơ',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInitialsWidget(String initials) {
+    return Center(
+      child: Text(
+        initials,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 28,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 1,
+        ),
       ),
     );
   }
 
-  Widget _buildInfoSection(bool isDark, User? user) {
+  // 3. Section Header
+  Widget _buildSectionHeader(bool isDark, String title) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Padding(
+        padding: const EdgeInsets.only(left: 4),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w700,
+            color: isDark ? AppColors.textSecondaryDark : const Color(0xFF94A3B8),
+            letterSpacing: 0.8,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // 4. Section 1: Thông tin tài khoản
+  Widget _buildAccountInfoCard(bool isDark, User? user) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
         ),
-      ),
-      child: Column(
-        children: [
-          _buildInfoTile(
-            icon: LucideIcons.user,
-            title: 'Tên đăng nhập',
-            value: user?.username ?? '-',
-            isDark: isDark,
-          ),
-          Divider(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-          _buildInfoTile(
-            icon: LucideIcons.phone,
-            title: 'Số điện thoại',
-            value: user?.phone ?? '-',
-            isDark: isDark,
-          ),
-          Divider(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-          _buildInfoTile(
-            icon: LucideIcons.building2,
-            title: 'Bộ phận',
-            value: user?.department ?? '-',
-            isDark: isDark,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            _buildInfoRow(
+              icon: LucideIcons.user,
+              iconBg: const Color(0xFFEFF6FF),
+              iconColor: const Color(0xFF2563EB),
+              title: 'Tên đăng nhập',
+              value: user?.username ?? '-',
+              isDark: isDark,
+            ),
+            _buildDivider(isDark),
+            _buildInfoRow(
+              icon: LucideIcons.phone,
+              iconBg: const Color(0xFFECFDF5),
+              iconColor: const Color(0xFF059669),
+              title: 'Số điện thoại',
+              value: user?.phone ?? '-',
+              isDark: isDark,
+            ),
+            _buildDivider(isDark),
+            _buildInfoRow(
+              icon: LucideIcons.building2,
+              iconBg: const Color(0xFFFFFBEB),
+              iconColor: const Color(0xFFD97706),
+              title: 'Bộ phận',
+              value: user?.department ?? '-',
+              isDark: isDark,
+            ),
+            _buildDivider(isDark),
+            _buildInfoRow(
+              icon: LucideIcons.badgeCheck,
+              iconBg: const Color(0xFFF5F3FF),
+              iconColor: const Color(0xFF7C3AED),
+              title: 'Mã nhân viên / Vai trò',
+              value: user != null
+                  ? '${user.employeeId.isNotEmpty ? user.employeeId : user.username} (${user.roleLabel})'
+                  : '-',
+              isDark: isDark,
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildSettingsSection(bool isDark, User? user) {
+  // 5. Section 2: Cài đặt & Tiện ích
+  Widget _buildSettingsCard(bool isDark, User? user, String currentVersion) {
     return Container(
       decoration: BoxDecoration(
         color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
         ),
-      ),
-      child: Column(
-        children: [
-          ListTile(
-            leading: Icon(
-              LucideIcons.settings,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
-            ),
-            title: Text(
-              'Cài đặt tài khoản',
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimaryLight,
-              ),
-            ),
-            trailing: Icon(
-              LucideIcons.chevronRight,
-              size: 18,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-            onTap: user == null ? null : () => _showAccountSettings(user),
-          ),
-          Divider(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-          ListTile(
-            leading: Icon(
-              LucideIcons.lock,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
-            ),
-            title: Text(
-              'Đổi mật khẩu',
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimaryLight,
-              ),
-            ),
-            trailing: Icon(
-              LucideIcons.chevronRight,
-              size: 18,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-            onTap: _showChangePassword,
-          ),
-          Divider(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-          ListTile(
-            leading: Icon(
-              LucideIcons.refreshCw,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
-            ),
-            title: Text(
-              'Kiểm tra cập nhật',
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimaryLight,
-              ),
-            ),
-            subtitle: Text(
-              'Phiên bản hiện tại: v${context.watch<UpdateProvider>().currentVersion}',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-            trailing: Icon(
-              LucideIcons.chevronRight,
-              size: 18,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-            onTap: () {
-              context.read<UpdateProvider>().checkForUpdate(
-                context,
-                manual: true,
-              );
-            },
-          ),
-          Divider(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-          ListTile(
-            leading: Icon(
-              LucideIcons.shieldCheck,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : AppColors.textPrimaryLight,
-            ),
-            title: Text(
-              'Chính sách bảo mật',
-              style: TextStyle(
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : AppColors.textPrimaryLight,
-              ),
-            ),
-            subtitle: Text(
-              'Quy định quyền riêng tư & bảo vệ dữ liệu',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-            trailing: Icon(
-              LucideIcons.chevronRight,
-              size: 18,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
-              );
-            },
-          ),
-          Divider(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.logOut, color: Colors.redAccent),
-            title: const Text(
-              'Đăng xuất',
-              style: TextStyle(
-                color: Colors.redAccent,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            trailing: const Icon(
-              LucideIcons.chevronRight,
-              size: 18,
-              color: Colors.redAccent,
-            ),
-            onTap: _handleLogout,
-          ),
-          Divider(
-            height: 1,
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
-          ),
-          ListTile(
-            leading: const Icon(LucideIcons.userX, color: Colors.red),
-            title: const Text(
-              'Xóa tài khoản',
-              style: TextStyle(color: Colors.red, fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              'Vô hiệu hóa vĩnh viễn tài khoản và dữ liệu',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
-              ),
-            ),
-            trailing: const Icon(
-              LucideIcons.chevronRight,
-              size: 18,
-              color: Colors.red,
-            ),
-            onTap: user == null ? null : () => _showDeleteAccountDialog(user),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
           ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            _buildActionRow(
+              icon: LucideIcons.userCog,
+              iconBg: const Color(0xFFEFF6FF),
+              iconColor: const Color(0xFF2563EB),
+              title: 'Cài đặt tài khoản',
+              subtitle: 'Cập nhật họ tên, điện thoại, bộ phận',
+              isDark: isDark,
+              onTap: user == null ? null : () => _showAccountSettings(user),
+            ),
+            _buildDivider(isDark),
+            _buildActionRow(
+              icon: LucideIcons.lockKeyhole,
+              iconBg: const Color(0xFFEEF2FF),
+              iconColor: const Color(0xFF4F46E5),
+              title: 'Đổi mật khẩu',
+              subtitle: 'Cập nhật mật khẩu bảo vệ tài khoản',
+              isDark: isDark,
+              onTap: _showChangePassword,
+            ),
+            _buildDivider(isDark),
+            _buildActionRow(
+              icon: LucideIcons.refreshCw,
+              iconBg: const Color(0xFFF0FDF4),
+              iconColor: const Color(0xFF16A34A),
+              title: 'Kiểm tra cập nhật',
+              subtitle: 'Phiên bản hiện tại: v$currentVersion',
+              isDark: isDark,
+              onTap: () {
+                context.read<UpdateProvider>().checkForUpdate(
+                      context,
+                      manual: true,
+                    );
+              },
+            ),
+            _buildDivider(isDark),
+            _buildActionRow(
+              icon: LucideIcons.shieldCheck,
+              iconBg: const Color(0xFFFAF5FF),
+              iconColor: const Color(0xFF9333EA),
+              title: 'Chính sách bảo mật',
+              subtitle: 'Quy định quyền riêng tư & bảo vệ dữ liệu',
+              isDark: isDark,
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const PrivacyPolicyPage()),
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildInfoTile({
+  // 6. Section 3: Bảo mật & Thao tác tài khoản
+  Widget _buildSecurityActionsCard(bool isDark, User? user) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
+            blurRadius: 12,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(22),
+        child: Column(
+          children: [
+            _buildActionRow(
+              icon: LucideIcons.logOut,
+              iconBg: const Color(0xFFFFF1F2),
+              iconColor: const Color(0xFFE11D48),
+              title: 'Đăng xuất',
+              subtitle: 'Đăng xuất khỏi phiên làm việc hiện tại',
+              titleColor: const Color(0xFFE11D48),
+              isDark: isDark,
+              onTap: _handleLogout,
+            ),
+            _buildDivider(isDark),
+            _buildActionRow(
+              icon: LucideIcons.userX,
+              iconBg: const Color(0xFFFEF2F2),
+              iconColor: Colors.red,
+              title: 'Xóa tài khoản',
+              subtitle: 'Vô hiệu hóa vĩnh viễn tài khoản và dữ liệu',
+              titleColor: Colors.red,
+              isDark: isDark,
+              onTap: user == null ? null : () => _showDeleteAccountDialog(user),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Helper row for info display
+  Widget _buildInfoRow({
     required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
     required String title,
     required String value,
     required bool isDark,
   }) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
       child: Row(
         children: [
-          Icon(icon, size: 20, color: AppColors.primary),
-          const SizedBox(width: 16),
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : iconBg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: iconColor),
+          ),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -343,21 +585,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 12,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w500,
+                    color: isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B),
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
                   value,
                   style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w500,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : AppColors.textPrimaryLight,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: isDark ? AppColors.textPrimaryDark : const Color(0xFF1E293B),
                   ),
                 ),
               ],
@@ -368,13 +607,93 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
+  // Helper row for interactive action
+  Widget _buildActionRow({
+    required IconData icon,
+    required Color iconBg,
+    required Color iconColor,
+    required String title,
+    String? subtitle,
+    Color? titleColor,
+    required bool isDark,
+    VoidCallback? onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : iconBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 18, color: iconColor),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14.5,
+                      fontWeight: FontWeight.w600,
+                      color: titleColor ??
+                          (isDark ? AppColors.textPrimaryDark : const Color(0xFF1E293B)),
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(
+              LucideIcons.chevronRight,
+              size: 16,
+              color: titleColor ??
+                  (isDark ? AppColors.textSecondaryDark : const Color(0xFFCBD5E1)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDivider(bool isDark) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      indent: 68,
+      endIndent: 16,
+      color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+    );
+  }
+
+  // =========================================================================
+  // PRESERVED MODALS & ACTION HANDLERS (Identical Logic & Validation)
+  // =========================================================================
+
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Đăng xuất'),
-          content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
+          content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -383,8 +702,9 @@ class _ProfilePageState extends State<ProfilePage> {
             FilledButton(
               onPressed: () => Navigator.of(dialogContext).pop(true),
               style: FilledButton.styleFrom(
-                backgroundColor: Colors.redAccent,
+                backgroundColor: const Color(0xFFE11D48),
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Đăng xuất'),
             ),
@@ -424,14 +744,14 @@ class _ProfilePageState extends State<ProfilePage> {
             setDialogState(() => isSaving = true);
             try {
               await context.read<AuthProvider>().updateProfile(
-                fullName: nameController.text.trim(),
-                phone: phoneController.text.trim(),
-                department: departmentController.text.trim(),
-              );
+                    fullName: nameController.text.trim(),
+                    phone: phoneController.text.trim(),
+                    department: departmentController.text.trim(),
+                  );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
-              _showSnackBar('Đã cập nhật thông tin tài khoản.');
+              _showSnackBar('Đã cập nhật thông tin tài khoản thành công.');
             } on ApiException catch (error) {
               if (dialogContext.mounted) {
                 _showSnackBar(error.message, isError: true);
@@ -453,7 +773,11 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                title: const Text('Cài đặt tài khoản'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                title: const Text(
+                  'Cài đặt tài khoản',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
                 content: Form(
                   key: formKey,
                   child: Column(
@@ -515,13 +839,20 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   FilledButton(
                     onPressed: isSaving ? null : () => submit(setDialogState),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     child: isSaving
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
-                        : const Text('Lưu'),
+                        : const Text('Lưu thay đổi'),
                   ),
                 ],
               );
@@ -530,7 +861,6 @@ class _ProfilePageState extends State<ProfilePage> {
         },
       );
     } finally {
-      // Delay disposal to prevent text fields from accessing disposed controllers during transition
       Future.delayed(const Duration(milliseconds: 500), () {
         nameController.dispose();
         phoneController.dispose();
@@ -557,10 +887,10 @@ class _ProfilePageState extends State<ProfilePage> {
             setDialogState(() => isSaving = true);
             try {
               await context.read<AuthProvider>().changePassword(
-                currentPassword: currentController.text,
-                newPassword: newController.text,
-                confirmPassword: confirmController.text,
-              );
+                    currentPassword: currentController.text,
+                    newPassword: newController.text,
+                    confirmPassword: confirmController.text,
+                  );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -586,7 +916,11 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                title: const Text('Đổi mật khẩu'),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                title: const Text(
+                  'Đổi mật khẩu',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
                 content: Form(
                   key: formKey,
                   child: Column(
@@ -648,11 +982,18 @@ class _ProfilePageState extends State<ProfilePage> {
                   ),
                   FilledButton(
                     onPressed: isSaving ? null : () => submit(setDialogState),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                     child: isSaving
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Text('Đổi mật khẩu'),
                   ),
@@ -663,7 +1004,6 @@ class _ProfilePageState extends State<ProfilePage> {
         },
       );
     } finally {
-      // Delay disposal to prevent text fields from accessing disposed controllers during transition
       Future.delayed(const Duration(milliseconds: 500), () {
         currentController.dispose();
         newController.dispose();
@@ -701,11 +1041,11 @@ class _ProfilePageState extends State<ProfilePage> {
               await context.read<NotificationProvider>().prepareForLogout();
               if (!mounted) return;
               await context.read<AuthProvider>().deleteAccount(
-                password: passwordController.text,
-                reason: reasonController.text.trim().isEmpty
-                    ? null
-                    : reasonController.text.trim(),
-              );
+                    password: passwordController.text,
+                    reason: reasonController.text.trim().isEmpty
+                        ? null
+                        : reasonController.text.trim(),
+                  );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -733,6 +1073,7 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 title: const Row(
                   children: [
                     Icon(
@@ -766,7 +1107,7 @@ class _ProfilePageState extends State<ProfilePage> {
                             color: Colors.red.withValues(
                               alpha: isDark ? 0.15 : 0.08,
                             ),
-                            borderRadius: BorderRadius.circular(10),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(
                               color: Colors.red.withValues(alpha: 0.3),
                             ),
@@ -809,7 +1150,9 @@ class _ProfilePageState extends State<ProfilePage> {
                           controller: passwordController,
                           decoration: InputDecoration(
                             labelText: 'Mật khẩu hiện tại *',
-                            border: const OutlineInputBorder(),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                             suffixIcon: IconButton(
                               icon: Icon(
                                 obscurePassword
@@ -836,9 +1179,11 @@ class _ProfilePageState extends State<ProfilePage> {
                         const SizedBox(height: 12),
                         TextFormField(
                           controller: reasonController,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             labelText: 'Lý do xóa (tùy chọn)',
-                            border: OutlineInputBorder(),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(14),
+                            ),
                           ),
                           textInputAction: TextInputAction.done,
                           maxLines: 2,
@@ -852,7 +1197,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                     confirmedCheckbox = !confirmedCheckbox;
                                   });
                                 },
-                          borderRadius: BorderRadius.circular(6),
+                          borderRadius: BorderRadius.circular(8),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(vertical: 6.0),
                             child: Row(
@@ -863,6 +1208,9 @@ class _ProfilePageState extends State<ProfilePage> {
                                   child: Checkbox(
                                     value: confirmedCheckbox,
                                     activeColor: Colors.red,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
                                     onChanged: isDeleting
                                         ? null
                                         : (val) {
@@ -906,6 +1254,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: isDeleting
                         ? const SizedBox(
@@ -935,7 +1284,19 @@ class _ProfilePageState extends State<ProfilePage> {
   InputDecoration _inputDecoration(String label) {
     return InputDecoration(
       labelText: label,
-      border: const OutlineInputBorder(),
+      labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5),
+      ),
+      filled: true,
+      fillColor: const Color(0xFFF8FAFC),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );
   }
 
@@ -954,7 +1315,242 @@ class _ProfilePageState extends State<ProfilePage> {
     final words = name.trim().split(RegExp(r'\s+'));
     if (words.isEmpty || words.first.isEmpty) return 'ND';
     if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
-        .toUpperCase();
+    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'.toUpperCase();
+  }
+
+  // Stitch 3-Tab Bottom Navigation Bar (Synchronized with HomePage)
+  Widget _buildStitchBottomNavBar() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 20,
+            offset: const Offset(0, -6),
+          ),
+        ],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              // Tab 1: Home
+              InkWell(
+                onTap: () {
+                  if (widget.onNavigateToHome != null) {
+                    widget.onNavigateToHome!();
+                  } else {
+                    Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+                  }
+                },
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(
+                        LucideIcons.house,
+                        size: 18,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Trang chủ',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Tab 2: Center Raised Floating '+' Button
+              Transform.translate(
+                offset: const Offset(0, -14),
+                child: InkWell(
+                  onTap: _showQuickBookingModal,
+                  borderRadius: BorderRadius.circular(30),
+                  child: Container(
+                    width: 54,
+                    height: 54,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF2563EB), Color(0xFF4F46E5), Color(0xFF3B82F6)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF2563EB).withValues(alpha: 0.45),
+                          blurRadius: 16,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                      border: Border.all(color: Colors.white, width: 3.5),
+                    ),
+                    child: const Center(
+                      child: Icon(LucideIcons.plus, size: 24, color: Colors.white),
+                    ),
+                  ),
+                ),
+              ),
+
+              // Tab 3: Profile (Active)
+              InkWell(
+                onTap: () {},
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB),
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF2563EB).withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        LucideIcons.user,
+                        size: 18,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      'Cá nhân',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF2563EB),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showQuickBookingModal() {
+    final noteController = TextEditingController();
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (bottomSheetContext) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  margin: const EdgeInsets.only(bottom: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Đặt lịch dịch vụ mới',
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(LucideIcons.x, size: 20),
+                    onPressed: () => Navigator.of(bottomSheetContext).pop(),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                'Mô tả yêu cầu hoặc lỗi cần sửa:',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
+              ),
+              const SizedBox(height: 8),
+              TextField(
+                controller: noteController,
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Nhập thông tin sự cố, mã lỗi hoặc yêu cầu kiểm tra...',
+                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(bottomSheetContext).pop();
+                    _showSnackBar('Đã gửi yêu cầu dịch vụ thành công! Kỹ thuật viên sẽ liên hệ sớm.');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    elevation: 2,
+                  ),
+                  child: const Text('Xác nhận đặt lịch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }

@@ -208,11 +208,13 @@ class DailyHistoryLog {
     final totalH = (json['totalHours'] as num?)?.toDouble() ?? 0.0;
     final otH = (json['overtimeHours'] as num?)?.toDouble() ?? 0.0;
 
+    final rawStatus = json['status']?.toString() ?? 'PRESENT';
+
     return DailyHistoryLog(
       day: dayVal,
       date: rawDate,
       dow: json['dow']?.toString() ?? json['dayOfWeek']?.toString() ?? '',
-      status: json['status']?.toString() ?? 'PRESENT',
+      status: rawStatus == 'LEAVE' ? 'ABSENT' : rawStatus,
       checkIn: inStr,
       checkOut: outStr,
       totalHours: totalH,

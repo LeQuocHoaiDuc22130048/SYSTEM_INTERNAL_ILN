@@ -1312,6 +1312,32 @@ class _OrderDetailSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                     ],
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () async {
+                          final updated = await showDialog<bool>(
+                            context: context,
+                            barrierDismissible: false,
+                            builder: (_) => _OrderStatusDialog(order: order),
+                          );
+                          if (updated == true && context.mounted) {
+                            Navigator.pop(context);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Cập nhật trạng thái thành công!',
+                                ),
+                                backgroundColor: AppColors.success,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(Icons.sync, size: 18),
+                        label: const Text('Cập nhật trạng thái'),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     Row(
                       children: [
                         Expanded(
@@ -1352,6 +1378,151 @@ class _OrderDetailSheet extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+const _orderStatuses = [
+  MapEntry('PENDING', 'Chưa kiểm tra'),
+  MapEntry('WAITING_FOR_CHECK', 'Chờ kiểm tra'),
+  MapEntry('CHECKING', 'Đang kiểm tra'),
+  MapEntry('CHECKED', 'Đã kiểm tra'),
+  MapEntry('IN_PROGRESS', 'Đang sửa'),
+  MapEntry('COMPLETED', 'Hoàn thành'),
+  MapEntry('DELIVERED', 'Đã giao'),
+  MapEntry('CANCELLED', 'Đã trả'),
+];
+
+String _orderStatusCode(RepairOrderStatus status) => switch (status) {
+  RepairOrderStatus.pending => 'PENDING',
+  RepairOrderStatus.waitingForCheck => 'WAITING_FOR_CHECK',
+  RepairOrderStatus.checking => 'CHECKING',
+  RepairOrderStatus.checked => 'CHECKED',
+  RepairOrderStatus.inProgress => 'IN_PROGRESS',
+  RepairOrderStatus.completed => 'COMPLETED',
+  RepairOrderStatus.delivered => 'DELIVERED',
+  RepairOrderStatus.cancelled => 'CANCELLED',
+};
+
+class _OrderStatusDialog extends StatefulWidget {
+  final RepairOrder order;
+
+  const _OrderStatusDialog({required this.order});
+
+  @override
+  State<_OrderStatusDialog> createState() => _OrderStatusDialogState();
+}
+
+class _OrderStatusDialogState extends State<_OrderStatusDialog> {
+  final _noteController = TextEditingController();
+  late String _status;
+  bool _saving = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _status = _orderStatusCode(widget.order.status);
+  }
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final note = _noteController.text.trim();
+      await context.read<BackendDataProvider>().updateRepairOrderStatus(
+        widget.order.id,
+        status: _status,
+        note: note.isEmpty ? null : note,
+      );
+      if (mounted) Navigator.pop(context, true);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _saving = false;
+        _error = error.toString();
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !_saving,
+      child: AlertDialog(
+        title: const Text('Cập nhật trạng thái'),
+        scrollable: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Đơn hàng: ${widget.order.orderNumber}'),
+            const SizedBox(height: 16),
+            DropdownButtonFormField<String>(
+              initialValue: _status,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                labelText: 'Trạng thái',
+                border: OutlineInputBorder(),
+              ),
+              items: _orderStatuses
+                  .map(
+                    (status) => DropdownMenuItem(
+                      value: status.key,
+                      child: Text(status.value),
+                    ),
+                  )
+                  .toList(),
+              onChanged: _saving
+                  ? null
+                  : (value) {
+                      if (value != null) setState(() => _status = value);
+                    },
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _noteController,
+              enabled: !_saving,
+              maxLines: 2,
+              decoration: const InputDecoration(
+                labelText: 'Ghi chú (không bắt buộc)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: AppColors.error)),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: _saving ? null : () => Navigator.pop(context),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            onPressed:
+                _saving || _status == _orderStatusCode(widget.order.status)
+                ? null
+                : _save,
+            child: _saving
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Text('Lưu'),
+          ),
+        ],
       ),
     );
   }
@@ -1801,26 +1972,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   bool get _canAssign =>
       context.read<AuthProvider>().can(AppPermission.assignRepairOrders);
 
-  String get _currentStatusBackendCode {
-    switch (widget.order.status) {
-      case RepairOrderStatus.pending:
-        return 'PENDING';
-      case RepairOrderStatus.waitingForCheck:
-        return 'WAITING_FOR_CHECK';
-      case RepairOrderStatus.checking:
-        return 'CHECKING';
-      case RepairOrderStatus.checked:
-        return 'CHECKED';
-      case RepairOrderStatus.inProgress:
-        return 'IN_PROGRESS';
-      case RepairOrderStatus.completed:
-        return 'COMPLETED';
-      case RepairOrderStatus.delivered:
-        return 'DELIVERED';
-      case RepairOrderStatus.cancelled:
-        return 'CANCELLED';
-    }
-  }
+  String get _currentStatusBackendCode => _orderStatusCode(widget.order.status);
 
   @override
   void initState() {
@@ -1908,16 +2060,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   }
 
   List<MapEntry<String, String>> _availableStatuses() {
-    return const [
-      MapEntry('PENDING', 'Chưa kiểm tra'),
-      MapEntry('WAITING_FOR_CHECK', 'Chờ kiểm tra'),
-      MapEntry('CHECKING', 'Đang kiểm tra'),
-      MapEntry('CHECKED', 'Đã kiểm tra'),
-      MapEntry('IN_PROGRESS', 'Đang sửa'),
-      MapEntry('COMPLETED', 'Hoàn thành'),
-      MapEntry('DELIVERED', 'Đã giao'),
-      MapEntry('CANCELLED', 'Đã trả'),
-    ];
+    return _orderStatuses;
   }
 
   Future<void> _save() async {

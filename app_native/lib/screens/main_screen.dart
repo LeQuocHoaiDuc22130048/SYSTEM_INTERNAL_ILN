@@ -51,6 +51,21 @@ class _MainScreenState extends State<MainScreen> {
     return buildMainNavigationItems(context.watch<AuthProvider>());
   }
 
+  bool _initializedArgs = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initializedArgs) {
+      _initializedArgs = true;
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is int && canAccessMainTab(context.read<AuthProvider>(), args)) {
+        _currentIndex = args;
+        _pages[_currentIndex] ??= _buildPage(_currentIndex);
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +78,10 @@ class _MainScreenState extends State<MainScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        final args = ModalRoute.of(context)?.settings.arguments;
+        if (args is int && canAccessMainTab(context.read<AuthProvider>(), args)) {
+          _setCurrentIndex(args);
+        }
         context.read<UpdateProvider>().checkForUpdate(context, manual: false);
       }
     });
@@ -143,7 +162,7 @@ class _MainScreenState extends State<MainScreen> {
       case MainTabs.accountApproval:
         return const SizedBox.shrink();
       case MainTabs.profile:
-        return const ProfilePage();
+        return ProfilePage(hideTopBar: true, onNavigateToTab: _setCurrentIndex);
       default:
         return DashboardPage(onNavigateToTab: _setCurrentIndex);
     }
