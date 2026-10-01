@@ -61,13 +61,15 @@ export const DailyTab: React.FC<DailyTabProps> = ({
     return (currentHours > endHours) || (currentHours === endHours && currentMinutes > endMinutes);
   };
 
-  const isOvertimeCheckout = (checkOutIso: string | null): boolean => {
-    if (!checkOutIso) return false;
+  const isOvertimeCheckout = (checkOutIso: string | null, checkInIso?: string | null): boolean => {
+    if (!checkOutIso || !checkInIso) return false;
+    const checkInTime = formatTime(checkInIso);
+    if (!checkInTime || checkInTime === '-' || checkInTime >= '12:30') return false;
     const timeStr = formatTime(checkOutIso);
     if (!timeStr || timeStr === '-') return false;
     const [h, m] = timeStr.split(':').map(Number);
     if (isNaN(h)) return false;
-    // Quy định tăng ca: Phải làm việc và check-out từ 21:00 trở đi
+    // Tăng ca cần đủ ca sáng, chiều và tối đến 21:00.
     return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
   };
 
@@ -102,7 +104,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
           return <span className="pill-badge late">Về sớm</span>;
         }
         // Quy định tăng ca: Chỉ khi checkout từ 21:00 trở đi mới hiển thị Tăng ca
-        const isOT = isOvertimeCheckout(report.checkOut);
+        const isOT = isOvertimeCheckout(report.checkOut, report.checkIn);
         if (isOT) {
           return <span className="pill-badge ot">Tăng ca</span>;
         }
@@ -188,7 +190,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                 const report = dailyReportMap[emp.id];
                 const statusChar = getDailyStatusFromPattern(emp, selectedDate);
 
-                const isOT = isOvertimeCheckout(report?.checkOut);
+                const isOT = isOvertimeCheckout(report?.checkOut, report?.checkIn);
                 const checkInText = report?.checkIn ? `In: ${formatTime(report.checkIn)}` : '-';
                 const checkInClass = report?.checkIn ? (report.isLate ? 'warning' : 'success') : '';
                 const checkOutText = report?.checkOut ? `Out: ${formatTime(report.checkOut)}` : '-';

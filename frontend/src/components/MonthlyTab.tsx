@@ -217,7 +217,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                         const checkOutEvent = dayLog?.events?.find(e => e.type === 'CHECK_OUT');
 
                                         const isOvertimeLogTime = (logTime?: string): boolean => {
-                                           if (!logTime) return false;
+                                           if (!logTime || !checkInEvent || checkInEvent.logTime >= '12:30') return false;
                                            const [h, m] = logTime.split(':').map(Number);
                                            if (isNaN(h)) return false;
                                            return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
@@ -241,7 +241,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                                default: state = dayObj.state;
                                              }
                                            }
-                                           // Quy định tăng ca: Chỉ khi checkout từ 21:00 trở đi mới hiển thị 'o' (Tăng ca)
+                                           // Tăng ca cần đủ ca sáng, chiều và tối đến 21:00.
                                            if (checkOutEvent?.logTime) {
                                              if (isOvertimeLogTime(checkOutEvent.logTime)) {
                                                state = 'o';

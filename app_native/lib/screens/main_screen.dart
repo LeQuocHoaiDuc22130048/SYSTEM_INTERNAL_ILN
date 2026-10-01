@@ -10,7 +10,6 @@ import '../models/app_notification.dart';
 import '../models/app_permission.dart';
 import '../navigation/main_tabs.dart';
 import '../navigation/navigation_config.dart';
-import '../navigation/navigation_item.dart';
 import '../navigation/notification_navigation_resolver.dart';
 import '../utils/auth_provider.dart';
 import '../utils/chat_provider.dart';
@@ -19,6 +18,7 @@ import '../utils/update_provider.dart';
 import '../widgets/navigation/mobile_dashboard_app_bar.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/navigation/side_navigation.dart';
+import '../widgets/quick_booking_sheet.dart';
 import 'attendance_only_page.dart';
 import 'attendance_screen.dart';
 import 'dashboard_page.dart';
@@ -46,10 +46,6 @@ class _MainScreenState extends State<MainScreen> {
   late final List<Widget?> _pages;
   StreamSubscription<AppNotification>? _notificationSub;
   bool _navigatingToLogin = false;
-
-  List<NavigationItem> get _navItems {
-    return buildMainNavigationItems(context.watch<AuthProvider>());
-  }
 
   bool _initializedArgs = false;
 
@@ -79,7 +75,8 @@ class _MainScreenState extends State<MainScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final args = ModalRoute.of(context)?.settings.arguments;
-        if (args is int && canAccessMainTab(context.read<AuthProvider>(), args)) {
+        if (args is int &&
+            canAccessMainTab(context.read<AuthProvider>(), args)) {
           _setCurrentIndex(args);
         }
         context.read<UpdateProvider>().checkForUpdate(context, manual: false);
@@ -346,10 +343,15 @@ class _MainScreenState extends State<MainScreen> {
       ),
       body: body,
       bottomNavigationBar: MobileNavigationBar(
-        items: _navItems,
-        currentIndex: _currentIndex,
         isDark: isDark,
-        onIndexChanged: _setCurrentIndex,
+        profileSelected: _currentIndex == MainTabs.profile,
+        onHome: () => Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil(AppRoutes.home, (route) => false),
+        onBooking: () => showQuickBookingSheet(context),
+        onProfile: auth.can(AppPermission.viewProfile)
+            ? () => _setCurrentIndex(MainTabs.profile)
+            : null,
       ),
     );
   }

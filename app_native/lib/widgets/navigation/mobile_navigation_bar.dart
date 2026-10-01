@@ -1,99 +1,189 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 
-import '../../navigation/main_tabs.dart';
-import '../../navigation/navigation_item.dart';
 import '../../theme/app_colors.dart';
-import '../../utils/chat_provider.dart';
-import 'badge_widgets.dart';
 
 class MobileNavigationBar extends StatelessWidget {
   const MobileNavigationBar({
     super.key,
-    required this.items,
-    required this.currentIndex,
     required this.isDark,
-    required this.onIndexChanged,
+    required this.onHome,
+    required this.onBooking,
+    this.onProfile,
+    this.homeSelected = false,
+    this.profileSelected = false,
   });
 
-  final List<NavigationItem> items;
-  final int currentIndex;
   final bool isDark;
-  final ValueChanged<int> onIndexChanged;
+  final bool homeSelected;
+  final bool profileSelected;
+  final VoidCallback onHome;
+  final VoidCallback onBooking;
+  final VoidCallback? onProfile;
 
   @override
   Widget build(BuildContext context) {
-    final unreadChats = context.watch<ChatProvider>().totalUnreadCount;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        border: Border(
-          top: BorderSide(
-            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+    final surface = isDark ? AppColors.surfaceDark : Colors.white;
+    final bottomInset = MediaQuery.paddingOf(context).bottom;
+    final labelGrowth = (MediaQuery.textScalerOf(context).scale(10) - 10).clamp(
+      0.0,
+      double.infinity,
+    );
+    return SizedBox(
+      height: 78 + bottomInset + labelGrowth * 1.5,
+      child: Stack(
+        children: [
+          Positioned.fill(
+            top: 14,
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: surface,
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.06),
+                    blurRadius: 20,
+                    offset: const Offset(0, -6),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-      ),
-      child: SafeArea(
-        top: false,
-        child: SizedBox(
-          height: 56,
-          child: Row(
-            children: List.generate(items.length, (index) {
-              final item = items[index];
-              final isSelected = currentIndex == item.tabIndex;
-              final color = isSelected
-                  ? Theme.of(context).primaryColor
-                  : (isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight);
-
-              return Expanded(
-                child: InkWell(
-                  onTap: () => onIndexChanged(item.tabIndex),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    clipBehavior: Clip.none,
-                    children: [
-                      Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            isSelected ? item.activeIcon : item.icon,
-                            size: 20,
-                            color: color,
-                          ),
-                          const SizedBox(height: 3),
-                          Text(
-                            item.label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: isSelected
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
-                              color: color,
+          Material(
+            type: MaterialType.transparency,
+            child: Padding(
+              padding: EdgeInsets.only(bottom: bottomInset),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: _tab(
+                      'Trang chủ',
+                      LucideIcons.house,
+                      homeSelected,
+                      onHome,
+                    ),
+                  ),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Semantics(
+                        button: true,
+                        label: 'Đặt lịch dịch vụ mới',
+                        child: Tooltip(
+                          message: 'Đặt lịch dịch vụ mới',
+                          child: InkWell(
+                            onTap: onBooking,
+                            customBorder: const CircleBorder(),
+                            child: Ink(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF2563EB),
+                                    Color(0xFF4F46E5),
+                                    Color(0xFF3B82F6),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF2563EB,
+                                    ).withValues(alpha: 0.45),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                                border: Border.all(color: surface, width: 3.5),
+                              ),
+                              child: const Icon(
+                                LucideIcons.plus,
+                                size: 24,
+                                color: Colors.white,
+                              ),
                             ),
                           ),
-                        ],
-                      ),
-                      if (item.tabIndex == MainTabs.messages && unreadChats > 0)
-                        Positioned(
-                          top: 10,
-                          right: 22,
-                          child: BadgePill(
-                            text: unreadChats > 99
-                                ? '99+'
-                                : unreadChats.toString(),
-                            size: 14,
-                          ),
                         ),
-                    ],
+                      ),
+                    ),
                   ),
+                  Expanded(
+                    child: onProfile == null
+                        ? const SizedBox.shrink()
+                        : _tab(
+                            'Cá nhân',
+                            LucideIcons.user,
+                            profileSelected,
+                            onProfile!,
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _tab(String label, IconData icon, bool selected, VoidCallback onTap) {
+    final color = selected
+        ? const Color(0xFF2563EB)
+        : (isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B));
+    return Padding(
+      padding: const EdgeInsets.only(top: 14),
+      child: Semantics(
+        selected: selected,
+        button: true,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                width: 40,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: selected
+                      ? const Color(0xFF2563EB)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: selected
+                      ? [
+                          BoxShadow(
+                            color: const Color(
+                              0xFF2563EB,
+                            ).withValues(alpha: 0.35),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ]
+                      : null,
                 ),
-              );
-            }),
+                child: Icon(
+                  icon,
+                  size: 18,
+                  color: selected ? Colors.white : color,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ],
           ),
         ),
       ),

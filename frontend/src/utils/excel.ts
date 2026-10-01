@@ -210,7 +210,7 @@ export async function exportAttendanceExcel(
       const isHalfDay = statusChar === 'm' || statusChar === 'c';
 
       if (isHalfDay) {
-        cell.value = 0.5;
+        cell.value = isSunday ? 1.5 : 0.5;
         cell.font = { name: 'Arial', size: 10, bold: true };
         if (isSunday) {
           cell.fill = yellowFill;
@@ -223,10 +223,10 @@ export async function exportAttendanceExcel(
           cell.font = { name: 'Arial', size: 10, color: { argb: 'FFD66A00' }, bold: true }; // Chữ cam đậm trên nền vàng
         } else {
           if (statusChar === 'o') {
-            cell.value = 1.5;
+            cell.value = emp.dailyWorkDays?.[d] ?? 1.5;
             cell.font = { name: 'Arial', size: 10, bold: true };
           } else {
-            cell.value = 1;
+            cell.value = emp.dailyWorkDays?.[d] ?? 1;
             if (statusChar === 'l') {
               cell.fill = redFill;
               cell.font = { name: 'Arial', size: 10, color: { argb: 'FFFFFFFF' } }; // Chữ trắng trên nền đỏ
@@ -480,7 +480,8 @@ export async function exportEmployeeHistoryExcel(
     let effectiveStatus = day.status;
     if (checkOutEvent?.logTime) {
       const [oh, om] = checkOutEvent.logTime.split(':').map(Number);
-      const isOt = !isNaN(oh) && (oh > 21 || (oh === 21 && (isNaN(om) || om >= 0)));
+      const isOt = !!checkInEvent && checkInEvent.logTime < '12:30'
+        && !isNaN(oh) && (oh > 21 || (oh === 21 && (isNaN(om) || om >= 0)));
       if (effectiveStatus === 'OVERTIME' && !isOt) {
         const isAfternoon = checkInEvent && checkInEvent.logTime >= '12:30';
         const isLate = isAfternoon ? (checkInEvent && checkInEvent.logTime > '13:45') : (checkInEvent && checkInEvent.logTime > '08:45');

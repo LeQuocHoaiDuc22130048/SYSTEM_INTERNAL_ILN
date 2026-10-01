@@ -71,8 +71,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
     setExpandedDays(prev => ({ ...prev, [date]: !prev[date] }));
   };
 
-  const isOvertimeLogTime = (logTime?: string): boolean => {
-    if (!logTime) return false;
+  const isOvertimeLogTime = (logTime?: string, checkInTime?: string): boolean => {
+    if (!logTime || !checkInTime || checkInTime >= '12:30') return false;
     const [h, m] = logTime.split(':').map(Number);
     if (isNaN(h)) return false;
     return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
@@ -81,7 +81,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   const getModalDayStatusBadge = (status: string, checkOutTime?: string, checkInTime?: string) => {
     let effectiveStatus = status;
     if (checkOutTime) {
-      const isOt = isOvertimeLogTime(checkOutTime);
+      const isOt = isOvertimeLogTime(checkOutTime, checkInTime);
       if (effectiveStatus === 'OVERTIME' && !isOt) {
         const isAfternoon = checkInTime && checkInTime >= '12:30';
         const isLate = isAfternoon ? (checkInTime > '13:45') : (checkInTime && checkInTime > '08:45');
@@ -249,7 +249,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                   const checkOutEvent = dayLog.events.find(e => e.type === 'CHECK_OUT');
                   const hasLate = dayLog.status === 'LATE';
                   const hasManual = dayLog.events.some(e => e.source === 'MANUAL');
-                  const hasOT = checkOutEvent ? isOvertimeLogTime(checkOutEvent.logTime) : dayLog.events.some(e => e.note.includes('OT'));
+                  const hasOT = checkOutEvent ? isOvertimeLogTime(checkOutEvent.logTime, checkInEvent?.logTime) : dayLog.status === 'OVERTIME';
 
                   return (
                     <div key={dayLog.date} className="day-block">

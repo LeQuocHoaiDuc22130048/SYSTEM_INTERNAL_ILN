@@ -92,6 +92,7 @@ public class AttendanceQueryController {
 
             DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZONE);
             Map<Integer, String> empUpdateNotes = new LinkedHashMap<>();
+            Map<Integer, Double> dailyWorkDays = new LinkedHashMap<>();
             List<String> formattedNoteList = new ArrayList<>();
 
             for (int d = 1; d <= totalDaysInMonth; d++) {
@@ -160,7 +161,7 @@ public class AttendanceQueryController {
 
                 if (date.isAfter(today)) {
                     patternBuilder.append("f");
-                } else if (isWeekend) {
+                } else if (isWeekend && dayRecords.isEmpty()) {
                     patternBuilder.append("h");
                 } else {
                     if (dayRecords.isEmpty()) {
@@ -195,8 +196,9 @@ public class AttendanceQueryController {
                             }
                         }
 
-                        // Quy định tăng ca: Chỉ khi nào làm việc đến 21:00 (9h tối) hoặc sau 21:00 mới được ghi nhận tăng ca
-                        boolean isOvertime = outTime != null && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
+                        // Tăng ca chỉ khi làm đủ sáng, chiều và tối đến ít nhất 21:00.
+                        boolean isOvertime = inTime != null && inTime.isBefore(LocalTime.of(12, 30))
+                                && outTime != null && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
 
                         // Tính số giờ thực làm và số giờ tăng ca
                         if (checkIn != null && checkOut != null) {
@@ -225,7 +227,7 @@ public class AttendanceQueryController {
                             patternBuilder.append("l");
                         } else if (isHalfDayMorning) {
                             patternBuilder.append("m");
-                        } else if (isHalfDayAfternoon) {
+                        } else if (isHalfDayAfternoon && !isFullDayAfternoon) {
                             patternBuilder.append("c");
                         } else {
                             patternBuilder.append("p");
@@ -235,11 +237,10 @@ public class AttendanceQueryController {
                             lateCount++;
                         }
 
-                        if (isHalfDayMorning || (isHalfDayAfternoon && !isFullDayAfternoon)) {
-                            workDays += 0.5;
-                        } else {
-                            workDays += 1.0;
-                        }
+                        double dayWorkDays = (isWeekend || isOvertime) ? 1.5
+                                : (isHalfDayMorning || (isHalfDayAfternoon && !isFullDayAfternoon)) ? 0.5 : 1.0;
+                        dailyWorkDays.put(d, dayWorkDays);
+                        workDays += dayWorkDays;
                     }
                 }
             }
@@ -263,6 +264,7 @@ public class AttendanceQueryController {
                     Math.round(overtimeHours * 10.0) / 10.0,
                     leaveDays,
                     patternBuilder.toString(),
+                    dailyWorkDays,
                     empUpdateNotes,
                     consolidatedNotes
             ));
@@ -342,7 +344,7 @@ public class AttendanceQueryController {
 
             if (date.isAfter(today)) {
                 status = "FUTURE";
-            } else if (isWeekend) {
+            } else if (isWeekend && dayRecords.isEmpty()) {
                 status = "HOLIDAY";
             } else {
                 if (dayRecords.isEmpty()) {
@@ -389,8 +391,9 @@ public class AttendanceQueryController {
                         }
                     }
 
-                    // Quy định tăng ca: Chỉ khi nào làm việc đến 21:00 (9h tối) hoặc sau 21:00 mới được ghi nhận tăng ca
-                    boolean isOvertime = outTime != null && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
+                    // Tăng ca chỉ khi làm đủ sáng, chiều và tối đến ít nhất 21:00.
+                    boolean isOvertime = inTime != null && inTime.isBefore(LocalTime.of(12, 30))
+                            && outTime != null && !outTime.isBefore(OVERTIME_MIN_CHECKOUT);
 
                     if (checkIn != null && checkOut != null) {
                         double rawMinutes = Duration.between(checkIn, checkOut).toMinutes();
@@ -420,7 +423,7 @@ public class AttendanceQueryController {
                         status = "LATE";
                     } else if (isHalfDayMorning) {
                         status = "HALF_DAY_MORNING";
-                    } else if (isHalfDayAfternoon) {
+                    } else if (isHalfDayAfternoon && !isFullDayAfternoon) {
                         status = "HALF_DAY_AFTERNOON";
                     } else {
                         status = "PRESENT";
@@ -430,7 +433,9 @@ public class AttendanceQueryController {
                         lateCount++;
                     }
 
-                    if (isHalfDayMorning || (isHalfDayAfternoon && !isFullDayAfternoon)) {
+                    if (isWeekend || isOvertime) {
+                        workDays += 1.5;
+                    } else if (isHalfDayMorning || (isHalfDayAfternoon && !isFullDayAfternoon)) {
                         workDays += 0.5;
                     } else {
                         workDays += 1.0;
@@ -650,6 +655,7 @@ public class AttendanceQueryController {
             double overtimeHours,
             int leavedays,
             String dailyPattern,
+            Map<Integer, Double> dailyWorkDays,
             Map<Integer, String> updateNotes,
             String notes
     ) {}

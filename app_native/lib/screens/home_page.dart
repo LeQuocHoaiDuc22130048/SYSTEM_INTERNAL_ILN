@@ -10,6 +10,9 @@ import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../utils/chat_provider.dart';
 import '../utils/notification_provider.dart';
+import '../models/app_permission.dart';
+import '../widgets/navigation/mobile_navigation_bar.dart';
+import '../widgets/quick_booking_sheet.dart';
 import 'profile_page.dart';
 
 /// Home Screen designed faithfully from Stitch (Home Screen - Home Service Marketplace)
@@ -155,15 +158,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _showBookingSheet({String? expertName, String? serviceName}) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _buildQuickBookingModal(
-        expertName: expertName,
-        serviceName: serviceName,
-      ),
-    );
+    showQuickBookingSheet(context, expertName: expertName, serviceName: serviceName);
   }
 
   void _showOrderDetailsSheet() {
@@ -265,109 +260,6 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildQuickBookingModal({String? expertName, String? serviceName}) {
-    final noteController = TextEditingController();
-    return Padding(
-      padding: EdgeInsets.only(
-        bottom: MediaQuery.of(context).viewInsets.bottom,
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 16),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    expertName != null
-                        ? 'Đặt lịch với $expertName'
-                        : (serviceName != null ? 'Đặt dịch vụ: $serviceName' : 'Đặt lịch dịch vụ mới'),
-                    style: const TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(LucideIcons.x, size: 20),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'Mô tả yêu cầu hoặc lỗi cần sửa:',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: noteController,
-              maxLines: 3,
-              decoration: InputDecoration(
-                hintText: 'Nhập thông tin sự cố, mã lỗi hoặc yêu cầu kiểm tra...',
-                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-                filled: true,
-                fillColor: const Color(0xFFF8FAFC),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'Đã gửi yêu cầu dịch vụ thành công! Kỹ thuật viên sẽ liên hệ sớm.',
-                      ),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  elevation: 2,
-                ),
-                child: const Text('Xác nhận đặt lịch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
@@ -452,7 +344,18 @@ class _HomePageState extends State<HomePage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC), // slate-50 from Stitch
       body: SafeArea(child: bodyContent),
-      bottomNavigationBar: widget.showBottomNav ? _buildStitchBottomNavBar() : null,
+      bottomNavigationBar: widget.showBottomNav
+          ? MobileNavigationBar(
+              isDark: Theme.of(context).brightness == Brightness.dark,
+              homeSelected: _currentNavTab == 0,
+              profileSelected: _currentNavTab == 2,
+              onHome: () => setState(() => _currentNavTab = 0),
+              onBooking: () => _showBookingSheet(),
+              onProfile: auth.can(AppPermission.viewProfile)
+                  ? () => setState(() => _currentNavTab = 2)
+                  : null,
+            )
+          : null,
     );
   }
 
@@ -1376,147 +1279,4 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 8. Stitch 3-Tab Bottom Navigation Bar
-  Widget _buildStitchBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // Tab 1: Home (Active)
-              InkWell(
-                onTap: () => setState(() => _currentNavTab = 0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: _currentNavTab == 0 ? const Color(0xFF2563EB) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: _currentNavTab == 0
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF2563EB).withValues(alpha: 0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                )
-                              ]
-                            : null,
-                      ),
-                      child: Icon(
-                        LucideIcons.house,
-                        size: 18,
-                        color: _currentNavTab == 0 ? Colors.white : const Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Trang chủ',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: _currentNavTab == 0 ? FontWeight.bold : FontWeight.w500,
-                        color: _currentNavTab == 0 ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Tab 2: Center Raised Floating '+' Button
-              Transform.translate(
-                offset: const Offset(0, -14),
-                child: InkWell(
-                  onTap: () => _showBookingSheet(),
-                  borderRadius: BorderRadius.circular(30),
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2563EB), Color(0xFF4F46E5), Color(0xFF3B82F6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.45),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                      border: Border.all(color: Colors.white, width: 3.5),
-                    ),
-                    child: const Center(
-                      child: Icon(LucideIcons.plus, size: 24, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Tab 3: Profile
-              InkWell(
-                onTap: () {
-                  setState(() => _currentNavTab = 2);
-                },
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: _currentNavTab == 2 ? const Color(0xFF2563EB) : Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: _currentNavTab == 2
-                            ? [
-                                BoxShadow(
-                                  color: const Color(0xFF2563EB).withValues(alpha: 0.35),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                )
-                              ]
-                            : null,
-                      ),
-                      child: Icon(
-                        LucideIcons.user,
-                        size: 18,
-                        color: _currentNavTab == 2 ? Colors.white : const Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Cá nhân',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: _currentNavTab == 2 ? FontWeight.bold : FontWeight.w500,
-                        color: _currentNavTab == 2 ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }

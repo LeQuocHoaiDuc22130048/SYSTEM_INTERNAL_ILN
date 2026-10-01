@@ -9,6 +9,8 @@ import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../utils/notification_provider.dart';
 import '../utils/update_provider.dart';
+import '../widgets/navigation/mobile_navigation_bar.dart';
+import '../widgets/quick_booking_sheet.dart';
 import 'privacy_policy_page.dart';
 
 /// Profile Page designed faithfully according to Stitch Home Service Marketplace
@@ -84,7 +86,16 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
-      bottomNavigationBar: widget.showBottomNav ? _buildStitchBottomNavBar() : null,
+      bottomNavigationBar: widget.showBottomNav
+          ? MobileNavigationBar(
+              isDark: isDark,
+              profileSelected: true,
+              onHome: widget.onNavigateToHome ??
+                  () => Navigator.of(context).pushReplacementNamed(AppRoutes.home),
+              onBooking: () => showQuickBookingSheet(context),
+              onProfile: () {},
+            )
+          : null,
     );
   }
 
@@ -1318,239 +1329,4 @@ class _ProfilePageState extends State<ProfilePage> {
     return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'.toUpperCase();
   }
 
-  // Stitch 3-Tab Bottom Navigation Bar (Synchronized with HomePage)
-  Widget _buildStitchBottomNavBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 20,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        top: false,
-        child: Container(
-          height: 64,
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              // Tab 1: Home
-              InkWell(
-                onTap: () {
-                  if (widget.onNavigateToHome != null) {
-                    widget.onNavigateToHome!();
-                  } else {
-                    Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-                  }
-                },
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: Colors.transparent,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: const Icon(
-                        LucideIcons.house,
-                        size: 18,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Trang chủ',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w500,
-                        color: Color(0xFF64748B),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-
-              // Tab 2: Center Raised Floating '+' Button
-              Transform.translate(
-                offset: const Offset(0, -14),
-                child: InkWell(
-                  onTap: _showQuickBookingModal,
-                  borderRadius: BorderRadius.circular(30),
-                  child: Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF2563EB), Color(0xFF4F46E5), Color(0xFF3B82F6)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFF2563EB).withValues(alpha: 0.45),
-                          blurRadius: 16,
-                          offset: const Offset(0, 6),
-                        ),
-                      ],
-                      border: Border.all(color: Colors.white, width: 3.5),
-                    ),
-                    child: const Center(
-                      child: Icon(LucideIcons.plus, size: 24, color: Colors.white),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Tab 3: Profile (Active)
-              InkWell(
-                onTap: () {},
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 34,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB),
-                        borderRadius: BorderRadius.circular(14),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF2563EB).withValues(alpha: 0.35),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        LucideIcons.user,
-                        size: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    const Text(
-                      'Cá nhân',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF2563EB),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _showQuickBookingModal() {
-    final noteController = TextEditingController();
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (bottomSheetContext) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(bottomSheetContext).viewInsets.bottom,
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Container(
-                  width: 40,
-                  height: 4,
-                  margin: const EdgeInsets.only(bottom: 16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Expanded(
-                    child: Text(
-                      'Đặt lịch dịch vụ mới',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(LucideIcons.x, size: 20),
-                    onPressed: () => Navigator.of(bottomSheetContext).pop(),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'Mô tả yêu cầu hoặc lỗi cần sửa:',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: noteController,
-                maxLines: 3,
-                decoration: InputDecoration(
-                  hintText: 'Nhập thông tin sự cố, mã lỗi hoặc yêu cầu kiểm tra...',
-                  hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
-                  filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 18),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(bottomSheetContext).pop();
-                    _showSnackBar('Đã gửi yêu cầu dịch vụ thành công! Kỹ thuật viên sẽ liên hệ sớm.');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                    elevation: 2,
-                  ),
-                  child: const Text('Xác nhận đặt lịch', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
