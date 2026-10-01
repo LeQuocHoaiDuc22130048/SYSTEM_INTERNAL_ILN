@@ -4,3 +4,6 @@ dist
 .gitignore
 README.md
 .vscode
+.env
+.env.*
+*.env

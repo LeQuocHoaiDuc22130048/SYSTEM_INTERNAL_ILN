@@ -4,3 +4,8 @@ target
 node_modules
 Dockerfile
 docker-compose.yml
+.env
+.env.*
+*.env
+*-service-account.json
+firebase-service-account.json

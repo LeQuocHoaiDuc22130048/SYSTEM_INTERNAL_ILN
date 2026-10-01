@@ -45,10 +45,17 @@ class ApiClient {
   static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
   );
-  static const bool _allowInsecureApi = bool.fromEnvironment(
+  static const bool _allowInsecureApiRaw = bool.fromEnvironment(
     'ALLOW_INSECURE_API',
     defaultValue: false,
   );
+
+  static bool get _allowInsecureApi {
+    if (kReleaseMode) {
+      return false;
+    }
+    return _allowInsecureApiRaw;
+  }
 
   static String get baseUrl {
     return _baseUrlCandidates.first;
