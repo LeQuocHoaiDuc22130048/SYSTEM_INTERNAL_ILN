@@ -56,7 +56,7 @@ public class AppUpdateController {
     @Value("${app.update.public-base-url:}")
     private String publicBaseUrl;
 
-    @Value("${app.update.ios.bundle-id:com.suachuabientan.systeminternal}")
+    @Value("${app.update.ios.bundle-id:com.suachuabientan.system}")
     private String iosBundleId;
 
     @Value("${app.update.ios.app-title:System Internal}")
