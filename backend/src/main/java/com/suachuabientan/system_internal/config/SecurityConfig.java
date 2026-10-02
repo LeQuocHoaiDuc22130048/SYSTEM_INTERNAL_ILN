@@ -72,6 +72,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/app-updates/check").permitAll()
                         .requestMatchers("/api/v1/app-updates/ios/manifest.plist").permitAll()
                         .requestMatchers("/api/v1/app-updates/download/**").permitAll()
+                        .requestMatchers("/api/v1/banners", "/api/v1/banners/active", "/api/v1/banners/images/**").permitAll()
                         .requestMatchers("/privacy-policy", "/api/v1/privacy-policy").permitAll()
                         // Actuator health check
                         .requestMatchers("/actuator/health").permitAll()

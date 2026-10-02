@@ -4,6 +4,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
 import '../models/store_location.dart';
 import '../utils/backend_data_provider.dart';
+import '../widgets/navigation/app_back_button.dart';
 
 class LocationManagementPage extends StatefulWidget {
   const LocationManagementPage({super.key});
@@ -262,6 +263,13 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: 58,
+        leading: const Padding(
+          padding: EdgeInsets.only(left: 16),
+          child: Center(
+            child: AppBackButton(),
+          ),
+        ),
         title: const Text(
           'Quản Lý Vị Trí Kho / Kệ',
           style: TextStyle(fontWeight: FontWeight.bold),

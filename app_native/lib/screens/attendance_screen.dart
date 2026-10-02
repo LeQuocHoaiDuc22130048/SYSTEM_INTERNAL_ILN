@@ -18,6 +18,7 @@ import '../services/face_detector_service.dart';
 import '../services/liveness_service.dart';
 import '../theme/app_colors.dart';
 import '../utils/api_client.dart';
+import '../widgets/navigation/app_back_button.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../utils/network_provider.dart';
@@ -1328,10 +1329,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         child: Row(
           children: [
             if (widget.showBackButton)
-              IconButton(
+              AppBackButton(
+                isDark: true,
                 onPressed: () => Navigator.maybePop(context),
-                icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
-                tooltip: 'Quay lại',
               )
             else
               const SizedBox(width: 48),
@@ -1359,10 +1359,9 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       child: Row(
         children: [
           if (widget.showBackButton)
-            IconButton(
+            AppBackButton(
+              isDark: true,
               onPressed: () => Navigator.maybePop(context),
-              icon: const Icon(LucideIcons.chevronLeft, color: Colors.white),
-              tooltip: 'Quay lại',
             )
           else
             const SizedBox(width: 48),

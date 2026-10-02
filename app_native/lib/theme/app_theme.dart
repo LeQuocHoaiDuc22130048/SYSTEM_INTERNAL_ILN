@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'app_colors.dart';
 
 class AppTheme {
@@ -24,6 +25,11 @@ class AppTheme {
       foregroundColor: AppColors.textPrimaryLight,
       elevation: 0,
       centerTitle: false,
+    ),
+
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (BuildContext context) =>
+          const Icon(LucideIcons.chevronLeft, size: 20),
     ),
 
     cardTheme: CardThemeData(
@@ -122,6 +128,11 @@ class AppTheme {
       foregroundColor: AppColors.textPrimaryDark,
       elevation: 0,
       centerTitle: false,
+    ),
+
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (BuildContext context) =>
+          const Icon(LucideIcons.chevronLeft, size: 20),
     ),
 
     cardTheme: CardThemeData(

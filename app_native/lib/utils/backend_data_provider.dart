@@ -8,6 +8,7 @@ import '../models/board_history_item.dart';
 import '../models/user.dart';
 import '../models/part.dart';
 import '../models/store_location.dart';
+import '../models/app_banner.dart';
 import 'api_client.dart';
 
 class BackendDataProvider extends ChangeNotifier {
@@ -22,9 +23,11 @@ class BackendDataProvider extends ChangeNotifier {
   List<Part> parts = [];
   List<StoreLocation> locations = [];
   List<AttendanceRecord> attendanceRecords = [];
+  List<AppBanner> banners = [AppBanner.defaultBanner];
   EmployeeHistoryData? myAttendanceHistory;
   MyTodayAttendance? myTodayAttendance;
   bool isLoadingMyAttendance = false;
+  bool isLoadingBanners = false;
 
   bool isLoading = false;
   String? error;
@@ -37,9 +40,11 @@ class BackendDataProvider extends ChangeNotifier {
     parts = [];
     locations = [];
     attendanceRecords = [];
+    banners = [AppBanner.defaultBanner];
     myAttendanceHistory = null;
     myTodayAttendance = null;
     isLoadingMyAttendance = false;
+    isLoadingBanners = false;
     isLoading = false;
     error = null;
     notifyListeners();
@@ -56,6 +61,7 @@ class BackendDataProvider extends ChangeNotifier {
         loadBoards(notify: false),
         loadParts(notify: false),
         loadLocations(notify: false),
+        loadBanners(notify: false),
       ];
 
       if (isManagerOrAbove) {
@@ -525,6 +531,37 @@ class BackendDataProvider extends ChangeNotifier {
   Future<void> deleteStoreLocation(String id, {bool reload = true}) async {
     await api.delete('/api/v1/parts/locations/$id');
     if (reload) await loadLocations();
+  }
+
+  Future<void> loadBanners({bool notify = true}) async {
+    try {
+      isLoadingBanners = true;
+      final data = await api.get('/api/v1/banners');
+      final list = _content(data);
+      final loaded = list
+          .map((item) {
+            try {
+              return AppBanner.fromJson(item);
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<AppBanner>()
+          .where((b) => b.isActive)
+          .toList();
+      if (loaded.isNotEmpty) {
+        banners = loaded;
+      } else if (banners.isEmpty) {
+        banners = [AppBanner.defaultBanner];
+      }
+    } catch (_) {
+      if (banners.isEmpty) {
+        banners = [AppBanner.defaultBanner];
+      }
+    } finally {
+      isLoadingBanners = false;
+      if (notify) notifyListeners();
+    }
   }
 
   List<Map<String, dynamic>> _content(dynamic data) {

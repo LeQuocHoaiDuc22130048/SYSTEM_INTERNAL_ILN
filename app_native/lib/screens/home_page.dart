@@ -5,12 +5,12 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../app/app_routes.dart';
 import '../navigation/main_tabs.dart';
 import '../navigation/navigation_config.dart';
-import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../utils/chat_provider.dart';
 import '../utils/notification_provider.dart';
 import '../models/app_permission.dart';
+import '../models/app_banner.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/quick_booking_sheet.dart';
 import 'profile_page.dart';
@@ -19,8 +19,6 @@ import 'profile_page.dart';
 /// Features:
 /// - Sticky TopBar with location picker, app logo avatar, notification indicator
 /// - User Greeting ("Hello, [Name] 👋")
-/// - Search & Filter Bar
-/// - Ongoing Activity Card (Active Booking with Tech & Status)
 /// - Promotional Banner featuring the 3D Character (`assets/images/image_character.png`)
 /// - Service Categories Grid (Chức năng: Dashboard, Đơn, Kho, Nhắn tin, Quản lý nhân viên)
 /// - Top Rated Experts list with verified badges, ratings, and booking action
@@ -42,13 +40,29 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  final TextEditingController _searchController = TextEditingController();
   late int _currentNavTab; // 0: Home, 1: Book (+), 2: Profile
+  late final PageController _bannerController;
+  int _currentBannerIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _currentNavTab = widget.initialNavTab;
+    _bannerController = PageController();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final backend = context.read<BackendDataProvider>();
+        if (backend.banners.length <= 1) {
+          backend.loadBanners(notify: false);
+        }
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _bannerController.dispose();
+    super.dispose();
   }
 
   List<Map<String, dynamic>> get _categories => const [
@@ -140,12 +154,6 @@ class _HomePageState extends State<HomePage> {
     },
   ];
 
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-
   void _navigateToTab(int tabIndex) {
     if (widget.onNavigateToTab != null) {
       widget.onNavigateToTab!(tabIndex);
@@ -159,105 +167,6 @@ class _HomePageState extends State<HomePage> {
 
   void _showBookingSheet({String? expertName, String? serviceName}) {
     showQuickBookingSheet(context, expertName: expertName, serviceName: serviceName);
-  }
-
-  void _showOrderDetailsSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                margin: const EdgeInsets.only(bottom: 18),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDBEAFE),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Text(
-                    'ĐÃ XÁC NHẬN ✓',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF1D4ED8),
-                    ),
-                  ),
-                ),
-                const Spacer(),
-                const Text(
-                  'Mã đơn: #INV-2026',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF64748B),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Bảo trì Inverter & Nạp linh kiện',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF0F172A),
-              ),
-            ),
-            const SizedBox(height: 6),
-            const Text(
-              'Kỹ thuật viên phụ trách: Michael Vance\nThời gian: Ngày mai lúc 10:00 AM\nĐịa chỉ: 124 Oxford St, Quận 1',
-              style: TextStyle(
-                fontSize: 13,
-                color: Color(0xFF475569),
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              height: 48,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  _navigateToTab(MainTabs.repairOrders);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                child: const Text(
-                  'Xem trong danh sách đơn sửa chữa',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 
   @override
@@ -311,15 +220,7 @@ class _HomePageState extends State<HomePage> {
                   children: [
                     // User Greeting Section
                     _buildGreeting(userName),
-                    const SizedBox(height: 16),
-
-                    // Search & Filter Bar
-                    _buildSearchBar(),
                     const SizedBox(height: 18),
-
-                    // Ongoing Activity Card (Matching Stitch)
-                    _buildOngoingBookingCard(),
-                    const SizedBox(height: 20),
 
                     // Promotional Banner with 3D Character (assets/images/image_character.png)
                     _buildPromotionalBanner(),
@@ -519,203 +420,67 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  // 3. Search & Filter Bar
-  Widget _buildSearchBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          const Padding(
-            padding: EdgeInsets.only(left: 14, right: 10),
-            child: Icon(LucideIcons.search, size: 18, color: Color(0xFF94A3B8)),
-          ),
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-              decoration: const InputDecoration(
-                hintText: 'Tìm kiếm sửa chữa, điện nước, biến tần...',
-                hintStyle: TextStyle(fontSize: 12.5, color: Color(0xFF94A3B8)),
-                border: InputBorder.none,
-                isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 13),
-              ),
-              onChanged: (value) => setState(() {}),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 6),
-            child: InkWell(
-              onTap: () {
-                _showBookingSheet();
-              },
-              borderRadius: BorderRadius.circular(12),
-              child: Container(
-                padding: const EdgeInsets.all(9),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  LucideIcons.slidersHorizontal,
-                  size: 16,
-                  color: Color(0xFF2563EB),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 4. Ongoing Booking Card (Matching Stitch)
-  Widget _buildOngoingBookingCard() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF312E81)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
-            blurRadius: 16,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
-            ),
-            child: const Center(
-              child: Text('❄️', style: TextStyle(fontSize: 20)),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF3B82F6).withValues(alpha: 0.40),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFF60A5FA).withValues(alpha: 0.40),
-                        ),
-                      ),
-                      child: const Text(
-                        'ĐÃ XÁC NHẬN ✓',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFFBFDBFE),
-                          letterSpacing: 0.2,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Ngày mai, 10:00 AM',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.blue.shade100,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 5),
-                const Text(
-                  'Bảo trì Inverter & Nạp linh kiện',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Với KTV: Michael Vance',
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: Colors.blue.shade100.withValues(alpha: 0.85),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: _showOrderDetailsSheet,
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.16),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
-              ),
-              child: const Text(
-                'Chi tiết',
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 5. Promotional Banner with 3D Character Image
+  // 3. Dynamic Promotional Banner with 3D Character or Custom Image
   Widget _buildPromotionalBanner() {
-    return Container(
-      width: double.infinity,
+    final backendProvider = Provider.of<BackendDataProvider?>(context);
+    final banners = (backendProvider?.banners != null && backendProvider!.banners.isNotEmpty)
+        ? backendProvider.banners
+        : const [AppBanner.defaultBanner];
+
+    final baseUrl = backendProvider?.api.activeBaseUrl ?? '';
+
+    if (banners.length == 1) {
+      return _buildBannerCard(banners.first, baseUrl, 0, 1);
+    }
+
+    return SizedBox(
+      height: 225,
+      child: PageView.builder(
+        controller: _bannerController,
+        itemCount: banners.length,
+        onPageChanged: (index) {
+          setState(() {
+            _currentBannerIndex = index;
+          });
+        },
+        itemBuilder: (context, index) {
+          return _buildBannerCard(banners[index], baseUrl, _currentBannerIndex, banners.length);
+        },
+      ),
+    );
+  }
+
+  Widget _buildBannerCard(AppBanner banner, String baseUrl, int currentIndex, int totalCount) {
+    return GestureDetector(
+      onTap: () => _handleBannerAction(banner),
+      child: Container(
+        width: double.infinity,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
-          colors: [Color(0xFF2563EB), Color(0xFF4F46E5), Color(0xFF1D4ED8)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        gradient: (banner.backgroundImageUrl == null || banner.backgroundImageUrl!.isEmpty)
+            ? LinearGradient(
+                colors: banner.gradientColorList,
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              )
+            : null,
+        image: (banner.backgroundImageUrl != null && banner.backgroundImageUrl!.isNotEmpty)
+            ? DecorationImage(
+                image: NetworkImage(
+                  banner.backgroundImageUrl!.startsWith('http')
+                      ? banner.backgroundImageUrl!
+                      : '$baseUrl${banner.backgroundImageUrl}',
+                ),
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withValues(alpha: 0.35),
+                  BlendMode.darken,
+                ),
+              )
+            : null,
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+            color: banner.gradientColorList.first.withValues(alpha: 0.25),
             blurRadius: 16,
             offset: const Offset(0, 4),
           ),
@@ -745,33 +510,35 @@ class _HomePageState extends State<HomePage> {
 
           // Banner text and action button
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 18, 126, 20),
+            padding: const EdgeInsets.fromLTRB(18, 16, 126, 18),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 // Pill Deal
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.22),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-                  ),
-                  child: const Text(
-                    '⚡ ƯU ĐÃI ĐẶC BIỆT',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
+                if (banner.badgeText != null && banner.badgeText!.isNotEmpty) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
+                    ),
+                    child: Text(
+                      banner.badgeText!,
+                      style: const TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Bảo Trì & Sửa Chữa Inverter',
-                  style: TextStyle(
+                  const SizedBox(height: 8),
+                ],
+                Text(
+                  banner.title,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
@@ -779,59 +546,35 @@ class _HomePageState extends State<HomePage> {
                     letterSpacing: -0.2,
                   ),
                 ),
-                const SizedBox(height: 4),
-                RichText(
-                  text: TextSpan(
-                    style: TextStyle(fontSize: 11, color: Colors.blue.shade100, height: 1.3),
-                    children: const [
-                      TextSpan(text: 'Giảm ngay '),
-                      TextSpan(
-                        text: '25% GIÁ TRỊ',
-                        style: TextStyle(
-                          color: Color(0xFFFDE047),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextSpan(text: ' cho lượt đặt dịch vụ đầu tiên!'),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                ElevatedButton(
-                  onPressed: () => _showBookingSheet(serviceName: 'Gói bảo trì ưu đãi 25%'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF1D4ED8),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                    elevation: 2,
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Đặt lịch ngay',
-                        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                      ),
-                      SizedBox(width: 4),
-                      Icon(LucideIcons.arrowRight, size: 13),
-                    ],
-                  ),
-                ),
+                if (banner.subtitle != null && banner.subtitle!.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  _buildSubtitle(banner.subtitle!),
+                ],
+                if (banner.buttonPosition != 'TOP_RIGHT') ...[
+                  const SizedBox(height: 12),
+                  _buildButtonsContainer(banner),
+                ],
               ],
             ),
           ),
 
-          // 3D Character Image (Prepared by User in assets/images/image_character.png)
+          // Top Right Buttons (if positioned TOP_RIGHT)
+          if (banner.buttonPosition == 'TOP_RIGHT')
+            Positioned(
+              top: 14,
+              right: 14,
+              child: _buildBannerButtons(banner),
+            ),
+
+          // 3D Character or Custom Image
           Positioned(
             right: 4,
             bottom: 0,
-            child: SizedBox(
-              width: 130,
-              height: 162,
-              child: Image.asset(
-                'assets/images/image_character.png',
-                fit: BoxFit.contain,
+            child: IgnorePointer(
+              child: SizedBox(
+                width: 130,
+                height: 162,
+                child: _buildBannerImage(banner, baseUrl),
               ),
             ),
           ),
@@ -841,39 +584,248 @@ class _HomePageState extends State<HomePage> {
             bottom: 8,
             left: 18,
             child: Row(
-              children: [
-                Container(
-                  width: 14,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(2),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Container(
-                  width: 4,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
+              children: List.generate(
+                totalCount > 1 ? totalCount : 3,
+                (dotIdx) {
+                  final isDotActive = dotIdx == currentIndex;
+                  return GestureDetector(
+                    onTap: () {
+                      if (totalCount > 1) {
+                        _bannerController.animateToPage(
+                          dotIdx,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                        );
+                      }
+                    },
+                    child: Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      width: isDotActive ? 14 : 4,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: isDotActive ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                        borderRadius: isDotActive ? BorderRadius.circular(2) : null,
+                        shape: isDotActive ? BoxShape.rectangle : BoxShape.circle,
+                      ),
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ],
       ),
+      ),
     );
+  }
+
+  Widget _buildSubtitle(String text) {
+    if (text.contains('25% GIÁ TRỊ')) {
+      final parts = text.split('25% GIÁ TRỊ');
+      return RichText(
+        text: TextSpan(
+          style: TextStyle(fontSize: 11, color: Colors.blue.shade100, height: 1.3),
+          children: [
+            TextSpan(text: parts.first),
+            const TextSpan(
+              text: '25% GIÁ TRỊ',
+              style: TextStyle(
+                color: Color(0xFFFDE047),
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            if (parts.length > 1) TextSpan(text: parts.sublist(1).join('25% GIÁ TRỊ')),
+          ],
+        ),
+      );
+    }
+    return Text(
+      text,
+      style: TextStyle(fontSize: 11, color: Colors.blue.shade100, height: 1.3),
+    );
+  }
+
+  Widget _buildBannerImage(AppBanner banner, String baseUrl) {
+    final imgUrl = banner.imageUrl;
+    if (imgUrl != null && imgUrl.isNotEmpty) {
+      final fullUrl = imgUrl.startsWith('http') ? imgUrl : '$baseUrl$imgUrl';
+      return Image.network(
+        fullUrl,
+        fit: BoxFit.contain,
+        errorBuilder: (_, _, _) => Image.asset(
+          'assets/images/image_character.png',
+          fit: BoxFit.contain,
+        ),
+      );
+    }
+    return Image.asset(
+      'assets/images/image_character.png',
+      fit: BoxFit.contain,
+    );
+  }
+
+  Widget _buildButtonsContainer(AppBanner banner) {
+    final pos = banner.buttonPosition;
+    final buttonsWidget = _buildBannerButtons(banner);
+
+    if (pos == 'BOTTOM_CENTER') {
+      return Center(child: buttonsWidget);
+    } else if (pos == 'BOTTOM_RIGHT') {
+      return Align(alignment: Alignment.centerRight, child: buttonsWidget);
+    }
+    // Default BOTTOM_LEFT
+    return Align(alignment: Alignment.centerLeft, child: buttonsWidget);
+  }
+
+  Widget _buildBannerButtons(AppBanner banner) {
+    if (banner.buttons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    final brandColor = banner.gradientColorList.length > 2
+        ? banner.gradientColorList[2]
+        : const Color(0xFF1D4ED8);
+
+    final buttonWidgets = banner.buttons.map((btn) {
+      final isSecondary = btn.styleType == 'SECONDARY';
+      final isOutline = btn.styleType == 'OUTLINE';
+
+      if (isSecondary) {
+        return OutlinedButton(
+          onPressed: () => _handleBannerButtonAction(btn),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.white.withValues(alpha: 0.22),
+            foregroundColor: Colors.white,
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.5), width: 1.2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                btn.text,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                btn.actionType == 'CALL' ? LucideIcons.phone : LucideIcons.arrowRight,
+                size: 12,
+              ),
+            ],
+          ),
+        );
+      }
+
+      if (isOutline) {
+        return OutlinedButton(
+          onPressed: () => _handleBannerButtonAction(btn),
+          style: OutlinedButton.styleFrom(
+            backgroundColor: Colors.transparent,
+            foregroundColor: Colors.white,
+            side: const BorderSide(color: Colors.white, width: 1.2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                btn.text,
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(width: 4),
+              Icon(
+                btn.actionType == 'CALL' ? LucideIcons.phone : LucideIcons.arrowRight,
+                size: 12,
+              ),
+            ],
+          ),
+        );
+      }
+
+      // Default PRIMARY
+      return ElevatedButton(
+        onPressed: () => _handleBannerButtonAction(btn),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: brandColor,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          elevation: 2,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              btn.text,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              btn.actionType == 'CALL' ? LucideIcons.phone : LucideIcons.arrowRight,
+              size: 13,
+            ),
+          ],
+        ),
+      );
+    }).toList();
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 6,
+      children: buttonWidgets,
+    );
+  }
+
+  void _handleBannerButtonAction(AppBannerButton btn) {
+    if (btn.actionType == 'BOOKING') {
+      _showBookingSheet(serviceName: btn.actionValue ?? 'Gói bảo trì ưu đãi 25%');
+    } else if (btn.actionType == 'REPAIR_ORDER') {
+      _navigateToTab(MainTabs.repairOrders);
+    } else if (btn.actionType == 'CALL') {
+      final phone = btn.actionValue ?? '0912345678';
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Gọi hotline: $phone'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } else if (btn.actionType == 'SCREEN') {
+      final val = (btn.actionValue ?? '').toLowerCase();
+      if (val.contains('warehouse') || val.contains('kho')) {
+        _navigateToTab(MainTabs.warehouse);
+      } else if (val.contains('message') || val.contains('chat') || val.contains('nhắn')) {
+        _navigateToTab(MainTabs.messages);
+      } else if (val.contains('employee') || val.contains('nhân viên')) {
+        _navigateToTab(MainTabs.employeeManagement);
+      } else {
+        _navigateToTab(MainTabs.dashboard);
+      }
+    } else if (btn.actionType == 'LINK') {
+      if (mounted && btn.actionValue != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Liên kết: ${btn.actionValue}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _handleBannerAction(AppBanner banner) {
+    if (banner.buttons.isNotEmpty) {
+      _handleBannerButtonAction(banner.buttons.first);
+    } else {
+      _handleBannerButtonAction(AppBannerButton(
+        text: banner.buttonText ?? 'Đặt lịch ngay',
+        actionType: banner.actionType,
+        actionValue: banner.actionValue,
+      ));
+    }
   }
 
   // 6. Service Categories Grid

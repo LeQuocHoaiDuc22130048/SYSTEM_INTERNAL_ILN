@@ -16,13 +16,14 @@ import {
   ShieldCheck,
   LayoutDashboard,
   X,
+  Image as ImageIcon,
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { isAdminOrAbove, isManagerOrAbove as _isManagerOrAbove, getRoleLabel } from '../utils/permissions';
 
 interface SidebarProps {
-  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts';
-  setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts') => void;
+  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'warehouse' | 'locations' | 'accounts';
+  setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'warehouse' | 'locations' | 'accounts') => void;
   currentUser: UserInfo | null;
   handleLogout: () => void;
   isOpen?: boolean;
@@ -45,7 +46,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isManagerOrAbove = React.useMemo(() => _isManagerOrAbove(currentUser), [currentUser]);
   const showAccountsTab = React.useMemo(() => isAdminOrAbove(currentUser), [currentUser]);
 
-  const handleTabClick = (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'locations' | 'accounts') => {
+  const handleTabClick = (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'warehouse' | 'locations' | 'accounts') => {
     setActiveTab(tab);
     if (onClose) {
       onClose();
@@ -152,6 +153,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   >
                     <RefreshCw size={16} className="item-icon" />
                     <span>Cập nhật ứng dụng</span>
+                  </button>
+                )}
+                {isManagerOrAbove && (
+                  <button
+                    className={`menu-item ${activeTab === 'banners' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('banners')}
+                  >
+                    <ImageIcon size={16} className="item-icon" />
+                    <span>Banner ứng dụng</span>
                   </button>
                 )}
               </div>

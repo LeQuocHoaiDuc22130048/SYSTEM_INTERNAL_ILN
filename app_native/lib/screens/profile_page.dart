@@ -9,6 +9,7 @@ import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../utils/notification_provider.dart';
 import '../utils/update_provider.dart';
+import '../widgets/navigation/app_back_button.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/quick_booking_sheet.dart';
 import 'privacy_policy_page.dart';
@@ -118,8 +119,12 @@ class _ProfilePageState extends State<ProfilePage> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           // Back / Home button
-          InkWell(
-            onTap: () {
+          AppBackButton(
+            isDark: isDark,
+            icon: (widget.onNavigateToHome != null || canPop)
+                ? LucideIcons.chevronLeft
+                : LucideIcons.house,
+            onPressed: () {
               if (widget.onNavigateToHome != null) {
                 widget.onNavigateToHome!();
               } else if (canPop) {
@@ -128,25 +133,6 @@ class _ProfilePageState extends State<ProfilePage> {
                 Navigator.of(context).pushReplacementNamed(AppRoutes.home);
               }
             },
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
-                ),
-              ),
-              child: Icon(
-                (widget.onNavigateToHome != null || canPop)
-                    ? LucideIcons.chevronLeft
-                    : LucideIcons.house,
-                size: 19,
-                color: isDark ? AppColors.textPrimaryDark : const Color(0xFF334155),
-              ),
-            ),
           ),
 
           // Title

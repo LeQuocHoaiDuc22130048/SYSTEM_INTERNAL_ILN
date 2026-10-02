@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_routes.dart';
 import '../../theme/app_colors.dart';
+import 'app_back_button.dart';
 import 'badge_widgets.dart';
 
 class DashboardMobileAppBar extends StatelessWidget
@@ -12,6 +14,7 @@ class DashboardMobileAppBar extends StatelessWidget
     required this.onToggleTheme,
     required this.onToggleNotifications,
     this.showNotification = true,
+    this.onBack,
   });
 
   final bool isDark;
@@ -19,12 +22,15 @@ class DashboardMobileAppBar extends StatelessWidget
   final VoidCallback onToggleTheme;
   final VoidCallback onToggleNotifications;
   final bool showNotification;
+  final VoidCallback? onBack;
 
   @override
   Size get preferredSize => const Size.fromHeight(57);
 
   @override
   Widget build(BuildContext context) {
+    final canPop = Navigator.canPop(context);
+
     return AppBar(
       toolbarHeight: 56,
       elevation: 0,
@@ -32,19 +38,27 @@ class DashboardMobileAppBar extends StatelessWidget
       backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
-      leading: Navigator.canPop(context)
-          ? IconButton(
-              icon: Icon(
-                Icons.arrow_back_ios_new_rounded,
-                size: 20,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : const Color(0xFF1E293B),
-              ),
-              onPressed: () => Navigator.of(context).maybePop(),
-              tooltip: 'Quay lại Trang chủ',
-            )
-          : null,
+      leadingWidth: 58,
+      leading: Padding(
+        padding: const EdgeInsets.only(left: 16),
+        child: Center(
+          child: AppBackButton(
+            isDark: isDark,
+            tooltip: 'Quay lại Trang chủ',
+            onPressed: onBack ??
+                () {
+                  if (canPop) {
+                    Navigator.of(context).maybePop();
+                  } else {
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      AppRoutes.home,
+                      (route) => false,
+                    );
+                  }
+                },
+          ),
+        ),
+      ),
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

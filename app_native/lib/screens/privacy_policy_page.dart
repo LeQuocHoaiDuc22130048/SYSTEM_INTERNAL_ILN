@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../theme/app_colors.dart';
 import '../utils/api_client.dart';
+import '../widgets/navigation/app_back_button.dart';
 
 class PrivacyPolicyPage extends StatelessWidget {
   const PrivacyPolicyPage({super.key});
@@ -36,6 +37,13 @@ class PrivacyPolicyPage extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        leadingWidth: 58,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Center(
+            child: AppBackButton(isDark: isDark),
+          ),
+        ),
         title: const Text('Chính sách bảo mật'),
         actions: [
           IconButton(

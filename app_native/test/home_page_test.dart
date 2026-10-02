@@ -128,17 +128,12 @@ void main() {
     // 2. Greeting section
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
 
-    // 3. Ongoing booking card
-    expect(find.text('ĐÃ XÁC NHẬN ✓'), findsOneWidget);
-    expect(find.text('Bảo trì Inverter & Nạp linh kiện'), findsOneWidget);
-    final ongoingCardFinder = find.ancestor(
-      of: find.text('Bảo trì Inverter & Nạp linh kiện'),
-      matching: find.byType(Container),
-    ).first;
-    final ongoingCardWidth = tester.getSize(ongoingCardFinder).width;
-    expect(ongoingCardWidth, 358.0);
+    // Verify search bar and ongoing booking card are hidden from home page
+    expect(find.text('ĐÃ XÁC NHẬN ✓'), findsNothing);
+    expect(find.text('Bảo trì Inverter & Nạp linh kiện'), findsNothing);
+    expect(find.text('Tìm kiếm sửa chữa, điện nước, biến tần...'), findsNothing);
 
-    // 4. Promotional banner with 3D Character image (width matches the card above it)
+    // 3. Promotional banner with 3D Character image
     expect(find.text('⚡ ƯU ĐÃI ĐẶC BIỆT'), findsOneWidget);
     expect(find.text('Bảo Trì & Sửa Chữa Inverter'), findsOneWidget);
     expect(find.byType(Image), findsWidgets);
@@ -147,7 +142,7 @@ void main() {
       of: promoHeadline,
       matching: find.byType(Container),
     ).first;
-    expect(tester.getSize(bannerContainerFinder).width, ongoingCardWidth);
+    expect(tester.getSize(bannerContainerFinder).width, 358.0);
 
     // 5. Functions section (Dashboard, Đơn, Kho, Nhắn tin, Quản lý nhân viên)
     expect(find.text('Chức năng'), findsOneWidget);

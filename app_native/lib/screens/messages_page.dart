@@ -18,6 +18,7 @@ import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../services/giphy_service.dart';
 import '../widgets/modal_top_bar.dart';
+import '../widgets/navigation/app_back_button.dart';
 import '../widgets/video_player_dialog.dart';
 
 class MessagesPage extends StatefulWidget {
@@ -1104,14 +1105,11 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
               ),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: widget.onBack,
-                    icon: Icon(
-                      Icons.arrow_back,
-                      size: 20,
-                      color: widget.isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: AppBackButton(
+                      isDark: widget.isDark,
+                      onPressed: widget.onBack,
                     ),
                   ),
                   Container(
@@ -1636,13 +1634,15 @@ class _ConversationSearchPageState extends State<_ConversationSearchPage> {
       appBar: AppBar(
         backgroundColor: surface,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new,
-            size: 20,
-            color: AppColors.primary,
+        leadingWidth: 58,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Center(
+            child: AppBackButton(
+              isDark: widget.isDark,
+              onPressed: () => Navigator.pop(context),
+            ),
           ),
-          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Tìm kiếm tin nhắn',
@@ -1929,13 +1929,15 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
         appBar: AppBar(
           backgroundColor: surface,
           elevation: 0,
-          leading: IconButton(
-            icon: Icon(
-              Icons.arrow_back_ios_new,
-              size: 20,
-              color: AppColors.primary,
+          leadingWidth: 58,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 16),
+            child: Center(
+              child: AppBackButton(
+                isDark: widget.isDark,
+                onPressed: () => Navigator.pop(context),
+              ),
             ),
-            onPressed: () => Navigator.pop(context),
           ),
           title: Text(
             'Ảnh, file & liên kết',
@@ -3106,13 +3108,15 @@ class _ChatDetailInfoPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: surface,
         elevation: 0,
-        leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new,
-            size: 20,
-            color: AppColors.primary,
+        leadingWidth: 58,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 16),
+          child: Center(
+            child: AppBackButton(
+              isDark: isDark,
+              onPressed: () => Navigator.pop(context),
+            ),
           ),
-          onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           'Chi tiết cuộc trò chuyện',

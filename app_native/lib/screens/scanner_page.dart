@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../theme/app_colors.dart';
+import '../widgets/navigation/app_back_button.dart';
 
 class ScannerPage extends StatefulWidget {
   const ScannerPage({super.key});
@@ -55,8 +56,8 @@ class _ScannerPageState extends State<ScannerPage> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildCircleButton(
-                  icon: Icons.arrow_back,
+                AppBackButton(
+                  isDark: true,
                   onPressed: () => Navigator.pop(context),
                 ),
                 Text(
