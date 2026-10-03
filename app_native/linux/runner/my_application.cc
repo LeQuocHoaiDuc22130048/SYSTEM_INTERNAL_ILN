@@ -45,11 +45,19 @@ static void my_application_activate(GApplication* application) {
   if (use_header_bar) {
     GtkHeaderBar* header_bar = GTK_HEADER_BAR(gtk_header_bar_new());
     gtk_widget_show(GTK_WIDGET(header_bar));
+<<<<<<< HEAD
     gtk_header_bar_set_title(header_bar, "System Inverter Likenew");
     gtk_header_bar_set_show_close_button(header_bar, TRUE);
     gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
   } else {
     gtk_window_set_title(window, "System Inverter Likenew");
+=======
+    gtk_header_bar_set_title(header_bar, "System Inverter LikeNew");
+    gtk_header_bar_set_show_close_button(header_bar, TRUE);
+    gtk_window_set_titlebar(window, GTK_WIDGET(header_bar));
+  } else {
+    gtk_window_set_title(window, "System Inverter LikeNew");
+>>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
   }
 
   gtk_window_set_default_size(window, 1280, 720);

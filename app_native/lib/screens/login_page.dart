@@ -614,7 +614,7 @@ class _LoginPageState extends State<LoginPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'INVERTER LIKE NEW',
+                'SYSTEM INVERTER LIKENEW',
                 style: TextStyle(
                   fontSize: isMobile ? 13.5 : 15,
                   fontWeight: FontWeight.w700,
@@ -1124,7 +1124,11 @@ class _LoginPageState extends State<LoginPage> {
                 Icon(LucideIcons.shieldCheck, size: 14, color: Color(0xFF2563EB)),
                 SizedBox(width: 6),
                 Text(
+<<<<<<< HEAD
                   'System Inverter Likenew',
+=======
+                  'Đăng nhập System Inverter LikeNew',
+>>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -1146,7 +1150,7 @@ class _LoginPageState extends State<LoginPage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Hệ thống quản lý dịch vụ & kho linh kiện Inverter Like New. Vui lòng đăng nhập hoặc đăng ký tài khoản để tiếp tục.',
+            'Hệ thống quản lý dịch vụ & kho linh kiện System Inverter LikeNew. Vui lòng đăng nhập hoặc đăng ký tài khoản để tiếp tục.',
             style: TextStyle(
               fontSize: 14,
               color: Color(0xFF64748B),

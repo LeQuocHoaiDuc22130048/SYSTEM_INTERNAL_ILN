@@ -1125,7 +1125,11 @@ class _ProfilePageState extends State<ProfilePage> {
                                 '• Hành động này không thể hoàn tác.\n'
                                 '• Mọi quyền truy cập hệ thống và phiên đăng nhập sẽ bị chấm dứt ngay lập tức.\n'
                                 '• Dữ liệu tài khoản cá nhân và thông báo đẩy sẽ bị hủy bỏ hoàn toàn.\n'
+<<<<<<< HEAD
                                 '• Tài khoản sẽ bị vô hiệu hóa theo đúng quy trình bảo mật hệ thống.',
+=======
+                                '• Tài khoản sẽ bị vô hiệu hóa theo đúng quy trình bảo mật.',
+>>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
                                 style: TextStyle(fontSize: 12, height: 1.4),
                               ),
                             ],

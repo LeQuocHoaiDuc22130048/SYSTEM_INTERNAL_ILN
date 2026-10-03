@@ -27,7 +27,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE instance, _In_opt_ HINSTANCE prev,
   FlutterWindow window(project);
   Win32Window::Point origin(10, 10);
   Win32Window::Size size(1280, 720);
+<<<<<<< HEAD
   if (!window.Create(L"System Inverter Likenew", origin, size)) {
+=======
+  if (!window.Create(L"System Inverter LikeNew", origin, size)) {
+>>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
     return EXIT_FAILURE;
   }
   window.SetQuitOnClose(true);

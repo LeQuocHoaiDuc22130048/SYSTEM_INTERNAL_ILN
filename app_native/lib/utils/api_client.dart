@@ -44,6 +44,7 @@ class ApiClient {
 
   static const String _configuredBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
+    defaultValue: 'https://inverterlikenew.com',
   );
   static const bool _allowInsecureApiRaw = bool.fromEnvironment(
     'ALLOW_INSECURE_API',
