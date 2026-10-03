@@ -58,7 +58,7 @@ export const PartBulkImportModal: React.FC<PartBulkImportModalProps> = ({
   const handleDownloadTemplate = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
-      workbook.creator = 'System Internal Warehouse';
+      workbook.creator = 'System Inverter Warehouse';
       workbook.created = new Date();
 
       const worksheet = workbook.addWorksheet('Danh_Sach_Linh_Kien', {

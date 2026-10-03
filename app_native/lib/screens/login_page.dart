@@ -1124,7 +1124,7 @@ class _LoginPageState extends State<LoginPage> {
                 Icon(LucideIcons.shieldCheck, size: 14, color: Color(0xFF2563EB)),
                 SizedBox(width: 6),
                 Text(
-                  'Cổng Đăng Nhập Nội Bộ',
+                  'System Inverter Likenew',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,

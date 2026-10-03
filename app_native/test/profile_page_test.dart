@@ -5,11 +5,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
-import 'package:system_internal_likenew/screens/profile_page.dart';
-import 'package:system_internal_likenew/utils/api_client.dart';
-import 'package:system_internal_likenew/utils/auth_provider.dart';
-import 'package:system_internal_likenew/utils/notification_provider.dart';
-import 'package:system_internal_likenew/utils/update_provider.dart';
+import 'package:system_inverter_likenew/screens/profile_page.dart';
+import 'package:system_inverter_likenew/utils/api_client.dart';
+import 'package:system_inverter_likenew/utils/auth_provider.dart';
+import 'package:system_inverter_likenew/utils/notification_provider.dart';
+import 'package:system_inverter_likenew/utils/update_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

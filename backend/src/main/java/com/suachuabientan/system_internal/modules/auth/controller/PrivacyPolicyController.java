@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PrivacyPolicyController {
 
     @GetMapping(value = {"/privacy-policy", "/api/v1/privacy-policy"}, produces = MediaType.TEXT_HTML_VALUE + ";charset=UTF-8")
-    @Operation(summary = "Xem chinh sach bao mat cua ung dung System Internal")
+    @Operation(summary = "Xem chinh sach bao mat cua ung dung System Inverter Likenew")
     public ResponseEntity<String> getPrivacyPolicy() {
         String html = """
             <!DOCTYPE html>
@@ -22,7 +22,7 @@ public class PrivacyPolicyController {
             <head>
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                <title>Chính sách bảo mật - System Internal</title>
+                <title>Chính sách bảo mật - System Inverter Likenew</title>
                 <style>
                     body {
                         font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -77,17 +77,17 @@ public class PrivacyPolicyController {
                 <div class="container">
                     <span class="badge">Quy định quyền riêng tư & Bảo mật dữ liệu</span>
                     <h1>Chính Sách Bảo Mật (Privacy Policy)</h1>
-                    <div class="updated">Ứng dụng: <strong>System Internal</strong> (Hệ thống quản lý nội bộ) • Cập nhật lần cuối: 03/09/2026</div>
+                    <div class="updated">Ứng dụng: <strong>System Inverter Likenew</strong> • Cập nhật lần cuối: 03/09/2026</div>
 
-                    <p>Chào mừng bạn đến với <strong>System Internal</strong>. Chúng tôi cam kết bảo vệ tuyệt đối thông tin cá nhân và dữ liệu riêng tư của cán bộ, công nhân viên và đối tác kỹ thuật khi sử dụng ứng dụng.</p>
+                    <p>Chào mừng bạn đến với <strong>System Inverter Likenew</strong>. Chúng tôi cam kết bảo vệ tuyệt đối thông tin cá nhân và dữ liệu riêng tư của người dùng và đối tác kỹ thuật khi sử dụng ứng dụng.</p>
 
                     <h2>1. Thu thập dữ liệu và Mục đích sử dụng</h2>
-                    <p>Ứng dụng chỉ thu thập các dữ liệu cần thiết phục vụ vận hành công việc nội bộ:</p>
+                    <p>Ứng dụng chỉ thu thập các dữ liệu cần thiết phục vụ quản lý và vận hành hệ thống:</p>
                     <ul>
-                        <li><strong>Thông tin định danh:</strong> Họ tên, tên tài khoản, số điện thoại, bộ phận công tác phục vụ xác thực phân quyền nhân viên.</li>
-                        <li><strong>Dữ liệu sinh trắc học khuôn mặt (Biometric Data):</strong> Vector đặc trưng nhận diện khuôn mặt được tạo cục bộ nhằm phục vụ duy nhất tính năng <em>chấm công điểm danh nội bộ</em>. Dữ liệu này chỉ được đối chiếu với mã nhân viên trong hệ thống và tuyệt đối không bao giờ được chia sẻ hay thương mại hóa.</li>
+                        <li><strong>Thông tin định danh:</strong> Họ tên, tên tài khoản, số điện thoại, bộ phận công tác phục vụ xác thực phân quyền người dùng.</li>
+                        <li><strong>Dữ liệu sinh trắc học khuôn mặt (Biometric Data):</strong> Vector đặc trưng nhận diện khuôn mặt được tạo cục bộ nhằm phục vụ duy nhất tính năng <em>chấm công điểm danh</em>. Dữ liệu này chỉ được đối chiếu với mã nhân viên trong hệ thống và tuyệt đối không bao giờ được chia sẻ hay thương mại hóa.</li>
                         <li><strong>Máy ảnh (Camera) & Thư viện ảnh (Photo Library):</strong> Được sử dụng khi bạn quét mã QR thiết bị, chụp ảnh biên bản nghiệm thu, ảnh lỗi biến tần sửa chữa hoặc gửi ảnh trong tin nhắn trao đổi công việc.</li>
-                        <li><strong>Mã thiết bị & Thông báo đẩy (Push Notification Token):</strong> Dùng để gửi thông báo tức thời về lịch phân công, cập nhật trạng thái đơn hàng và tin nhắn nội bộ.</li>
+                        <li><strong>Mã thiết bị & Thông báo đẩy (Push Notification Token):</strong> Dùng để gửi thông báo tức thời về lịch phân công, cập nhật trạng thái đơn hàng và tin nhắn trao đổi công việc.</li>
                     </ul>
 
                     <h2>2. Cam kết không chia sẻ dữ liệu cho bên thứ ba</h2>
@@ -123,7 +123,7 @@ public class PrivacyPolicyController {
                     </ul>
 
                     <footer>
-                        &copy; 2026 System Internal - Sửa Chữa Biến Tần. All rights reserved.
+                        &copy; 2026 System Inverter Likenew - Sửa Chữa Biến Tần. All rights reserved.
                     </footer>
                 </div>
             </body>

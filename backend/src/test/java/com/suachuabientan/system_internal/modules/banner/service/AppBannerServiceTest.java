@@ -139,6 +139,55 @@ class AppBannerServiceTest {
     }
 
     @Test
+    void testCreateBanner_WithCustomButtonCoordinates() {
+        CreateAppBannerDto dto = CreateAppBannerDto.builder()
+                .title("Banner Tùy Biến Tọa Độ")
+                .buttonPosition("CUSTOM")
+                .buttonTop(18.5)
+                .buttonLeft(24.0)
+                .buttonBottom(10.0)
+                .buttonRight(12.0)
+                .build();
+
+        UUID generatedId = UUID.randomUUID();
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(invocation -> {
+            AppBanner saved = invocation.getArgument(0);
+            saved.setId(generatedId);
+            return saved;
+        });
+
+        AppBannerDto result = bannerService.createBanner(dto, null, UUID.randomUUID());
+
+        assertNotNull(result);
+        assertEquals("CUSTOM", result.getButtonPosition());
+        assertEquals(18.5, result.getButtonTop());
+        assertEquals(24.0, result.getButtonLeft());
+        assertEquals(10.0, result.getButtonBottom());
+        assertEquals(12.0, result.getButtonRight());
+    }
+
+    @Test
+    void testCreateBanner_WithZeroButtons() {
+        CreateAppBannerDto dto = CreateAppBannerDto.builder()
+                .title("Banner Không Nút Bấm")
+                .buttons(List.of())
+                .build();
+
+        UUID generatedId = UUID.randomUUID();
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(invocation -> {
+            AppBanner saved = invocation.getArgument(0);
+            saved.setId(generatedId);
+            return saved;
+        });
+
+        AppBannerDto result = bannerService.createBanner(dto, null, UUID.randomUUID());
+
+        assertNotNull(result);
+        assertTrue(result.getButtons().isEmpty());
+        assertNull(result.getButtonText());
+    }
+
+    @Test
     void testToggleActive_InvertsStatus() {
         UUID id = UUID.randomUUID();
         AppBanner banner = AppBanner.builder()
@@ -176,5 +225,74 @@ class AppBannerServiceTest {
         assertNotNull(banner.getDeletedAt());
         assertEquals(userId, banner.getUpdatedBy());
         verify(bannerRepository).save(banner);
+    }
+
+    @Test
+    void testCreateBanner_WithFontFamily() {
+        CreateAppBannerDto dto = CreateAppBannerDto.builder()
+                .title("Banner Font Tùy Chỉnh")
+                .fontFamily("Montserrat")
+                .build();
+
+        UUID generatedId = UUID.randomUUID();
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(invocation -> {
+            AppBanner saved = invocation.getArgument(0);
+            saved.setId(generatedId);
+            return saved;
+        });
+
+        AppBannerDto result = bannerService.createBanner(dto, null, UUID.randomUUID());
+
+        assertNotNull(result);
+        assertEquals("Montserrat", result.getFontFamily());
+    }
+
+    @Test
+    void testCreateBanner_WithEmptyTitleAndNoMascot() {
+        CreateAppBannerDto dto = CreateAppBannerDto.builder()
+                .title(null)
+                .badgeText("")
+                .subtitle("")
+                .imagePosition("NONE")
+                .backgroundImageUrl("/api/v1/banners/images/uploaded_banner.jpg")
+                .build();
+
+        UUID generatedId = UUID.randomUUID();
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(invocation -> {
+            AppBanner saved = invocation.getArgument(0);
+            saved.setId(generatedId);
+            return saved;
+        });
+
+        AppBannerDto result = bannerService.createBanner(dto, null, UUID.randomUUID());
+
+        assertNotNull(result);
+        assertEquals("", result.getTitle());
+        assertEquals("NONE", result.getImagePosition());
+        assertNull(result.getImageUrl());
+        assertEquals("/api/v1/banners/images/uploaded_banner.jpg", result.getBackgroundImageUrl());
+        assertFalse(result.getDarkenOverlay());
+    }
+
+    @Test
+    void testCreateBanner_WithCustomBackgroundAndDarkenOverlay() {
+        CreateAppBannerDto dto = CreateAppBannerDto.builder()
+                .title("Ưu Đãi Đặc Biệt")
+                .backgroundImageUrl("/api/v1/banners/images/bg_texture.jpg")
+                .darkenOverlay(true)
+                .build();
+
+        UUID generatedId = UUID.randomUUID();
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(invocation -> {
+            AppBanner saved = invocation.getArgument(0);
+            saved.setId(generatedId);
+            return saved;
+        });
+
+        AppBannerDto result = bannerService.createBanner(dto, null, UUID.randomUUID());
+
+        assertNotNull(result);
+        assertEquals("Ưu Đãi Đặc Biệt", result.getTitle());
+        assertTrue(result.getDarkenOverlay());
     }
 }

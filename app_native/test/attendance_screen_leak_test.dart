@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:system_internal_likenew/screens/attendance_screen.dart';
-import 'package:system_internal_likenew/utils/network_provider.dart';
+import 'package:system_inverter_likenew/screens/attendance_screen.dart';
+import 'package:system_inverter_likenew/utils/network_provider.dart';
 
 void main() {
   testWidgets(

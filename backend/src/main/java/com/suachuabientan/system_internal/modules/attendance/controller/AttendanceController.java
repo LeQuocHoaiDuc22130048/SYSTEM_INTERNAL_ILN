@@ -32,7 +32,7 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Attendance", description = "Chấm công nội bộ")
+@Tag(name = "Attendance", description = "Chấm công & Điểm danh")
 @RestController
 @RequestMapping("/api/v1/attendance")
 @RequiredArgsConstructor

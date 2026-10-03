@@ -25,10 +25,18 @@ public class AppBannerDto {
     private String actionType;
     private String actionValue;
     private String buttonPosition;
+    private Double buttonTop;
+    private Double buttonBottom;
+    private Double buttonLeft;
+    private Double buttonRight;
     private String buttonsJson;
     private List<BannerButtonDto> buttons;
     private String imageUrl;
+    private String imagePosition;
+    private String fontFamily;
     private String backgroundImageUrl;
+    @Builder.Default
+    private Boolean darkenOverlay = false;
     private String gradientColors;
     private Integer displayOrder;
     private Boolean isActive;
@@ -48,7 +56,7 @@ public class AppBannerDto {
                 parsedButtons = OBJECT_MAPPER.readValue(banner.getButtonsJson(), new TypeReference<List<BannerButtonDto>>() {});
             } catch (Exception ignored) {}
         }
-        if (parsedButtons.isEmpty() && StringUtils.hasText(banner.getButtonText())) {
+        if (banner.getButtonsJson() == null && parsedButtons.isEmpty() && StringUtils.hasText(banner.getButtonText())) {
             parsedButtons.add(BannerButtonDto.builder()
                     .text(banner.getButtonText())
                     .actionType(StringUtils.hasText(banner.getActionType()) ? banner.getActionType() : "BOOKING")
@@ -66,10 +74,17 @@ public class AppBannerDto {
                 .actionType(banner.getActionType())
                 .actionValue(banner.getActionValue())
                 .buttonPosition(StringUtils.hasText(banner.getButtonPosition()) ? banner.getButtonPosition() : "BOTTOM_LEFT")
+                .buttonTop(banner.getButtonTop())
+                .buttonBottom(banner.getButtonBottom())
+                .buttonLeft(banner.getButtonLeft())
+                .buttonRight(banner.getButtonRight())
                 .buttonsJson(banner.getButtonsJson())
                 .buttons(parsedButtons)
                 .imageUrl(banner.getImageUrl())
+                .imagePosition(StringUtils.hasText(banner.getImagePosition()) ? banner.getImagePosition() : "RIGHT")
+                .fontFamily(StringUtils.hasText(banner.getFontFamily()) ? banner.getFontFamily() : "Be Vietnam Pro")
                 .backgroundImageUrl(banner.getBackgroundImageUrl())
+                .darkenOverlay(banner.getDarkenOverlay() != null ? banner.getDarkenOverlay() : false)
                 .gradientColors(banner.getGradientColors())
                 .displayOrder(banner.getDisplayOrder())
                 .isActive(banner.getIsActive())

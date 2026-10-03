@@ -41,10 +41,17 @@ class AppBanner {
   final String? buttonText;
   final String actionType; // BOOKING, REPAIR_ORDER, LINK, SCREEN, CALL, NONE
   final String? actionValue;
-  final String buttonPosition; // BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT, TOP_RIGHT
+  final String buttonPosition; // BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT, TOP_RIGHT, TOP_LEFT, CUSTOM
+  final double? buttonTop;
+  final double? buttonBottom;
+  final double? buttonLeft;
+  final double? buttonRight;
   final List<AppBannerButton> buttons;
   final String? imageUrl;
+  final String imagePosition; // RIGHT, LEFT, RIGHT_TOP, NONE
+  final String fontFamily;
   final String? backgroundImageUrl;
+  final bool darkenOverlay;
   final String gradientColors;
   final int displayOrder;
   final bool isActive;
@@ -58,18 +65,28 @@ class AppBanner {
     this.actionType = 'BOOKING',
     this.actionValue,
     this.buttonPosition = 'BOTTOM_LEFT',
+    this.buttonTop,
+    this.buttonBottom,
+    this.buttonLeft,
+    this.buttonRight,
     this.buttons = const [],
     this.imageUrl,
+    this.imagePosition = 'RIGHT',
+    this.fontFamily = 'Be Vietnam Pro',
     this.backgroundImageUrl,
+    this.darkenOverlay = false,
     this.gradientColors = '#2563EB,#4F46E5,#1D4ED8',
     this.displayOrder = 0,
     this.isActive = true,
   });
 
   factory AppBanner.fromJson(Map<String, dynamic> json) {
-    final rawBtnText = json['buttonText']?.toString() ?? 'Đặt lịch ngay';
+    final rawBtnText = json['buttonText']?.toString() ?? '';
     final rawActionType = json['actionType']?.toString() ?? 'BOOKING';
     final rawActionValue = json['actionValue']?.toString();
+
+    final hasButtonsList = json.containsKey('buttons') && json['buttons'] is List;
+    final hasButtonsJson = json.containsKey('buttonsJson') && json['buttonsJson'] != null;
 
     final parsedButtons = <AppBannerButton>[];
     if (json['buttons'] is List) {
@@ -93,7 +110,8 @@ class AppBanner {
       } catch (_) {}
     }
 
-    if (parsedButtons.isEmpty) {
+    // Only fallback if buttons list or buttonsJson was not provided at all, and buttonText is not empty
+    if (parsedButtons.isEmpty && !hasButtonsList && !hasButtonsJson && rawBtnText.isNotEmpty) {
       parsedButtons.add(AppBannerButton(
         text: rawBtnText,
         actionType: rawActionType,
@@ -107,13 +125,20 @@ class AppBanner {
       title: json['title']?.toString() ?? '',
       badgeText: json['badgeText']?.toString(),
       subtitle: json['subtitle']?.toString(),
-      buttonText: rawBtnText,
+      buttonText: rawBtnText.isNotEmpty ? rawBtnText : null,
       actionType: rawActionType,
       actionValue: rawActionValue,
       buttonPosition: json['buttonPosition']?.toString() ?? 'BOTTOM_LEFT',
+      buttonTop: (json['buttonTop'] as num?)?.toDouble(),
+      buttonBottom: (json['buttonBottom'] as num?)?.toDouble(),
+      buttonLeft: (json['buttonLeft'] as num?)?.toDouble(),
+      buttonRight: (json['buttonRight'] as num?)?.toDouble(),
       buttons: parsedButtons,
       imageUrl: json['imageUrl']?.toString(),
+      imagePosition: json['imagePosition']?.toString() ?? 'RIGHT',
+      fontFamily: json['fontFamily']?.toString() ?? 'Be Vietnam Pro',
       backgroundImageUrl: json['backgroundImageUrl']?.toString(),
+      darkenOverlay: json['darkenOverlay'] == true,
       gradientColors:
           json['gradientColors']?.toString() ?? '#2563EB,#4F46E5,#1D4ED8',
       displayOrder: (json['displayOrder'] as num?)?.toInt() ?? 0,
@@ -131,9 +156,16 @@ class AppBanner {
       'actionType': actionType,
       'actionValue': actionValue,
       'buttonPosition': buttonPosition,
+      'buttonTop': buttonTop,
+      'buttonBottom': buttonBottom,
+      'buttonLeft': buttonLeft,
+      'buttonRight': buttonRight,
       'buttons': buttons.map((b) => b.toJson()).toList(),
       'imageUrl': imageUrl,
+      'imagePosition': imagePosition,
+      'fontFamily': fontFamily,
       'backgroundImageUrl': backgroundImageUrl,
+      'darkenOverlay': darkenOverlay,
       'gradientColors': gradientColors,
       'displayOrder': displayOrder,
       'isActive': isActive,
@@ -184,6 +216,7 @@ class AppBanner {
         styleType: 'PRIMARY',
       ),
     ],
+    imagePosition: 'RIGHT',
     gradientColors: '#2563EB,#4F46E5,#1D4ED8',
     displayOrder: 1,
     isActive: true,

@@ -3,9 +3,9 @@ import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
-import 'package:system_internal_likenew/utils/api_client.dart';
-import 'package:system_internal_likenew/utils/chat_provider.dart';
-import 'package:system_internal_likenew/utils/notification_provider.dart';
+import 'package:system_inverter_likenew/utils/api_client.dart';
+import 'package:system_inverter_likenew/utils/chat_provider.dart';
+import 'package:system_inverter_likenew/utils/notification_provider.dart';
 
 void main() {
   test('stale message response does not overwrite the active conversation', () async {

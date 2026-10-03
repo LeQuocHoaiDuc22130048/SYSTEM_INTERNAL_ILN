@@ -86,9 +86,16 @@ public class AppBannerController {
             @RequestParam(value = "actionType", required = false, defaultValue = "BOOKING") String actionType,
             @RequestParam(value = "actionValue", required = false) String actionValue,
             @RequestParam(value = "buttonPosition", required = false, defaultValue = "BOTTOM_LEFT") String buttonPosition,
+            @RequestParam(value = "buttonTop", required = false) Double buttonTop,
+            @RequestParam(value = "buttonBottom", required = false) Double buttonBottom,
+            @RequestParam(value = "buttonLeft", required = false) Double buttonLeft,
+            @RequestParam(value = "buttonRight", required = false) Double buttonRight,
             @RequestParam(value = "buttonsJson", required = false) String buttonsJson,
             @RequestParam(value = "imageUrl", required = false) String imageUrl,
+            @RequestParam(value = "imagePosition", required = false, defaultValue = "RIGHT") String imagePosition,
+            @RequestParam(value = "fontFamily", required = false, defaultValue = "Be Vietnam Pro") String fontFamily,
             @RequestParam(value = "backgroundImageUrl", required = false) String backgroundImageUrl,
+            @RequestParam(value = "darkenOverlay", required = false) Boolean darkenOverlay,
             @RequestParam(value = "gradientColors", required = false) String gradientColors,
             @RequestParam(value = "displayOrder", required = false, defaultValue = "0") Integer displayOrder,
             @RequestParam(value = "isActive", required = false, defaultValue = "true") Boolean isActive,
@@ -109,9 +116,16 @@ public class AppBannerController {
                 .actionType(actionType)
                 .actionValue(actionValue)
                 .buttonPosition(buttonPosition)
+                .buttonTop(buttonTop)
+                .buttonBottom(buttonBottom)
+                .buttonLeft(buttonLeft)
+                .buttonRight(buttonRight)
                 .buttonsJson(buttonsJson)
                 .imageUrl(imageUrl)
+                .imagePosition(imagePosition)
+                .fontFamily(fontFamily)
                 .backgroundImageUrl(backgroundImageUrl)
+                .darkenOverlay(darkenOverlay)
                 .gradientColors(gradientColors)
                 .displayOrder(displayOrder)
                 .isActive(isActive)
@@ -148,9 +162,16 @@ public class AppBannerController {
             @RequestParam(value = "actionType", required = false) String actionType,
             @RequestParam(value = "actionValue", required = false) String actionValue,
             @RequestParam(value = "buttonPosition", required = false) String buttonPosition,
+            @RequestParam(value = "buttonTop", required = false) Double buttonTop,
+            @RequestParam(value = "buttonBottom", required = false) Double buttonBottom,
+            @RequestParam(value = "buttonLeft", required = false) Double buttonLeft,
+            @RequestParam(value = "buttonRight", required = false) Double buttonRight,
             @RequestParam(value = "buttonsJson", required = false) String buttonsJson,
             @RequestParam(value = "imageUrl", required = false) String imageUrl,
+            @RequestParam(value = "imagePosition", required = false) String imagePosition,
+            @RequestParam(value = "fontFamily", required = false) String fontFamily,
             @RequestParam(value = "backgroundImageUrl", required = false) String backgroundImageUrl,
+            @RequestParam(value = "darkenOverlay", required = false) Boolean darkenOverlay,
             @RequestParam(value = "gradientColors", required = false) String gradientColors,
             @RequestParam(value = "displayOrder", required = false) Integer displayOrder,
             @RequestParam(value = "isActive", required = false) Boolean isActive,
@@ -171,9 +192,16 @@ public class AppBannerController {
                 .actionType(actionType)
                 .actionValue(actionValue)
                 .buttonPosition(buttonPosition)
+                .buttonTop(buttonTop)
+                .buttonBottom(buttonBottom)
+                .buttonLeft(buttonLeft)
+                .buttonRight(buttonRight)
                 .buttonsJson(buttonsJson)
                 .imageUrl(imageUrl)
+                .imagePosition(imagePosition)
+                .fontFamily(fontFamily)
                 .backgroundImageUrl(backgroundImageUrl)
+                .darkenOverlay(darkenOverlay)
                 .gradientColors(gradientColors)
                 .displayOrder(displayOrder)
                 .isActive(isActive)

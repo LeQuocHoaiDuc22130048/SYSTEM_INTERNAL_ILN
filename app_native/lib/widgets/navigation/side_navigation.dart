@@ -69,7 +69,7 @@ class SideNavigation extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Inverter like new',
+                          'System Inverter Likenew',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
@@ -79,7 +79,7 @@ class SideNavigation extends StatelessWidget {
                           ),
                         ),
                         Text(
-                          'Internal Management',
+                          'Service Management',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(color: Colors.white54, fontSize: 10),

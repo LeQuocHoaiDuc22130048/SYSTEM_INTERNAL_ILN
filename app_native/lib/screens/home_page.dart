@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../app/app_routes.dart';
 import '../navigation/main_tabs.dart';
@@ -99,7 +100,7 @@ class _HomePageState extends State<HomePage> {
     {
       'id': 'messages',
       'label': 'Nhắn tin',
-      'tooltip': 'Nhắn tin nội bộ',
+      'tooltip': 'Tin nhắn trao đổi',
       'tabIndex': MainTabs.messages,
       'icon': LucideIcons.messageSquare,
       'bgColor': Color(0xFFEEF2FF),
@@ -472,10 +473,12 @@ class _HomePageState extends State<HomePage> {
                       : '$baseUrl${banner.backgroundImageUrl}',
                 ),
                 fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(
-                  Colors.black.withValues(alpha: 0.35),
-                  BlendMode.darken,
-                ),
+                colorFilter: banner.darkenOverlay
+                    ? ColorFilter.mode(
+                        Colors.black.withValues(alpha: 0.35),
+                        BlendMode.darken,
+                      )
+                    : null,
               )
             : null,
         boxShadow: [
@@ -510,7 +513,7 @@ class _HomePageState extends State<HomePage> {
 
           // Banner text and action button
           Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 126, 18),
+            padding: _getBannerTextPadding(banner.imagePosition),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
@@ -526,31 +529,42 @@ class _HomePageState extends State<HomePage> {
                     ),
                     child: Text(
                       banner.badgeText!,
-                      style: const TextStyle(
-                        fontSize: 9.5,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        letterSpacing: 0.5,
+                      style: _getBannerTextStyle(
+                        fontFamily: banner.fontFamily,
+                        baseStyle: const TextStyle(
+                          fontSize: 9.5,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                          letterSpacing: 0.5,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
                 ],
-                Text(
-                  banner.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.25,
-                    letterSpacing: -0.2,
+                if (banner.title.trim().isNotEmpty) ...[
+                  Text(
+                    banner.title,
+                    style: _getBannerTextStyle(
+                      fontFamily: banner.fontFamily,
+                      baseStyle: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.25,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
                   ),
-                ),
+                ],
                 if (banner.subtitle != null && banner.subtitle!.isNotEmpty) ...[
                   const SizedBox(height: 4),
-                  _buildSubtitle(banner.subtitle!),
+                  _buildSubtitle(banner.subtitle!, banner.fontFamily),
                 ],
-                if (banner.buttonPosition != 'TOP_RIGHT') ...[
+                if (banner.buttons.isNotEmpty &&
+                    banner.buttonPosition != 'TOP_RIGHT' &&
+                    banner.buttonPosition != 'TOP_LEFT' &&
+                    banner.buttonPosition != 'CUSTOM') ...[
                   const SizedBox(height: 12),
                   _buildButtonsContainer(banner),
                 ],
@@ -558,31 +572,17 @@ class _HomePageState extends State<HomePage> {
             ),
           ),
 
-          // Top Right Buttons (if positioned TOP_RIGHT)
-          if (banner.buttonPosition == 'TOP_RIGHT')
-            Positioned(
-              top: 14,
-              right: 14,
-              child: _buildBannerButtons(banner),
-            ),
+          // Custom / Stack Positioned Buttons (if TOP_RIGHT, TOP_LEFT, or CUSTOM)
+          _buildCustomPositionedButtons(banner),
 
-          // 3D Character or Custom Image
-          Positioned(
-            right: 4,
-            bottom: 0,
-            child: IgnorePointer(
-              child: SizedBox(
-                width: 130,
-                height: 162,
-                child: _buildBannerImage(banner, baseUrl),
-              ),
-            ),
-          ),
+          // 3D Character or Custom Image based on imagePosition
+          _buildPositionedMascot(banner, baseUrl),
 
           // Carousel indicator dots (Stitch style)
           Positioned(
             bottom: 8,
-            left: 18,
+            left: banner.imagePosition == 'LEFT' ? null : 18,
+            right: banner.imagePosition == 'LEFT' ? 18 : null,
             child: Row(
               children: List.generate(
                 totalCount > 1 ? totalCount : 3,
@@ -619,20 +619,45 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _buildSubtitle(String text) {
+  TextStyle _getBannerTextStyle({
+    required String? fontFamily,
+    required TextStyle baseStyle,
+  }) {
+    if (fontFamily == null || fontFamily.trim().isEmpty || fontFamily == 'DEFAULT') {
+      return baseStyle;
+    }
+    try {
+      return GoogleFonts.getFont(fontFamily.trim(), textStyle: baseStyle);
+    } catch (_) {
+      return baseStyle;
+    }
+  }
+
+  Widget _buildSubtitle(String text, [String? fontFamily]) {
+    final baseStyle = _getBannerTextStyle(
+      fontFamily: fontFamily,
+      baseStyle: TextStyle(fontSize: 11, color: Colors.blue.shade100, height: 1.3),
+    );
+    final highlightStyle = _getBannerTextStyle(
+      fontFamily: fontFamily,
+      baseStyle: const TextStyle(
+        fontSize: 11,
+        color: Color(0xFFFDE047),
+        fontWeight: FontWeight.bold,
+        height: 1.3,
+      ),
+    );
+
     if (text.contains('25% GIÁ TRỊ')) {
       final parts = text.split('25% GIÁ TRỊ');
       return RichText(
         text: TextSpan(
-          style: TextStyle(fontSize: 11, color: Colors.blue.shade100, height: 1.3),
+          style: baseStyle,
           children: [
             TextSpan(text: parts.first),
-            const TextSpan(
+            TextSpan(
               text: '25% GIÁ TRỊ',
-              style: TextStyle(
-                color: Color(0xFFFDE047),
-                fontWeight: FontWeight.bold,
-              ),
+              style: highlightStyle,
             ),
             if (parts.length > 1) TextSpan(text: parts.sublist(1).join('25% GIÁ TRỊ')),
           ],
@@ -641,7 +666,58 @@ class _HomePageState extends State<HomePage> {
     }
     return Text(
       text,
-      style: TextStyle(fontSize: 11, color: Colors.blue.shade100, height: 1.3),
+      style: baseStyle,
+    );
+  }
+
+  EdgeInsets _getBannerTextPadding(String imagePosition) {
+    switch (imagePosition) {
+      case 'LEFT':
+        return const EdgeInsets.fromLTRB(124, 16, 18, 20);
+      case 'RIGHT_TOP':
+        return const EdgeInsets.fromLTRB(18, 16, 95, 20);
+      case 'NONE':
+        return const EdgeInsets.fromLTRB(18, 16, 18, 20);
+      case 'RIGHT':
+      default:
+        return const EdgeInsets.fromLTRB(18, 16, 118, 20);
+    }
+  }
+
+  Widget _buildPositionedMascot(AppBanner banner, String baseUrl) {
+    if (banner.imagePosition == 'NONE' || banner.imagePosition == 'EMPTY') {
+      return const SizedBox.shrink();
+    }
+    // If banner has an uploaded custom image and no specific mascot image is configured, omit mascot
+    if (banner.backgroundImageUrl != null &&
+        banner.backgroundImageUrl!.isNotEmpty &&
+        (banner.imageUrl == null || banner.imageUrl!.isEmpty)) {
+      return const SizedBox.shrink();
+    }
+    if (banner.imagePosition == 'LEFT') {
+      return Positioned(
+        left: 0,
+        bottom: 0,
+        width: 120,
+        height: 120,
+        child: _buildBannerImage(banner, baseUrl),
+      );
+    }
+    if (banner.imagePosition == 'RIGHT_TOP') {
+      return Positioned(
+        right: 8,
+        top: 8,
+        width: 85,
+        height: 85,
+        child: _buildBannerImage(banner, baseUrl),
+      );
+    }
+    return Positioned(
+      right: 0,
+      bottom: 0,
+      width: 125,
+      height: 125,
+      child: _buildBannerImage(banner, baseUrl),
     );
   }
 
@@ -677,6 +753,42 @@ class _HomePageState extends State<HomePage> {
     return Align(alignment: Alignment.centerLeft, child: buttonsWidget);
   }
 
+  Widget _buildCustomPositionedButtons(AppBanner banner) {
+    if (banner.buttons.isEmpty) return const SizedBox.shrink();
+
+    if (banner.buttonPosition == 'CUSTOM') {
+      return Positioned(
+        top: banner.buttonTop,
+        bottom: banner.buttonBottom,
+        left: banner.buttonLeft,
+        right: banner.buttonRight,
+        child: _buildBannerButtons(banner),
+      );
+    }
+
+    if (banner.buttonPosition == 'TOP_RIGHT') {
+      return Positioned(
+        top: banner.buttonTop ?? 14,
+        right: banner.buttonRight ?? 14,
+        bottom: banner.buttonBottom,
+        left: banner.buttonLeft,
+        child: _buildBannerButtons(banner),
+      );
+    }
+
+    if (banner.buttonPosition == 'TOP_LEFT') {
+      return Positioned(
+        top: banner.buttonTop ?? 14,
+        left: banner.buttonLeft ?? 18,
+        bottom: banner.buttonBottom,
+        right: banner.buttonRight,
+        child: _buildBannerButtons(banner),
+      );
+    }
+
+    return const SizedBox.shrink();
+  }
+
   Widget _buildBannerButtons(AppBanner banner) {
     if (banner.buttons.isEmpty) {
       return const SizedBox.shrink();
@@ -705,7 +817,10 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 btn.text,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                style: _getBannerTextStyle(
+                  fontFamily: banner.fontFamily,
+                  baseStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                ),
               ),
               const SizedBox(width: 4),
               Icon(
@@ -732,7 +847,10 @@ class _HomePageState extends State<HomePage> {
             children: [
               Text(
                 btn.text,
-                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                style: _getBannerTextStyle(
+                  fontFamily: banner.fontFamily,
+                  baseStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                ),
               ),
               const SizedBox(width: 4),
               Icon(
@@ -759,7 +877,10 @@ class _HomePageState extends State<HomePage> {
           children: [
             Text(
               btn.text,
-              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+              style: _getBannerTextStyle(
+                fontFamily: banner.fontFamily,
+                baseStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+              ),
             ),
             const SizedBox(width: 4),
             Icon(

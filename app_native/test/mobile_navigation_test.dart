@@ -4,19 +4,19 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
-import 'package:system_internal_likenew/app/app_routes.dart';
-import 'package:system_internal_likenew/app/theme_provider.dart';
-import 'package:system_internal_likenew/models/app_permission.dart';
-import 'package:system_internal_likenew/navigation/main_tabs.dart';
-import 'package:system_internal_likenew/screens/main_screen.dart';
-import 'package:system_internal_likenew/utils/api_client.dart';
-import 'package:system_internal_likenew/utils/auth_provider.dart';
-import 'package:system_internal_likenew/utils/backend_data_provider.dart';
-import 'package:system_internal_likenew/utils/chat_provider.dart';
-import 'package:system_internal_likenew/utils/notification_provider.dart';
-import 'package:system_internal_likenew/utils/update_provider.dart';
-import 'package:system_internal_likenew/widgets/navigation/mobile_navigation_bar.dart';
-import 'package:system_internal_likenew/theme/app_colors.dart';
+import 'package:system_inverter_likenew/app/app_routes.dart';
+import 'package:system_inverter_likenew/app/theme_provider.dart';
+import 'package:system_inverter_likenew/models/app_permission.dart';
+import 'package:system_inverter_likenew/navigation/main_tabs.dart';
+import 'package:system_inverter_likenew/screens/main_screen.dart';
+import 'package:system_inverter_likenew/utils/api_client.dart';
+import 'package:system_inverter_likenew/utils/auth_provider.dart';
+import 'package:system_inverter_likenew/utils/backend_data_provider.dart';
+import 'package:system_inverter_likenew/utils/chat_provider.dart';
+import 'package:system_inverter_likenew/utils/notification_provider.dart';
+import 'package:system_inverter_likenew/utils/update_provider.dart';
+import 'package:system_inverter_likenew/widgets/navigation/mobile_navigation_bar.dart';
+import 'package:system_inverter_likenew/theme/app_colors.dart';
 
 class _AuthenticatedUser extends AuthProvider {
   _AuthenticatedUser(ApiClient api, {this.allowProfile = true})

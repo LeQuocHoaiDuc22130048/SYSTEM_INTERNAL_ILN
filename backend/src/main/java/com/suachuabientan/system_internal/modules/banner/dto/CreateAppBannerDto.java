@@ -12,7 +12,6 @@ import java.time.Instant;
 @Builder
 public class CreateAppBannerDto {
 
-    @NotBlank(message = "Tiêu đề banner không được để trống")
     private String title;
 
     private String badgeText;
@@ -29,13 +28,27 @@ public class CreateAppBannerDto {
     @Builder.Default
     private String buttonPosition = "BOTTOM_LEFT";
 
+    private Double buttonTop;
+    private Double buttonBottom;
+    private Double buttonLeft;
+    private Double buttonRight;
+
     private String buttonsJson;
 
     private java.util.List<BannerButtonDto> buttons;
 
     private String imageUrl;
 
+    @Builder.Default
+    private String imagePosition = "RIGHT";
+
+    @Builder.Default
+    private String fontFamily = "Be Vietnam Pro";
+
     private String backgroundImageUrl;
+
+    @Builder.Default
+    private Boolean darkenOverlay = false;
 
     @Builder.Default
     private String gradientColors = "#2563EB,#4F46E5,#1D4ED8";

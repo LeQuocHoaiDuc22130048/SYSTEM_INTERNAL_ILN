@@ -150,8 +150,8 @@ class NotificationProvider extends ChangeNotifier {
         body,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'system_internal_notifications',
-            'System Internal Notifications',
+            'system_inverter_notifications',
+            'System Inverter Notifications',
             channelDescription: 'In-app and push notifications',
             importance: Importance.high,
             priority: Priority.high,
@@ -511,8 +511,8 @@ class NotificationProvider extends ChangeNotifier {
           .timeout(const Duration(seconds: 4));
 
       const channel = AndroidNotificationChannel(
-        'system_internal_notifications',
-        'System Internal Notifications',
+        'system_inverter_notifications',
+        'System Inverter Notifications',
         description: 'In-app and push notifications',
         importance: Importance.high,
       );
@@ -540,8 +540,8 @@ class NotificationProvider extends ChangeNotifier {
         notification.body,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-            'system_internal_notifications',
-            'System Internal Notifications',
+            'system_inverter_notifications',
+            'System Inverter Notifications',
             channelDescription: 'In-app and push notifications',
             importance: Importance.high,
             priority: Priority.high,

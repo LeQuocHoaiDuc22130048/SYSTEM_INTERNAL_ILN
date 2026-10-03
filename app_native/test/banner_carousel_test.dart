@@ -5,13 +5,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
-import 'package:system_internal_likenew/models/app_banner.dart';
-import 'package:system_internal_likenew/screens/home_page.dart';
-import 'package:system_internal_likenew/utils/api_client.dart';
-import 'package:system_internal_likenew/utils/auth_provider.dart';
-import 'package:system_internal_likenew/utils/backend_data_provider.dart';
-import 'package:system_internal_likenew/utils/notification_provider.dart';
-import 'package:system_internal_likenew/utils/update_provider.dart';
+import 'package:system_inverter_likenew/models/app_banner.dart';
+import 'package:system_inverter_likenew/screens/home_page.dart';
+import 'package:system_inverter_likenew/utils/api_client.dart';
+import 'package:system_inverter_likenew/utils/auth_provider.dart';
+import 'package:system_inverter_likenew/utils/backend_data_provider.dart';
+import 'package:system_inverter_likenew/utils/notification_provider.dart';
+import 'package:system_inverter_likenew/utils/update_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -61,6 +61,91 @@ void main() {
       final colors = banner.gradientColorList;
       expect(colors.length, 3);
       expect(colors[0], const Color(0xFF2563EB));
+    });
+
+    test('imagePosition parses correctly and defaults to RIGHT', () {
+      const bannerDefault = AppBanner(id: 'b1', title: 'Default');
+      expect(bannerDefault.imagePosition, 'RIGHT');
+
+      final fromJsonLeft = AppBanner.fromJson({
+        'id': 'b2',
+        'title': 'Left',
+        'imagePosition': 'LEFT',
+      });
+      expect(fromJsonLeft.imagePosition, 'LEFT');
+
+      final jsonMap = fromJsonLeft.toJson();
+      expect(jsonMap['imagePosition'], 'LEFT');
+    });
+
+    test('custom button position coordinates parse correctly', () {
+      final banner = AppBanner.fromJson({
+        'id': 'b3',
+        'title': 'Custom Coordinates',
+        'buttonPosition': 'CUSTOM',
+        'buttonTop': 15.5,
+        'buttonBottom': 20.0,
+        'buttonLeft': 12.0,
+        'buttonRight': 16.0,
+      });
+
+      expect(banner.buttonPosition, 'CUSTOM');
+      expect(banner.buttonTop, 15.5);
+      expect(banner.buttonBottom, 20.0);
+      expect(banner.buttonLeft, 12.0);
+      expect(banner.buttonRight, 16.0);
+
+      final jsonMap = banner.toJson();
+      expect(jsonMap['buttonTop'], 15.5);
+      expect(jsonMap['buttonBottom'], 20.0);
+      expect(jsonMap['buttonLeft'], 12.0);
+      expect(jsonMap['buttonRight'], 16.0);
+    });
+
+    test('supports zero buttons when buttons is empty list', () {
+      final banner = AppBanner.fromJson({
+        'id': 'b4',
+        'title': 'No Buttons',
+        'buttons': [],
+      });
+
+      expect(banner.buttons.isEmpty, true);
+      expect(banner.buttonText, isNull);
+    });
+
+    test('fontFamily parses correctly and defaults to Be Vietnam Pro', () {
+      const bannerDefault = AppBanner(id: 'b5', title: 'Default Font');
+      expect(bannerDefault.fontFamily, 'Be Vietnam Pro');
+
+      final bannerCustom = AppBanner.fromJson({
+        'id': 'b6',
+        'title': 'Custom Font',
+        'fontFamily': 'Montserrat',
+      });
+      expect(bannerCustom.fontFamily, 'Montserrat');
+      expect(bannerCustom.toJson()['fontFamily'], 'Montserrat');
+    });
+
+    test('darkenOverlay parses correctly and defaults to false', () {
+      const bannerDefault = AppBanner(id: 'b7', title: 'Banner Default');
+      expect(bannerDefault.darkenOverlay, false);
+
+      final bannerFromUpload = AppBanner.fromJson({
+        'id': 'b8',
+        'title': 'Uploaded Banner',
+        'backgroundImageUrl': '/images/uploaded.png',
+        'darkenOverlay': false,
+      });
+      expect(bannerFromUpload.darkenOverlay, false);
+
+      final bannerWithBg = AppBanner.fromJson({
+        'id': 'b9',
+        'title': 'Background Banner',
+        'backgroundImageUrl': '/images/bg.png',
+        'darkenOverlay': true,
+      });
+      expect(bannerWithBg.darkenOverlay, true);
+      expect(bannerWithBg.toJson()['darkenOverlay'], true);
     });
   });
 

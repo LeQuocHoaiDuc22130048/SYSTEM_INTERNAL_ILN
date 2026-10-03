@@ -1,11 +1,11 @@
 {
-    "name": "system_internal_likenew",
-    "short_name": "system_internal_likenew",
+    "name": "System Inverter Likenew",
+    "short_name": "System Inverter Likenew",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "System Inverter Likenew Mobile Application.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

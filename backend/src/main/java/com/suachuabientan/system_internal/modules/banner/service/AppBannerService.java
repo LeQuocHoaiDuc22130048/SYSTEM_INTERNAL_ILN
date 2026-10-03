@@ -88,7 +88,7 @@ public class AppBannerService {
         }
 
         AppBanner banner = AppBanner.builder()
-                .title(dto.getTitle())
+                .title(dto.getTitle() != null ? dto.getTitle().trim() : "")
                 .badgeText(dto.getBadgeText())
                 .subtitle(dto.getSubtitle())
                 .buttonText(dto.getButtonText())
@@ -96,7 +96,10 @@ public class AppBannerService {
                 .actionValue(dto.getActionValue())
                 .buttonPosition(StringUtils.hasText(dto.getButtonPosition()) ? dto.getButtonPosition() : "BOTTOM_LEFT")
                 .imageUrl(finalImageUrl)
+                .imagePosition(StringUtils.hasText(dto.getImagePosition()) ? dto.getImagePosition() : "RIGHT")
+                .fontFamily(StringUtils.hasText(dto.getFontFamily()) ? dto.getFontFamily() : "Be Vietnam Pro")
                 .backgroundImageUrl(finalBgImageUrl)
+                .darkenOverlay(dto.getDarkenOverlay() != null ? dto.getDarkenOverlay() : false)
                 .gradientColors(StringUtils.hasText(dto.getGradientColors()) ? dto.getGradientColors() : "#2563EB,#4F46E5,#1D4ED8")
                 .displayOrder(dto.getDisplayOrder() != null ? dto.getDisplayOrder() : 0)
                 .isActive(dto.getIsActive() != null ? dto.getIsActive() : true)
@@ -104,7 +107,8 @@ public class AppBannerService {
                 .endDate(dto.getEndDate())
                 .build();
 
-        applyButtonsAndPosition(banner, dto.getButtons(), dto.getButtonsJson(), dto.getButtonPosition());
+        applyButtonsAndPosition(banner, dto.getButtons(), dto.getButtonsJson(), dto.getButtonPosition(),
+                dto.getButtonTop(), dto.getButtonBottom(), dto.getButtonLeft(), dto.getButtonRight());
 
         if (currentUserId != null) {
             banner.setCreatedBy(currentUserId);
@@ -142,18 +146,20 @@ public class AppBannerService {
             finalBgImageUrl = banner.getBackgroundImageUrl();
         }
 
-        banner.setTitle(dto.getTitle());
+        banner.setTitle(dto.getTitle() != null ? dto.getTitle().trim() : "");
         banner.setBadgeText(dto.getBadgeText());
         banner.setSubtitle(dto.getSubtitle());
-        if (StringUtils.hasText(dto.getButtonText())) {
-            banner.setButtonText(dto.getButtonText());
-        }
-        if (StringUtils.hasText(dto.getActionType())) {
-            banner.setActionType(dto.getActionType());
-        }
-        banner.setActionValue(dto.getActionValue());
         banner.setImageUrl(finalImageUrl);
+        if (StringUtils.hasText(dto.getImagePosition())) {
+            banner.setImagePosition(dto.getImagePosition());
+        }
+        if (StringUtils.hasText(dto.getFontFamily())) {
+            banner.setFontFamily(dto.getFontFamily());
+        }
         banner.setBackgroundImageUrl(finalBgImageUrl);
+        if (dto.getDarkenOverlay() != null) {
+            banner.setDarkenOverlay(dto.getDarkenOverlay());
+        }
         if (StringUtils.hasText(dto.getGradientColors())) {
             banner.setGradientColors(dto.getGradientColors());
         }
@@ -166,7 +172,8 @@ public class AppBannerService {
         banner.setStartDate(dto.getStartDate());
         banner.setEndDate(dto.getEndDate());
 
-        applyButtonsAndPosition(banner, dto.getButtons(), dto.getButtonsJson(), dto.getButtonPosition());
+        applyButtonsAndPosition(banner, dto.getButtons(), dto.getButtonsJson(), dto.getButtonPosition(),
+                dto.getButtonTop(), dto.getButtonBottom(), dto.getButtonLeft(), dto.getButtonRight());
 
         if (currentUserId != null) {
             banner.setUpdatedBy(currentUserId);
@@ -177,12 +184,19 @@ public class AppBannerService {
         return AppBannerDto.fromEntity(saved);
     }
 
-    private void applyButtonsAndPosition(AppBanner banner, List<BannerButtonDto> buttons, String buttonsJson, String buttonPosition) {
+    private void applyButtonsAndPosition(AppBanner banner, List<BannerButtonDto> buttons, String buttonsJson,
+                                         String buttonPosition, Double buttonTop, Double buttonBottom,
+                                         Double buttonLeft, Double buttonRight) {
         if (StringUtils.hasText(buttonPosition)) {
             banner.setButtonPosition(buttonPosition);
         } else if (!StringUtils.hasText(banner.getButtonPosition())) {
             banner.setButtonPosition("BOTTOM_LEFT");
         }
+
+        banner.setButtonTop(buttonTop);
+        banner.setButtonBottom(buttonBottom);
+        banner.setButtonLeft(buttonLeft);
+        banner.setButtonRight(buttonRight);
 
         if (buttons != null && !buttons.isEmpty()) {
             try {
@@ -196,6 +210,12 @@ public class AppBannerService {
                 banner.setActionType(first.getActionType());
             }
             banner.setActionValue(first.getActionValue());
+        } else if (buttons != null && buttons.isEmpty()) {
+            // Explicitly empty buttons list
+            banner.setButtonsJson("[]");
+            banner.setButtonText(null);
+            banner.setActionType("NONE");
+            banner.setActionValue(null);
         } else if (StringUtils.hasText(buttonsJson)) {
             banner.setButtonsJson(buttonsJson);
             try {
@@ -207,6 +227,10 @@ public class AppBannerService {
                         banner.setActionType(first.getActionType());
                     }
                     banner.setActionValue(first.getActionValue());
+                } else {
+                    banner.setButtonText(null);
+                    banner.setActionType("NONE");
+                    banner.setActionValue(null);
                 }
             } catch (Exception ignored) {}
         } else if (StringUtils.hasText(banner.getButtonText()) && !StringUtils.hasText(banner.getButtonsJson())) {

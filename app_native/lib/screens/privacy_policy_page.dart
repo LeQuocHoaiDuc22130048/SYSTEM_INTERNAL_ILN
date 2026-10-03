@@ -66,9 +66,9 @@ class PrivacyPolicyPage extends StatelessWidget {
                 icon: LucideIcons.shieldCheck,
                 title: '1. Thu thập dữ liệu và Mục đích',
                 content:
-                    'Ứng dụng System Internal chỉ thu thập các dữ liệu cần thiết phục vụ quản lý và vận hành nội bộ doanh nghiệp:\n\n'
+                    'Ứng dụng System Inverter Likenew chỉ thu thập các dữ liệu cần thiết phục vụ quản lý và vận hành hệ thống:\n\n'
                     '• Thông tin định danh: Họ tên, tên tài khoản, số điện thoại, bộ phận công tác phục vụ xác thực người dùng.\n'
-                    '• Dữ liệu sinh trắc học khuôn mặt: Vector đặc trưng khuôn mặt được dùng duy nhất cho tính năng điểm danh / chấm công nội bộ. Dữ liệu không được chia sẻ hay thương mại hóa.\n'
+                    '• Dữ liệu sinh trắc học khuôn mặt: Vector đặc trưng khuôn mặt được dùng duy nhất cho tính năng điểm danh / chấm công. Dữ liệu không được chia sẻ hay thương mại hóa.\n'
                     '• Quyền máy ảnh & Thư viện ảnh: Được sử dụng khi quét mã QR thiết bị, chụp ảnh biên bản kỹ thuật, linh kiện sửa chữa biến tần hoặc gửi tệp trong tin nhắn.\n'
                     '• Thông báo đẩy (Push Notification): Dùng để cập nhật tiến độ công việc, đơn hàng và phân công nhiệm vụ.',
               ),
@@ -175,7 +175,7 @@ class PrivacyPolicyPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Hệ thống System Internal cam kết bảo mật toàn diện thông tin cá nhân và dữ liệu sinh trắc học của bạn.',
+            'Hệ thống System Inverter Likenew cam kết bảo mật toàn diện thông tin cá nhân và dữ liệu sinh trắc học của bạn.',
             style: TextStyle(
               fontSize: 13,
               color: isDark

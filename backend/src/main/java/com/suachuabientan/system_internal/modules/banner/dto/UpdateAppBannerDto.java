@@ -12,7 +12,6 @@ import java.time.Instant;
 @Builder
 public class UpdateAppBannerDto {
 
-    @NotBlank(message = "Tiêu đề banner không được để trống")
     private String title;
 
     private String badgeText;
@@ -27,13 +26,23 @@ public class UpdateAppBannerDto {
 
     private String buttonPosition;
 
+    private Double buttonTop;
+    private Double buttonBottom;
+    private Double buttonLeft;
+    private Double buttonRight;
+
     private String buttonsJson;
 
     private java.util.List<BannerButtonDto> buttons;
 
     private String imageUrl;
 
+    private String imagePosition;
+    private String fontFamily;
+
     private String backgroundImageUrl;
+
+    private Boolean darkenOverlay;
 
     private String gradientColors;
 

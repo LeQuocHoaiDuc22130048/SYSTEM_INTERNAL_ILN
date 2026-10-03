@@ -1,14 +1,14 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/testing.dart';
 import 'package:http/http.dart' as http;
-import 'package:system_internal_likenew/models/attendance.dart';
-import 'package:system_internal_likenew/models/board.dart';
-import 'package:system_internal_likenew/models/part.dart';
-import 'package:system_internal_likenew/models/repair_order.dart';
-import 'package:system_internal_likenew/models/store_location.dart';
-import 'package:system_internal_likenew/models/user.dart';
-import 'package:system_internal_likenew/utils/api_client.dart';
-import 'package:system_internal_likenew/utils/backend_data_provider.dart';
+import 'package:system_inverter_likenew/models/attendance.dart';
+import 'package:system_inverter_likenew/models/board.dart';
+import 'package:system_inverter_likenew/models/part.dart';
+import 'package:system_inverter_likenew/models/repair_order.dart';
+import 'package:system_inverter_likenew/models/store_location.dart';
+import 'package:system_inverter_likenew/models/user.dart';
+import 'package:system_inverter_likenew/utils/api_client.dart';
+import 'package:system_inverter_likenew/utils/backend_data_provider.dart';
 
 void main() {
   group('BackendDataProvider Tests', () {

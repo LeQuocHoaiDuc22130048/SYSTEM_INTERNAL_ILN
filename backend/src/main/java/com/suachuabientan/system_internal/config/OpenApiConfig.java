@@ -12,7 +12,7 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI().info(new Info()
-                .title("System Internal ILN")
+                .title("System Inverter Likenew API")
                 .version("1.0")
                 .description("Tài liệu hướng dẫn sử dụng API cho dự án Spring Boot của tôi.")
                 .contact(new Contact()

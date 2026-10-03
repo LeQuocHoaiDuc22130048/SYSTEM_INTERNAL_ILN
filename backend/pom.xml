@@ -12,8 +12,8 @@
     <groupId>com.suachuabientan</groupId>
     <artifactId>system_internal</artifactId>
     <version>0.0.1-SNAPSHOT</version>
-    <name>System Internal Backend</name>
-    <description>Hệ thống quản lý nội bộ và quản lý kho bo mạch</description>
+    <name>System Inverter Likenew Backend</name>
+    <description>Hệ thống quản lý dịch vụ và kho bo mạch biến tần</description>
 
     <properties>
         <java.version>21</java.version>

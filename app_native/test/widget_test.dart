@@ -5,18 +5,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
-import 'package:system_internal_likenew/app/theme_provider.dart';
-import 'package:system_internal_likenew/screens/main_screen.dart';
-import 'package:system_internal_likenew/utils/auth_provider.dart';
-import 'package:system_internal_likenew/utils/api_client.dart';
-import 'package:system_internal_likenew/utils/backend_data_provider.dart';
-import 'package:system_internal_likenew/utils/notification_provider.dart';
-import 'package:system_internal_likenew/utils/chat_provider.dart';
-import 'package:system_internal_likenew/utils/network_provider.dart';
-import 'package:system_internal_likenew/utils/pending_sync_provider.dart';
+import 'package:system_inverter_likenew/app/theme_provider.dart';
+import 'package:system_inverter_likenew/screens/main_screen.dart';
+import 'package:system_inverter_likenew/utils/auth_provider.dart';
+import 'package:system_inverter_likenew/utils/api_client.dart';
+import 'package:system_inverter_likenew/utils/backend_data_provider.dart';
+import 'package:system_inverter_likenew/utils/notification_provider.dart';
+import 'package:system_inverter_likenew/utils/chat_provider.dart';
+import 'package:system_inverter_likenew/utils/network_provider.dart';
+import 'package:system_inverter_likenew/utils/pending_sync_provider.dart';
 
 import 'package:flutter/services.dart';
-import 'package:system_internal_likenew/utils/update_provider.dart';
+import 'package:system_inverter_likenew/utils/update_provider.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

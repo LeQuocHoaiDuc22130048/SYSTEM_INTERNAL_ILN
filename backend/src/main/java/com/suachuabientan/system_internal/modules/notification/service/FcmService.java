@@ -43,7 +43,7 @@ public class FcmService {
                             .setNotification(AndroidNotification.builder()
                                     .setSound("default")
                                     .setClickAction("FLUTTER_NOTIFICATION_CLICK")
-                                    .setChannelId("system_internal_notifications")
+                                    .setChannelId("system_inverter_notifications")
                                     .build())
                             .build())
                     // iOS config
@@ -93,7 +93,7 @@ public class FcmService {
                             .setNotification(AndroidNotification.builder()
                                     .setSound("default")
                                     .setClickAction("FLUTTER_NOTIFICATION_CLICK")
-                                    .setChannelId("system_internal_notifications")
+                                    .setChannelId("system_inverter_notifications")
                                     .build())
                             .build());
 

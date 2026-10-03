@@ -1,6 +1,6 @@
 -- =============================================================================
 -- SCRIPT TẠO DỮ LIỆU TEST (20 BẢN GHI CHO MỖI VỊ TRÍ KHO) - MODULE WAREHOUSE
--- Hệ thống: Smart E-WMS / System Internal
+-- Hệ thống: Smart E-WMS / System Inverter Likenew
 -- Cơ sở dữ liệu: PostgreSQL (system_internal_test_db)
 -- =============================================================================
 

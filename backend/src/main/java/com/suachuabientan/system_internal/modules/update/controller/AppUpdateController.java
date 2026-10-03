@@ -59,7 +59,7 @@ public class AppUpdateController {
     @Value("${app.update.ios.bundle-id:com.suachuabientan.system}")
     private String iosBundleId;
 
-    @Value("${app.update.ios.app-title:System Internal}")
+    @Value("${app.update.ios.app-title:System Inverter Likenew}")
     private String iosAppTitle;
 
     @Value("${app.update.ios.app-store-url:https://apps.apple.com/app/id6740000000}")
@@ -109,7 +109,7 @@ public class AppUpdateController {
         return ResponseEntity.ok(ApiResponse.success(updateInfo));
     }
 
-    @Operation(summary = "Tải manifest.plist cho môi trường kiểm thử nội bộ iOS")
+    @Operation(summary = "Tải manifest.plist cho môi trường iOS")
     @GetMapping(value = "/ios/manifest.plist", produces = {"application/x-plist;charset=UTF-8", "text/xml;charset=UTF-8", MediaType.APPLICATION_XML_VALUE})
     public ResponseEntity<String> getIosManifest(
             @RequestParam(required = false) String version,
@@ -120,7 +120,7 @@ public class AppUpdateController {
                 : (latest != null ? latest.getVersion() : latestVersion);
 
         String baseUrl = getBaseUrl(request);
-        String ipaUrl = baseUrl + "/api/v1/app-updates/download/system_internal_v" + targetVersion + ".ipa";
+        String ipaUrl = baseUrl + "/api/v1/app-updates/download/system_inverter_v" + targetVersion + ".ipa";
 
         String plistXml = """
                 <?xml version="1.0" encoding="UTF-8"?>
