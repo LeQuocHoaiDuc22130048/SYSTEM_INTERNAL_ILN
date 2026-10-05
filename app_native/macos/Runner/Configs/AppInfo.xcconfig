@@ -5,11 +5,7 @@
 // 'flutter create' template.
 
 // The application's name. By default this is also the title of the Flutter window.
-<<<<<<< HEAD
 PRODUCT_NAME = System Inverter Likenew
-=======
-PRODUCT_NAME = system_inverter_likenew
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
 
 // The application's bundle identifier
 PRODUCT_BUNDLE_IDENTIFIER = com.suachuabientan.system

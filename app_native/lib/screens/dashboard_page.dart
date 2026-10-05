@@ -6,7 +6,9 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/attendance.dart';
 import '../models/board.dart';
 import '../models/repair_order.dart';
+import '../models/user.dart';
 import '../navigation/main_tabs.dart';
+import '../navigation/navigation_config.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
@@ -39,8 +41,9 @@ class _DashboardPageState extends State<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = Provider.of<AuthProvider>(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isNonManager = !Provider.of<AuthProvider>(context).isManagerOrAbove;
+    final isNonManager = !auth.isManagerOrAbove;
     final screenSize = MediaQuery.sizeOf(context);
     final wide = screenSize.width > 760;
     final contentWidth = screenSize.width > 980 ? 980.0 : screenSize.width;
@@ -76,38 +79,49 @@ class _DashboardPageState extends State<DashboardPage> {
                           Builder(
                             builder: (context) {
                               final stats = _buildDashboardStats(context);
-                              return GridView.builder(
-                                itemCount: stats.length,
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: wide ? 4 : 2,
-                                      mainAxisSpacing: wide ? 20 : 10,
-                                      crossAxisSpacing: wide ? 12 : 10,
-                                      mainAxisExtent: wide ? 112 : 98,
-                                    ),
-                                itemBuilder: (context, index) {
-                                  final stat = stats[index];
-                                  return _DashboardStatCard(
-                                    stat: stat,
-                                    isDark: isDark,
-                                  );
-                                },
+                              if (stats.isEmpty) return const SizedBox.shrink();
+                              return Padding(
+                                padding: const EdgeInsets.only(bottom: 20),
+                                child: GridView.builder(
+                                  itemCount: stats.length,
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  gridDelegate:
+                                      SliverGridDelegateWithFixedCrossAxisCount(
+                                        crossAxisCount: wide
+                                            ? 4
+                                            : (stats.length == 1 ? 1 : 2),
+                                        mainAxisSpacing: wide ? 20 : 10,
+                                        crossAxisSpacing: wide ? 12 : 10,
+                                        mainAxisExtent: wide ? 112 : 98,
+                                      ),
+                                  itemBuilder: (context, index) {
+                                    final stat = stats[index];
+                                    return _DashboardStatCard(
+                                      stat: stat,
+                                      isDark: isDark,
+                                    );
+                                  },
+                                ),
                               );
                             },
                           ),
-                          const SizedBox(height: 20),
-                          _WeeklyOrdersChart(isDark: isDark),
-                          const SizedBox(height: 20),
-                          _StatusRatioCard(isDark: isDark, wide: wide),
-                          const SizedBox(height: 20),
-                          _TodayAttendanceCard(isDark: isDark),
-                          const SizedBox(height: 20),
-                          _RecentOrdersCard(
-                            isDark: isDark,
-                            onNavigateToTab: widget.onNavigateToTab,
-                          ),
+                          if (auth.can(AppPermission.viewRepairOrders)) ...[
+                            _WeeklyOrdersChart(isDark: isDark),
+                            const SizedBox(height: 20),
+                            _StatusRatioCard(isDark: isDark, wide: wide),
+                            const SizedBox(height: 20),
+                          ],
+                          if (auth.can(AppPermission.viewAttendance) ||
+                              auth.can(AppPermission.manageAttendance)) ...[
+                            _TodayAttendanceCard(isDark: isDark),
+                            const SizedBox(height: 20),
+                          ],
+                          if (auth.can(AppPermission.viewRepairOrders))
+                            _RecentOrdersCard(
+                              isDark: isDark,
+                              onNavigateToTab: widget.onNavigateToTab,
+                            ),
                         ],
                       ),
               ),
@@ -119,6 +133,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   Widget _buildEmployeeDashboard(BuildContext context, bool isDark, bool wide) {
+    final auth = Provider.of<AuthProvider>(context);
     final backend = Provider.of<BackendDataProvider>(context);
     final myOrders = backend.repairOrders;
     final history = backend.myAttendanceHistory;
@@ -130,73 +145,84 @@ class _DashboardPageState extends State<DashboardPage> {
               : summary.workDays.toString())
         : '0';
 
+    final stats = <_DashboardStat>[
+      if (auth.can(AppPermission.viewRepairOrders))
+        _DashboardStat(
+          label: 'Đơn của tôi',
+          value: '${myOrders.length}',
+          icon: LucideIcons.wrench,
+          color: AppColors.primary,
+          background: AppColors.infoLight,
+          helper:
+              '${myOrders.where((o) => o.status == RepairOrderStatus.inProgress).length} đang sửa',
+        ),
+      if (auth.can(AppPermission.useMessages))
+        _DashboardStat(
+          label: 'Tin nhắn chưa đọc',
+          value: '0',
+          icon: LucideIcons.messageSquare,
+          color: AppColors.warning,
+          background: AppColors.warningLight,
+        ),
+      if (auth.can(AppPermission.viewAttendance)) ...[
+        _DashboardStat(
+          label: 'Công tháng này',
+          value: '$workDaysDisplay công',
+          icon: LucideIcons.calendarCheck,
+          color: const Color(0xFF10B981),
+          background: const Color(0xFFECFDF5),
+          helper:
+              '${summary != null ? summary.totalHours.toStringAsFixed(1) : '0.0'} giờ làm',
+        ),
+        _DashboardStat(
+          label: 'Đi muộn / Tăng ca',
+          value: '${summary?.lateCount ?? 0} lần',
+          icon: LucideIcons.clockAlert,
+          color: const Color(0xFFF59E0B),
+          background: const Color(0xFFFFFBEB),
+          helper:
+              '+${summary != null ? summary.overtimeHours.toStringAsFixed(1) : '0.0'}h tăng ca',
+        ),
+      ],
+    ];
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _DashboardHeader(isDark: isDark, wide: wide),
-        const SizedBox(height: 24),
-        GridView.builder(
-          itemCount: 4,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: wide ? 4 : 2,
-            mainAxisSpacing: wide ? 20 : 10,
-            crossAxisSpacing: wide ? 12 : 10,
-            mainAxisExtent: wide ? 114 : 106,
+        if (stats.isNotEmpty) ...[
+          const SizedBox(height: 24),
+          GridView.builder(
+            itemCount: stats.length,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: wide ? 4 : (stats.length == 1 ? 1 : 2),
+              mainAxisSpacing: wide ? 20 : 10,
+              crossAxisSpacing: wide ? 12 : 10,
+              mainAxisExtent: wide ? 114 : 106,
+            ),
+            itemBuilder: (context, index) {
+              final stat = stats[index];
+              return _DashboardStatCard(stat: stat, isDark: isDark);
+            },
           ),
-          itemBuilder: (context, index) {
-            final stats = [
-              _DashboardStat(
-                label: 'Đơn của tôi',
-                value: '${myOrders.length}',
-                icon: LucideIcons.wrench,
-                color: AppColors.primary,
-                background: AppColors.infoLight,
-                helper:
-                    '${myOrders.where((o) => o.status == RepairOrderStatus.inProgress).length} đang sửa',
-              ),
-              _DashboardStat(
-                label: 'Tin nhắn chưa đọc',
-                value: '0',
-                icon: LucideIcons.messageSquare,
-                color: AppColors.warning,
-                background: AppColors.warningLight,
-              ),
-              _DashboardStat(
-                label: 'Công tháng này',
-                value: '$workDaysDisplay công',
-                icon: LucideIcons.calendarCheck,
-                color: const Color(0xFF10B981),
-                background: const Color(0xFFECFDF5),
-                helper:
-                    '${summary != null ? summary.totalHours.toStringAsFixed(1) : '0.0'} giờ làm',
-              ),
-              _DashboardStat(
-                label: 'Đi muộn / Tăng ca',
-                value: '${summary?.lateCount ?? 0} lần',
-                icon: LucideIcons.clockAlert,
-                color: const Color(0xFFF59E0B),
-                background: const Color(0xFFFFFBEB),
-                helper:
-                    '+${summary != null ? summary.overtimeHours.toStringAsFixed(1) : '0.0'}h tăng ca',
-              ),
-            ];
-            final stat = stats[index];
-            return _DashboardStatCard(stat: stat, isDark: isDark);
-          },
-        ),
-        const SizedBox(height: 20),
-        _PersonalAttendanceCard(
-          isDark: isDark,
-          wide: wide,
-          onNavigateToTab: widget.onNavigateToTab,
-        ),
-        const SizedBox(height: 20),
-        _RecentOrdersCard(
-          isDark: isDark,
-          onNavigateToTab: widget.onNavigateToTab,
-        ),
+        ],
+        if (auth.can(AppPermission.viewAttendance)) ...[
+          const SizedBox(height: 20),
+          _PersonalAttendanceCard(
+            isDark: isDark,
+            wide: wide,
+            onNavigateToTab: widget.onNavigateToTab,
+          ),
+        ],
+        if (auth.can(AppPermission.viewRepairOrders)) ...[
+          const SizedBox(height: 20),
+          _RecentOrdersCard(
+            isDark: isDark,
+            onNavigateToTab: widget.onNavigateToTab,
+          ),
+        ],
       ],
     );
   }
@@ -307,77 +333,111 @@ class _DashboardStat {
 }
 
 List<_DashboardStat> _buildDashboardStats(BuildContext context) {
+  final auth = context.watch<AuthProvider>();
   final backend = context.watch<BackendDataProvider>();
   final orders = backend.repairOrders;
   final boards = backend.boards;
   final employees = backend.employees;
   final attendance = backend.attendanceRecords;
 
-  return [
-    _DashboardStat(
-      label: 'Tổng đơn',
-      value: '${orders.length}',
-      icon: LucideIcons.wrench,
-      color: AppColors.primary,
-      background: AppColors.infoLight,
-    ),
-    _DashboardStat(
-      label: 'Đang xử lý',
-      value:
-          '${orders.where((o) => o.status == RepairOrderStatus.inProgress).length}',
-      icon: LucideIcons.activity,
-      color: AppColors.warning,
-      background: AppColors.warningLight,
-      helper: 'Cần theo dõi',
-    ),
-    _DashboardStat(
-      label: 'Hoàn thành',
-      value:
-          '${orders.where((o) => o.status == RepairOrderStatus.completed).length}',
-      icon: LucideIcons.circleCheck,
-      color: AppColors.success,
-      background: AppColors.successLight,
-    ),
-    _DashboardStat(
-      label: 'Bo mạch sẵn sàng',
-      value:
-          '${boards.where((b) => b.status == BoardStatus.available).length}/${boards.length}',
-      icon: LucideIcons.microchip,
-      color: AppColors.purple,
-      background: AppColors.purpleLight,
-      helper:
-          '${boards.where((b) => b.status == BoardStatus.checkedOut).length} đang dùng',
-    ),
-    _DashboardStat(
-      label: 'Nhân viên có mặt',
-      value: '${attendance.length}/${employees.length}',
-      icon: LucideIcons.usersRound,
-      color: AppColors.primary,
-      background: AppColors.infoLight,
-    ),
-    _DashboardStat(
-      label: 'Đơn chờ phân công',
-      value: '${orders.where((o) => o.assignedToId == null).length}',
-      icon: LucideIcons.circle,
-      color: AppColors.warning,
-      background: AppColors.warningLight,
-    ),
-    _DashboardStat(
-      label: 'Bo mạch bảo trì',
-      value:
-          '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
-      icon: LucideIcons.triangleAlert,
-      color: AppColors.error,
-      background: AppColors.errorLight,
-    ),
-    _DashboardStat(
-      label: 'Tài khoản chờ duyệt',
-      value: '${backend.pendingUsers.length}',
-      icon: LucideIcons.userRoundPlus,
-      color: AppColors.purple,
-      background: AppColors.purpleLight,
-    ),
-  ];
+  final stats = <_DashboardStat>[];
+
+  if (auth.can(AppPermission.viewRepairOrders)) {
+    stats.addAll([
+      _DashboardStat(
+        label: 'Tổng đơn',
+        value: '${orders.length}',
+        icon: LucideIcons.wrench,
+        color: AppColors.primary,
+        background: AppColors.infoLight,
+      ),
+      _DashboardStat(
+        label: 'Đang xử lý',
+        value:
+            '${orders.where((o) => o.status == RepairOrderStatus.inProgress).length}',
+        icon: LucideIcons.activity,
+        color: AppColors.warning,
+        background: AppColors.warningLight,
+        helper: 'Cần theo dõi',
+      ),
+      _DashboardStat(
+        label: 'Hoàn thành',
+        value:
+            '${orders.where((o) => o.status == RepairOrderStatus.completed).length}',
+        icon: LucideIcons.circleCheck,
+        color: AppColors.success,
+        background: AppColors.successLight,
+      ),
+    ]);
+  }
+
+  if (auth.can(AppPermission.viewWarehouse)) {
+    stats.add(
+      _DashboardStat(
+        label: 'Bo mạch sẵn sàng',
+        value:
+            '${boards.where((b) => b.status == BoardStatus.available).length}/${boards.length}',
+        icon: LucideIcons.microchip,
+        color: AppColors.purple,
+        background: AppColors.purpleLight,
+        helper:
+            '${boards.where((b) => b.status == BoardStatus.checkedOut).length} đang dùng',
+      ),
+    );
+  }
+
+  if (auth.can(AppPermission.viewAttendance) ||
+      auth.can(AppPermission.manageAttendance) ||
+      auth.can(AppPermission.manageEmployees)) {
+    stats.add(
+      _DashboardStat(
+        label: 'Nhân viên có mặt',
+        value: '${attendance.length}/${employees.length}',
+        icon: LucideIcons.usersRound,
+        color: AppColors.primary,
+        background: AppColors.infoLight,
+      ),
+    );
+  }
+
+  if (auth.can(AppPermission.viewRepairOrders)) {
+    stats.add(
+      _DashboardStat(
+        label: 'Đơn chờ phân công',
+        value: '${orders.where((o) => o.assignedToId == null).length}',
+        icon: LucideIcons.circle,
+        color: AppColors.warning,
+        background: AppColors.warningLight,
+      ),
+    );
+  }
+
+  if (auth.can(AppPermission.viewWarehouse)) {
+    stats.add(
+      _DashboardStat(
+        label: 'Bo mạch bảo trì',
+        value:
+            '${boards.where((b) => b.status == BoardStatus.maintenance).length}',
+        icon: LucideIcons.triangleAlert,
+        color: AppColors.error,
+        background: AppColors.errorLight,
+      ),
+    );
+  }
+
+  if (auth.can(AppPermission.approveAccounts)) {
+    stats.add(
+      _DashboardStat(
+        label: 'Tài khoản chờ duyệt',
+        value: '${backend.pendingUsers.length}',
+        icon: LucideIcons.userRoundPlus,
+        color: AppColors.purple,
+        background: AppColors.purpleLight,
+      ),
+    );
+  }
+
+  return stats;
 }
 
 class _DashboardStatCard extends StatelessWidget {
@@ -2031,14 +2091,18 @@ class _RecentOrdersCard extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(child: _SectionTitle('Đơn gần đây', isDark: isDark)),
-                TextButton(
-                  onPressed: () {
-                    if (onNavigateToTab != null) {
-                      onNavigateToTab!(MainTabs.repairOrders);
-                    }
-                  },
-                  child: const Text('Xem tất cả'),
-                ),
+                if (canAccessMainTab(
+                  context.watch<AuthProvider>(),
+                  MainTabs.repairOrders,
+                ))
+                  TextButton(
+                    onPressed: () {
+                      if (onNavigateToTab != null) {
+                        onNavigateToTab!(MainTabs.repairOrders);
+                      }
+                    },
+                    child: const Text('Xem tất cả'),
+                  ),
               ],
             ),
           ),

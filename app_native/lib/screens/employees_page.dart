@@ -429,8 +429,10 @@ class _EmployeeDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarColor = _getAvatarColor(user.role);
-    final currentRole = context.watch<AuthProvider>().role;
-    final canEnrollFace = !Platform.isIOS && currentRole.isManagerOrAbove;
+    final auth = context.watch<AuthProvider>();
+    final canEnrollFace =
+        !Platform.isIOS && auth.can(AppPermission.manageEmployeeSecurity);
+    final canManageEmployees = auth.can(AppPermission.manageEmployees);
 
     return Container(
       constraints: BoxConstraints(
@@ -615,25 +617,29 @@ class _EmployeeDetailSheet extends StatelessWidget {
                             child: const Text('Đóng'),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (context) =>
-                                    _EditEmployeeSheet(user: user),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                        if (canManageEmployees) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) =>
+                                      _EditEmployeeSheet(user: user),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                              ),
+                              child: const Text('Chỉnh sửa'),
                             ),
-                            child: const Text('Chỉnh sửa'),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ],

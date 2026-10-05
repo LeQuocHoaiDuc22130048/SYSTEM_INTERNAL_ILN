@@ -8,7 +8,7 @@ class MobileNavigationBar extends StatelessWidget {
     super.key,
     required this.isDark,
     required this.onHome,
-    required this.onBooking,
+    this.onBooking,
     this.onProfile,
     this.homeSelected = false,
     this.profileSelected = false,
@@ -18,7 +18,7 @@ class MobileNavigationBar extends StatelessWidget {
   final bool homeSelected;
   final bool profileSelected;
   final VoidCallback onHome;
-  final VoidCallback onBooking;
+  final VoidCallback? onBooking;
   final VoidCallback? onProfile;
 
   @override
@@ -66,51 +66,56 @@ class MobileNavigationBar extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: Align(
-                      alignment: Alignment.topCenter,
-                      child: Semantics(
-                        button: true,
-                        label: 'Đặt lịch dịch vụ mới',
-                        child: Tooltip(
-                          message: 'Đặt lịch dịch vụ mới',
-                          child: InkWell(
-                            onTap: onBooking,
-                            customBorder: const CircleBorder(),
-                            child: Ink(
-                              width: 54,
-                              height: 54,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                gradient: const LinearGradient(
-                                  colors: [
-                                    Color(0xFF2563EB),
-                                    Color(0xFF4F46E5),
-                                    Color(0xFF3B82F6),
-                                  ],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(
-                                      0xFF2563EB,
-                                    ).withValues(alpha: 0.45),
-                                    blurRadius: 16,
-                                    offset: const Offset(0, 6),
+                    child: onBooking == null
+                        ? const SizedBox.shrink()
+                        : Align(
+                            alignment: Alignment.topCenter,
+                            child: Semantics(
+                              button: true,
+                              label: 'Tạo mới & thao tác nhanh',
+                              child: Tooltip(
+                                message: 'Tạo mới & thao tác nhanh',
+                                child: InkWell(
+                                  onTap: onBooking,
+                                  customBorder: const CircleBorder(),
+                                  child: Ink(
+                                    width: 54,
+                                    height: 54,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: const LinearGradient(
+                                        colors: [
+                                          Color(0xFF2563EB),
+                                          Color(0xFF4F46E5),
+                                          Color(0xFF3B82F6),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: const Color(
+                                            0xFF2563EB,
+                                          ).withValues(alpha: 0.45),
+                                          blurRadius: 16,
+                                          offset: const Offset(0, 6),
+                                        ),
+                                      ],
+                                      border: Border.all(
+                                        color: surface,
+                                        width: 3.5,
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      LucideIcons.plus,
+                                      size: 24,
+                                      color: Colors.white,
+                                    ),
                                   ),
-                                ],
-                                border: Border.all(color: surface, width: 3.5),
-                              ),
-                              child: const Icon(
-                                LucideIcons.plus,
-                                size: 24,
-                                color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                    ),
                   ),
                   Expanded(
                     child: onProfile == null

@@ -217,59 +217,59 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                         const checkOutEvent = dayLog?.events?.find(e => e.type === 'CHECK_OUT');
 
                                         const isOvertimeLogTime = (logTime?: string): boolean => {
-                                           if (!logTime || !checkInEvent || checkInEvent.logTime >= '12:30') return false;
-                                           const [h, m] = logTime.split(':').map(Number);
-                                           if (isNaN(h)) return false;
-                                           return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
-                                         };
+                                          if (!logTime || !checkInEvent || checkInEvent.logTime >= '12:30') return false;
+                                          const [h, m] = logTime.split(':').map(Number);
+                                          if (isNaN(h)) return false;
+                                          return h > 21 || (h === 21 && (isNaN(m) || m >= 0));
+                                        };
 
-                                         const getCellState = () => {
-                                           let state = dayObj.state;
-                                           if (dayLog) {
-                                             switch (dayLog.status as string) {
-                                               case 'PRESENT': state = 'p'; break;
-                                               case 'LATE': state = 'l'; break;
-                                               case 'ABSENT': state = 'a'; break;
-                                               case 'LEAVE': state = 'v'; break;
-                                               case 'HOLIDAY': state = 'h'; break;
-                                               case 'OVERTIME':
-                                               case 'OT': state = 'o'; break;
-                                               case 'HALF_DAY_MORNING': state = 'm'; break;
-                                               case 'HALF_DAY_AFTERNOON': state = 'c'; break;
-                                               case 'HALF_DAY': state = 'c'; break;
-                                               case 'FUTURE': state = 'f'; break;
-                                               default: state = dayObj.state;
-                                             }
-                                           }
-                                           // Tăng ca cần đủ ca sáng, chiều và tối đến 21:00.
-                                           if (checkOutEvent?.logTime) {
-                                             if (isOvertimeLogTime(checkOutEvent.logTime)) {
-                                               state = 'o';
-                                             } else if (state === 'o') {
-                                               if (dayLog?.status && (dayLog.status as string) !== 'OVERTIME') {
-                                                 switch (dayLog.status as string) {
-                                                   case 'HALF_DAY_AFTERNOON': state = 'c'; break;
-                                                   case 'HALF_DAY_MORNING': state = 'm'; break;
-                                                   case 'LATE': state = 'l'; break;
-                                                   default: state = 'p';
-                                                 }
-                                               } else {
-                                                 const isAfternoon = checkInEvent && checkInEvent.logTime >= '12:30';
-                                                 const isLate = isAfternoon
-                                                   ? (checkInEvent && checkInEvent.logTime > '13:45')
-                                                   : (checkInEvent && checkInEvent.logTime > '08:45');
-                                                 if (isLate) {
-                                                   state = 'l';
-                                                 } else if (isAfternoon) {
-                                                   state = 'c';
-                                                 } else {
-                                                   state = 'p';
-                                                 }
-                                               }
-                                             }
-                                           }
-                                           return state;
-                                         };
+                                        const getCellState = () => {
+                                          let state = dayObj.state;
+                                          if (dayLog) {
+                                            switch (dayLog.status as string) {
+                                              case 'PRESENT': state = 'p'; break;
+                                              case 'LATE': state = 'l'; break;
+                                              case 'ABSENT': state = 'a'; break;
+                                              case 'LEAVE': state = 'v'; break;
+                                              case 'HOLIDAY': state = 'h'; break;
+                                              case 'OVERTIME':
+                                              case 'OT': state = 'o'; break;
+                                              case 'HALF_DAY_MORNING': state = 'm'; break;
+                                              case 'HALF_DAY_AFTERNOON': state = 'c'; break;
+                                              case 'HALF_DAY': state = 'c'; break;
+                                              case 'FUTURE': state = 'f'; break;
+                                              default: state = dayObj.state;
+                                            }
+                                          }
+                                          // Tăng ca cần đủ ca sáng, chiều và tối đến 21:00.
+                                          if (checkOutEvent?.logTime) {
+                                            if (isOvertimeLogTime(checkOutEvent.logTime)) {
+                                              state = 'o';
+                                            } else if (state === 'o') {
+                                              if (dayLog?.status && (dayLog.status as string) !== 'OVERTIME') {
+                                                switch (dayLog.status as string) {
+                                                  case 'HALF_DAY_AFTERNOON': state = 'c'; break;
+                                                  case 'HALF_DAY_MORNING': state = 'm'; break;
+                                                  case 'LATE': state = 'l'; break;
+                                                  default: state = 'p';
+                                                }
+                                              } else {
+                                                const isAfternoon = checkInEvent && checkInEvent.logTime >= '12:30';
+                                                const isLate = isAfternoon
+                                                  ? (checkInEvent && checkInEvent.logTime > '13:45')
+                                                  : (checkInEvent && checkInEvent.logTime > '08:45');
+                                                if (isLate) {
+                                                  state = 'l';
+                                                } else if (isAfternoon) {
+                                                  state = 'c';
+                                                } else {
+                                                  state = 'p';
+                                                }
+                                              }
+                                            }
+                                          }
+                                          return state;
+                                        };
                                         const cellState = getCellState();
 
                                         return (
@@ -346,12 +346,12 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
         <span className="legend-title">Chú thích màu sắc:</span>
         <div className="legend-items">
           {[
-            { key: 'p', label: 'Đủ công (#639922)' },
-            { key: 'l', label: 'Vào muộn (#BA7517)' },
-            { key: 'a', label: 'Vắng không phép (#E24B4A)' },
-            { key: 'v', label: 'Nghỉ phép (#378ADD)' },
-            { key: 'h', label: 'Cuối tuần / Lễ (#cbd5e1)' },
-            { key: 'o', label: 'Tăng ca (#8B5CF6)' },
+            { key: 'p', label: 'Đủ công' },
+            { key: 'l', label: 'Vào muộn' },
+            { key: 'a', label: 'Vắng không phép' },
+            { key: 'v', label: 'Nghỉ phép' },
+            { key: 'h', label: 'Cuối tuần / Lễ' },
+            { key: 'o', label: 'Tăng ca' },
           ].map(({ key, label }) => (
             <div key={key} className="legend-item">
               <div className={`legend-dot ${key}`} />

@@ -1,9 +1,5 @@
 name: system_inverter_likenew
-<<<<<<< HEAD
-description: "System Inverter Likenew Mobile Application."
-=======
 description: "System Inverter LikeNew: quản lý dịch vụ, sửa chữa và kho linh kiện."
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
 publish_to: 'none'
 
 version: 1.1.27+27

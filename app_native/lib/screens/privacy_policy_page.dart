@@ -40,9 +40,7 @@ class PrivacyPolicyPage extends StatelessWidget {
         leadingWidth: 58,
         leading: Padding(
           padding: const EdgeInsets.only(left: 16),
-          child: Center(
-            child: AppBackButton(isDark: isDark),
-          ),
+          child: Center(child: AppBackButton(isDark: isDark)),
         ),
         title: const Text('Chính sách bảo mật'),
         actions: [
@@ -66,11 +64,7 @@ class PrivacyPolicyPage extends StatelessWidget {
                 icon: LucideIcons.shieldCheck,
                 title: '1. Thu thập dữ liệu và Mục đích',
                 content:
-<<<<<<< HEAD
                     'Ứng dụng System Inverter Likenew chỉ thu thập các dữ liệu cần thiết phục vụ quản lý và vận hành hệ thống:\n\n'
-=======
-                    'Ứng dụng System Inverter LikeNew chỉ thu thập các dữ liệu cần thiết phục vụ quản lý và vận hành doanh nghiệp:\n\n'
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
                     '• Thông tin định danh: Họ tên, tên tài khoản, số điện thoại, bộ phận công tác phục vụ xác thực người dùng.\n'
                     '• Dữ liệu sinh trắc học khuôn mặt: Vector đặc trưng khuôn mặt được dùng duy nhất cho tính năng điểm danh / chấm công. Dữ liệu không được chia sẻ hay thương mại hóa.\n'
                     '• Quyền máy ảnh & Thư viện ảnh: Được sử dụng khi quét mã QR thiết bị, chụp ảnh biên bản kỹ thuật, linh kiện sửa chữa biến tần hoặc gửi tệp trong tin nhắn.\n'
@@ -179,11 +173,7 @@ class PrivacyPolicyPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-<<<<<<< HEAD
             'Hệ thống System Inverter Likenew cam kết bảo mật toàn diện thông tin cá nhân và dữ liệu sinh trắc học của bạn.',
-=======
-            'Hệ thống System Inverter LikeNew cam kết bảo mật toàn diện thông tin cá nhân và dữ liệu sinh trắc học của bạn.',
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
             style: TextStyle(
               fontSize: 13,
               color: isDark

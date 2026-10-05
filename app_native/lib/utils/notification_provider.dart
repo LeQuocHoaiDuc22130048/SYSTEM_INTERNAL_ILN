@@ -113,8 +113,8 @@ class NotificationProvider extends ChangeNotifier {
         clickNotification(notification);
       });
 
-      final initialMessage =
-          await FirebaseMessaging.instance.getInitialMessage();
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
       if (initialMessage != null && apiHasToken) {
         _log('FCM getInitialMessage triggered');
         final notification = _parseNotificationFromPayload(
@@ -150,13 +150,8 @@ class NotificationProvider extends ChangeNotifier {
         body,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-<<<<<<< HEAD
             'system_inverter_notifications',
             'System Inverter Notifications',
-=======
-            'system_internal_notifications',
-            'System Inverter LikeNew Notifications',
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
             channelDescription: 'In-app and push notifications',
             importance: Importance.high,
             priority: Priority.high,
@@ -516,13 +511,8 @@ class NotificationProvider extends ChangeNotifier {
           .timeout(const Duration(seconds: 4));
 
       const channel = AndroidNotificationChannel(
-<<<<<<< HEAD
         'system_inverter_notifications',
         'System Inverter Notifications',
-=======
-        'system_internal_notifications',
-        'System Inverter LikeNew Notifications',
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
         description: 'In-app and push notifications',
         importance: Importance.high,
       );
@@ -550,13 +540,8 @@ class NotificationProvider extends ChangeNotifier {
         notification.body,
         const NotificationDetails(
           android: AndroidNotificationDetails(
-<<<<<<< HEAD
             'system_inverter_notifications',
             'System Inverter Notifications',
-=======
-            'system_internal_notifications',
-            'System Inverter LikeNew Notifications',
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
             channelDescription: 'In-app and push notifications',
             importance: Importance.high,
             priority: Priority.high,

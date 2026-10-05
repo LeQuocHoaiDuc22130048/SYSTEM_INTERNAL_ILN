@@ -15,6 +15,7 @@ class DashboardMobileAppBar extends StatelessWidget
     required this.onToggleNotifications,
     this.showNotification = true,
     this.onBack,
+    this.title,
   });
 
   final bool isDark;
@@ -23,6 +24,7 @@ class DashboardMobileAppBar extends StatelessWidget
   final VoidCallback onToggleNotifications;
   final bool showNotification;
   final VoidCallback? onBack;
+  final Widget? title;
 
   @override
   Size get preferredSize => const Size.fromHeight(57);
@@ -45,30 +47,32 @@ class DashboardMobileAppBar extends StatelessWidget
           child: AppBackButton(
             isDark: isDark,
             tooltip: 'Quay lại Trang chủ',
-            onPressed: onBack ??
+            onPressed:
+                onBack ??
                 () {
                   if (canPop) {
                     Navigator.of(context).maybePop();
                   } else {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      AppRoutes.home,
-                      (route) => false,
-                    );
+                    Navigator.of(
+                      context,
+                    ).pushNamedAndRemoveUntil(AppRoutes.home, (route) => false);
                   }
                 },
           ),
         ),
       ),
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 50,
-            height: 50,
-            child: Image.asset("assets/images/app_logo.png"),
+      title:
+          title ??
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 50,
+                height: 50,
+                child: Image.asset("assets/images/app_logo.png"),
+              ),
+            ],
           ),
-        ],
-      ),
       actions: [
         IconButton(
           icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, size: 22),

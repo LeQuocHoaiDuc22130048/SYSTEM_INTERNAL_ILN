@@ -8,7 +8,6 @@ import 'package:provider/provider.dart';
 import '../models/repair_device.dart';
 import '../models/repair_order.dart';
 import '../models/user.dart';
-import '../models/app_permission.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
@@ -186,7 +185,6 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     final backend = context.watch<BackendDataProvider>();
     final auth = context.watch<AuthProvider>();
     final orders = backend.repairOrders;
-    final isEmployee = auth.role == UserRole.employee;
 
     final screenSize = MediaQuery.sizeOf(context);
     final wide = screenSize.width >= 760;
@@ -239,7 +237,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                               ],
                             ),
                           ),
-                          if (!isEmployee)
+                          if (auth.can(AppPermission.manageRepairOrders))
                             ElevatedButton.icon(
                               onPressed: () => _showCreateOrderSheet(context),
                               icon: const Icon(Icons.add, size: 18),
@@ -1024,7 +1022,13 @@ class _OrderDetailSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final canDelete = context.watch<AuthProvider>().isManagerOrAbove;
+    final auth = context.watch<AuthProvider>();
+    final canDelete =
+        auth.isManagerOrAbove && auth.can(AppPermission.manageRepairOrders);
+    final canUpdateStatus =
+        auth.can(AppPermission.updateRepairOrderStatus) ||
+        auth.can(AppPermission.manageRepairOrders);
+    final canEdit = auth.can(AppPermission.manageRepairOrders);
 
     return Container(
       constraints: BoxConstraints(
@@ -1312,32 +1316,34 @@ class _OrderDetailSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 16),
                     ],
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final updated = await showDialog<bool>(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (_) => _OrderStatusDialog(order: order),
-                          );
-                          if (updated == true && context.mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Cập nhật trạng thái thành công!',
-                                ),
-                                backgroundColor: AppColors.success,
-                              ),
+                    if (canUpdateStatus) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final updated = await showDialog<bool>(
+                              context: context,
+                              barrierDismissible: false,
+                              builder: (_) => _OrderStatusDialog(order: order),
                             );
-                          }
-                        },
-                        icon: const Icon(Icons.sync, size: 18),
-                        label: const Text('Cập nhật trạng thái'),
+                            if (updated == true && context.mounted) {
+                              Navigator.pop(context);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text(
+                                    'Cập nhật trạng thái thành công!',
+                                  ),
+                                  backgroundColor: AppColors.success,
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.sync, size: 18),
+                          label: const Text('Cập nhật trạng thái'),
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 16),
+                      const SizedBox(height: 16),
+                    ],
                     Row(
                       children: [
                         Expanded(
@@ -1346,30 +1352,33 @@ class _OrderDetailSheet extends StatelessWidget {
                             child: const Text('Đóng'),
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              final updated = await showModalBottomSheet<bool>(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (context) =>
-                                    _EditOrderSheet(order: order),
-                              );
-                              if (updated == true && context.mounted) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                  }
-                                });
-                              }
-                            },
-                            child: const Text('Chỉnh sửa'),
+                        if (canEdit) ...[
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final updated =
+                                    await showModalBottomSheet<bool>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (context) =>
+                                          _EditOrderSheet(order: order),
+                                    );
+                                if (updated == true && context.mounted) {
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                    }
+                                  });
+                                }
+                              },
+                              child: const Text('Chỉnh sửa'),
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ],

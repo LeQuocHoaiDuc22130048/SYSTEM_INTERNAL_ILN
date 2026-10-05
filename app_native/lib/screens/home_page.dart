@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -40,28 +41,73 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late int _currentNavTab; // 0: Home, 1: Book (+), 2: Profile
   late final PageController _bannerController;
   int _currentBannerIndex = 0;
+  int _previousBannerCount = 0;
+  Timer? _bannerTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _currentNavTab = widget.initialNavTab;
     _bannerController = PageController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final backend = context.read<BackendDataProvider>();
-        if (backend.banners.length <= 1) {
-          backend.loadBanners(notify: false);
-        }
+        _previousBannerCount = backend.banners.length;
+        _startBannerTimer(backend.banners.length);
+        backend.loadBanners(notify: true).then((_) {
+          if (mounted) {
+            final count = context.read<BackendDataProvider>().banners.length;
+            _previousBannerCount = count;
+            _startBannerTimer(count);
+          }
+        });
       }
     });
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      context.read<BackendDataProvider>().loadBanners(notify: true);
+    }
+  }
+
+  void _startBannerTimer(int count) {
+    _bannerTimer?.cancel();
+    if (count <= 1) {
+      _currentBannerIndex = 0;
+      return;
+    }
+    if (_currentBannerIndex >= count) {
+      _currentBannerIndex = 0;
+      if (_bannerController.hasClients) {
+        _bannerController.jumpToPage(0);
+      }
+    }
+    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+      if (!mounted || !_bannerController.hasClients) return;
+      final nextIndex = (_currentBannerIndex + 1) % count;
+      _bannerController.animateToPage(
+        nextIndex,
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeInOutCubic,
+      );
+    });
+  }
+
+  void _resetBannerTimer(int count) {
+    _startBannerTimer(count);
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _bannerTimer?.cancel();
     _bannerController.dispose();
     super.dispose();
   }
@@ -100,11 +146,7 @@ class _HomePageState extends State<HomePage> {
     {
       'id': 'messages',
       'label': 'Nhắn tin',
-<<<<<<< HEAD
-      'tooltip': 'Tin nhắn trao đổi',
-=======
       'tooltip': 'Nhắn tin',
->>>>>>> 1eaf0b7 (Refactor project name from "system_internal_likenew" to "system_inverter_likenew" across all configurations, files, and tests. Update dependencies and versioning in pubspec.yaml and pubspec.lock. Modify web index.html and manifest.json for new app title. Adjust Windows and iOS project files to reflect the new application name. Ensure all references in test files are updated accordingly.)
       'tabIndex': MainTabs.messages,
       'icon': LucideIcons.messageSquare,
       'bgColor': Color(0xFFEEF2FF),
@@ -163,15 +205,17 @@ class _HomePageState extends State<HomePage> {
     if (widget.onNavigateToTab != null) {
       widget.onNavigateToTab!(tabIndex);
     } else {
-      Navigator.of(context).pushNamed(
-        AppRoutes.dashboard,
-        arguments: tabIndex,
-      );
+      Navigator.of(context).pushNamed(AppRoutes.dashboard, arguments: tabIndex);
     }
   }
 
   void _showBookingSheet({String? expertName, String? serviceName}) {
-    showQuickBookingSheet(context, expertName: expertName, serviceName: serviceName);
+    showQuickBookingSheet(
+      context,
+      expertName: expertName,
+      serviceName: serviceName,
+      onNavigateToTab: _navigateToTab,
+    );
   }
 
   @override
@@ -180,17 +224,17 @@ class _HomePageState extends State<HomePage> {
     if (!auth.isAuthenticated) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          Navigator.of(context).pushNamedAndRemoveUntil(
-            AppRoutes.login,
-            (route) => false,
-          );
+          Navigator.of(
+            context,
+          ).pushNamedAndRemoveUntil(AppRoutes.login, (route) => false);
         }
       });
     }
 
     final notificationProvider = context.watch<NotificationProvider>();
     final unreadCount = notificationProvider.unreadCount;
-    final userName = auth.currentUser?.name ?? auth.currentUser?.username ?? 'Alex';
+    final userName =
+        auth.currentUser?.name ?? auth.currentUser?.username ?? 'Alex';
 
     final Widget bodyContent;
     if (_currentNavTab == 2) {
@@ -255,8 +299,13 @@ class _HomePageState extends State<HomePage> {
               isDark: Theme.of(context).brightness == Brightness.dark,
               homeSelected: _currentNavTab == 0,
               profileSelected: _currentNavTab == 2,
-              onHome: () => setState(() => _currentNavTab = 0),
-              onBooking: () => _showBookingSheet(),
+              onHome: () {
+                setState(() => _currentNavTab = 0);
+                context.read<BackendDataProvider>().loadBanners(notify: true);
+              },
+              onBooking: auth.isAuthenticated
+                  ? () => _showBookingSheet()
+                  : null,
               onProfile: auth.can(AppPermission.viewProfile)
                   ? () => setState(() => _currentNavTab = 2)
                   : null,
@@ -267,15 +316,13 @@ class _HomePageState extends State<HomePage> {
 
   // 1. Top Bar Header
   Widget _buildTopBar(int unreadCount) {
+    final auth = context.watch<AuthProvider>();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         border: Border(
-          bottom: BorderSide(
-            color: const Color(0xFFF1F5F9),
-            width: 1.2,
-          ),
+          bottom: BorderSide(color: const Color(0xFFF1F5F9), width: 1.2),
         ),
         boxShadow: [
           BoxShadow(
@@ -294,7 +341,9 @@ class _HomePageState extends State<HomePage> {
               onTap: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text('Vị trí hiện tại: 124 Oxford St, Quận 1, TP.HCM'),
+                    content: Text(
+                      'Vị trí hiện tại: 124 Oxford St, Quận 1, TP.HCM',
+                    ),
                     duration: Duration(seconds: 2),
                   ),
                 );
@@ -347,7 +396,11 @@ class _HomePageState extends State<HomePage> {
                               ),
                             ),
                             SizedBox(width: 3),
-                            Icon(LucideIcons.chevronDown, size: 14, color: Color(0xFF64748B)),
+                            Icon(
+                              LucideIcons.chevronDown,
+                              size: 14,
+                              color: Color(0xFF64748B),
+                            ),
                           ],
                         ),
                       ],
@@ -360,40 +413,45 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(width: 8),
 
           // Notification Bell Icon with Badge
-          InkWell(
-            onTap: () => _navigateToTab(MainTabs.notifications),
-            borderRadius: BorderRadius.circular(20),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Icon(LucideIcons.bell, size: 18, color: Color(0xFF475569)),
-                  ),
-                ),
-                if (unreadCount > 0)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
+          if (auth.can(AppPermission.viewNotifications))
+            InkWell(
+              onTap: () => _navigateToTab(MainTabs.notifications),
+              borderRadius: BorderRadius.circular(20),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        LucideIcons.bell,
+                        size: 18,
+                        color: Color(0xFF475569),
                       ),
                     ),
                   ),
-              ],
+                  if (unreadCount > 0)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
-          ),
         ],
       ),
     );
@@ -416,10 +474,7 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 3),
         const Text(
           'Tìm kiếm chuyên gia & đặt dịch vụ bảo trì nhanh chóng',
-          style: TextStyle(
-            fontSize: 13,
-            color: Color(0xFF64748B),
-          ),
+          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
         ),
       ],
     );
@@ -428,197 +483,265 @@ class _HomePageState extends State<HomePage> {
   // 3. Dynamic Promotional Banner with 3D Character or Custom Image
   Widget _buildPromotionalBanner() {
     final backendProvider = Provider.of<BackendDataProvider?>(context);
-    final banners = (backendProvider?.banners != null && backendProvider!.banners.isNotEmpty)
+    final banners =
+        (backendProvider?.banners != null &&
+            backendProvider!.banners.isNotEmpty)
         ? backendProvider.banners
-        : const [AppBanner.defaultBanner];
+        : AppBanner.defaultBanners;
 
     final baseUrl = backendProvider?.api.activeBaseUrl ?? '';
 
-    if (banners.length == 1) {
-      return _buildBannerCard(banners.first, baseUrl, 0, 1);
+    if (_currentBannerIndex >= banners.length) {
+      _currentBannerIndex = 0;
+    }
+
+    if (_bannerTimer == null ||
+        !_bannerTimer!.isActive ||
+        _previousBannerCount != banners.length) {
+      _previousBannerCount = banners.length;
+      _startBannerTimer(banners.length);
     }
 
     return SizedBox(
       height: 225,
-      child: PageView.builder(
-        controller: _bannerController,
-        itemCount: banners.length,
-        onPageChanged: (index) {
-          setState(() {
-            _currentBannerIndex = index;
-          });
-        },
-        itemBuilder: (context, index) {
-          return _buildBannerCard(banners[index], baseUrl, _currentBannerIndex, banners.length);
-        },
+      child: Stack(
+        children: [
+          Listener(
+            onPointerDown: (_) => _bannerTimer?.cancel(),
+            onPointerUp: (_) => _resetBannerTimer(banners.length),
+            onPointerCancel: (_) => _resetBannerTimer(banners.length),
+            child: PageView.builder(
+              controller: _bannerController,
+              itemCount: banners.length,
+              physics: const BouncingScrollPhysics(),
+              onPageChanged: (index) {
+                setState(() {
+                  _currentBannerIndex = index;
+                });
+                _resetBannerTimer(banners.length);
+              },
+              itemBuilder: (context, index) {
+                return AnimatedBuilder(
+                  animation: _bannerController,
+                  builder: (context, child) {
+                    double pageOffset = 0.0;
+                    if (_bannerController.position.haveDimensions) {
+                      pageOffset =
+                          (_bannerController.page ??
+                              _currentBannerIndex.toDouble()) -
+                          index;
+                    } else {
+                      pageOffset = (_currentBannerIndex - index).toDouble();
+                    }
+                    final double absOffset = pageOffset.abs().clamp(0.0, 1.0);
+                    final double scale = 1.0 - (absOffset * 0.06);
+                    final double opacity = 1.0 - (absOffset * 0.28);
+                    final double translationX = pageOffset * 14;
+
+                    return Transform.translate(
+                      offset: Offset(translationX, 0.0),
+                      child: Transform.scale(
+                        scale: scale,
+                        child: Opacity(
+                          opacity: opacity.clamp(0.0, 1.0),
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _buildBannerCard(banners[index], baseUrl),
+                );
+              },
+            ),
+          ),
+
+          // Pinned Carousel Indicator Dots (Stitch modern capsule style)
+          if (banners.length > 1)
+            Positioned(
+              bottom: 12,
+              left: 20,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(banners.length, (dotIdx) {
+                  final isDotActive = dotIdx == _currentBannerIndex;
+                  return GestureDetector(
+                    onTap: () {
+                      _bannerController.animateToPage(
+                        dotIdx,
+                        duration: const Duration(milliseconds: 550),
+                        curve: Curves.easeInOutCubic,
+                      );
+                      _resetBannerTimer(banners.length);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      margin: const EdgeInsets.only(right: 6),
+                      width: isDotActive ? 22 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: isDotActive
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(3),
+                        boxShadow: isDotActive
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.35),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ]
+                            : null,
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildBannerCard(AppBanner banner, String baseUrl, int currentIndex, int totalCount) {
+  Widget _buildBannerCard(AppBanner banner, String baseUrl) {
     return GestureDetector(
       onTap: () => _handleBannerAction(banner),
       child: Container(
         width: double.infinity,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        gradient: (banner.backgroundImageUrl == null || banner.backgroundImageUrl!.isEmpty)
-            ? LinearGradient(
-                colors: banner.gradientColorList,
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              )
-            : null,
-        image: (banner.backgroundImageUrl != null && banner.backgroundImageUrl!.isNotEmpty)
-            ? DecorationImage(
-                image: NetworkImage(
-                  banner.backgroundImageUrl!.startsWith('http')
-                      ? banner.backgroundImageUrl!
-                      : '$baseUrl${banner.backgroundImageUrl}',
-                ),
-                fit: BoxFit.cover,
-                colorFilter: banner.darkenOverlay
-                    ? ColorFilter.mode(
-                        Colors.black.withValues(alpha: 0.35),
-                        BlendMode.darken,
-                      )
-                    : null,
-              )
-            : null,
-        boxShadow: [
-          BoxShadow(
-            color: banner.gradientColorList.first.withValues(alpha: 0.25),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Background soft radial blur
-          Positioned(
-            right: 0,
-            bottom: 0,
-            child: Container(
-              width: 160,
-              height: 160,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF38BDF8).withValues(alpha: 0.35),
-                    Colors.transparent,
-                  ],
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          gradient:
+              (banner.backgroundImageUrl == null ||
+                  banner.backgroundImageUrl!.isEmpty)
+              ? LinearGradient(
+                  colors: banner.gradientColorList,
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
+          image:
+              (banner.backgroundImageUrl != null &&
+                  banner.backgroundImageUrl!.isNotEmpty)
+              ? DecorationImage(
+                  image: NetworkImage(
+                    _resolveImageUrl(banner.backgroundImageUrl, baseUrl),
+                  ),
+                  fit: BoxFit.cover,
+                  onError: (_, _) {},
+                  colorFilter: banner.darkenOverlay
+                      ? ColorFilter.mode(
+                          Colors.black.withValues(alpha: 0.35),
+                          BlendMode.darken,
+                        )
+                      : null,
+                )
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: banner.gradientColorList.first.withValues(alpha: 0.25),
+              blurRadius: 16,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Background soft radial blur
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: Container(
+                width: 160,
+                height: 160,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF38BDF8).withValues(alpha: 0.35),
+                      Colors.transparent,
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
 
-          // Banner text and action button
-          Padding(
-            padding: _getBannerTextPadding(banner.imagePosition),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Pill Deal
-                if (banner.badgeText != null && banner.badgeText!.isNotEmpty) ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.22),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
-                    ),
-                    child: Text(
-                      banner.badgeText!,
-                      style: _getBannerTextStyle(
-                        fontFamily: banner.fontFamily,
-                        baseStyle: const TextStyle(
-                          fontSize: 9.5,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                          letterSpacing: 0.5,
+            // Banner text and action button
+            Padding(
+              padding: _getBannerTextPadding(banner.imagePosition),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Pill Deal
+                  if (banner.badgeText != null &&
+                      banner.badgeText!.isNotEmpty) ...[
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.22),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.28),
+                        ),
+                      ),
+                      child: Text(
+                        banner.badgeText!,
+                        style: _getBannerTextStyle(
+                          fontFamily: banner.fontFamily,
+                          baseStyle: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            letterSpacing: 0.5,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 8),
-                ],
-                if (banner.title.trim().isNotEmpty) ...[
-                  Text(
-                    banner.title,
-                    style: _getBannerTextStyle(
-                      fontFamily: banner.fontFamily,
-                      baseStyle: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        height: 1.25,
-                        letterSpacing: -0.2,
+                    const SizedBox(height: 8),
+                  ],
+                  if (banner.title.trim().isNotEmpty) ...[
+                    Text(
+                      banner.title,
+                      style: _getBannerTextStyle(
+                        fontFamily: banner.fontFamily,
+                        baseStyle: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          height: 1.25,
+                          letterSpacing: -0.2,
+                        ),
                       ),
                     ),
-                  ),
+                  ],
+                  if (banner.subtitle != null &&
+                      banner.subtitle!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    _buildSubtitle(banner.subtitle!, banner.fontFamily),
+                  ],
+                  if (banner.buttons.isNotEmpty &&
+                      banner.buttonPosition != 'TOP_RIGHT' &&
+                      banner.buttonPosition != 'TOP_LEFT' &&
+                      banner.buttonPosition != 'CUSTOM') ...[
+                    const SizedBox(height: 12),
+                    _buildButtonsContainer(banner),
+                  ],
                 ],
-                if (banner.subtitle != null && banner.subtitle!.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  _buildSubtitle(banner.subtitle!, banner.fontFamily),
-                ],
-                if (banner.buttons.isNotEmpty &&
-                    banner.buttonPosition != 'TOP_RIGHT' &&
-                    banner.buttonPosition != 'TOP_LEFT' &&
-                    banner.buttonPosition != 'CUSTOM') ...[
-                  const SizedBox(height: 12),
-                  _buildButtonsContainer(banner),
-                ],
-              ],
-            ),
-          ),
-
-          // Custom / Stack Positioned Buttons (if TOP_RIGHT, TOP_LEFT, or CUSTOM)
-          _buildCustomPositionedButtons(banner),
-
-          // 3D Character or Custom Image based on imagePosition
-          _buildPositionedMascot(banner, baseUrl),
-
-          // Carousel indicator dots (Stitch style)
-          Positioned(
-            bottom: 8,
-            left: banner.imagePosition == 'LEFT' ? null : 18,
-            right: banner.imagePosition == 'LEFT' ? 18 : null,
-            child: Row(
-              children: List.generate(
-                totalCount > 1 ? totalCount : 3,
-                (dotIdx) {
-                  final isDotActive = dotIdx == currentIndex;
-                  return GestureDetector(
-                    onTap: () {
-                      if (totalCount > 1) {
-                        _bannerController.animateToPage(
-                          dotIdx,
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeInOut,
-                        );
-                      }
-                    },
-                    child: Container(
-                      margin: const EdgeInsets.only(right: 4),
-                      width: isDotActive ? 14 : 4,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: isDotActive ? Colors.white : Colors.white.withValues(alpha: 0.4),
-                        borderRadius: isDotActive ? BorderRadius.circular(2) : null,
-                        shape: isDotActive ? BoxShape.rectangle : BoxShape.circle,
-                      ),
-                    ),
-                  );
-                },
               ),
             ),
-          ),
-        ],
-      ),
+
+            // Custom / Stack Positioned Buttons (if TOP_RIGHT, TOP_LEFT, or CUSTOM)
+            _buildCustomPositionedButtons(banner),
+
+            // 3D Character or Custom Image based on imagePosition
+            _buildPositionedMascot(banner, baseUrl),
+          ],
+        ),
       ),
     );
   }
@@ -627,7 +750,9 @@ class _HomePageState extends State<HomePage> {
     required String? fontFamily,
     required TextStyle baseStyle,
   }) {
-    if (fontFamily == null || fontFamily.trim().isEmpty || fontFamily == 'DEFAULT') {
+    if (fontFamily == null ||
+        fontFamily.trim().isEmpty ||
+        fontFamily == 'DEFAULT') {
       return baseStyle;
     }
     try {
@@ -640,7 +765,11 @@ class _HomePageState extends State<HomePage> {
   Widget _buildSubtitle(String text, [String? fontFamily]) {
     final baseStyle = _getBannerTextStyle(
       fontFamily: fontFamily,
-      baseStyle: TextStyle(fontSize: 11, color: Colors.blue.shade100, height: 1.3),
+      baseStyle: TextStyle(
+        fontSize: 11,
+        color: Colors.blue.shade100,
+        height: 1.3,
+      ),
     );
     final highlightStyle = _getBannerTextStyle(
       fontFamily: fontFamily,
@@ -659,19 +788,14 @@ class _HomePageState extends State<HomePage> {
           style: baseStyle,
           children: [
             TextSpan(text: parts.first),
-            TextSpan(
-              text: '25% GIÁ TRỊ',
-              style: highlightStyle,
-            ),
-            if (parts.length > 1) TextSpan(text: parts.sublist(1).join('25% GIÁ TRỊ')),
+            TextSpan(text: '25% GIÁ TRỊ', style: highlightStyle),
+            if (parts.length > 1)
+              TextSpan(text: parts.sublist(1).join('25% GIÁ TRỊ')),
           ],
         ),
       );
     }
-    return Text(
-      text,
-      style: baseStyle,
-    );
+    return Text(text, style: baseStyle);
   }
 
   EdgeInsets _getBannerTextPadding(String imagePosition) {
@@ -725,10 +849,23 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+  String _resolveImageUrl(String? url, String baseUrl) {
+    if (url == null || url.trim().isEmpty) return '';
+    final trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    final cleanBase = baseUrl.endsWith('/')
+        ? baseUrl.substring(0, baseUrl.length - 1)
+        : baseUrl;
+    final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '$cleanBase$cleanPath';
+  }
+
   Widget _buildBannerImage(AppBanner banner, String baseUrl) {
     final imgUrl = banner.imageUrl;
     if (imgUrl != null && imgUrl.isNotEmpty) {
-      final fullUrl = imgUrl.startsWith('http') ? imgUrl : '$baseUrl$imgUrl';
+      final fullUrl = _resolveImageUrl(imgUrl, baseUrl);
       return Image.network(
         fullUrl,
         fit: BoxFit.contain,
@@ -798,11 +935,44 @@ class _HomePageState extends State<HomePage> {
       return const SizedBox.shrink();
     }
 
+    final auth = context.watch<AuthProvider>();
+    final allowedButtons = banner.buttons.where((btn) {
+      if (btn.actionType == 'BOOKING') {
+        return auth.can(AppPermission.manageRepairOrders);
+      }
+      if (btn.actionType == 'REPAIR_ORDER') {
+        return auth.can(AppPermission.viewRepairOrders);
+      }
+      if (btn.actionType == 'SCREEN') {
+        final val = (btn.actionValue ?? '').toLowerCase();
+        if (val.contains('warehouse') || val.contains('kho')) {
+          return auth.can(AppPermission.viewWarehouse);
+        }
+        if (val.contains('message') ||
+            val.contains('chat') ||
+            val.contains('nhắn')) {
+          return auth.can(AppPermission.useMessages);
+        }
+        if (val.contains('employee') || val.contains('nhân viên')) {
+          return auth.canAny({
+            AppPermission.manageEmployees,
+            AppPermission.approveAccounts,
+          });
+        }
+        return auth.can(AppPermission.viewDashboard);
+      }
+      return true;
+    }).toList();
+
+    if (allowedButtons.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
     final brandColor = banner.gradientColorList.length > 2
         ? banner.gradientColorList[2]
         : const Color(0xFF1D4ED8);
 
-    final buttonWidgets = banner.buttons.map((btn) {
+    final buttonWidgets = allowedButtons.map((btn) {
       final isSecondary = btn.styleType == 'SECONDARY';
       final isOutline = btn.styleType == 'OUTLINE';
 
@@ -812,9 +982,14 @@ class _HomePageState extends State<HomePage> {
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white.withValues(alpha: 0.22),
             foregroundColor: Colors.white,
-            side: BorderSide(color: Colors.white.withValues(alpha: 0.5), width: 1.2),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.5),
+              width: 1.2,
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -823,12 +998,17 @@ class _HomePageState extends State<HomePage> {
                 btn.text,
                 style: _getBannerTextStyle(
                   fontFamily: banner.fontFamily,
-                  baseStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                  baseStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
               Icon(
-                btn.actionType == 'CALL' ? LucideIcons.phone : LucideIcons.arrowRight,
+                btn.actionType == 'CALL'
+                    ? LucideIcons.phone
+                    : LucideIcons.arrowRight,
                 size: 12,
               ),
             ],
@@ -844,7 +1024,9 @@ class _HomePageState extends State<HomePage> {
             foregroundColor: Colors.white,
             side: const BorderSide(color: Colors.white, width: 1.2),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
@@ -853,12 +1035,17 @@ class _HomePageState extends State<HomePage> {
                 btn.text,
                 style: _getBannerTextStyle(
                   fontFamily: banner.fontFamily,
-                  baseStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
+                  baseStyle: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
               const SizedBox(width: 4),
               Icon(
-                btn.actionType == 'CALL' ? LucideIcons.phone : LucideIcons.arrowRight,
+                btn.actionType == 'CALL'
+                    ? LucideIcons.phone
+                    : LucideIcons.arrowRight,
                 size: 12,
               ),
             ],
@@ -873,7 +1060,9 @@ class _HomePageState extends State<HomePage> {
           backgroundColor: Colors.white,
           foregroundColor: brandColor,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           elevation: 2,
         ),
         child: Row(
@@ -883,12 +1072,17 @@ class _HomePageState extends State<HomePage> {
               btn.text,
               style: _getBannerTextStyle(
                 fontFamily: banner.fontFamily,
-                baseStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
+                baseStyle: const TextStyle(
+                  fontSize: 11.5,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
             const SizedBox(width: 4),
             Icon(
-              btn.actionType == 'CALL' ? LucideIcons.phone : LucideIcons.arrowRight,
+              btn.actionType == 'CALL'
+                  ? LucideIcons.phone
+                  : LucideIcons.arrowRight,
               size: 13,
             ),
           ],
@@ -896,16 +1090,14 @@ class _HomePageState extends State<HomePage> {
       );
     }).toList();
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      children: buttonWidgets,
-    );
+    return Wrap(spacing: 8, runSpacing: 6, children: buttonWidgets);
   }
 
   void _handleBannerButtonAction(AppBannerButton btn) {
     if (btn.actionType == 'BOOKING') {
-      _showBookingSheet(serviceName: btn.actionValue ?? 'Gói bảo trì ưu đãi 25%');
+      _showBookingSheet(
+        serviceName: btn.actionValue ?? 'Gói bảo trì ưu đãi 25%',
+      );
     } else if (btn.actionType == 'REPAIR_ORDER') {
       _navigateToTab(MainTabs.repairOrders);
     } else if (btn.actionType == 'CALL') {
@@ -922,7 +1114,9 @@ class _HomePageState extends State<HomePage> {
       final val = (btn.actionValue ?? '').toLowerCase();
       if (val.contains('warehouse') || val.contains('kho')) {
         _navigateToTab(MainTabs.warehouse);
-      } else if (val.contains('message') || val.contains('chat') || val.contains('nhắn')) {
+      } else if (val.contains('message') ||
+          val.contains('chat') ||
+          val.contains('nhắn')) {
         _navigateToTab(MainTabs.messages);
       } else if (val.contains('employee') || val.contains('nhân viên')) {
         _navigateToTab(MainTabs.employeeManagement);
@@ -945,11 +1139,13 @@ class _HomePageState extends State<HomePage> {
     if (banner.buttons.isNotEmpty) {
       _handleBannerButtonAction(banner.buttons.first);
     } else {
-      _handleBannerButtonAction(AppBannerButton(
-        text: banner.buttonText ?? 'Đặt lịch ngay',
-        actionType: banner.actionType,
-        actionValue: banner.actionValue,
-      ));
+      _handleBannerButtonAction(
+        AppBannerButton(
+          text: banner.buttonText ?? 'Đặt lịch ngay',
+          actionType: banner.actionType,
+          actionValue: banner.actionValue,
+        ),
+      );
     }
   }
 
@@ -959,6 +1155,16 @@ class _HomePageState extends State<HomePage> {
     try {
       unreadChats = Provider.of<ChatProvider?>(context)?.totalUnreadCount ?? 0;
     } catch (_) {}
+
+    final auth = context.watch<AuthProvider>();
+    final visibleCategories = _categories.where((cat) {
+      final tabIndex = (cat['tabIndex'] as int?) ?? MainTabs.dashboard;
+      return canAccessMainTab(auth, tabIndex);
+    }).toList();
+
+    if (visibleCategories.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     return Column(
       children: [
@@ -974,65 +1180,65 @@ class _HomePageState extends State<HomePage> {
                 letterSpacing: -0.2,
               ),
             ),
-            InkWell(
-              onTap: () {
-                _navigateToTab(MainTabs.dashboard);
-              },
-              child: const Text(
-                'Xem tất cả',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2563EB),
+            if (canAccessMainTab(auth, MainTabs.dashboard))
+              InkWell(
+                onTap: () {
+                  _navigateToTab(MainTabs.dashboard);
+                },
+                child: const Text(
+                  'Xem tất cả',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2563EB),
+                  ),
                 ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: _categories.length,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
+          itemCount: visibleCategories.length,
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: visibleCategories.length <= 4
+                ? (visibleCategories.isEmpty ? 1 : visibleCategories.length)
+                : 5,
             crossAxisSpacing: 6,
             mainAxisSpacing: 8,
             mainAxisExtent: 96,
           ),
           itemBuilder: (context, index) {
-            final cat = _categories[index];
+            final cat = visibleCategories[index];
             final tabIndex = (cat['tabIndex'] as int?) ?? MainTabs.dashboard;
             final label = cat['label']?.toString() ?? '';
             final tooltip = cat['tooltip']?.toString() ?? label;
             final bgColor = cat['bgColor'] as Color? ?? const Color(0xFFEFF6FF);
-            final textColor = cat['textColor'] as Color? ?? const Color(0xFF2563EB);
-            final borderColor = cat['borderColor'] as Color? ?? const Color(0xFFBFDBFE);
-            final iconData = cat['icon'] is IconData ? cat['icon'] as IconData : null;
-            final iconText = cat['icon'] is String ? cat['icon'] as String : null;
+            final textColor =
+                cat['textColor'] as Color? ?? const Color(0xFF2563EB);
+            final borderColor =
+                cat['borderColor'] as Color? ?? const Color(0xFFBFDBFE);
+            final iconData = cat['icon'] is IconData
+                ? cat['icon'] as IconData
+                : null;
+            final iconText = cat['icon'] is String
+                ? cat['icon'] as String
+                : null;
             final catId = cat['id']?.toString() ?? '';
 
             return Tooltip(
               message: tooltip,
               child: InkWell(
                 onTap: () {
-                  final auth = context.read<AuthProvider>();
-                  if (!canAccessMainTab(auth, tabIndex)) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text(
-                          'Bạn không có quyền truy cập chức năng $label.',
-                        ),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
-                    return;
-                  }
                   _navigateToTab(tabIndex);
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 8,
+                    horizontal: 2,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(16),
@@ -1067,11 +1273,7 @@ class _HomePageState extends State<HomePage> {
                             ),
                             child: Center(
                               child: iconData != null
-                                  ? Icon(
-                                      iconData,
-                                      size: 20,
-                                      color: textColor,
-                                    )
+                                  ? Icon(iconData, size: 20, color: textColor)
                                   : Text(
                                       iconText ?? '',
                                       style: const TextStyle(fontSize: 18),
@@ -1090,10 +1292,15 @@ class _HomePageState extends State<HomePage> {
                                 decoration: BoxDecoration(
                                   color: const Color(0xFFEF4444),
                                   borderRadius: BorderRadius.circular(10),
-                                  border: Border.all(color: Colors.white, width: 1.5),
+                                  border: Border.all(
+                                    color: Colors.white,
+                                    width: 1.5,
+                                  ),
                                 ),
                                 child: Text(
-                                  unreadChats > 99 ? '99+' : unreadChats.toString(),
+                                  unreadChats > 99
+                                      ? '99+'
+                                      : unreadChats.toString(),
                                   style: const TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.bold,
@@ -1159,18 +1366,23 @@ class _HomePageState extends State<HomePage> {
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: () => _navigateToTab(MainTabs.employeeManagement),
-              child: const Text(
-                'Xem tất cả',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2563EB),
+            if (canAccessMainTab(
+              context.watch<AuthProvider>(),
+              MainTabs.employeeManagement,
+            )) ...[
+              const SizedBox(width: 8),
+              InkWell(
+                onTap: () => _navigateToTab(MainTabs.employeeManagement),
+                child: const Text(
+                  'Xem tất cả',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2563EB),
+                  ),
                 ),
               ),
-            ),
+            ],
           ],
         ),
         const SizedBox(height: 12),
@@ -1274,7 +1486,10 @@ class _HomePageState extends State<HomePage> {
                             ),
                             const SizedBox(width: 6),
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 5,
+                                vertical: 1,
+                              ),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFEFF6FF),
                                 borderRadius: BorderRadius.circular(4),
@@ -1295,12 +1510,19 @@ class _HomePageState extends State<HomePage> {
                           exp['role'] as String,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF64748B),
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.star_rounded, size: 14, color: Color(0xFFF59E0B)),
+                            const Icon(
+                              Icons.star_rounded,
+                              size: 14,
+                              color: Color(0xFFF59E0B),
+                            ),
                             const SizedBox(width: 2),
                             Text(
                               '${exp['rating']}',
@@ -1313,7 +1535,10 @@ class _HomePageState extends State<HomePage> {
                             const SizedBox(width: 3),
                             Text(
                               '(${exp['reviews']})',
-                              style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: Color(0xFF94A3B8),
+                              ),
                             ),
                           ],
                         ),
@@ -1333,20 +1558,32 @@ class _HomePageState extends State<HomePage> {
                   ),
 
                   // Action Book Button
-                  ElevatedButton(
-                    onPressed: () => _showBookingSheet(expertName: exp['name'] as String),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2563EB),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      elevation: 0,
+                  if (context.watch<AuthProvider>().can(
+                    AppPermission.manageRepairOrders,
+                  ))
+                    ElevatedButton(
+                      onPressed: () =>
+                          _showBookingSheet(expertName: exp['name'] as String),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF2563EB),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 7,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 0,
+                      ),
+                      child: const Text(
+                        'Đặt lịch',
+                        style: TextStyle(
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                    child: const Text(
-                      'Đặt lịch',
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold),
-                    ),
-                  ),
                 ],
               ),
             );
@@ -1355,5 +1592,4 @@ class _HomePageState extends State<HomePage> {
       ],
     );
   }
-
 }

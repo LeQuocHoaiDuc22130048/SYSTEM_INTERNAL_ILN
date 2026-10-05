@@ -23,7 +23,7 @@ class BackendDataProvider extends ChangeNotifier {
   List<Part> parts = [];
   List<StoreLocation> locations = [];
   List<AttendanceRecord> attendanceRecords = [];
-  List<AppBanner> banners = [AppBanner.defaultBanner];
+  List<AppBanner> banners = AppBanner.defaultBanners;
   EmployeeHistoryData? myAttendanceHistory;
   MyTodayAttendance? myTodayAttendance;
   bool isLoadingMyAttendance = false;
@@ -40,7 +40,7 @@ class BackendDataProvider extends ChangeNotifier {
     parts = [];
     locations = [];
     attendanceRecords = [];
-    banners = [AppBanner.defaultBanner];
+    banners = AppBanner.defaultBanners;
     myAttendanceHistory = null;
     myTodayAttendance = null;
     isLoadingMyAttendance = false;
@@ -549,14 +549,15 @@ class BackendDataProvider extends ChangeNotifier {
           .whereType<AppBanner>()
           .where((b) => b.isActive)
           .toList();
+      loaded.sort((a, b) => a.displayOrder.compareTo(b.displayOrder));
       if (loaded.isNotEmpty) {
         banners = loaded;
       } else if (banners.isEmpty) {
-        banners = [AppBanner.defaultBanner];
+        banners = AppBanner.defaultBanners;
       }
     } catch (_) {
       if (banners.isEmpty) {
-        banners = [AppBanner.defaultBanner];
+        banners = AppBanner.defaultBanners;
       }
     } finally {
       isLoadingBanners = false;
@@ -565,13 +566,21 @@ class BackendDataProvider extends ChangeNotifier {
   }
 
   List<Map<String, dynamic>> _content(dynamic data) {
-    if (data is Map<String, dynamic>) {
-      final content = data['content'];
+    if (data is Map) {
+      final content = data['content'] ?? data['data'];
       if (content is List) {
-        return content.whereType<Map<String, dynamic>>().toList();
+        return content
+            .whereType<Map>()
+            .map((item) => Map<String, dynamic>.from(item))
+            .toList();
       }
     }
-    if (data is List) return data.whereType<Map<String, dynamic>>().toList();
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
     return const [];
   }
 }
