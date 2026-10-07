@@ -11,7 +11,7 @@ import '../utils/notification_provider.dart';
 import '../utils/update_provider.dart';
 import '../widgets/navigation/app_back_button.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
-import '../widgets/quick_booking_sheet.dart';
+import '../widgets/app_quick_actions.dart';
 import 'privacy_policy_page.dart';
 
 /// Profile Page designed faithfully according to Stitch Home Service Marketplace
@@ -46,7 +46,9 @@ class _ProfilePageState extends State<ProfilePage> {
     final currentVersion = updateProvider.currentVersion;
 
     return Scaffold(
-      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF8FAFC),
+      backgroundColor: isDark
+          ? AppColors.backgroundDark
+          : const Color(0xFFF8FAFC),
       body: SafeArea(
         child: Column(
           children: [
@@ -91,9 +93,15 @@ class _ProfilePageState extends State<ProfilePage> {
           ? MobileNavigationBar(
               isDark: isDark,
               profileSelected: true,
-              onHome: widget.onNavigateToHome ??
-                  () => Navigator.of(context).pushReplacementNamed(AppRoutes.home),
-              onBooking: () => showQuickBookingSheet(context),
+              onHome:
+                  widget.onNavigateToHome ??
+                  () => Navigator.of(
+                    context,
+                  ).pushReplacementNamed(AppRoutes.home),
+              onBooking: () => showAppQuickActions(
+                context,
+                onNavigateToTab: widget.onNavigateToTab,
+              ),
               onProfile: () {},
             )
           : null,
@@ -141,7 +149,9 @@ class _ProfilePageState extends State<ProfilePage> {
             style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w700,
-              color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : const Color(0xFF0F172A),
               letterSpacing: -0.2,
             ),
           ),
@@ -154,16 +164,22 @@ class _ProfilePageState extends State<ProfilePage> {
               width: 38,
               height: 38,
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                color: isDark
+                    ? const Color(0xFF1E293B)
+                    : const Color(0xFFF8FAFC),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+                  color: isDark
+                      ? AppColors.borderDark
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
               child: Icon(
                 LucideIcons.settings,
                 size: 18,
-                color: isDark ? AppColors.textPrimaryDark : const Color(0xFF334155),
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : const Color(0xFF334155),
               ),
             ),
           ),
@@ -173,7 +189,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   // 2. Hero Avatar & Profile Identity
-  Widget _buildHeroSection(bool isDark, User? user, String name, String initials) {
+  Widget _buildHeroSection(
+    bool isDark,
+    User? user,
+    String name,
+    String initials,
+  ) {
     return Column(
       children: [
         const SizedBox(height: 8),
@@ -229,7 +250,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       color: isDark ? const Color(0xFF1E293B) : Colors.white,
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: isDark ? AppColors.borderDark : const Color(0xFFCBD5E1),
+                        color: isDark
+                            ? AppColors.borderDark
+                            : const Color(0xFFCBD5E1),
                         width: 1.5,
                       ),
                       boxShadow: [
@@ -243,7 +266,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     child: Icon(
                       LucideIcons.camera,
                       size: 15,
-                      color: isDark ? AppColors.textPrimaryDark : const Color(0xFF475569),
+                      color: isDark
+                          ? AppColors.textPrimaryDark
+                          : const Color(0xFF475569),
                     ),
                   ),
                 ),
@@ -293,7 +318,9 @@ class _ProfilePageState extends State<ProfilePage> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: isDark ? AppColors.textSecondaryDark : const Color(0xFF94A3B8),
+                color: isDark
+                    ? AppColors.textSecondaryDark
+                    : const Color(0xFF94A3B8),
               ),
             ),
           ],
@@ -320,10 +347,7 @@ class _ProfilePageState extends State<ProfilePage> {
               SizedBox(width: 6),
               Text(
                 'Chỉnh sửa hồ sơ',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -357,7 +381,9 @@ class _ProfilePageState extends State<ProfilePage> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: isDark ? AppColors.textSecondaryDark : const Color(0xFF94A3B8),
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : const Color(0xFF94A3B8),
             letterSpacing: 0.8,
           ),
         ),
@@ -479,9 +505,9 @@ class _ProfilePageState extends State<ProfilePage> {
               isDark: isDark,
               onTap: () {
                 context.read<UpdateProvider>().checkForUpdate(
-                      context,
-                      manual: true,
-                    );
+                  context,
+                  manual: true,
+                );
               },
             ),
             _buildDivider(isDark),
@@ -584,7 +610,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w500,
-                    color: isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B),
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -593,7 +621,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isDark ? AppColors.textPrimaryDark : const Color(0xFF1E293B),
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : const Color(0xFF1E293B),
                   ),
                 ),
               ],
@@ -640,8 +670,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
-                      color: titleColor ??
-                          (isDark ? AppColors.textPrimaryDark : const Color(0xFF1E293B)),
+                      color:
+                          titleColor ??
+                          (isDark
+                              ? AppColors.textPrimaryDark
+                              : const Color(0xFF1E293B)),
                     ),
                   ),
                   if (subtitle != null) ...[
@@ -650,7 +683,9 @@ class _ProfilePageState extends State<ProfilePage> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B),
+                        color: isDark
+                            ? AppColors.textSecondaryDark
+                            : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -660,8 +695,11 @@ class _ProfilePageState extends State<ProfilePage> {
             Icon(
               LucideIcons.chevronRight,
               size: 16,
-              color: titleColor ??
-                  (isDark ? AppColors.textSecondaryDark : const Color(0xFFCBD5E1)),
+              color:
+                  titleColor ??
+                  (isDark
+                      ? AppColors.textSecondaryDark
+                      : const Color(0xFFCBD5E1)),
             ),
           ],
         ),
@@ -688,9 +726,13 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
           title: const Text('Đăng xuất'),
-          content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
+          content: const Text(
+            'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?',
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -701,7 +743,9 @@ class _ProfilePageState extends State<ProfilePage> {
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFE11D48),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
               child: const Text('Đăng xuất'),
             ),
@@ -741,10 +785,10 @@ class _ProfilePageState extends State<ProfilePage> {
             setDialogState(() => isSaving = true);
             try {
               await context.read<AuthProvider>().updateProfile(
-                    fullName: nameController.text.trim(),
-                    phone: phoneController.text.trim(),
-                    department: departmentController.text.trim(),
-                  );
+                fullName: nameController.text.trim(),
+                phone: phoneController.text.trim(),
+                department: departmentController.text.trim(),
+              );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -770,7 +814,9 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 title: const Text(
                   'Cài đặt tài khoản',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -838,7 +884,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: isSaving ? null : () => submit(setDialogState),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: isSaving
                         ? const SizedBox(
@@ -884,10 +932,10 @@ class _ProfilePageState extends State<ProfilePage> {
             setDialogState(() => isSaving = true);
             try {
               await context.read<AuthProvider>().changePassword(
-                    currentPassword: currentController.text,
-                    newPassword: newController.text,
-                    confirmPassword: confirmController.text,
-                  );
+                currentPassword: currentController.text,
+                newPassword: newController.text,
+                confirmPassword: confirmController.text,
+              );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -913,7 +961,9 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 title: const Text(
                   'Đổi mật khẩu',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -981,7 +1031,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: isSaving ? null : () => submit(setDialogState),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: isSaving
                         ? const SizedBox(
@@ -1038,11 +1090,11 @@ class _ProfilePageState extends State<ProfilePage> {
               await context.read<NotificationProvider>().prepareForLogout();
               if (!mounted) return;
               await context.read<AuthProvider>().deleteAccount(
-                    password: passwordController.text,
-                    reason: reasonController.text.trim().isEmpty
-                        ? null
-                        : reasonController.text.trim(),
-                  );
+                password: passwordController.text,
+                reason: reasonController.text.trim().isEmpty
+                    ? null
+                    : reasonController.text.trim(),
+              );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -1070,7 +1122,9 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
                 title: const Row(
                   children: [
                     Icon(
@@ -1251,7 +1305,9 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: isDeleting
                         ? const SizedBox(
@@ -1312,7 +1368,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final words = name.trim().split(RegExp(r'\s+'));
     if (words.isEmpty || words.first.isEmpty) return 'ND';
     if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'.toUpperCase();
+    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
+        .toUpperCase();
   }
-
 }

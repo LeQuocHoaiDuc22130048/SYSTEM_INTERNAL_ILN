@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../screens/home_page.dart';
+import '../navigation/main_tabs.dart';
 import '../screens/login_page.dart';
 import '../screens/main_screen.dart';
 
@@ -17,11 +17,7 @@ class AppRoutes {
   static Map<String, WidgetBuilder> get routes => {
     login: (context) => const LoginPage(),
     dashboard: (context) => const MainScreen(),
-    home: (context) {
-      final args = ModalRoute.of(context)?.settings.arguments;
-      final initialTab = args is int ? args : 0;
-      return HomePage(showBottomNav: true, initialNavTab: initialTab);
-    },
-    profile: (context) => const HomePage(showBottomNav: true, initialNavTab: 2),
+    home: (context) => const MainScreen(initialIndex: MainTabs.home),
+    profile: (context) => const MainScreen(initialIndex: MainTabs.profile),
   };
 }

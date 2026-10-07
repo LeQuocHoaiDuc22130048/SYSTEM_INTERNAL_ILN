@@ -5,16 +5,79 @@ import 'package:system_inverter_likenew/widgets/directional_slide_switcher.dart'
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('DirectionalSlideSwitcher slides forward (from right to left)', (tester) async {
+  for (final hz in [60, 90, 120, 144]) {
+    testWidgets('same animation progress after 450ms at $hz Hz', (
+      tester,
+    ) async {
+      Widget page(String id) => MaterialApp(
+        home: Scaffold(
+          body: DirectionalSlideSwitcher(
+            child: SizedBox(key: ValueKey(id), child: Text(id)),
+          ),
+        ),
+      );
+      await tester.pumpWidget(page('A'));
+      await tester.pumpWidget(page('B'));
+      await tester.pump();
+      final frame = (1000000 / hz).round();
+      var elapsed = 0;
+      while (elapsed < 450000) {
+        final step = (450000 - elapsed).clamp(0, frame);
+        await tester.pump(Duration(microseconds: step));
+        elapsed += step;
+      }
+      final slide = tester.widget<SlideTransition>(
+        find
+            .ancestor(
+              of: find.text('B'),
+              matching: find.byType(SlideTransition),
+            )
+            .first,
+      );
+      expect(
+        slide.position.value.dx,
+        closeTo(.18 * (1 - Curves.easeInOutSine.transform(.5)), .0001),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('A'), findsNothing);
+    });
+  }
+
+  testWidgets(
+    'rapid page changes keep only the latest outgoing page and settle',
+    (tester) async {
+      Widget page(String id) => MaterialApp(
+        home: Scaffold(
+          body: DirectionalSlideSwitcher(child: Text(id, key: ValueKey(id))),
+        ),
+      );
+      await tester.pumpWidget(page('A'));
+      await tester.pumpWidget(page('B'));
+      await tester.pump(const Duration(milliseconds: 90));
+      await tester.pumpWidget(page('C'));
+      expect(find.text('A'), findsNothing);
+      expect(find.text('B'), findsOneWidget);
+      expect(find.text('C'), findsOneWidget);
+      expect(
+        find.ancestor(of: find.text('B'), matching: find.byType(IgnorePointer)),
+        findsWidgets,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('C'), findsOneWidget);
+      expect(find.text('B'), findsNothing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('DirectionalSlideSwitcher slides forward (from right to left)', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
           body: DirectionalSlideSwitcher(
             isForward: true,
-            child: SizedBox(
-              key: ValueKey('page_1'),
-              child: Text('Page 1'),
-            ),
+            child: SizedBox(key: ValueKey('page_1'), child: Text('Page 1')),
           ),
         ),
       ),
@@ -28,10 +91,7 @@ void main() {
         home: Scaffold(
           body: DirectionalSlideSwitcher(
             isForward: true,
-            child: SizedBox(
-              key: ValueKey('page_2'),
-              child: Text('Page 2'),
-            ),
+            child: SizedBox(key: ValueKey('page_2'), child: Text('Page 2')),
           ),
         ),
       ),
@@ -64,16 +124,15 @@ void main() {
     expect(find.text('Page 1'), findsNothing);
   });
 
-  testWidgets('DirectionalSlideSwitcher slides backward (from left to right)', (tester) async {
+  testWidgets('DirectionalSlideSwitcher slides backward (from left to right)', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       const MaterialApp(
         home: Scaffold(
           body: DirectionalSlideSwitcher(
             isForward: false,
-            child: SizedBox(
-              key: ValueKey('page_2'),
-              child: Text('Page 2'),
-            ),
+            child: SizedBox(key: ValueKey('page_2'), child: Text('Page 2')),
           ),
         ),
       ),
@@ -87,10 +146,7 @@ void main() {
         home: Scaffold(
           body: DirectionalSlideSwitcher(
             isForward: false,
-            child: SizedBox(
-              key: ValueKey('page_1'),
-              child: Text('Page 1'),
-            ),
+            child: SizedBox(key: ValueKey('page_1'), child: Text('Page 1')),
           ),
         ),
       ),

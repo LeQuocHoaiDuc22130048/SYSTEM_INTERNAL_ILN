@@ -33,7 +33,7 @@ import type { UserInfo } from '../mockData';
 import './BannerTab.css';
 import { ImageCropperModal } from './ImageCropperModal';
 import { BannerCanvas, CanvasInspector } from './BannerCanvas';
-import { defaultDesign, parseDesign, templateDesign, snapPosition, removeButtonDesign, legacyDesign, type BannerDesign } from './bannerDesign';
+import { defaultDesign, parseDesign, savedDesignMatches, templateDesign, snapPosition, removeButtonDesign, legacyDesign, type BannerDesign } from './bannerDesign';
 
 export interface BannerButton {
   text: string;
@@ -866,6 +866,14 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
         });
 
         if (res.ok) {
+          const result = await res.json();
+          const saved = result?.data ?? result;
+          if (!savedDesignMatches(saved?.designJson, design)) {
+            if (!editingBanner && saved?.id) setEditingBanner(saved);
+            showToast('Server chưa trả lại đúng cấu hình custom banner. Chưa thể áp dụng bố cục này trên mobile; hãy kiểm tra bản backend và trường designJson.');
+            await fetchBanners(true);
+            return;
+          }
           showToast(editingBanner ? 'Cập nhật banner thành công!' : 'Tạo mới banner thành công!');
           setShowModal(false);
           fetchBanners(true);
@@ -912,6 +920,14 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
         });
 
         if (res.ok) {
+          const result = await res.json();
+          const saved = result?.data ?? result;
+          if (!savedDesignMatches(saved?.designJson, design)) {
+            if (!editingBanner && saved?.id) setEditingBanner(saved);
+            showToast('Server chưa trả lại đúng cấu hình custom banner. Chưa thể áp dụng bố cục này trên mobile; hãy kiểm tra bản backend và trường designJson.');
+            await fetchBanners(true);
+            return;
+          }
           showToast(editingBanner ? 'Cập nhật banner thành công!' : 'Tạo mới banner thành công!');
           setShowModal(false);
           fetchBanners(true);

@@ -240,6 +240,15 @@ class BackendDataProvider extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
+  Future<void> loadMyTodayAttendance({bool notify = true}) async {
+    final data = await api.get('/api/v1/attendance/me/today');
+    if (data is! Map<String, dynamic>) {
+      throw StateError('Invalid attendance response');
+    }
+    myTodayAttendance = MyTodayAttendance.fromJson(data);
+    if (notify) notifyListeners();
+  }
+
   Future<void> loadMyAttendance({
     String? employeeId,
     int? year,

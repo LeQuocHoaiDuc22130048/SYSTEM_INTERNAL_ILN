@@ -83,7 +83,7 @@ void main() {
     expect(find.byKey(const Key('btn-welcome-login')), findsOneWidget);
     expect(find.byKey(const Key('btn-welcome-register')), findsOneWidget);
     expect(find.text('Chính sách bảo mật'), findsWidgets);
-    expect(find.text('INVERTER LIKE NEW'), findsOneWidget);
+    expect(find.text('SYSTEM INVERTER LIKENEW'), findsOneWidget);
   });
 
   testWidgets('Tapping Login opens bottom sheet in Login mode and can be closed', (tester) async {
@@ -184,7 +184,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 500));
 
     // Initially logo is visible
-    expect(find.text('INVERTER LIKE NEW'), findsOneWidget);
+    expect(find.text('SYSTEM INVERTER LIKENEW'), findsOneWidget);
 
     // Open login modal
     await tester.tap(find.byKey(const Key('btn-welcome-login')));
@@ -192,7 +192,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     // Logo remains visible in top frame
-    expect(find.text('INVERTER LIKE NEW'), findsOneWidget);
+    expect(find.text('SYSTEM INVERTER LIKENEW'), findsOneWidget);
     expect(find.text('Nhập thông tin tài khoản để tiếp tục'), findsOneWidget);
 
     // Tap in top area (Y=80) to dismiss modal

@@ -272,7 +272,7 @@ void main() {
       expect(find.text('Xác nhận đặt lịch'), findsOneWidget);
     });
 
-    testWidgets('Single banner maintains full 225px height and does not shrink',
+    testWidgets('Single banner uses the same 2:1 aspect ratio as custom banners',
         (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -380,8 +380,8 @@ void main() {
       ).first;
 
       final bannerSize = tester.getSize(bannerContainer);
-      expect(bannerSize.height, 225.0);
-      expect(bannerSize.width, 358.0);
+      expect(bannerSize.height, bannerSize.width / 2);
+      expect(bannerSize.width, 346.0);
     });
 
     testWidgets('Multiple banners have horizontal spacing (12px total gap) between slides during transition',
@@ -481,7 +481,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       final pageView = tester.widget<PageView>(find.byType(PageView));
-      expect(pageView.clipBehavior, Clip.none);
+      expect(pageView.clipBehavior, Clip.hardEdge);
 
       final titleFinder = find.text('Banner 1');
       final bannerContainer = find.ancestor(
@@ -497,7 +497,7 @@ void main() {
       expect(paddingWidget.padding, const EdgeInsets.symmetric(horizontal: 6.0));
     });
 
-    testWidgets('Auto-play advances to the next banner automatically after 4 seconds with smooth transition',
+    testWidgets('Auto-play advances to the next banner automatically after 6 seconds with smooth transition',
         (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
@@ -596,11 +596,128 @@ void main() {
       // Initially on Banner Alpha
       expect(find.text('Banner Alpha'), findsOneWidget);
 
-      // Advance time by 4 seconds (auto-play interval) + animation duration
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pump(const Duration(milliseconds: 700));
+      // Advance time by 6 seconds (auto-play interval) + animation duration
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump(const Duration(milliseconds: 1300));
 
       // Now on Banner Beta
+      expect(find.text('Banner Beta'), findsOneWidget);
+
+      final pageView = tester.widget<PageView>(find.byType(PageView));
+      final pageBefore = pageView.controller!.page!;
+      expect(pageBefore, equals(10081.0));
+
+      // Advance time by another 6 seconds + animation duration
+      await tester.pump(const Duration(seconds: 6));
+      await tester.pump(const Duration(milliseconds: 1300));
+
+      // Loops forward seamlessly into Banner Alpha without rewinding
+      expect(find.text('Banner Alpha'), findsOneWidget);
+      expect(pageView.controller!.page, equals(10082.0));
+      expect(pageView.controller!.page, greaterThan(pageBefore));
+    });
+
+    testWidgets('Manual swiping supports infinite loop backward and forward',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final multiBanners = [
+        {
+          'id': 'b-1',
+          'title': 'Banner Alpha',
+          'badgeText': 'HOT',
+          'subtitle': 'Sub 1',
+          'displayOrder': 1,
+          'isActive': true,
+        },
+        {
+          'id': 'b-2',
+          'title': 'Banner Beta',
+          'badgeText': 'SALE',
+          'subtitle': 'Sub 2',
+          'displayOrder': 2,
+          'isActive': true,
+        },
+      ];
+
+      final auth = AuthProvider(
+        apiClient: ApiClient(
+          client: MockClient((request) async {
+            if (request.url.path == '/api/v1/auth/login') {
+              return http.Response(
+                jsonEncode({
+                  'accessToken': 'test-token',
+                  'refreshToken': 'test-refresh-token',
+                  'userInfo': {
+                    'id': '1',
+                    'username': 'duc',
+                    'role': 'EMPLOYEE',
+                    'status': 'ACTIVE',
+                  },
+                }),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            if (request.url.path == '/api/v1/employees/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': '1',
+                  'username': 'duc',
+                  'role': 'EMPLOYEE',
+                  'status': 'ACTIVE',
+                }),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            if (request.url.path == '/api/v1/banners') {
+              return http.Response(
+                jsonEncode({'data': multiBanners}),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            return http.Response(
+              jsonEncode({'data': []}),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }),
+        ),
+      );
+
+      await auth.login(username: 'duc', password: 'password');
+      final backendProvider = BackendDataProvider(api: auth.api);
+      await backendProvider.loadBanners();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: auth),
+            ChangeNotifierProvider.value(value: backendProvider),
+            ChangeNotifierProvider(create: (_) => NotificationProvider(api: auth.api)),
+            ChangeNotifierProvider(create: (_) => UpdateProvider(api: auth.api)),
+          ],
+          child: const MaterialApp(
+            home: HomePage(showBottomNav: false),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Initial banner is Banner Alpha (virtual page 10080)
+      expect(find.text('Banner Alpha'), findsOneWidget);
+
+      // Drag right to go backward into Banner Beta seamlessly
+      await tester.drag(find.byType(PageView), const Offset(300, 0));
+      await tester.pumpAndSettle();
+
       expect(find.text('Banner Beta'), findsOneWidget);
     });
   });

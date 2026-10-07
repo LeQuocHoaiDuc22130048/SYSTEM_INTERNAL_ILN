@@ -23,15 +23,22 @@ class _QuickBookingSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Padding(
       padding: EdgeInsets.only(
         bottom: MediaQuery.of(context).viewInsets.bottom,
       ),
       child: Container(
         padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          border: isDark
+              ? const Border(
+                  top: BorderSide(color: AppColors.borderDark, width: 1),
+                )
+              : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -43,7 +50,7 @@ class _QuickBookingSheet extends StatelessWidget {
                 height: 4,
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
@@ -58,44 +65,66 @@ class _QuickBookingSheet extends StatelessWidget {
                         : (serviceName != null
                               ? 'Đặt dịch vụ: $serviceName'
                               : 'Đặt lịch dịch vụ mới'),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF0F172A),
+                      color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
                     ),
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(LucideIcons.x, size: 20),
+                  icon: Icon(
+                    LucideIcons.x,
+                    size: 20,
+                    color: isDark ? AppColors.textSecondaryDark : null,
+                  ),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Mô tả yêu cầu hoặc lỗi cần sửa:',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF334155),
+                color: isDark ? AppColors.textSecondaryDark : const Color(0xFF334155),
               ),
             ),
             const SizedBox(height: 8),
             TextField(
               maxLines: 3,
+              style: TextStyle(
+                color: isDark ? AppColors.textPrimaryDark : null,
+                fontSize: 14,
+              ),
               decoration: InputDecoration(
                 hintText:
                     'Nhập thông tin sự cố, mã lỗi hoặc yêu cầu kiểm tra...',
-                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400,
+                ),
                 filled: true,
-                fillColor: const Color(0xFFF8FAFC),
+                fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  borderSide: BorderSide(
+                    color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(14),
-                  borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                  borderSide: BorderSide(
+                    color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                focusedBorder: const OutlineInputBorder(
+                  borderRadius: BorderRadius.all(Radius.circular(14)),
+                  borderSide: BorderSide(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
                 ),
               ),
             ),
@@ -107,7 +136,7 @@ class _QuickBookingSheet extends StatelessWidget {
                 onPressed: () {
                   Navigator.of(context).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
+                    const SnackBar(
                       content: Text(
                         'Đã gửi yêu cầu dịch vụ thành công! Kỹ thuật viên sẽ liên hệ sớm.',
                       ),

@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../theme/app_colors.dart';
 import '../interactive_bounce.dart';
+import 'account_avatar.dart';
 
 class MobileNavigationBar extends StatelessWidget {
   const MobileNavigationBar({
@@ -71,10 +72,11 @@ class MobileNavigationBar extends StatelessWidget {
                       alignment: Alignment.topCenter,
                       child: Semantics(
                         button: true,
-                        label: 'Đặt lịch dịch vụ mới',
+                        label: 'Mở thao tác nhanh',
                         child: Tooltip(
-                          message: 'Đặt lịch dịch vụ mới',
+                          message: 'Mở thao tác nhanh',
                           child: InteractiveBounce(
+                            key: const ValueKey('bottom-nav-booking-button'),
                             scaleDown: 0.88,
                             onTap: onBooking,
                             child: Container(
@@ -102,10 +104,28 @@ class MobileNavigationBar extends StatelessWidget {
                                 ],
                                 border: Border.all(color: surface, width: 3.5),
                               ),
-                              child: const Icon(
-                                LucideIcons.plus,
-                                size: 24,
-                                color: Colors.white,
+                              child: Center(
+                                child: Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.08),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  padding: const EdgeInsets.all(5),
+                                  child: Image.asset(
+                                    'assets/images/app_logo.png',
+                                    key: const ValueKey('bottom-nav-center-logo'),
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -121,6 +141,9 @@ class MobileNavigationBar extends StatelessWidget {
                             LucideIcons.user,
                             profileSelected,
                             onProfile!,
+                            iconWidget: AccountAvatar(
+                              selected: profileSelected,
+                            ),
                           ),
                   ),
                 ],
@@ -132,7 +155,13 @@ class MobileNavigationBar extends StatelessWidget {
     );
   }
 
-  Widget _tab(String label, IconData icon, bool selected, VoidCallback onTap) {
+  Widget _tab(
+    String label,
+    IconData icon,
+    bool selected,
+    VoidCallback onTap, {
+    Widget? iconWidget,
+  }) {
     final color = selected
         ? const Color(0xFF2563EB)
         : (isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B));
@@ -169,11 +198,13 @@ class MobileNavigationBar extends StatelessWidget {
                         ]
                       : null,
                 ),
-                child: Icon(
-                  icon,
-                  size: 18,
-                  color: selected ? Colors.white : color,
-                ),
+                child:
+                    iconWidget ??
+                    Icon(
+                      icon,
+                      size: 18,
+                      color: selected ? Colors.white : color,
+                    ),
               ),
               const SizedBox(height: 2),
               Text(

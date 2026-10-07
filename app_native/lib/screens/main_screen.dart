@@ -1,3 +1,4 @@
+import '../widgets/smooth_tab_stack.dart';
 import 'dart:async';
 import 'dart:io';
 
@@ -18,10 +19,11 @@ import '../utils/update_provider.dart';
 import '../widgets/navigation/mobile_dashboard_app_bar.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/navigation/side_navigation.dart';
-import '../widgets/quick_booking_sheet.dart';
+import '../widgets/app_quick_actions.dart';
 import 'attendance_only_page.dart';
 import 'attendance_screen.dart';
 import 'dashboard_page.dart';
+import 'home_page.dart';
 import 'employee_management_page.dart';
 import 'messages_page.dart';
 import 'notifications_page.dart';
@@ -30,7 +32,8 @@ import 'repair_orders_page.dart';
 import 'warehouse_page.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  const MainScreen({super.key, this.initialIndex});
+  final int? initialIndex;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -40,6 +43,7 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = MainTabs.dashboard;
   int _previousIndex = MainTabs.dashboard;
   bool _isSidebarExpanded = true;
+  bool _contentForward = true;
   String? _targetRepairOrderId;
   int _targetEmployeeManagementTabIndex = 0;
 
@@ -66,7 +70,11 @@ class _MainScreenState extends State<MainScreen> {
   void initState() {
     super.initState();
     final auth = context.read<AuthProvider>();
-    _currentIndex = firstAllowedMainTab(auth);
+    _currentIndex =
+        widget.initialIndex != null &&
+            canAccessMainTab(auth, widget.initialIndex!)
+        ? widget.initialIndex!
+        : firstAllowedMainTab(auth);
     _previousIndex = _currentIndex;
     _pages = List<Widget?>.filled(MainTabs.count, null);
     _pages[_currentIndex] = _buildPage(_currentIndex);
@@ -130,6 +138,8 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildPage(int index) {
     switch (index) {
+      case MainTabs.home:
+        return HomePage(embedded: true, onNavigateToTab: _setCurrentIndex);
       case MainTabs.dashboard:
         return DashboardPage(onNavigateToTab: _setCurrentIndex);
       case MainTabs.repairOrders:
@@ -159,13 +169,22 @@ class _MainScreenState extends State<MainScreen> {
       case MainTabs.accountApproval:
         return const SizedBox.shrink();
       case MainTabs.profile:
-        return ProfilePage(hideTopBar: true, onNavigateToTab: _setCurrentIndex);
+        return ProfilePage(
+          hideTopBar: true,
+          onNavigateToTab: _setCurrentIndex,
+          onNavigateToHome: () => _setCurrentIndex(MainTabs.home),
+        );
       default:
         return DashboardPage(onNavigateToTab: _setCurrentIndex);
     }
   }
 
-  void _setCurrentIndex(int index, {String? refId, int? subTabIndex}) {
+  void _setCurrentIndex(
+    int index, {
+    String? refId,
+    int? subTabIndex,
+    bool isBack = false,
+  }) {
     final auth = context.read<AuthProvider>();
     if (auth.isAttendanceAccount && index != MainTabs.attendance) {
       index = MainTabs.attendance;
@@ -184,6 +203,7 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     setState(() {
+      _contentForward = !isBack && index != MainTabs.home;
       if (index == MainTabs.repairOrders) {
         _targetRepairOrderId = refId;
         _pages[MainTabs.repairOrders] = RepairOrdersPage(targetOrderId: refId);
@@ -270,7 +290,7 @@ class _MainScreenState extends State<MainScreen> {
 
   void _toggleNotifications() {
     if (_currentIndex == MainTabs.notifications) {
-      _setCurrentIndex(_previousIndex);
+      _setCurrentIndex(_previousIndex, isBack: true);
     } else {
       _previousIndex = _currentIndex;
       _setCurrentIndex(MainTabs.notifications);
@@ -306,7 +326,11 @@ class _MainScreenState extends State<MainScreen> {
 
     final isWide = MediaQuery.sizeOf(context).width > 900;
     final body = _withProfileNotice(
-      IndexedStack(index: _currentIndex, children: _visiblePages),
+      SmoothTabStack(
+        index: _currentIndex,
+        isForward: _contentForward,
+        children: _visiblePages,
+      ),
       auth,
     );
 
@@ -332,26 +356,34 @@ class _MainScreenState extends State<MainScreen> {
       );
     }
 
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      appBar: DashboardMobileAppBar(
-        isDark: isDark,
-        notificationBadge: notificationBadge,
-        onToggleTheme: themeProvider.toggleTheme,
-        onToggleNotifications: _toggleNotifications,
-        showNotification: auth.can(AppPermission.viewNotifications),
-      ),
-      body: body,
-      bottomNavigationBar: MobileNavigationBar(
-        isDark: isDark,
-        profileSelected: _currentIndex == MainTabs.profile,
-        onHome: () => Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil(AppRoutes.home, (route) => false),
-        onBooking: () => showQuickBookingSheet(context),
-        onProfile: auth.can(AppPermission.viewProfile)
-            ? () => _setCurrentIndex(MainTabs.profile)
-            : null,
+    return PopScope(
+      canPop: _currentIndex == MainTabs.home,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) _setCurrentIndex(MainTabs.home);
+      },
+      child: Scaffold(
+        resizeToAvoidBottomInset: false,
+        appBar: DashboardMobileAppBar(
+          isDark: isDark,
+          showBack: _currentIndex != MainTabs.home,
+          onBack: () => _setCurrentIndex(MainTabs.home),
+          notificationBadge: notificationBadge,
+          onToggleTheme: themeProvider.toggleTheme,
+          onToggleNotifications: _toggleNotifications,
+          showNotification: auth.can(AppPermission.viewNotifications),
+        ),
+        body: body,
+        bottomNavigationBar: MobileNavigationBar(
+          isDark: isDark,
+          homeSelected: _currentIndex == MainTabs.home,
+          profileSelected: _currentIndex == MainTabs.profile,
+          onHome: () => _setCurrentIndex(MainTabs.home),
+          onBooking: () =>
+              showAppQuickActions(context, onNavigateToTab: _setCurrentIndex),
+          onProfile: auth.can(AppPermission.viewProfile)
+              ? () => _setCurrentIndex(MainTabs.profile)
+              : null,
+        ),
       ),
     );
   }

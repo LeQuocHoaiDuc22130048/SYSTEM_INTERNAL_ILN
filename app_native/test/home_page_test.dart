@@ -10,6 +10,7 @@ import 'package:system_inverter_likenew/navigation/main_tabs.dart';
 import 'package:system_inverter_likenew/models/app_permission.dart';
 import 'package:system_inverter_likenew/models/user.dart';
 import 'package:system_inverter_likenew/models/app_banner.dart';
+import 'package:system_inverter_likenew/models/attendance.dart';
 import 'package:system_inverter_likenew/screens/home_page.dart';
 import 'package:system_inverter_likenew/utils/api_client.dart';
 import 'package:system_inverter_likenew/utils/auth_provider.dart';
@@ -17,8 +18,10 @@ import 'package:system_inverter_likenew/utils/backend_data_provider.dart';
 import 'package:system_inverter_likenew/utils/notification_provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:system_inverter_likenew/utils/update_provider.dart';
+import 'package:system_inverter_likenew/theme/app_colors.dart';
 import 'package:system_inverter_likenew/widgets/directional_slide_switcher.dart';
 import 'package:system_inverter_likenew/widgets/navigation/mobile_navigation_bar.dart';
+import 'package:system_inverter_likenew/widgets/navigation/mobile_dashboard_app_bar.dart';
 
 class _HomeAuth extends AuthProvider {
   _HomeAuth(this.user)
@@ -64,6 +67,16 @@ class _RefreshingBannerBackend extends BackendDataProvider {
   }
 }
 
+class _AttendanceBackend extends _BannerBackend {
+  _AttendanceBackend(ApiClient api) : super(api, const AppBanner(id: 'test', title: 'Banner', imagePosition: 'NONE'));
+  int teamLoads = 0;
+  int ownLoads = 0;
+  @override
+  Future<void> loadAttendance({bool notify = true}) async { teamLoads++; }
+  @override
+  Future<void> loadMyTodayAttendance({bool notify = true}) async { ownLoads++; }
+}
+
 User _homeUser(UserRole role, {Set<AppPermission>? permissions}) => User(
   id: 'home-test', name: 'Test User', email: '', employeeId: '',
   role: role, status: UserStatus.active, permissions: permissions,
@@ -106,6 +119,7 @@ void main() {
     bool showBottomNav = true,
     int initialNavTab = 0,
     void Function(int)? onNavigateToTab,
+    ThemeData? theme,
   }) {
     return MultiProvider(
       providers: [
@@ -115,6 +129,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => UpdateProvider(api: auth.api)),
       ],
       child: MaterialApp(
+        theme: theme,
         home: HomePage(
           showBottomNav: showBottomNav,
           initialNavTab: initialNavTab,
@@ -136,6 +151,117 @@ void main() {
     await tester.pump();
     expect(find.text('Mới 2'), findsOneWidget);
     expect(backend.requests, 2);
+    await tester.pumpWidget(const SizedBox.shrink());
+    auth.dispose();
+  });
+
+  testWidgets('Mixed legacy and custom slides have identical 2:1 frames', (tester) async {
+    final auth = _HomeAuth(_homeUser(UserRole.manager));
+    final backend = _BannerBackend(auth.api, const AppBanner(id: 'legacy', title: 'Legacy', imagePosition: 'NONE'));
+    backend.banners.add(AppBanner(id: 'custom', title: 'Custom', imagePosition: 'NONE', designJson: jsonEncode({
+      'version': 1, 'nodes': {'title': {'x': 5, 'y': 28, 'width': 62, 'height': 23}},
+    })));
+    await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend, showBottomNav: false));
+    await tester.pump();
+    final page = tester.widget<PageView>(find.byType(PageView));
+    final first = tester.getSize(find.byKey(const ValueKey('banner-slide-legacy')));
+    expect(first.height, (first.width - 12) / 2);
+    page.controller!.jumpToPage(1);
+    await tester.pump();
+    expect(tester.getSize(find.byKey(const ValueKey('banner-slide-custom'))), first);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    auth.dispose();
+  });
+
+  testWidgets('Home uses shared dashboard header and account avatar only in footer', (tester) async {
+    final auth = _HomeAuth(_homeUser(UserRole.manager));
+    final backend = _BannerBackend(auth.api, const AppBanner(id: 'header', title: 'Banner', imagePosition: 'NONE'));
+    await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend));
+    await tester.pump();
+    expect(find.byType(DashboardMobileAppBar), findsOneWidget);
+    final avatar = find.byKey(const ValueKey('bottom-account-avatar'));
+    expect(avatar, findsOneWidget);
+    expect(find.ancestor(of: avatar, matching: find.byType(MobileNavigationBar)), findsOneWidget);
+    expect(find.descendant(of: find.byType(DashboardMobileAppBar), matching: avatar), findsNothing);
+    expect(find.text('TU'), findsOneWidget);
+    auth.updateUser(User(id: 'home-test', name: 'Nguyễn Văn An', email: '', employeeId: '', role: UserRole.manager, status: UserStatus.active));
+    await tester.pump();
+    expect(find.text('NA'), findsOneWidget);
+    await tester.pumpWidget(const SizedBox.shrink());
+    auth.dispose();
+  });
+
+  testWidgets('Home replaces experts with today attendance and filters other dates', (tester) async {
+    final auth = _HomeAuth(_homeUser(UserRole.manager));
+    final backend = _AttendanceBackend(auth.api);
+    final now = DateTime.now();
+    backend.attendanceRecords = [
+      AttendanceRecord(id: 'today', employeeId: '1', employeeName: 'Nhân viên hôm nay', date: now, checkIn: '08:00', checkOut: '17:00', status: AttendanceStatus.onTime),
+      AttendanceRecord(id: 'old', employeeId: '2', employeeName: 'Dữ liệu cũ', date: now.subtract(const Duration(days: 1)), status: AttendanceStatus.late),
+    ];
+    await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend));
+    await tester.pump();
+    expect(find.text('Chấm công hôm nay'), findsOneWidget);
+    expect(find.text('Nhân viên hôm nay'), findsOneWidget);
+    expect(find.text('Vào: 08:00'), findsOneWidget);
+    expect(find.text('Ra: 17:00'), findsOneWidget);
+    expect(find.text('Dữ liệu cũ'), findsNothing);
+    expect(find.text('Kỹ thuật viên tiêu biểu'), findsNothing);
+    expect(backend.teamLoads, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    auth.dispose();
+  });
+
+  testWidgets('Employee only sees own attendance; no team report is loaded', (tester) async {
+    final auth = _HomeAuth(_homeUser(UserRole.employee));
+    final backend = _AttendanceBackend(auth.api);
+    backend.myTodayAttendance = MyTodayAttendance(date: DateTime.now(), checkIn: DateTime.now(), isLate: true);
+    backend.attendanceRecords = [AttendanceRecord(id: 'other', employeeId: '2', employeeName: 'Thông tin người khác', date: DateTime.now(), status: AttendanceStatus.onTime)];
+    await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend));
+    await tester.pump();
+    expect(find.text('Chấm công của bạn'), findsOneWidget);
+    expect(find.text('Muộn'), findsOneWidget);
+    expect(find.text('Thông tin người khác'), findsNothing);
+    expect(backend.teamLoads, 0);
+    expect(backend.ownLoads, 1);
+    await tester.pumpWidget(const SizedBox.shrink());
+    auth.dispose();
+  });
+
+  testWidgets('bottom plus opens the existing create repair order form', (tester) async {
+    final auth = _HomeAuth(_homeUser(UserRole.manager));
+    final backend = _AttendanceBackend(auth.api);
+    await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('bottom-nav-booking-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Thao tác nhanh'), findsOneWidget);
+    await tester.tap(find.text('Tạo đơn sửa chữa'));
+    await tester.pumpAndSettle();
+    expect(find.text('Thao tác nhanh'), findsNothing);
+    expect(find.text('Tạo đơn sửa chữa mới'), findsOneWidget);
+    expect(find.text('Tên khách hàng'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    auth.dispose();
+  });
+
+  testWidgets('quick actions respect explicit permissions and navigate after closing menu', (tester) async {
+    final auth = _HomeAuth(_homeUser(UserRole.employee, permissions: {AppPermission.viewProfile, AppPermission.useMessages}));
+    final backend = _AttendanceBackend(auth.api);
+    int? destination;
+    await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend, onNavigateToTab: (tab) => destination = tab));
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('bottom-nav-booking-button')));
+    await tester.pumpAndSettle();
+    expect(find.text('Tạo đơn sửa chữa'), findsNothing);
+    expect(find.text('Kho linh kiện'), findsNothing);
+    expect(find.text('Chấm công hôm nay'), findsNothing);
+    await tester.tap(find.widgetWithText(ListTile, 'Nhắn tin'));
+    await tester.pumpAndSettle();
+    expect(destination, MainTabs.messages);
+    expect(find.text('Thao tác nhanh'), findsNothing);
     await tester.pumpWidget(const SizedBox.shrink());
     auth.dispose();
   });
@@ -354,11 +480,12 @@ void main() {
 
     await tester.pumpWidget(createHomeScreen(auth: auth, showBottomNav: true));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // 1. Top bar: Account Profile Info (Avatar, Name, and Role)
-    expect(find.text('Hoai Duc'), findsOneWidget);
-    expect(find.text('Nhân viên'), findsOneWidget);
+    expect(find.byType(DashboardMobileAppBar), findsOneWidget);
+    expect(find.byKey(const ValueKey('bottom-account-avatar')), findsOneWidget);
+    expect(find.text('Nhân viên'), findsNothing);
 
     // 2. Greeting section
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
@@ -377,7 +504,7 @@ void main() {
       of: promoHeadline,
       matching: find.byType(Container),
     ).first;
-    expect(tester.getSize(bannerContainerFinder).width, 358.0);
+    expect(tester.getSize(bannerContainerFinder).width, 346.0);
 
     // 5. Functions section (Dashboard, Đơn, Kho, Nhắn tin, Quản lý nhân viên)
     expect(find.text('Chức năng'), findsOneWidget);
@@ -388,22 +515,23 @@ void main() {
     expect(find.text('Quản lý nhân viên'), findsNothing);
 
     // 6. Top Rated Experts
-    expect(find.text('Kỹ thuật viên tiêu biểu'), findsOneWidget);
-    expect(find.text('David Miller'), findsOneWidget);
-    expect(find.text('Sarah Jenkins'), findsOneWidget);
+    expect(find.text('Chấm công hôm nay'), findsOneWidget);
+    expect(find.text('David Miller'), findsNothing);
+    expect(find.text('Sarah Jenkins'), findsNothing);
 
     // 7. Stitch Bottom Nav
     expect(find.text('Trang chủ'), findsOneWidget);
     expect(find.text('Cá nhân'), findsOneWidget);
 
     // Tap Book Now button to open booking sheet
-    final bookNowBtn = find.text('Đặt lịch ngay');
+    final bookNowBtn = find.byKey(const ValueKey('bottom-nav-booking-button'));
     expect(bookNowBtn, findsOneWidget);
+    expect(find.byKey(const ValueKey('bottom-nav-center-logo')), findsOneWidget);
     await tester.tap(bookNowBtn);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
-    expect(find.text('Xác nhận đặt lịch'), findsOneWidget);
+    expect(find.text('Thao tác nhanh'), findsOneWidget);
   });
 
   testWidgets('HomePage syncs seamlessly with ProfilePage via bottom nav and back action', (tester) async {
@@ -457,21 +585,21 @@ void main() {
 
     await tester.pumpWidget(createHomeScreen(auth: auth, showBottomNav: true, initialNavTab: 0));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Initially on Home page
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
-    expect(find.text('Hồ sơ của tôi'), findsNothing);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsNothing);
 
     // Tap Tab 3 "Cá nhân" in the Stitch bottom nav
     final profileTabFinder = find.text('Cá nhân');
     expect(profileTabFinder, findsOneWidget);
     await tester.tap(profileTabFinder);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Now synchronized and switched to Profile page
-    expect(find.text('Hồ sơ của tôi'), findsOneWidget);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsOneWidget);
     expect(find.text('THÔNG TIN TÀI KHOẢN'), findsOneWidget);
     expect(find.text('Hoai Duc'), findsWidgets);
 
@@ -480,27 +608,27 @@ void main() {
     expect(homeTabFinder, findsOneWidget);
     await tester.tap(homeTabFinder);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Switched back to Home page
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
-    expect(find.text('Hồ sơ của tôi'), findsNothing);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsNothing);
 
     // Switch to Profile again and test Profile's top bar back button
     await tester.tap(find.text('Cá nhân'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
-    expect(find.text('Hồ sơ của tôi'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1000));
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsOneWidget);
 
     final backButtonFinder = find.byIcon(LucideIcons.chevronLeft);
     expect(backButtonFinder, findsOneWidget);
     await tester.tap(backButtonFinder);
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Returned to Home page via top bar back button
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
-    expect(find.text('Hồ sơ của tôi'), findsNothing);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsNothing);
   });
 
   testWidgets('HomePage with initialNavTab: 2 opens directly to Profile and can switch to Home', (tester) async {
@@ -554,20 +682,20 @@ void main() {
 
     await tester.pumpWidget(createHomeScreen(auth: auth, showBottomNav: true, initialNavTab: 2));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Directly in Profile
-    expect(find.text('Hồ sơ của tôi'), findsOneWidget);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsOneWidget);
     expect(find.text('Xin chào, Hoai Duc 👋'), findsNothing);
 
     // Tap Tab 1 "Trang chủ" in the Stitch bottom nav
     await tester.tap(find.text('Trang chủ'));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Switched to Home
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
-    expect(find.text('Hồ sơ của tôi'), findsNothing);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsNothing);
   });
 
   testWidgets('HomePage functions section allows navigating to dashboard, đơn, kho, nhắn tin, and quản lý nhân viên', (tester) async {
@@ -628,7 +756,7 @@ void main() {
       onNavigateToTab: (tabIndex) => navigatedTab = tabIndex,
     ));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // 1. Tap Dashboard
     await tester.tap(find.text('Dashboard'));
@@ -656,7 +784,7 @@ void main() {
     expect(navigatedTab, MainTabs.employeeManagement);
   });
 
-  testWidgets('HomePage top bar displays user avatar, name, and role, and clicking it opens ProfilePage', (tester) async {
+  testWidgets('HomePage bottom account avatar opens ProfilePage', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -707,20 +835,20 @@ void main() {
 
     await tester.pumpWidget(createHomeScreen(auth: auth, showBottomNav: true, initialNavTab: 0));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Verify avatar initials fallback, name, and role label
     expect(find.text('NT'), findsOneWidget);
-    expect(find.text('Nguyen Van Tech'), findsOneWidget);
-    expect(find.text('Kỹ thuật viên'), findsOneWidget);
+    expect(find.byType(DashboardMobileAppBar), findsOneWidget);
+    expect(find.byKey(const ValueKey('bottom-account-avatar')), findsOneWidget);
 
     // Tap the top bar profile area to navigate to Profile
-    await tester.tap(find.text('Nguyen Van Tech'));
+    await tester.tap(find.byKey(const ValueKey('bottom-account-avatar')));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Verify it opened ProfilePage
-    expect(find.text('Hồ sơ của tôi'), findsOneWidget);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsOneWidget);
   });
 
   testWidgets('HomePage keeps Header and Footer fixed while sliding middle content directionally', (tester) async {
@@ -774,7 +902,7 @@ void main() {
 
     await tester.pumpWidget(createHomeScreen(auth: auth, showBottomNav: true, initialNavTab: 0));
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 300));
+    await tester.pump(const Duration(milliseconds: 1000));
 
     // Initially at Home
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
@@ -804,8 +932,8 @@ void main() {
     expect(midNavLeft, equals(initialNavLeft));
 
     // Complete transition to Profile
-    await tester.pump(const Duration(milliseconds: 200));
-    expect(find.text('Hồ sơ của tôi'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 800));
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsOneWidget);
 
     // Tap top bar back button to navigate backwards to Home
     final backButton = find.byIcon(LucideIcons.chevronLeft);
@@ -822,9 +950,49 @@ void main() {
     expect(tester.getTopLeft(find.byType(MobileNavigationBar)).dx, equals(initialNavLeft));
 
     // Complete reverse transition to Home
-    await tester.pump(const Duration(milliseconds: 200));
+    await tester.pump(const Duration(milliseconds: 800));
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
-    expect(find.text('Hồ sơ của tôi'), findsNothing);
+    expect(find.text('THÔNG TIN TÀI KHOẢN'), findsNothing);
+  });
+
+  testWidgets('HomePage adapts colors properly in dark mode', (tester) async {
+    final auth = _HomeAuth(
+      _homeUser(UserRole.employee, permissions: {AppPermission.viewDashboard}),
+    );
+    final backend = _BannerBackend(
+      auth.api,
+      const AppBanner(
+        id: 'b1',
+        title: 'Bảo trì',
+        subtitle: 'Giảm 25%',
+        imagePosition: 'NONE',
+      ),
+    );
+
+    await tester.pumpWidget(
+      createHomeScreen(
+        auth: auth,
+        backend: backend,
+        showBottomNav: true,
+        theme: ThemeData.dark(),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify 'Chức năng' header has dark theme text color
+    final chucNangFinder = find.text('Chức năng');
+    expect(chucNangFinder, findsOneWidget);
+    final chucNangText = tester.widget<Text>(chucNangFinder);
+    expect(chucNangText.style?.color, equals(AppColors.textPrimaryDark));
+
+    expect(find.text('Kỹ thuật viên tiêu biểu'), findsNothing);
+    // Verify function card (Dashboard) has dark text color
+    final dashboardFinder = find.text('Dashboard');
+    expect(dashboardFinder, findsOneWidget);
+    final dashboardText = tester.widget<Text>(dashboardFinder);
+    expect(dashboardText.style?.color, equals(AppColors.textPrimaryDark));
+
   });
 }
 

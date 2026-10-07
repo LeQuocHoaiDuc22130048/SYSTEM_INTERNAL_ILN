@@ -1,3 +1,5 @@
+import '../widgets/app_quick_actions.dart';
+import '../widgets/home_attendance.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -13,15 +15,17 @@ import '../utils/backend_data_provider.dart';
 import '../utils/chat_provider.dart';
 import '../utils/notification_provider.dart';
 import '../models/app_permission.dart';
-import '../models/user.dart';
 import '../models/app_banner.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/quick_booking_sheet.dart';
 import '../widgets/banner_canvas.dart';
 import '../widgets/interactive_bounce.dart';
 import '../widgets/directional_slide_switcher.dart';
-import '../widgets/navigation/app_back_button.dart';
+import '../widgets/smooth_banner_physics.dart';
+import '../widgets/navigation/mobile_dashboard_app_bar.dart';
+import '../app/theme_provider.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_motion.dart';
 import 'profile_page.dart';
 
 /// Home Screen designed faithfully from Stitch (Home Screen - Home Service Marketplace)
@@ -35,12 +39,14 @@ import 'profile_page.dart';
 class HomePage extends StatefulWidget {
   final void Function(int tabIndex)? onNavigateToTab;
   final bool showBottomNav;
+  final bool embedded;
   final int initialNavTab;
 
   const HomePage({
     super.key,
     this.onNavigateToTab,
     this.showBottomNav = false,
+    this.embedded = false,
     this.initialNavTab = 0,
   });
 
@@ -51,27 +57,63 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late int _currentNavTab; // 0: Home, 1: Book (+), 2: Profile
   bool _navigatingBack = false;
+  static const int _kInitialVirtualPage = 10080;
   late final PageController _bannerController;
   int _currentBannerIndex = 0;
   Timer? _bannerAutoPlayTimer;
   int _lastAutoPlayBannerCount = 0;
 
+  static int _toRealBannerIndex(int index, int length) {
+    if (length <= 0) return 0;
+    final mod = index % length;
+    return mod < 0 ? mod + length : mod;
+  }
+
   void _startBannerAutoPlay(int bannerCount) {
     _stopBannerAutoPlay();
     if (bannerCount <= 1) return;
-    _bannerAutoPlayTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+    _bannerAutoPlayTimer = Timer.periodic(AppMotion.bannerHold, (timer) {
       if (!mounted ||
           !_bannerController.hasClients ||
           _bannerController.positions.length != 1) {
         return;
       }
-      final nextPage = (_currentBannerIndex + 1) % bannerCount;
+      if (_bannerController.position.isScrollingNotifier.value ||
+          MediaQuery.disableAnimationsOf(context)) {
+        return;
+      }
+      final currentPage =
+          _bannerController.page?.round() ?? _kInitialVirtualPage;
+      final nextPage = currentPage + 1;
       _bannerController.animateToPage(
         nextPage,
-        duration: const Duration(milliseconds: 650),
-        curve: Curves.easeInOutCubic,
+        duration: MediaQuery.disableAnimationsOf(context)
+            ? Duration.zero
+            : AppMotion.banner,
+        curve: AppMotion.curve,
       );
     });
+  }
+
+  void _animateToBannerIndex(int targetBannerIndex, int totalCount) {
+    if (!_bannerController.hasClients || totalCount <= 1) return;
+    _stopBannerAutoPlay();
+    final currentPage = _bannerController.page?.round() ?? _kInitialVirtualPage;
+    final currentModulo = _toRealBannerIndex(currentPage, totalCount);
+    final forwardDelta = (targetBannerIndex - currentModulo) % totalCount;
+    final backwardDelta = (currentModulo - targetBannerIndex) % totalCount;
+    final targetPage = forwardDelta <= backwardDelta
+        ? currentPage + forwardDelta
+        : currentPage - backwardDelta;
+
+    _bannerController.animateToPage(
+      targetPage,
+      duration: MediaQuery.disableAnimationsOf(context)
+          ? Duration.zero
+          : AppMotion.banner,
+      curve: AppMotion.curve,
+    );
+    _startBannerAutoPlay(totalCount);
   }
 
   void _stopBannerAutoPlay() {
@@ -98,7 +140,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _currentNavTab = widget.initialNavTab;
     _navigatingBack = false;
-    _bannerController = PageController();
+    _bannerController = PageController(initialPage: _kInitialVirtualPage);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final backend = context.read<BackendDataProvider>();
@@ -111,8 +153,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) _stopBannerAutoPlay();
     if (state == AppLifecycleState.resumed && mounted) {
       final backend = context.read<BackendDataProvider>();
+      _startBannerAutoPlay(backend.banners.length);
       if (!backend.isLoadingBanners) unawaited(backend.loadBanners());
     }
   }
@@ -178,42 +222,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     },
   ];
 
-  final List<Map<String, dynamic>> _experts = const [
-    {
-      'id': 'exp_1',
-      'name': 'David Miller',
-      'role': 'Chuyên gia Bo mạch Inverter • 6 năm exp',
-      'rating': 4.9,
-      'reviews': 128,
-      'price': '350.000đ/h',
-      'initials': 'DM',
-      'gradient': [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
-      'verified': true,
-    },
-    {
-      'id': 'exp_2',
-      'name': 'Sarah Jenkins',
-      'role': 'Chuyên viên Vệ sinh & Bảo dưỡng • 4 năm exp',
-      'rating': 5.0,
-      'reviews': 94,
-      'price': '280.000đ/h',
-      'initials': 'SJ',
-      'gradient': [Color(0xFFA855F7), Color(0xFFEC4899)],
-      'verified': true,
-    },
-    {
-      'id': 'exp_3',
-      'name': 'Trần Anh Tuấn',
-      'role': 'Kỹ sư Tự động hóa & Biến tần • 8 năm exp',
-      'rating': 4.9,
-      'reviews': 215,
-      'price': '420.000đ/h',
-      'initials': 'TA',
-      'gradient': [Color(0xFF10B981), Color(0xFF0F766E)],
-      'verified': true,
-    },
-  ];
-
   void _navigateToTab(int tabIndex) {
     if (widget.onNavigateToTab != null) {
       widget.onNavigateToTab!(tabIndex);
@@ -233,24 +241,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   void _goBackHome() {
     _switchToTab(0, isBack: true);
-  }
-
-  void _navigateToProfile() {
-    if (widget.onNavigateToTab != null) {
-      widget.onNavigateToTab!(MainTabs.profile);
-    } else if (widget.showBottomNav) {
-      _switchToTab(2, isBack: false);
-    } else {
-      _navigateToTab(MainTabs.profile);
-    }
-  }
-
-  String _initials(String name) {
-    final words = name.trim().split(RegExp(r'\s+'));
-    if (words.isEmpty || words.first.isEmpty) return 'U';
-    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
-        .toUpperCase();
   }
 
   void _showBookingSheet({String? expertName, String? serviceName}) {
@@ -313,7 +303,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // User Greeting Section
-                _buildGreeting(userName),
+                _buildGreeting(userName, isDark),
                 const SizedBox(height: 18),
 
                 // Promotional Banner with 3D Character (assets/images/image_character.png)
@@ -321,11 +311,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 const SizedBox(height: 22),
 
                 // Service Categories Grid
-                _buildServiceCategories(),
+                _buildServiceCategories(isDark),
                 const SizedBox(height: 22),
 
                 // Top Rated Experts
-                _buildTopRatedExperts(),
+                const HomeAttendance(),
                 const SizedBox(height: 20),
               ],
             ),
@@ -334,7 +324,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
     }
 
-    final Widget fixedHeader = _buildFixedHeader(auth, unreadCount, isDark);
+    if (widget.embedded) return middleContent;
 
     return PopScope(
       canPop: _currentNavTab == 0,
@@ -347,12 +337,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         backgroundColor: isDark
             ? AppColors.backgroundDark
             : const Color(0xFFF8FAFC),
+        appBar: DashboardMobileAppBar(
+          isDark: isDark,
+          showBack: _currentNavTab != 0 || Navigator.canPop(context),
+          notificationBadge: unreadCount == 0
+              ? ''
+              : unreadCount > 99
+              ? '99+'
+              : '$unreadCount',
+          onToggleTheme: () => context.read<ThemeProvider>().toggleTheme(),
+          onToggleNotifications: () => _navigateToTab(MainTabs.notifications),
+          showNotification: auth.can(AppPermission.viewNotifications),
+          onBack: _currentNavTab == 2
+              ? _goBackHome
+              : () => Navigator.of(context).maybePop(),
+        ),
         body: SafeArea(
           child: Column(
             children: [
-              // Fixed Header (pinned at top, does NOT slide horizontally)
-              fixedHeader,
-
               // Middle Content (slides left when navigating forward, right when returning)
               Expanded(
                 child: ClipRect(
@@ -371,7 +373,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 homeSelected: _currentNavTab == 0,
                 profileSelected: _currentNavTab == 2,
                 onHome: () => _switchToTab(0, isBack: true),
-                onBooking: () => _showBookingSheet(),
+                onBooking: () => showAppQuickActions(
+                  context,
+                  onNavigateToTab: (tab) {
+                    if (tab == MainTabs.profile) {
+                      _switchToTab(2);
+                    } else {
+                      _navigateToTab(tab);
+                    }
+                  },
+                ),
                 onProfile: auth.can(AppPermission.viewProfile)
                     ? () => _switchToTab(2, isBack: false)
                     : null,
@@ -381,291 +392,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildProfileTopBar(bool isDark) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
-            width: 1,
-          ),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Back / Home button
-          AppBackButton(
-            isDark: isDark,
-            icon: LucideIcons.chevronLeft,
-            onPressed: _goBackHome,
-          ),
-
-          // Title
-          Text(
-            'Hồ sơ của tôi',
-            style: TextStyle(
-              fontSize: 17,
-              fontWeight: FontWeight.w700,
-              color: isDark
-                  ? AppColors.textPrimaryDark
-                  : const Color(0xFF0F172A),
-              letterSpacing: -0.2,
-            ),
-          ),
-
-          // Balance spacer matching Stitch profile top bar
-          const SizedBox(width: 38, height: 38),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFixedHeader(AuthProvider auth, int unreadCount, bool isDark) {
-    final Widget headerChild;
-    if (_currentNavTab == 2) {
-      headerChild = KeyedSubtree(
-        key: const ValueKey('profile_fixed_header'),
-        child: _buildProfileTopBar(isDark),
-      );
-    } else {
-      headerChild = KeyedSubtree(
-        key: const ValueKey('home_fixed_header'),
-        child: _buildTopBar(auth, unreadCount),
-      );
-    }
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 200),
-      switchInCurve: Curves.easeInOut,
-      switchOutCurve: Curves.easeInOut,
-      child: headerChild,
-    );
-  }
-
-  Widget _buildTopBar(AuthProvider auth, int unreadCount) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final user = auth.currentUser;
-    final userName = user?.name.isNotEmpty == true
-        ? user!.name
-        : (user?.username.isNotEmpty == true ? user!.username : 'Người dùng');
-    final roleLabel = user?.roleLabel.isNotEmpty == true
-        ? user!.roleLabel
-        : 'Nhân viên';
-    final roleColor = user?.role.avatarColor ?? const Color(0xFF2563EB);
-    final initials = _initials(userName);
-
-    String? avatarUrl = user?.avatar;
-    if (avatarUrl != null &&
-        avatarUrl.isNotEmpty &&
-        !avatarUrl.startsWith('http')) {
-      final base = auth.api.activeBaseUrl.replaceAll(RegExp(r'/+$'), '');
-      final path = avatarUrl.startsWith('/') ? avatarUrl : '/$avatarUrl';
-      avatarUrl = '$base$path';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-        border: Border(
-          bottom: BorderSide(
-            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
-            width: 1.2,
-          ),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.02),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Account Profile Info (Avatar + Name & Role)
-          Expanded(
-            child: InteractiveBounce(
-              scaleDown: 0.96,
-              onTap: auth.can(AppPermission.viewProfile)
-                  ? _navigateToProfile
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: roleColor.withValues(alpha: 0.12),
-                        border: Border.all(
-                          color: roleColor.withValues(alpha: 0.3),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: ClipOval(
-                        child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                            ? Image.network(
-                                avatarUrl,
-                                width: 40,
-                                height: 40,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    _buildAvatarFallback(initials, roleColor),
-                              )
-                            : _buildAvatarFallback(initials, roleColor),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            userName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : const Color(0xFF0F172A),
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 6,
-                                    vertical: 1.5,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: roleColor.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: roleColor.withValues(alpha: 0.22),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                  child: Text(
-                                    roleLabel,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
-                                      fontSize: 10.5,
-                                      fontWeight: FontWeight.w600,
-                                      color: roleColor,
-                                      letterSpacing: 0.1,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Notification Bell Icon with Badge
-          InteractiveBounce(
-            scaleDown: 0.90,
-            onTap: () => _navigateToTab(MainTabs.notifications),
-            child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      LucideIcons.bell,
-                      size: 18,
-                      color: Color(0xFF475569),
-                    ),
-                  ),
-                ),
-                if (unreadCount > 0)
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: Container(
-                      width: 8,
-                      height: 8,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEF4444),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAvatarFallback(String initials, Color roleColor) {
-    return Container(
-      width: 40,
-      height: 40,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: roleColor.withValues(alpha: 0.12),
-        shape: BoxShape.circle,
-      ),
-      child: Text(
-        initials,
-        style: TextStyle(
-          color: roleColor,
-          fontSize: 13,
-          fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
-        ),
-      ),
-    );
-  }
-
   // 2. User Greeting Section
-  Widget _buildGreeting(String userName) {
+  Widget _buildGreeting(String userName, bool isDark) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Xin chào, $userName 👋',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+            color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
             letterSpacing: -0.4,
           ),
         ),
         const SizedBox(height: 3),
-        const Text(
+        Text(
           '',
-          style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+          style: TextStyle(
+            fontSize: 13,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : const Color(0xFF64748B),
+          ),
         ),
       ],
     );
@@ -682,84 +431,62 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     final baseUrl = backendProvider?.api.activeBaseUrl ?? '';
 
-    if (banners.length == 1) {
-      _stopBannerAutoPlay();
-      return SizedBox(
-        height: 225,
-        child: _buildBannerCard(banners.first, baseUrl, 0, 1),
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bannerHeight = (constraints.maxWidth - 12) / 2;
+        if (banners.length == 1) {
+          _stopBannerAutoPlay();
+          return SizedBox(
+            height: bannerHeight,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: _buildBannerCard(banners.first, baseUrl, 0, 1),
+            ),
+          );
+        }
 
-    _syncBannerAutoPlay(banners.length);
+        _syncBannerAutoPlay(banners.length);
 
-    return SizedBox(
-      height: 225,
-      child: NotificationListener<ScrollNotification>(
-        onNotification: (notification) {
-          if (notification is ScrollStartNotification) {
-            _stopBannerAutoPlay();
-          } else if (notification is ScrollEndNotification) {
-            _startBannerAutoPlay(banners.length);
-          }
-          return false;
-        },
-        child: AnimatedBuilder(
-          animation: _bannerController,
-          builder: (context, _) {
-            return PageView.builder(
+        return SizedBox(
+          height: bannerHeight,
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollStartNotification) {
+                _stopBannerAutoPlay();
+              } else if (notification is ScrollEndNotification) {
+                _startBannerAutoPlay(banners.length);
+              }
+              return false;
+            },
+            child: PageView.builder(
               controller: _bannerController,
-              clipBehavior: Clip.none,
-              itemCount: banners.length,
+              physics: const SmoothBannerPhysics(),
+              clipBehavior: Clip.hardEdge,
               onPageChanged: (index) {
                 setState(() {
-                  _currentBannerIndex = index;
+                  _currentBannerIndex = _toRealBannerIndex(
+                    index,
+                    banners.length,
+                  );
                 });
               },
               itemBuilder: (context, index) {
-                double factor = 1.0;
-                if (_bannerController.hasClients &&
-                    _bannerController.positions.length == 1) {
-                  try {
-                    if (_bannerController.position.haveDimensions) {
-                      final page =
-                          _bannerController.page ??
-                          _currentBannerIndex.toDouble();
-                      final delta = (page - index).abs();
-                      factor = (1.0 - delta).clamp(0.0, 1.0);
-                    }
-                  } catch (_) {
-                    factor = (index == _currentBannerIndex) ? 1.0 : 0.0;
-                  }
-                } else {
-                  factor = (index == _currentBannerIndex) ? 1.0 : 0.0;
-                }
-
-                // Smooth scale (0.94 -> 1.0) and opacity (0.75 -> 1.0) transition effect
-                final scale = 0.94 + (0.06 * factor);
-                final opacity = 0.75 + (0.25 * factor);
-
-                return RepaintBoundary(
-                  child: Transform.scale(
-                    scale: scale,
-                    child: Opacity(
-                      opacity: opacity,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
-                        child: _buildBannerCard(
-                          banners[index],
-                          baseUrl,
-                          _currentBannerIndex,
-                          banners.length,
-                        ),
-                      ),
-                    ),
+                final realIndex = _toRealBannerIndex(index, banners.length);
+                return Padding(
+                  key: ValueKey('banner-slide-${banners[realIndex].id}'),
+                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  child: _buildBannerCard(
+                    banners[realIndex],
+                    baseUrl,
+                    _currentBannerIndex,
+                    banners.length,
                   ),
                 );
               },
-            );
-          },
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -939,13 +666,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   return GestureDetector(
                     onTap: () {
                       if (totalCount > 1) {
-                        _stopBannerAutoPlay();
-                        _bannerController.animateToPage(
-                          dotIdx,
-                          duration: const Duration(milliseconds: 500),
-                          curve: Curves.easeInOutCubic,
-                        );
-                        _startBannerAutoPlay(totalCount);
+                        _animateToBannerIndex(dotIdx, totalCount);
                       }
                     },
                     child: AnimatedContainer(
@@ -1408,7 +1129,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // 6. Service Categories Grid
-  Widget _buildServiceCategories() {
+  Widget _buildServiceCategories(bool isDark) {
     final auth = context.watch<AuthProvider>();
     final categories = auth.isAuthenticated && auth.currentUser != null
         ? _categories
@@ -1430,28 +1151,17 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               'Chức năng',
               style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A),
+                color: isDark
+                    ? AppColors.textPrimaryDark
+                    : const Color(0xFF0F172A),
                 letterSpacing: -0.2,
               ),
             ),
-            // InkWell(
-            //   onTap: () {
-            //     _navigateToTab(MainTabs.dashboard);
-            //   },
-            //   child: const Text(
-            //     'Xem tất cả',
-            //     style: TextStyle(
-            //       fontSize: 12,
-            //       fontWeight: FontWeight.bold,
-            //       color: Color(0xFF2563EB),
-            //     ),
-            //   ),
-            // ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1470,10 +1180,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             final tabIndex = (cat['tabIndex'] as int?) ?? MainTabs.dashboard;
             final label = cat['label']?.toString() ?? '';
             final tooltip = cat['tooltip']?.toString() ?? label;
-            final bgColor = cat['bgColor'] as Color? ?? const Color(0xFFEFF6FF);
-            final textColor =
+            final baseBgColor =
+                cat['bgColor'] as Color? ?? const Color(0xFFEFF6FF);
+            final baseTextColor =
                 cat['textColor'] as Color? ?? const Color(0xFF2563EB);
-            final borderColor =
+            final baseBorderColor =
                 cat['borderColor'] as Color? ?? const Color(0xFFBFDBFE);
             final iconData = cat['icon'] is IconData
                 ? cat['icon'] as IconData
@@ -1482,6 +1193,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ? cat['icon'] as String
                 : null;
             final catId = cat['id']?.toString() ?? '';
+
+            final effectiveColor = isDark
+                ? _getDarkCategoryTone(baseTextColor)
+                : baseTextColor;
+            final iconBgColor = isDark
+                ? effectiveColor.withValues(alpha: 0.16)
+                : baseBgColor;
+            final iconBorderColor = isDark
+                ? effectiveColor.withValues(alpha: 0.35)
+                : baseBorderColor;
 
             return Tooltip(
               message: tooltip,
@@ -1508,15 +1229,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     horizontal: 2,
                   ),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? AppColors.surfaceDark : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: const Color(0xFFF1F5F9),
+                      color: isDark
+                          ? AppColors.borderDark
+                          : const Color(0xFFF1F5F9),
                       width: 1.0,
                     ),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.02),
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.2 : 0.02,
+                        ),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
                       ),
@@ -1532,16 +1257,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             width: 42,
                             height: 42,
                             decoration: BoxDecoration(
-                              color: bgColor,
+                              color: iconBgColor,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: borderColor.withValues(alpha: 0.8),
+                                color: iconBorderColor.withValues(alpha: 0.8),
                                 width: 1.0,
                               ),
                             ),
                             child: Center(
                               child: iconData != null
-                                  ? Icon(iconData, size: 20, color: textColor)
+                                  ? Icon(
+                                      iconData,
+                                      size: 20,
+                                      color: effectiveColor,
+                                    )
                                   : Text(
                                       iconText ?? '',
                                       style: const TextStyle(fontSize: 18),
@@ -1561,7 +1290,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                   color: const Color(0xFFEF4444),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: Colors.white,
+                                    color: isDark
+                                        ? AppColors.surfaceDark
+                                        : Colors.white,
                                     width: 1.5,
                                   ),
                                 ),
@@ -1585,10 +1316,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xFF334155),
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : const Color(0xFF334155),
                           height: 1.15,
                         ),
                       ),
@@ -1603,253 +1336,22 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  // 7. Top Rated Experts Section
-  Widget _buildTopRatedExperts() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Text(
-                    'Kỹ thuật viên tiêu biểu',
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w800,
-                      color: Color(0xFF0F172A),
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  SizedBox(height: 1),
-                  Text(
-                    'Chuyên gia đã xác thực & đánh giá cao',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            InkWell(
-              onTap: () => _navigateToTab(MainTabs.employeeManagement),
-              child: const Text(
-                'Xem tất cả',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF2563EB),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ListView.separated(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: _experts.length,
-          separatorBuilder: (context, index) => const SizedBox(height: 10),
-          itemBuilder: (context, index) {
-            final exp = _experts[index];
-            final gradients = exp['gradient'] as List<Color>;
-
-            return Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFF1F5F9)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.02),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // Avatar with Initials & Verified badge
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Container(
-                        width: 46,
-                        height: 46,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: gradients,
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                        ),
-                        child: Center(
-                          child: Text(
-                            exp['initials'] as String,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (exp['verified'] == true)
-                        Positioned(
-                          right: -3,
-                          bottom: -3,
-                          child: Container(
-                            width: 16,
-                            height: 16,
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981),
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                '✓',
-                                style: TextStyle(
-                                  fontSize: 8,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(width: 12),
-
-                  // Name, role, rating & price
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Wrap(
-                          spacing: 6,
-                          runSpacing: 2,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            Text(
-                              exp['name'] as String,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF1E293B),
-                              ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 5,
-                                vertical: 1,
-                              ),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Text(
-                                'Đã xác thực',
-                                style: TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w600,
-                                  color: Color(0xFF2563EB),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          exp['role'] as String,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: Color(0xFF64748B),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Wrap(
-                          spacing: 2,
-                          crossAxisAlignment: WrapCrossAlignment.center,
-                          children: [
-                            const Icon(
-                              Icons.star_rounded,
-                              size: 14,
-                              color: Color(0xFFF59E0B),
-                            ),
-                            Text(
-                              '${exp['rating']}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF334155),
-                              ),
-                            ),
-                            Text(
-                              '(${exp['reviews']})',
-                              style: const TextStyle(
-                                fontSize: 10,
-                                color: Color(0xFF94A3B8),
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          exp['price'] as String,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF2563EB),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Action Book Button
-                  InteractiveBounce(
-                    scaleDown: 0.92,
-                    onTap: () =>
-                        _showBookingSheet(expertName: exp['name'] as String),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 7,
-                      ),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2563EB),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Text(
-                        'Đặt lịch',
-                        style: TextStyle(
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ],
-    );
+  Color _getDarkCategoryTone(Color c) {
+    if (c.toARGB32() == const Color(0xFF2563EB).toARGB32()) {
+      return const Color(0xFF60A5FA);
+    }
+    if (c.toARGB32() == const Color(0xFFD97706).toARGB32()) {
+      return const Color(0xFFFBBF24);
+    }
+    if (c.toARGB32() == const Color(0xFF059669).toARGB32()) {
+      return const Color(0xFF34D399);
+    }
+    if (c.toARGB32() == const Color(0xFF4F46E5).toARGB32()) {
+      return const Color(0xFF818CF8);
+    }
+    if (c.toARGB32() == const Color(0xFF7C3AED).toARGB32()) {
+      return const Color(0xFFA78BFA);
+    }
+    return c;
   }
 }

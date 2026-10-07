@@ -15,6 +15,7 @@ class DashboardMobileAppBar extends StatelessWidget
     required this.onToggleNotifications,
     this.showNotification = true,
     this.onBack,
+    this.showBack = true,
   });
 
   final bool isDark;
@@ -23,6 +24,7 @@ class DashboardMobileAppBar extends StatelessWidget
   final VoidCallback onToggleNotifications;
   final bool showNotification;
   final VoidCallback? onBack;
+  final bool showBack;
 
   @override
   Size get preferredSize => const Size.fromHeight(57);
@@ -39,26 +41,30 @@ class DashboardMobileAppBar extends StatelessWidget
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
       leadingWidth: 58,
-      leading: Padding(
-        padding: const EdgeInsets.only(left: 16),
-        child: Center(
-          child: AppBackButton(
-            isDark: isDark,
-            tooltip: 'Quay lại Trang chủ',
-            onPressed: onBack ??
-                () {
-                  if (canPop) {
-                    Navigator.of(context).maybePop();
-                  } else {
-                    Navigator.of(context).pushNamedAndRemoveUntil(
-                      AppRoutes.home,
-                      (route) => false,
-                    );
-                  }
-                },
-          ),
-        ),
-      ),
+      automaticallyImplyLeading: false,
+      leading: showBack
+          ? Padding(
+              padding: const EdgeInsets.only(left: 16),
+              child: Center(
+                child: AppBackButton(
+                  isDark: isDark,
+                  tooltip: 'Quay lại Trang chủ',
+                  onPressed:
+                      onBack ??
+                      () {
+                        if (canPop) {
+                          Navigator.of(context).maybePop();
+                        } else {
+                          Navigator.of(context).pushNamedAndRemoveUntil(
+                            AppRoutes.home,
+                            (route) => false,
+                          );
+                        }
+                      },
+                ),
+              ),
+            )
+          : null,
       title: Row(
         mainAxisSize: MainAxisSize.min,
         children: [

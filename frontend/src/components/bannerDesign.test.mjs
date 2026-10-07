@@ -6,7 +6,7 @@ import ts from 'typescript';
 const code = ts.transpileModule(readFileSync(new URL('./bannerDesign.ts', import.meta.url), 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 },
 }).outputText;
-const { defaultDesign, snapPosition, parseDesign, templateDesign, removeButtonDesign, legacyDesign } =
+const { savedDesignMatches, defaultDesign, snapPosition, parseDesign, templateDesign, removeButtonDesign, legacyDesign } =
   await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`);
 
 test('drag snaps to grid and element center', () => {
@@ -55,4 +55,15 @@ test('legacy left mascot and custom coordinates map to percentage layout', () =>
   const design = legacyDesign({ imagePosition: 'LEFT', buttonPosition: 'CUSTOM', buttonTop: 18, buttonLeft: 36 });
   assert.equal(design.nodes.mascot.x, 2); assert.equal(design.nodes.title.x, 36);
   assert.equal(design.nodes.button0.x, 10); assert.equal(design.nodes.button0.y, 10);
+});
+
+test('save verification rejects missing, stale and malformed server design', () => {
+  const design = defaultDesign();
+  design.nodes.badge.verticalAlign = 'center';
+  design.nodes.mascot.flip = true;
+  assert.equal(savedDesignMatches(JSON.stringify(design), design), true);
+  assert.equal(savedDesignMatches(undefined, design), false);
+  assert.equal(savedDesignMatches(null, design), false);
+  assert.equal(savedDesignMatches('{', design), false);
+  assert.equal(savedDesignMatches(JSON.stringify(defaultDesign()), design), false);
 });

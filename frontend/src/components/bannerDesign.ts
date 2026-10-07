@@ -91,3 +91,14 @@ export function legacyDesign(banner: { imagePosition?: string; buttonPosition?: 
   }
   return design;
 }
+
+/** Only report success when the server returns the exact custom settings sent. */
+export function savedDesignMatches(raw: unknown, expected: BannerDesign): boolean {
+  if (typeof raw !== 'string') return false;
+  try {
+    const saved = JSON.parse(raw);
+    return saved.version === expected.version && Object.entries(expected.nodes).every(([id, node]) =>
+      Object.entries(node).every(([field, value]) =>
+        JSON.stringify(saved.nodes?.[id]?.[field]) === JSON.stringify(value)));
+  } catch { return false; }
+}

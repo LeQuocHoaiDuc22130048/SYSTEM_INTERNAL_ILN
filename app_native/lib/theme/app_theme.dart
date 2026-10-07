@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'app_colors.dart';
+import 'app_motion.dart';
 
 class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
+    pageTransitionsTheme: AppMotion.transitions,
     brightness: Brightness.light,
     primaryColor: AppColors.primary,
     scaffoldBackgroundColor: AppColors.backgroundLight,
@@ -108,6 +110,7 @@ class AppTheme {
 
   static ThemeData darkTheme = ThemeData(
     useMaterial3: true,
+    pageTransitionsTheme: AppMotion.transitions,
     brightness: Brightness.dark,
     primaryColor: AppColors.primary,
     scaffoldBackgroundColor: AppColors.backgroundDark,

@@ -73,6 +73,8 @@ bool canAccessMainTab(AuthProvider auth, int tabIndex) {
   }
 
   switch (tabIndex) {
+    case MainTabs.home:
+      return auth.isAuthenticated;
     case MainTabs.dashboard:
       return auth.can(AppPermission.viewDashboard);
     case MainTabs.repairOrders:

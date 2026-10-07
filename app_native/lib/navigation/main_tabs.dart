@@ -10,5 +10,6 @@ class MainTabs {
   static const employeeManagement = 6;
   static const accountApproval = 7;
   static const profile = 8;
-  static const count = 9;
+  static const home = 9;
+  static const count = 10;
 }
