@@ -150,9 +150,8 @@ void main() {
   });
 
   group('HomePage Banner Dynamic Carousel Widget Tests', () {
-    testWidgets('Renders dynamic banners fetched from API with carousel dots', (
-      tester,
-    ) async {
+    testWidgets('Renders dynamic banners fetched from API with carousel dots',
+        (tester) async {
       tester.view.physicalSize = const Size(390, 844);
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.resetPhysicalSize);
@@ -245,13 +244,12 @@ void main() {
             ChangeNotifierProvider.value(value: auth),
             ChangeNotifierProvider.value(value: backendProvider),
             ChangeNotifierProvider(
-              create: (_) => NotificationProvider(api: auth.api),
-            ),
-            ChangeNotifierProvider(
-              create: (_) => UpdateProvider(api: auth.api),
-            ),
+                create: (_) => NotificationProvider(api: auth.api)),
+            ChangeNotifierProvider(create: (_) => UpdateProvider(api: auth.api)),
           ],
-          child: const MaterialApp(home: HomePage(showBottomNav: false)),
+          child: const MaterialApp(
+            home: HomePage(showBottomNav: false),
+          ),
         ),
       );
 
@@ -274,239 +272,338 @@ void main() {
       expect(find.text('Xác nhận đặt lịch'), findsOneWidget);
     });
 
-    testWidgets(
-      'Single banner from management website displays accurately without dummy complementary banners',
-      (tester) async {
-        tester.view.physicalSize = const Size(390, 844);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
+    testWidgets('Single banner maintains full 225px height and does not shrink',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-        final singleBanner = [
-          {
-            'id': 'b-single',
-            'title': 'Banner Độc Quyền Từ Web Quản Lý',
-            'badgeText': '⭐ DUY NHẤT',
-            'subtitle': 'Khuyến mãi đặc biệt chỉ có trên web',
-            'buttonText': 'Khám phá ngay',
-            'actionType': 'LINK',
-            'actionValue': 'https://inverterlikenew.com',
-            'gradientColors': '#0F172A,#1E293B,#334155',
-            'displayOrder': 1,
-            'isActive': true,
-          },
-        ];
+      final singleBanner = [
+        {
+          'id': 'b-single',
+          'title': 'INVERTER LIKE NEW',
+          'badgeText': 'SỬA CHỮA BIẾN TẦN',
+          'subtitle': '243 Quốc Lộ 1A, khu phố 4, Phường Tam Bình, TP Hồ Chí Minh',
+          'buttonText': 'Liên hệ ngay',
+          'actionType': 'CALL',
+          'actionValue': '0702500551',
+          'buttonPosition': 'CUSTOM',
+          'buttonBottom': 14.0,
+          'buttonLeft': 16.0,
+          'gradientColors': '#2563EB,#4F46E5,#1D4ED8',
+          'displayOrder': 1,
+          'isActive': true,
+        },
+      ];
 
-        final auth = AuthProvider(
-          apiClient: ApiClient(
-            client: MockClient((request) async {
-              if (request.url.path == '/api/v1/auth/login') {
-                return http.Response(
-                  jsonEncode({
-                    'accessToken': 'test-token',
-                    'refreshToken': 'test-refresh-token',
-                    'userInfo': {
-                      'id': '1',
-                      'username': 'duc',
-                      'fullName': 'Hoai Duc',
-                      'role': 'EMPLOYEE',
-                      'status': 'ACTIVE',
-                    },
-                  }),
-                  200,
-                  headers: {'content-type': 'application/json; charset=utf-8'},
-                );
-              }
-              if (request.url.path == '/api/v1/employees/me') {
-                return http.Response(
-                  jsonEncode({
+      final auth = AuthProvider(
+        apiClient: ApiClient(
+          client: MockClient((request) async {
+            if (request.url.path == '/api/v1/auth/login') {
+              return http.Response(
+                jsonEncode({
+                  'accessToken': 'test-token',
+                  'refreshToken': 'test-refresh-token',
+                  'userInfo': {
                     'id': '1',
                     'username': 'duc',
                     'fullName': 'Hoai Duc',
                     'role': 'EMPLOYEE',
                     'status': 'ACTIVE',
-                  }),
-                  200,
-                  headers: {'content-type': 'application/json; charset=utf-8'},
-                );
-              }
-              if (request.url.path == '/api/v1/banners') {
-                return http.Response(
-                  jsonEncode({'data': singleBanner}),
-                  200,
-                  headers: {'content-type': 'application/json; charset=utf-8'},
-                );
-              }
-              return http.Response(
-                jsonEncode({'data': []}),
+                  },
+                }),
                 200,
                 headers: {'content-type': 'application/json; charset=utf-8'},
               );
-            }),
-          ),
-        );
-
-        await auth.login(username: 'duc', password: 'password');
-
-        final backendProvider = BackendDataProvider(api: auth.api);
-        await backendProvider.loadBanners();
-
-        expect(backendProvider.banners.length, 1);
-        expect(
-          backendProvider.banners.first.title,
-          'Banner Độc Quyền Từ Web Quản Lý',
-        );
-
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider.value(value: auth),
-              ChangeNotifierProvider.value(value: backendProvider),
-              ChangeNotifierProvider(
-                create: (_) => NotificationProvider(api: auth.api),
-              ),
-              ChangeNotifierProvider(
-                create: (_) => UpdateProvider(api: auth.api),
-              ),
-            ],
-            child: const MaterialApp(home: HomePage(showBottomNav: false)),
-          ),
-        );
-
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
-
-        expect(find.text('Banner Độc Quyền Từ Web Quản Lý'), findsOneWidget);
-        expect(find.text('⭐ DUY NHẤT'), findsOneWidget);
-        // Hardcoded dummy banners should NOT be present
-        expect(find.text('Sửa Chữa Biến Tần Inverter Like New'), findsNothing);
-        expect(find.text('Linh Kiện & Board Mạch Biến Tần'), findsNothing);
-      },
-    );
-
-    testWidgets(
-      'Dynamically increases slider count and updates indicators when new banner is added',
-      (tester) async {
-        tester.view.physicalSize = const Size(390, 844);
-        tester.view.devicePixelRatio = 1;
-        addTearDown(tester.view.resetPhysicalSize);
-        addTearDown(tester.view.resetDevicePixelRatio);
-
-        final dynamicBanners = <Map<String, dynamic>>[
-          {
-            'id': 'b-1',
-            'title': 'Banner Ban Đầu',
-            'badgeText': 'BANNER 1',
-            'subtitle': 'Mô tả banner 1',
-            'buttonText': 'Nút 1',
-            'actionType': 'NONE',
-            'displayOrder': 1,
-            'isActive': true,
-          },
-        ];
-
-        final auth = AuthProvider(
-          apiClient: ApiClient(
-            client: MockClient((request) async {
-              if (request.url.path == '/api/v1/auth/login') {
-                return http.Response(
-                  jsonEncode({
-                    'accessToken': 'test-token',
-                    'refreshToken': 'test-refresh-token',
-                    'userInfo': {
-                      'id': '1',
-                      'username': 'duc',
-                      'fullName': 'Hoai Duc',
-                      'role': 'EMPLOYEE',
-                      'status': 'ACTIVE',
-                    },
-                  }),
-                  200,
-                  headers: {'content-type': 'application/json; charset=utf-8'},
-                );
-              }
-              if (request.url.path == '/api/v1/employees/me') {
-                return http.Response(
-                  jsonEncode({
-                    'id': '1',
-                    'username': 'duc',
-                    'fullName': 'Hoai Duc',
-                    'role': 'EMPLOYEE',
-                    'status': 'ACTIVE',
-                  }),
-                  200,
-                  headers: {'content-type': 'application/json; charset=utf-8'},
-                );
-              }
-              if (request.url.path == '/api/v1/banners') {
-                return http.Response(
-                  jsonEncode({'data': dynamicBanners}),
-                  200,
-                  headers: {'content-type': 'application/json; charset=utf-8'},
-                );
-              }
+            }
+            if (request.url.path == '/api/v1/employees/me') {
               return http.Response(
-                jsonEncode({'data': []}),
+                jsonEncode({
+                  'id': '1',
+                  'username': 'duc',
+                  'fullName': 'Hoai Duc',
+                  'role': 'EMPLOYEE',
+                  'status': 'ACTIVE',
+                }),
                 200,
                 headers: {'content-type': 'application/json; charset=utf-8'},
               );
-            }),
+            }
+            if (request.url.path == '/api/v1/banners') {
+              return http.Response(
+                jsonEncode({'data': singleBanner}),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            return http.Response(
+              jsonEncode({'data': []}),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }),
+        ),
+      );
+
+      await auth.login(username: 'duc', password: 'password');
+
+      final backendProvider = BackendDataProvider(api: auth.api);
+      await backendProvider.loadBanners();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: auth),
+            ChangeNotifierProvider.value(value: backendProvider),
+            ChangeNotifierProvider(
+                create: (_) => NotificationProvider(api: auth.api)),
+            ChangeNotifierProvider(create: (_) => UpdateProvider(api: auth.api)),
+          ],
+          child: const MaterialApp(
+            home: HomePage(showBottomNav: false),
           ),
-        );
+        ),
+      );
 
-        await auth.login(username: 'duc', password: 'password');
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
-        final backendProvider = BackendDataProvider(api: auth.api);
-        await backendProvider.loadBanners();
+      expect(find.text('INVERTER LIKE NEW'), findsOneWidget);
+      expect(find.text('SỬA CHỮA BIẾN TẦN'), findsOneWidget);
+      expect(find.text('Liên hệ ngay'), findsOneWidget);
 
-        expect(backendProvider.banners.length, 1);
+      final titleFinder = find.text('INVERTER LIKE NEW');
+      final bannerContainer = find.ancestor(
+        of: titleFinder,
+        matching: find.byType(Container),
+      ).first;
 
-        await tester.pumpWidget(
-          MultiProvider(
-            providers: [
-              ChangeNotifierProvider.value(value: auth),
-              ChangeNotifierProvider.value(value: backendProvider),
-              ChangeNotifierProvider(
-                create: (_) => NotificationProvider(api: auth.api),
-              ),
-              ChangeNotifierProvider(
-                create: (_) => UpdateProvider(api: auth.api),
-              ),
-            ],
-            child: const MaterialApp(home: HomePage(showBottomNav: false)),
-          ),
-        );
+      final bannerSize = tester.getSize(bannerContainer);
+      expect(bannerSize.height, 225.0);
+      expect(bannerSize.width, 358.0);
+    });
 
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
+    testWidgets('Multiple banners have horizontal spacing (12px total gap) between slides during transition',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
 
-        expect(find.text('Banner Ban Đầu'), findsOneWidget);
-
-        // Now simulate admin adding a 2nd banner on the management website
-        dynamicBanners.add({
+      final multiBanners = [
+        {
+          'id': 'b-1',
+          'title': 'Banner 1',
+          'badgeText': 'HOT',
+          'subtitle': 'Sub 1',
+          'displayOrder': 1,
+          'isActive': true,
+        },
+        {
           'id': 'b-2',
-          'title': 'Banner Mới Thêm Từ Website',
-          'badgeText': 'BANNER 2',
-          'subtitle': 'Mô tả banner mới',
-          'buttonText': 'Nút 2',
-          'actionType': 'NONE',
+          'title': 'Banner 2',
+          'badgeText': 'SALE',
+          'subtitle': 'Sub 2',
           'displayOrder': 2,
           'isActive': true,
-        });
+        },
+      ];
 
-        // Reload banners from API
-        await backendProvider.loadBanners();
-        expect(backendProvider.banners.length, 2);
+      final auth = AuthProvider(
+        apiClient: ApiClient(
+          client: MockClient((request) async {
+            if (request.url.path == '/api/v1/auth/login') {
+              return http.Response(
+                jsonEncode({
+                  'accessToken': 'test-token',
+                  'refreshToken': 'test-refresh-token',
+                  'userInfo': {
+                    'id': '1',
+                    'username': 'duc',
+                    'fullName': 'Hoai Duc',
+                    'role': 'EMPLOYEE',
+                    'status': 'ACTIVE',
+                  },
+                }),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            if (request.url.path == '/api/v1/employees/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': '1',
+                  'username': 'duc',
+                  'fullName': 'Hoai Duc',
+                  'role': 'EMPLOYEE',
+                  'status': 'ACTIVE',
+                }),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            if (request.url.path == '/api/v1/banners') {
+              return http.Response(
+                jsonEncode({'data': multiBanners}),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            return http.Response(
+              jsonEncode({'data': []}),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }),
+        ),
+      );
 
-        await tester.pump();
-        await tester.pump(const Duration(milliseconds: 300));
+      await auth.login(username: 'duc', password: 'password');
+      final backendProvider = BackendDataProvider(api: auth.api);
+      await backendProvider.loadBanners();
 
-        // PageView now contains 2 banners, can swipe to the new banner
-        await tester.drag(find.text('Banner Ban Đầu'), const Offset(-400, 0));
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: auth),
+            ChangeNotifierProvider.value(value: backendProvider),
+            ChangeNotifierProvider(create: (_) => NotificationProvider(api: auth.api)),
+            ChangeNotifierProvider(create: (_) => UpdateProvider(api: auth.api)),
+          ],
+          child: const MaterialApp(
+            home: HomePage(showBottomNav: false),
+          ),
+        ),
+      );
 
-        expect(find.text('Banner Mới Thêm Từ Website'), findsOneWidget);
-      },
-    );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      final pageView = tester.widget<PageView>(find.byType(PageView));
+      expect(pageView.clipBehavior, Clip.none);
+
+      final titleFinder = find.text('Banner 1');
+      final bannerContainer = find.ancestor(
+        of: titleFinder,
+        matching: find.byType(Container),
+      ).first;
+
+      final paddingWidgetFinder = find.ancestor(
+        of: bannerContainer,
+        matching: find.byType(Padding),
+      ).first;
+      final paddingWidget = tester.widget<Padding>(paddingWidgetFinder);
+      expect(paddingWidget.padding, const EdgeInsets.symmetric(horizontal: 6.0));
+    });
+
+    testWidgets('Auto-play advances to the next banner automatically after 4 seconds with smooth transition',
+        (tester) async {
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final multiBanners = [
+        {
+          'id': 'b-1',
+          'title': 'Banner Alpha',
+          'badgeText': 'HOT',
+          'subtitle': 'Sub 1',
+          'displayOrder': 1,
+          'isActive': true,
+        },
+        {
+          'id': 'b-2',
+          'title': 'Banner Beta',
+          'badgeText': 'SALE',
+          'subtitle': 'Sub 2',
+          'displayOrder': 2,
+          'isActive': true,
+        },
+      ];
+
+      final auth = AuthProvider(
+        apiClient: ApiClient(
+          client: MockClient((request) async {
+            if (request.url.path == '/api/v1/auth/login') {
+              return http.Response(
+                jsonEncode({
+                  'accessToken': 'test-token',
+                  'refreshToken': 'test-refresh-token',
+                  'userInfo': {
+                    'id': '1',
+                    'username': 'duc',
+                    'fullName': 'Hoai Duc',
+                    'role': 'EMPLOYEE',
+                    'status': 'ACTIVE',
+                  },
+                }),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            if (request.url.path == '/api/v1/employees/me') {
+              return http.Response(
+                jsonEncode({
+                  'id': '1',
+                  'username': 'duc',
+                  'fullName': 'Hoai Duc',
+                  'role': 'EMPLOYEE',
+                  'status': 'ACTIVE',
+                }),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            if (request.url.path == '/api/v1/banners') {
+              return http.Response(
+                jsonEncode({'data': multiBanners}),
+                200,
+                headers: {'content-type': 'application/json; charset=utf-8'},
+              );
+            }
+            return http.Response(
+              jsonEncode({'data': []}),
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }),
+        ),
+      );
+
+      await auth.login(username: 'duc', password: 'password');
+      final backendProvider = BackendDataProvider(api: auth.api);
+      await backendProvider.loadBanners();
+
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider.value(value: auth),
+            ChangeNotifierProvider.value(value: backendProvider),
+            ChangeNotifierProvider(create: (_) => NotificationProvider(api: auth.api)),
+            ChangeNotifierProvider(create: (_) => UpdateProvider(api: auth.api)),
+          ],
+          child: const MaterialApp(
+            home: HomePage(showBottomNav: false),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+
+      // Initially on Banner Alpha
+      expect(find.text('Banner Alpha'), findsOneWidget);
+
+      // Advance time by 4 seconds (auto-play interval) + animation duration
+      await tester.pump(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 700));
+
+      // Now on Banner Beta
+      expect(find.text('Banner Beta'), findsOneWidget);
+    });
   });
 }
+
+

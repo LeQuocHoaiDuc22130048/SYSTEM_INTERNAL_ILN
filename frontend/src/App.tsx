@@ -112,13 +112,45 @@ function App() {
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('system_sidebar_collapsed') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleToggleCollapse = useCallback(() => {
+    setIsSidebarCollapsed(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem('system_sidebar_collapsed', String(next));
+      } catch {
+        // Ignore localStorage error if disabled
+      }
+      return next;
+    });
+  }, []);
 
   const showToast = useCallback((message: string) => {
     setToastMessage(message);
     setTimeout(() => setToastMessage(null), 3000);
   }, []);
 
-  // Tự động đóng sidebar khi chuyển sang màn hình lớn (> 1024px)
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  const handleGlobalRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    setRefreshTrigger(prev => prev + 1);
+    setRetryCount(prev => prev + 1);
+    showToast('Đang làm mới dữ liệu...');
+    setTimeout(() => {
+      setIsRefreshing(false);
+    }, 600);
+  }, [showToast]);
+
+  // Tự động đóng sidebar drawer khi chuyển sang màn hình lớn (> 1024px)
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth > 1024) {
@@ -139,6 +171,22 @@ function App() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [isSidebarOpen]);
+
+  // Phím tắt Ctrl+B hoặc Cmd+B để thu gọn / mở rộng sidebar
+  useEffect(() => {
+    const handleShortcut = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'b') {
+        e.preventDefault();
+        if (window.innerWidth <= 1024) {
+          setIsSidebarOpen(prev => !prev);
+        } else {
+          handleToggleCollapse();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [handleToggleCollapse]);
 
   // Khóa cuộn trang khi mở sidebar trên màn hình nhỏ
   useEffect(() => {
@@ -450,9 +498,12 @@ function App() {
         handleLogout={handleLogout}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={handleToggleCollapse}
+        dataSource={dataSource}
       />
 
-      <div className="main-container">
+      <div className={`main-container ${isSidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
         <Header
           activeTab={activeTab}
           currentMonth={currentMonth}
@@ -466,6 +517,8 @@ function App() {
           handleRetryConnection={handleRetryConnection}
           onToggleSidebar={() => setIsSidebarOpen(prev => !prev)}
           isSidebarOpen={isSidebarOpen}
+          onRefreshData={handleGlobalRefresh}
+          isRefreshing={isRefreshing}
         />
 
         <div className="main-content-inner">
@@ -477,6 +530,7 @@ function App() {
               onViewPersonalAttendance={setHistoryEmployee}
               currentMonth={currentMonth}
               currentYear={currentYear}
+              refreshTrigger={refreshTrigger}
             />
           ) : activeTab === 'monthly' ? (
             <>
@@ -526,6 +580,7 @@ function App() {
           ) : activeTab === 'updates' ? (
             <UpdateTab
               showToast={showToast}
+              refreshTrigger={refreshTrigger}
             />
           ) : activeTab === 'banners' ? (
             <BannerTab

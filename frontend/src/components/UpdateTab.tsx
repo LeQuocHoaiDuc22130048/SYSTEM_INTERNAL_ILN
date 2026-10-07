@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus,
-  RefreshCw,
   Rocket,
   Copy,
   ExternalLink,
@@ -11,7 +10,11 @@ import {
   Clock,
   ShieldAlert,
   Loader2,
-  Trash2
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from 'lucide-react';
 import { getAuthHeaders } from '../utils/auth';
 import './UpdateTab.css';
@@ -30,6 +33,7 @@ interface AppUpdate {
 
 interface UpdateTabProps {
   showToast: (message: string) => void;
+  refreshTrigger?: number;
 }
 
 const AndroidIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16, className = '' }) => (
@@ -44,7 +48,7 @@ const AppleIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16,
   </svg>
 );
 
-export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
+export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger }) => {
   const [updates, setUpdates] = useState<AppUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -53,8 +57,15 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
   const [releasingId, setReleasingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [selectedPlatformFilter, setSelectedPlatformFilter] = useState<'ALL' | 'ANDROID' | 'IOS'>('ALL');
+  const [expandedChangelogs, setExpandedChangelogs] = useState<Record<string, boolean>>({});
 
-  // Form states
+  // Phân trang
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+
+  const toggleChangelog = (id: string) => {
+    setExpandedChangelogs(prev => ({ ...prev, [id]: !prev[id] }));
+  };
   const [platform, setPlatform] = useState<'ANDROID' | 'IOS'>('ANDROID');
   const [version, setVersion] = useState('');
   const [changelog, setChangelog] = useState('');
@@ -94,6 +105,18 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
   useEffect(() => {
     fetchUpdates();
   }, [fetchUpdates]);
+
+  // Lắng nghe tín hiệu làm mới dữ liệu từ Header
+  useEffect(() => {
+    if (refreshTrigger) {
+      fetchUpdates(true);
+    }
+  }, [refreshTrigger, fetchUpdates]);
+
+  // Tự động quay về trang 1 khi chuyển tab nền tảng
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedPlatformFilter]);
 
   // Handle copy link
   const handleCopyLink = (url: string) => {
@@ -365,11 +388,39 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
   const iosCount = updates.filter(u => u.platform === 'IOS').length;
 
   // Filtered list
-  const filteredUpdates = updates.filter(u => {
-    if (selectedPlatformFilter === 'ALL') return true;
-    const itemPlatform = u.platform || 'ANDROID';
-    return itemPlatform === selectedPlatformFilter;
-  });
+  const filteredUpdates = useMemo(() => {
+    return updates.filter(u => {
+      if (selectedPlatformFilter === 'ALL') return true;
+      const itemPlatform = u.platform || 'ANDROID';
+      return itemPlatform === selectedPlatformFilter;
+    });
+  }, [updates, selectedPlatformFilter]);
+
+  // Phân trang danh sách bản cập nhật (10 bản/trang)
+  const totalItems = filteredUpdates.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const paginatedUpdates = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredUpdates.slice(start, start + pageSize);
+  }, [filteredUpdates, currentPage, pageSize]);
+
+  const getPageNumbers = () => {
+    const pages: number[] = [];
+    if (totalPages <= 5) {
+      for (let i = 1; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      if (currentPage > 3) pages.push(-1);
+      const start = Math.max(2, currentPage - 1);
+      const end = Math.min(totalPages - 1, currentPage + 1);
+      for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) pages.push(i);
+      }
+      if (currentPage < totalPages - 2) pages.push(-1);
+      if (!pages.includes(totalPages)) pages.push(totalPages);
+    }
+    return pages;
+  };
 
   return (
     <div className="update-container">
@@ -423,14 +474,6 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
           <p>Phân tách và phát hành các phiên bản độc lập cho Android (.apk) và iOS (.ipa / App Store).</p>
         </div>
         <div className="update-search-actions">
-          <button
-            className="update-refresh-btn"
-            onClick={() => fetchUpdates(true)}
-            disabled={refreshing || loading}
-            title="Làm mới dữ liệu"
-          >
-            <RefreshCw size={16} className={refreshing ? 'spin' : ''} />
-          </button>
           <button className="update-add-btn" onClick={() => openCreateModal()}>
             <Plus size={18} />
             Tạo bản cập nhật
@@ -468,10 +511,10 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
       </div>
 
       {/* Updates History List */}
-      {loading ? (
+      {loading || refreshing ? (
         <div className="update-loading">
           <Loader2 size={32} className="spin loading-icon" />
-          <p>Đang tải lịch sử phiên bản cập nhật...</p>
+          <p>{refreshing ? 'Đang làm mới dữ liệu...' : 'Đang tải lịch sử phiên bản cập nhật...'}</p>
         </div>
       ) : filteredUpdates.length === 0 ? (
         <div className="update-empty-state">
@@ -487,149 +530,381 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast }) => {
         </div>
       ) : (
         <div className="update-list-wrapper">
-          <table className="update-table">
-            <thead>
-              <tr>
-                <th>Hệ điều hành</th>
-                <th>Phiên bản</th>
-                <th>Chi tiết cập nhật</th>
-                <th>Đường dẫn file cài đặt</th>
-                <th>Bắt buộc</th>
-                <th>Trạng thái</th>
-                <th>Thời gian</th>
-                <th>Thao tác</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUpdates.map((update) => {
-                const itemPlatform = update.platform || 'ANDROID';
-                const isIos = itemPlatform === 'IOS';
+          {/* Desktop Table View (>= 768px) */}
+          <div className="update-desktop-table-view">
+            <table className="update-table">
+              <thead>
+                <tr>
+                  <th className="th-platform">Hệ điều hành</th>
+                  <th className="th-version">Phiên bản</th>
+                  <th className="th-changelog">Chi tiết cập nhật</th>
+                  <th className="th-url">Đường dẫn file cài đặt</th>
+                  <th className="th-mandatory">Bắt buộc</th>
+                  <th className="th-status">Trạng thái</th>
+                  <th className="th-time">Thời gian</th>
+                  <th className="th-actions">Thao tác</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginatedUpdates.map((update) => {
+                  const itemPlatform = update.platform || 'ANDROID';
+                  const isIos = itemPlatform === 'IOS';
 
-                return (
-                  <tr key={update.id} className={update.status === 'RELEASED' ? 'row-released' : 'row-draft'}>
-                    <td className="col-platform">
-                      {isIos ? (
-                        <span className="platform-badge platform-ios" title="Dành cho hệ điều hành iOS (Apple)">
-                          <AppleIcon size={14} />
-                          <span>iOS</span>
-                        </span>
-                      ) : (
-                        <span className="platform-badge platform-android" title="Dành cho hệ điều hành Android">
-                          <AndroidIcon size={14} />
-                          <span>Android</span>
-                        </span>
-                      )}
-                    </td>
-                    <td className="col-version">
-                      <span className="version-tag">v{update.version}</span>
-                    </td>
-                    <td className="col-changelog">
-                      <div className="changelog-text" title={update.changelog}>
-                        {update.changelog.split('\n').map((line, i) => (
-                          <div key={i}>{line}</div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="col-url">
-                      <div className="url-container">
-                        <span className="url-text" title={update.downloadUrl}>
-                          {update.downloadUrl}
-                        </span>
-                        <div className="url-actions">
-                          <button
-                            className="icon-action-btn"
-                            onClick={() => handleCopyLink(update.downloadUrl)}
-                            title="Sao chép liên kết tải"
-                          >
-                            <Copy size={13} />
-                          </button>
-                          {update.status === 'RELEASED' && (
-                            <a
-                              href={update.downloadUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                  return (
+                    <tr key={update.id} className={update.status === 'RELEASED' ? 'row-released' : 'row-draft'}>
+                      <td className="col-platform">
+                        {isIos ? (
+                          <span className="platform-badge platform-ios" title="Dành cho hệ điều hành iOS (Apple)">
+                            <AppleIcon size={14} />
+                            <span>iOS</span>
+                          </span>
+                        ) : (
+                          <span className="platform-badge platform-android" title="Dành cho hệ điều hành Android">
+                            <AndroidIcon size={14} />
+                            <span>Android</span>
+                          </span>
+                        )}
+                      </td>
+                      <td className="col-version">
+                        <span className="version-tag">v{update.version}</span>
+                      </td>
+                      <td className="col-changelog">
+                        <div className="changelog-text" title={update.changelog}>
+                          {update.changelog.split('\n').map((line, i) => (
+                            <div key={i}>{line}</div>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="col-url">
+                        <div className="url-container">
+                          <span className="url-text" title={update.downloadUrl}>
+                            {update.downloadUrl}
+                          </span>
+                          <div className="url-actions">
+                            <button
                               className="icon-action-btn"
-                              title="Mở liên kết trực tiếp"
+                              onClick={() => handleCopyLink(update.downloadUrl)}
+                              title="Sao chép liên kết tải"
                             >
-                              <ExternalLink size={13} />
-                            </a>
+                              <Copy size={13} />
+                            </button>
+                            {update.status === 'RELEASED' && (
+                              <a
+                                href={update.downloadUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="icon-action-btn"
+                                title="Mở liên kết trực tiếp"
+                              >
+                                <ExternalLink size={13} />
+                              </a>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="col-mandatory">
+                        {update.mandatory ? (
+                          <span className="badge badge-danger" title="Bắt buộc cập nhật ngay lập tức">
+                            <ShieldAlert size={12} style={{ marginRight: '4px' }} />
+                            Bắt buộc
+                          </span>
+                        ) : (
+                          <span className="badge badge-secondary">Tùy chọn</span>
+                        )}
+                      </td>
+                      <td className="col-status">
+                        {update.status === 'RELEASED' ? (
+                          <span className="badge badge-success">Đã phát hành</span>
+                        ) : (
+                          <span className="badge badge-warning">Bản nháp</span>
+                        )}
+                      </td>
+                      <td className="col-time">
+                        <div className="time-info">
+                          <div className="time-row" title="Ngày tạo">
+                            <Clock size={12} className="time-icon" />
+                            <span>Tạo: {new Date(update.createdAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                          </div>
+                          {update.releasedAt && (
+                            <div className="time-row highlight" title="Ngày phát hành">
+                              <Rocket size={12} className="time-icon" />
+                              <span>Phát hành: {new Date(update.releasedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            </div>
                           )}
                         </div>
-                      </div>
-                    </td>
-                    <td className="col-mandatory">
-                      {update.mandatory ? (
-                        <span className="badge badge-danger" title="Bắt buộc cập nhật ngay lập tức">
-                          <ShieldAlert size={12} style={{ marginRight: '4px' }} />
-                          Bắt buộc
-                        </span>
-                      ) : (
-                        <span className="badge badge-secondary">Tùy chọn</span>
-                      )}
-                    </td>
-                    <td className="col-status">
-                      {update.status === 'RELEASED' ? (
-                        <span className="badge badge-success">Đã phát hành</span>
-                      ) : (
-                        <span className="badge badge-warning">Bản nháp</span>
-                      )}
-                    </td>
-                    <td className="col-time">
-                      <div className="time-info">
-                        <div className="time-row" title="Ngày tạo">
-                          <Clock size={12} className="time-icon" />
-                          <span>Tạo: {new Date(update.createdAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                      </td>
+                      <td className="col-actions">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          {update.status === 'DRAFT' ? (
+                            <button
+                              className="action-btn release-btn"
+                              onClick={() => handleRelease(update.id, update.version, itemPlatform)}
+                              disabled={releasingId === update.id || deletingId === update.id}
+                            >
+                              {releasingId === update.id ? (
+                                <Loader2 size={14} className="spin" />
+                              ) : (
+                                <Rocket size={14} />
+                              )}
+                              <span>Phát hành</span>
+                            </button>
+                          ) : (
+                            <span className="action-done" title="Bản cập nhật đã được phát hành hàng loạt">
+                              <CheckCircle2 size={16} className="text-success" />
+                              <span>Đã phát hành</span>
+                            </span>
+                          )}
+
+                          <button
+                            className="icon-action-btn delete-action-btn"
+                            onClick={() => handleDelete(update.id, update.version, itemPlatform)}
+                            disabled={deletingId === update.id || releasingId === update.id}
+                            title="Xóa bản cập nhật"
+                            style={{ color: '#ef4444' }}
+                          >
+                            {deletingId === update.id ? (
+                              <Loader2 size={14} className="spin" />
+                            ) : (
+                              <Trash2 size={14} />
+                            )}
+                          </button>
                         </div>
-                        {update.releasedAt && (
-                          <div className="time-row highlight" title="Ngày phát hành">
-                            <Rocket size={12} className="time-icon" />
-                            <span>Phát hành: {new Date(update.releasedAt).toLocaleString('vi-VN', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                          </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Card Timeline View (< 768px) */}
+          <div className="update-mobile-timeline-view">
+            {paginatedUpdates.map((update) => {
+              const itemPlatform = update.platform || 'ANDROID';
+              const isIos = itemPlatform === 'IOS';
+              const isChangelogExpanded = !!expandedChangelogs[update.id];
+              const hasLongChangelog = update.changelog.length > 70 || update.changelog.includes('\n');
+              const releaseDateStr = update.releasedAt
+                ? new Date(update.releasedAt).toLocaleDateString('vi-VN')
+                : new Date(update.createdAt).toLocaleDateString('vi-VN');
+
+              return (
+                <div key={update.id} className={`update-timeline-card ${update.status === 'RELEASED' ? 'released' : 'draft'}`}>
+                  {/* Timeline indicator node */}
+                  <div className="timeline-node">
+                    <div className={`timeline-dot ${update.status === 'RELEASED' ? 'released' : 'draft'}`} />
+                    <div className="timeline-stem" />
+                  </div>
+
+                  <div className="update-card-content">
+                    {/* Dòng đầu: Badge HĐH (Android/iOS) + Phiên bản (v1.1.21) + Tag trạng thái (Bắt buộc/Tùy chọn) + Tag phát hành */}
+                    <div className="update-card-header">
+                      <div className="update-card-header-left">
+                        {isIos ? (
+                          <span className="platform-badge platform-ios">
+                            <AppleIcon size={14} />
+                            <span>iOS</span>
+                          </span>
+                        ) : (
+                          <span className="platform-badge platform-android">
+                            <AndroidIcon size={14} />
+                            <span>Android</span>
+                          </span>
+                        )}
+                        <span className="version-tag">v{update.version}</span>
+                      </div>
+
+                      <div className="update-card-header-right">
+                        {update.mandatory ? (
+                          <span className="badge badge-danger">
+                            <ShieldAlert size={11} style={{ marginRight: '3px' }} />
+                            Bắt buộc
+                          </span>
+                        ) : (
+                          <span className="badge badge-secondary">Tùy chọn</span>
+                        )}
+                        {update.status === 'RELEASED' ? (
+                          <span className="badge badge-success">Đã phát hành</span>
+                        ) : (
+                          <span className="badge badge-warning">Bản nháp</span>
                         )}
                       </div>
-                    </td>
-                    <td className="col-actions">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {update.status === 'DRAFT' ? (
+                    </div>
+
+                    {/* Dòng giữa: Nội dung ghi chú cập nhật (line-clamp-2 kèm nút Xem thêm) */}
+                    <div className="update-card-body">
+                      <div className={`update-card-changelog ${isChangelogExpanded ? 'expanded' : 'clamped'}`}>
+                        {update.changelog}
+                      </div>
+                      {hasLongChangelog && (
+                        <button
+                          type="button"
+                          className="btn-toggle-changelog"
+                          onClick={() => toggleChangelog(update.id)}
+                        >
+                          {isChangelogExpanded ? 'Thu gọn ▲' : 'Xem thêm ▼'}
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Dòng cuối: Nút copy/tải file cài đặt + Ngày phát hành */}
+                    <div className="update-card-footer">
+                      <div className="update-card-date">
+                        <Clock size={13} />
+                        <span>{update.releasedAt ? `Phát hành: ${releaseDateStr}` : `Tạo: ${releaseDateStr}`}</span>
+                      </div>
+
+                      <div className="update-card-actions">
+                        <button
+                          type="button"
+                          className="card-action-btn copy-btn"
+                          onClick={() => handleCopyLink(update.downloadUrl)}
+                          title="Sao chép link tải"
+                        >
+                          <Copy size={13} />
+                          <span>Sao chép link</span>
+                        </button>
+
+                        {update.status === 'RELEASED' && (
+                          <a
+                            href={update.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="card-action-btn download-btn"
+                            title="Tải file / Mở liên kết"
+                          >
+                            <ExternalLink size={13} />
+                            <span>Tải file</span>
+                          </a>
+                        )}
+
+                        {update.status === 'DRAFT' && (
                           <button
-                            className="action-btn release-btn"
+                            type="button"
+                            className="card-action-btn release-btn"
                             onClick={() => handleRelease(update.id, update.version, itemPlatform)}
                             disabled={releasingId === update.id || deletingId === update.id}
                           >
                             {releasingId === update.id ? (
-                              <Loader2 size={14} className="spin" />
+                              <Loader2 size={13} className="spin" />
                             ) : (
-                              <Rocket size={14} />
+                              <Rocket size={13} />
                             )}
                             <span>Phát hành</span>
                           </button>
-                        ) : (
-                          <span className="action-done" title="Bản cập nhật đã được phát hành hàng loạt">
-                            <CheckCircle2 size={16} className="text-success" />
-                            <span>Đã phát hành</span>
-                          </span>
                         )}
 
                         <button
-                          className="icon-action-btn delete-action-btn"
+                          type="button"
+                          className="card-action-btn delete-btn"
                           onClick={() => handleDelete(update.id, update.version, itemPlatform)}
-                          disabled={deletingId === update.id || releasingId === update.id}
+                          disabled={releasingId === update.id || deletingId === update.id}
                           title="Xóa bản cập nhật"
-                          style={{ color: '#ef4444' }}
                         >
                           {deletingId === update.id ? (
-                            <Loader2 size={14} className="spin" />
+                            <Loader2 size={13} className="spin" />
                           ) : (
-                            <Trash2 size={14} />
+                            <Trash2 size={13} />
                           )}
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Phân trang danh sách (Pagination) */}
+          {totalItems > 0 && (
+            <div className="update-pagination">
+              <div className="pagination-info">
+                <span>
+                  Hiển thị <strong>{Math.min((currentPage - 1) * pageSize + 1, totalItems)}</strong> -{' '}
+                  <strong>{Math.min(currentPage * pageSize, totalItems)}</strong> trên tổng số{' '}
+                  <strong>{totalItems}</strong> bản cập nhật
+                </span>
+                <div className="page-size-selector">
+                  <label htmlFor="update-page-size">Mỗi trang:</label>
+                  <select
+                    id="update-page-size"
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value));
+                      setCurrentPage(1);
+                    }}
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={30}>30</option>
+                  </select>
+                </div>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="pagination-controls">
+                  <button
+                    type="button"
+                    className="page-btn nav-btn"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={currentPage === 1}
+                    title="Trang đầu"
+                    aria-label="Trang đầu"
+                  >
+                    <ChevronsLeft size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="page-btn nav-btn"
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    title="Trang trước"
+                    aria-label="Trang trước"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  {getPageNumbers().map((p, idx) =>
+                    p === -1 ? (
+                      <span key={`ellipsis-${idx}`} className="page-ellipsis">
+                        ...
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        className={`page-btn number-btn ${currentPage === p ? 'active' : ''}`}
+                        onClick={() => setCurrentPage(p)}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+
+                  <button
+                    type="button"
+                    className="page-btn nav-btn"
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    title="Trang sau"
+                    aria-label="Trang sau"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    className="page-btn nav-btn"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={currentPage === totalPages}
+                    title="Trang cuối"
+                    aria-label="Trang cuối"
+                  >
+                    <ChevronsRight size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 

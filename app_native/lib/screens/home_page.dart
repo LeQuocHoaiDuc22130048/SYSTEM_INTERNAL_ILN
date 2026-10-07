@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../app/app_routes.dart';
 import '../navigation/main_tabs.dart';
@@ -12,14 +13,20 @@ import '../utils/backend_data_provider.dart';
 import '../utils/chat_provider.dart';
 import '../utils/notification_provider.dart';
 import '../models/app_permission.dart';
+import '../models/user.dart';
 import '../models/app_banner.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/quick_booking_sheet.dart';
+import '../widgets/banner_canvas.dart';
+import '../widgets/interactive_bounce.dart';
+import '../widgets/directional_slide_switcher.dart';
+import '../widgets/navigation/app_back_button.dart';
+import '../theme/app_colors.dart';
 import 'profile_page.dart';
 
 /// Home Screen designed faithfully from Stitch (Home Screen - Home Service Marketplace)
 /// Features:
-/// - Sticky TopBar with location picker, app logo avatar, notification indicator
+/// - Sticky TopBar with account profile avatar, name, role badge, notification indicator
 /// - User Greeting ("Hello, [Name] 👋")
 /// - Promotional Banner featuring the 3D Character (`assets/images/image_character.png`)
 /// - Service Categories Grid (Chức năng: Dashboard, Đơn, Kho, Nhắn tin, Quản lý nhân viên)
@@ -43,29 +50,61 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   late int _currentNavTab; // 0: Home, 1: Book (+), 2: Profile
+  bool _navigatingBack = false;
   late final PageController _bannerController;
   int _currentBannerIndex = 0;
-  int _previousBannerCount = 0;
-  Timer? _bannerTimer;
+  Timer? _bannerAutoPlayTimer;
+  int _lastAutoPlayBannerCount = 0;
+
+  void _startBannerAutoPlay(int bannerCount) {
+    _stopBannerAutoPlay();
+    if (bannerCount <= 1) return;
+    _bannerAutoPlayTimer = Timer.periodic(const Duration(seconds: 4), (timer) {
+      if (!mounted ||
+          !_bannerController.hasClients ||
+          _bannerController.positions.length != 1) {
+        return;
+      }
+      final nextPage = (_currentBannerIndex + 1) % bannerCount;
+      _bannerController.animateToPage(
+        nextPage,
+        duration: const Duration(milliseconds: 650),
+        curve: Curves.easeInOutCubic,
+      );
+    });
+  }
+
+  void _stopBannerAutoPlay() {
+    _bannerAutoPlayTimer?.cancel();
+    _bannerAutoPlayTimer = null;
+  }
+
+  void _syncBannerAutoPlay(int bannerCount) {
+    if (bannerCount <= 1) {
+      _stopBannerAutoPlay();
+      _lastAutoPlayBannerCount = bannerCount;
+      return;
+    }
+    if (_bannerAutoPlayTimer == null ||
+        _lastAutoPlayBannerCount != bannerCount) {
+      _lastAutoPlayBannerCount = bannerCount;
+      _startBannerAutoPlay(bannerCount);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _currentNavTab = widget.initialNavTab;
+    _navigatingBack = false;
     _bannerController = PageController();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         final backend = context.read<BackendDataProvider>();
-        _previousBannerCount = backend.banners.length;
-        _startBannerTimer(backend.banners.length);
-        backend.loadBanners(notify: true).then((_) {
-          if (mounted) {
-            final count = context.read<BackendDataProvider>().banners.length;
-            _previousBannerCount = count;
-            _startBannerTimer(count);
-          }
-        });
+        if (!backend.isLoadingBanners) {
+          unawaited(backend.loadBanners());
+        }
       }
     });
   }
@@ -73,41 +112,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && mounted) {
-      context.read<BackendDataProvider>().loadBanners(notify: true);
+      final backend = context.read<BackendDataProvider>();
+      if (!backend.isLoadingBanners) unawaited(backend.loadBanners());
     }
-  }
-
-  void _startBannerTimer(int count) {
-    _bannerTimer?.cancel();
-    if (count <= 1) {
-      _currentBannerIndex = 0;
-      return;
-    }
-    if (_currentBannerIndex >= count) {
-      _currentBannerIndex = 0;
-      if (_bannerController.hasClients) {
-        _bannerController.jumpToPage(0);
-      }
-    }
-    _bannerTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      if (!mounted || !_bannerController.hasClients) return;
-      final nextIndex = (_currentBannerIndex + 1) % count;
-      _bannerController.animateToPage(
-        nextIndex,
-        duration: const Duration(milliseconds: 650),
-        curve: Curves.easeInOutCubic,
-      );
-    });
-  }
-
-  void _resetBannerTimer(int count) {
-    _startBannerTimer(count);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _bannerTimer?.cancel();
+    _stopBannerAutoPlay();
     _bannerController.dispose();
     super.dispose();
   }
@@ -146,7 +159,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     {
       'id': 'messages',
       'label': 'Nhắn tin',
-      'tooltip': 'Nhắn tin',
+      'tooltip': 'Tin nhắn trao đổi',
       'tabIndex': MainTabs.messages,
       'icon': LucideIcons.messageSquare,
       'bgColor': Color(0xFFEEF2FF),
@@ -209,12 +222,42 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
+  void _switchToTab(int tabIndex, {bool? isBack}) {
+    if (_currentNavTab == tabIndex) return;
+    final bool goingBack = isBack ?? (tabIndex < _currentNavTab);
+    setState(() {
+      _navigatingBack = goingBack;
+      _currentNavTab = tabIndex;
+    });
+  }
+
+  void _goBackHome() {
+    _switchToTab(0, isBack: true);
+  }
+
+  void _navigateToProfile() {
+    if (widget.onNavigateToTab != null) {
+      widget.onNavigateToTab!(MainTabs.profile);
+    } else if (widget.showBottomNav) {
+      _switchToTab(2, isBack: false);
+    } else {
+      _navigateToTab(MainTabs.profile);
+    }
+  }
+
+  String _initials(String name) {
+    final words = name.trim().split(RegExp(r'\s+'));
+    if (words.isEmpty || words.first.isEmpty) return 'U';
+    if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
+    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
+        .toUpperCase();
+  }
+
   void _showBookingSheet({String? expertName, String? serviceName}) {
     showQuickBookingSheet(
       context,
       expertName: expertName,
       serviceName: serviceName,
-      onNavigateToTab: _navigateToTab,
     );
   }
 
@@ -231,98 +274,207 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       });
     }
 
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final notificationProvider = context.watch<NotificationProvider>();
     final unreadCount = notificationProvider.unreadCount;
     final userName =
         auth.currentUser?.name ?? auth.currentUser?.username ?? 'Alex';
 
-    final Widget bodyContent;
+    final Widget middleContent;
     if (_currentNavTab == 2) {
-      bodyContent = ProfilePage(
-        showBottomNav: false,
-        onNavigateToHome: () {
-          setState(() => _currentNavTab = 0);
-        },
-        onNavigateToTab: widget.onNavigateToTab,
+      _stopBannerAutoPlay();
+      middleContent = KeyedSubtree(
+        key: const ValueKey('profile_tab_view'),
+        child: ProfilePage(
+          hideTopBar: true,
+          showBottomNav: false,
+          onNavigateToHome: _goBackHome,
+          onNavigateToTab: widget.onNavigateToTab,
+        ),
       );
     } else {
-      bodyContent = RefreshIndicator(
-        onRefresh: () async {
-          if (!auth.isAttendanceAccount) {
-            await context.read<BackendDataProvider>().loadAll(
-              isManagerOrAbove: auth.isManagerOrAbove,
-            );
-          }
-        },
-        child: Column(
-          children: [
-            // Sticky Top Bar Header
-            _buildTopBar(unreadCount),
-
-            // Scrollable Main Content
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User Greeting Section
-                    _buildGreeting(userName),
-                    const SizedBox(height: 18),
-
-                    // Promotional Banner with 3D Character (assets/images/image_character.png)
-                    _buildPromotionalBanner(),
-                    const SizedBox(height: 22),
-
-                    // Service Categories Grid
-                    _buildServiceCategories(),
-                    const SizedBox(height: 22),
-
-                    // Top Rated Experts
-                    _buildTopRatedExperts(),
-                    const SizedBox(height: 20),
-                  ],
-                ),
-              ),
+      middleContent = KeyedSubtree(
+        key: const ValueKey('home_tab_view'),
+        child: RefreshIndicator(
+          onRefresh: () async {
+            if (!auth.isAttendanceAccount) {
+              await context.read<BackendDataProvider>().loadAll(
+                isManagerOrAbove: auth.isManagerOrAbove,
+              );
+            }
+          },
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
             ),
-          ],
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // User Greeting Section
+                _buildGreeting(userName),
+                const SizedBox(height: 18),
+
+                // Promotional Banner with 3D Character (assets/images/image_character.png)
+                _buildPromotionalBanner(),
+                const SizedBox(height: 22),
+
+                // Service Categories Grid
+                _buildServiceCategories(),
+                const SizedBox(height: 22),
+
+                // Top Rated Experts
+                _buildTopRatedExperts(),
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC), // slate-50 from Stitch
-      body: SafeArea(child: bodyContent),
-      bottomNavigationBar: widget.showBottomNav
-          ? MobileNavigationBar(
-              isDark: Theme.of(context).brightness == Brightness.dark,
-              homeSelected: _currentNavTab == 0,
-              profileSelected: _currentNavTab == 2,
-              onHome: () {
-                setState(() => _currentNavTab = 0);
-                context.read<BackendDataProvider>().loadBanners(notify: true);
-              },
-              onBooking: auth.isAuthenticated
-                  ? () => _showBookingSheet()
-                  : null,
-              onProfile: auth.can(AppPermission.viewProfile)
-                  ? () => setState(() => _currentNavTab = 2)
-                  : null,
-            )
-          : null,
+    final Widget fixedHeader = _buildFixedHeader(auth, unreadCount, isDark);
+
+    return PopScope(
+      canPop: _currentNavTab == 0,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) {
+          _goBackHome();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: isDark
+            ? AppColors.backgroundDark
+            : const Color(0xFFF8FAFC),
+        body: SafeArea(
+          child: Column(
+            children: [
+              // Fixed Header (pinned at top, does NOT slide horizontally)
+              fixedHeader,
+
+              // Middle Content (slides left when navigating forward, right when returning)
+              Expanded(
+                child: ClipRect(
+                  child: DirectionalSlideSwitcher(
+                    isForward: !_navigatingBack,
+                    child: middleContent,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        bottomNavigationBar: widget.showBottomNav
+            ? MobileNavigationBar(
+                isDark: isDark,
+                homeSelected: _currentNavTab == 0,
+                profileSelected: _currentNavTab == 2,
+                onHome: () => _switchToTab(0, isBack: true),
+                onBooking: () => _showBookingSheet(),
+                onProfile: auth.can(AppPermission.viewProfile)
+                    ? () => _switchToTab(2, isBack: false)
+                    : null,
+              )
+            : null,
+      ),
     );
   }
 
-  // 1. Top Bar Header
-  Widget _buildTopBar(int unreadCount) {
-    final auth = context.watch<AuthProvider>();
+  Widget _buildProfileTopBar(bool isDark) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Back / Home button
+          AppBackButton(
+            isDark: isDark,
+            icon: LucideIcons.chevronLeft,
+            onPressed: _goBackHome,
+          ),
+
+          // Title
+          Text(
+            'Hồ sơ của tôi',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: isDark
+                  ? AppColors.textPrimaryDark
+                  : const Color(0xFF0F172A),
+              letterSpacing: -0.2,
+            ),
+          ),
+
+          // Balance spacer matching Stitch profile top bar
+          const SizedBox(width: 38, height: 38),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFixedHeader(AuthProvider auth, int unreadCount, bool isDark) {
+    final Widget headerChild;
+    if (_currentNavTab == 2) {
+      headerChild = KeyedSubtree(
+        key: const ValueKey('profile_fixed_header'),
+        child: _buildProfileTopBar(isDark),
+      );
+    } else {
+      headerChild = KeyedSubtree(
+        key: const ValueKey('home_fixed_header'),
+        child: _buildTopBar(auth, unreadCount),
+      );
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 200),
+      switchInCurve: Curves.easeInOut,
+      switchOutCurve: Curves.easeInOut,
+      child: headerChild,
+    );
+  }
+
+  Widget _buildTopBar(AuthProvider auth, int unreadCount) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final user = auth.currentUser;
+    final userName = user?.name.isNotEmpty == true
+        ? user!.name
+        : (user?.username.isNotEmpty == true ? user!.username : 'Người dùng');
+    final roleLabel = user?.roleLabel.isNotEmpty == true
+        ? user!.roleLabel
+        : 'Nhân viên';
+    final roleColor = user?.role.avatarColor ?? const Color(0xFF2563EB);
+    final initials = _initials(userName);
+
+    String? avatarUrl = user?.avatar;
+    if (avatarUrl != null &&
+        avatarUrl.isNotEmpty &&
+        !avatarUrl.startsWith('http')) {
+      final base = auth.api.activeBaseUrl.replaceAll(RegExp(r'/+$'), '');
+      final path = avatarUrl.startsWith('/') ? avatarUrl : '/$avatarUrl';
+      avatarUrl = '$base$path';
+    }
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         border: Border(
-          bottom: BorderSide(color: const Color(0xFFF1F5F9), width: 1.2),
+          bottom: BorderSide(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
+            width: 1.2,
+          ),
         ),
         boxShadow: [
           BoxShadow(
@@ -335,124 +487,163 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Location Picker with App Logo Avatar
+          // Account Profile Info (Avatar + Name & Role)
           Expanded(
-            child: InkWell(
-              onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text(
-                      'Vị trí hiện tại: 124 Oxford St, Quận 1, TP.HCM',
-                    ),
-                    duration: Duration(seconds: 2),
-                  ),
-                );
-              },
-              borderRadius: BorderRadius.circular(20),
-              child: Row(
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    padding: const EdgeInsets.all(5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0xFFDBEAFE)),
-                    ),
-                    child: Image.asset(
-                      'assets/images/app_logo.png',
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Text(
-                          'VỊ TRÍ CỦA BẠN',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF94A3B8),
-                            letterSpacing: 0.6,
-                          ),
+            child: InteractiveBounce(
+              scaleDown: 0.96,
+              onTap: auth.can(AppPermission.viewProfile)
+                  ? _navigateToProfile
+                  : null,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 2),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: roleColor.withValues(alpha: 0.12),
+                        border: Border.all(
+                          color: roleColor.withValues(alpha: 0.3),
+                          width: 1.5,
                         ),
-                        const SizedBox(height: 1),
-                        Row(
-                          children: const [
-                            Flexible(
-                              child: Text(
-                                '124 Oxford St, Quận 1',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Color(0xFF1E293B),
+                      ),
+                      child: ClipOval(
+                        child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                            ? Image.network(
+                                avatarUrl,
+                                width: 40,
+                                height: 40,
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildAvatarFallback(initials, roleColor),
+                              )
+                            : _buildAvatarFallback(initials, roleColor),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            userName,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: isDark
+                                  ? AppColors.textPrimaryDark
+                                  : const Color(0xFF0F172A),
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 6,
+                                    vertical: 1.5,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: roleColor.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: roleColor.withValues(alpha: 0.22),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    roleLabel,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 10.5,
+                                      fontWeight: FontWeight.w600,
+                                      color: roleColor,
+                                      letterSpacing: 0.1,
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ),
-                            SizedBox(width: 3),
-                            Icon(
-                              LucideIcons.chevronDown,
-                              size: 14,
-                              color: Color(0xFF64748B),
-                            ),
-                          ],
-                        ),
-                      ],
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
           const SizedBox(width: 8),
 
           // Notification Bell Icon with Badge
-          if (auth.can(AppPermission.viewNotifications))
-            InkWell(
-              onTap: () => _navigateToTab(MainTabs.notifications),
-              borderRadius: BorderRadius.circular(20),
-              child: Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: BorderRadius.circular(12),
+          InteractiveBounce(
+            scaleDown: 0.90,
+            onTap: () => _navigateToTab(MainTabs.notifications),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      LucideIcons.bell,
+                      size: 18,
+                      color: Color(0xFF475569),
                     ),
-                    child: const Center(
-                      child: Icon(
-                        LucideIcons.bell,
-                        size: 18,
-                        color: Color(0xFF475569),
+                  ),
+                ),
+                if (unreadCount > 0)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1.5),
                       ),
                     ),
                   ),
-                  if (unreadCount > 0)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEF4444),
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+              ],
             ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAvatarFallback(String initials, Color roleColor) {
+    return Container(
+      width: 40,
+      height: 40,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: roleColor.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+      ),
+      child: Text(
+        initials,
+        style: TextStyle(
+          color: roleColor,
+          fontSize: 13,
+          fontWeight: FontWeight.w700,
+          letterSpacing: 0.5,
+        ),
       ),
     );
   }
@@ -473,7 +664,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
         const SizedBox(height: 3),
         const Text(
-          'Tìm kiếm chuyên gia & đặt dịch vụ bảo trì nhanh chóng',
+          '',
           style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
         ),
       ],
@@ -487,128 +678,119 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         (backendProvider?.banners != null &&
             backendProvider!.banners.isNotEmpty)
         ? backendProvider.banners
-        : AppBanner.defaultBanners;
+        : const [AppBanner.defaultBanner];
 
     final baseUrl = backendProvider?.api.activeBaseUrl ?? '';
 
-    if (_currentBannerIndex >= banners.length) {
-      _currentBannerIndex = 0;
+    if (banners.length == 1) {
+      _stopBannerAutoPlay();
+      return SizedBox(
+        height: 225,
+        child: _buildBannerCard(banners.first, baseUrl, 0, 1),
+      );
     }
 
-    if (_bannerTimer == null ||
-        !_bannerTimer!.isActive ||
-        _previousBannerCount != banners.length) {
-      _previousBannerCount = banners.length;
-      _startBannerTimer(banners.length);
-    }
+    _syncBannerAutoPlay(banners.length);
 
     return SizedBox(
       height: 225,
-      child: Stack(
-        children: [
-          Listener(
-            onPointerDown: (_) => _bannerTimer?.cancel(),
-            onPointerUp: (_) => _resetBannerTimer(banners.length),
-            onPointerCancel: (_) => _resetBannerTimer(banners.length),
-            child: PageView.builder(
+      child: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          if (notification is ScrollStartNotification) {
+            _stopBannerAutoPlay();
+          } else if (notification is ScrollEndNotification) {
+            _startBannerAutoPlay(banners.length);
+          }
+          return false;
+        },
+        child: AnimatedBuilder(
+          animation: _bannerController,
+          builder: (context, _) {
+            return PageView.builder(
               controller: _bannerController,
+              clipBehavior: Clip.none,
               itemCount: banners.length,
-              physics: const BouncingScrollPhysics(),
               onPageChanged: (index) {
                 setState(() {
                   _currentBannerIndex = index;
                 });
-                _resetBannerTimer(banners.length);
               },
               itemBuilder: (context, index) {
-                return AnimatedBuilder(
-                  animation: _bannerController,
-                  builder: (context, child) {
-                    double pageOffset = 0.0;
+                double factor = 1.0;
+                if (_bannerController.hasClients &&
+                    _bannerController.positions.length == 1) {
+                  try {
                     if (_bannerController.position.haveDimensions) {
-                      pageOffset =
-                          (_bannerController.page ??
-                              _currentBannerIndex.toDouble()) -
-                          index;
-                    } else {
-                      pageOffset = (_currentBannerIndex - index).toDouble();
+                      final page =
+                          _bannerController.page ??
+                          _currentBannerIndex.toDouble();
+                      final delta = (page - index).abs();
+                      factor = (1.0 - delta).clamp(0.0, 1.0);
                     }
-                    final double absOffset = pageOffset.abs().clamp(0.0, 1.0);
-                    final double scale = 1.0 - (absOffset * 0.06);
-                    final double opacity = 1.0 - (absOffset * 0.28);
-                    final double translationX = pageOffset * 14;
+                  } catch (_) {
+                    factor = (index == _currentBannerIndex) ? 1.0 : 0.0;
+                  }
+                } else {
+                  factor = (index == _currentBannerIndex) ? 1.0 : 0.0;
+                }
 
-                    return Transform.translate(
-                      offset: Offset(translationX, 0.0),
-                      child: Transform.scale(
-                        scale: scale,
-                        child: Opacity(
-                          opacity: opacity.clamp(0.0, 1.0),
-                          child: child,
+                // Smooth scale (0.94 -> 1.0) and opacity (0.75 -> 1.0) transition effect
+                final scale = 0.94 + (0.06 * factor);
+                final opacity = 0.75 + (0.25 * factor);
+
+                return RepaintBoundary(
+                  child: Transform.scale(
+                    scale: scale,
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6.0),
+                        child: _buildBannerCard(
+                          banners[index],
+                          baseUrl,
+                          _currentBannerIndex,
+                          banners.length,
                         ),
                       ),
-                    );
-                  },
-                  child: _buildBannerCard(banners[index], baseUrl),
+                    ),
+                  ),
                 );
               },
-            ),
-          ),
-
-          // Pinned Carousel Indicator Dots (Stitch modern capsule style)
-          if (banners.length > 1)
-            Positioned(
-              bottom: 12,
-              left: 20,
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: List.generate(banners.length, (dotIdx) {
-                  final isDotActive = dotIdx == _currentBannerIndex;
-                  return GestureDetector(
-                    onTap: () {
-                      _bannerController.animateToPage(
-                        dotIdx,
-                        duration: const Duration(milliseconds: 550),
-                        curve: Curves.easeInOutCubic,
-                      );
-                      _resetBannerTimer(banners.length);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 350),
-                      curve: Curves.easeOutCubic,
-                      margin: const EdgeInsets.only(right: 6),
-                      width: isDotActive ? 22 : 6,
-                      height: 6,
-                      decoration: BoxDecoration(
-                        color: isDotActive
-                            ? Colors.white
-                            : Colors.white.withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(3),
-                        boxShadow: isDotActive
-                            ? [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.35),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 1),
-                                ),
-                              ]
-                            : null,
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-        ],
+            );
+          },
+        ),
       ),
     );
   }
 
-  Widget _buildBannerCard(AppBanner banner, String baseUrl) {
+  Widget _buildBannerCard(
+    AppBanner banner,
+    String baseUrl,
+    int currentIndex,
+    int totalCount,
+  ) {
+    final design = banner.canvasDesign;
+    if (design != null) {
+      return BannerCanvas(
+        banner: banner,
+        design: design,
+        baseUrl: baseUrl,
+        mascot: _buildBannerImage(
+          banner,
+          baseUrl,
+          imageAlignment: Alignment.center,
+        ),
+        onTap: () => _handleBannerAction(banner),
+        onButtonTap: _handleBannerButtonAction,
+        textStyle: (font, style) =>
+            _getBannerTextStyle(fontFamily: font, baseStyle: style),
+      );
+    }
     return GestureDetector(
       onTap: () => _handleBannerAction(banner),
       child: Container(
         width: double.infinity,
+        height: double.infinity,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
           gradient:
@@ -625,10 +807,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   banner.backgroundImageUrl!.isNotEmpty)
               ? DecorationImage(
                   image: NetworkImage(
-                    _resolveImageUrl(banner.backgroundImageUrl, baseUrl),
+                    banner.backgroundImageUrl!.startsWith('http')
+                        ? banner.backgroundImageUrl!
+                        : '$baseUrl${banner.backgroundImageUrl}',
                   ),
                   fit: BoxFit.cover,
-                  onError: (_, _) {},
                   colorFilter: banner.darkenOverlay
                       ? ColorFilter.mode(
                           Colors.black.withValues(alpha: 0.35),
@@ -670,68 +853,70 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             // Banner text and action button
             Padding(
               padding: _getBannerTextPadding(banner.imagePosition),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Pill Deal
-                  if (banner.badgeText != null &&
-                      banner.badgeText!.isNotEmpty) ...[
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.22),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.28),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Pill Deal
+                    if (banner.badgeText != null &&
+                        banner.badgeText!.isNotEmpty) ...[
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
                         ),
-                      ),
-                      child: Text(
-                        banner.badgeText!,
-                        style: _getBannerTextStyle(
-                          fontFamily: banner.fontFamily,
-                          baseStyle: const TextStyle(
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            letterSpacing: 0.5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.22),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.28),
+                          ),
+                        ),
+                        child: Text(
+                          banner.badgeText!,
+                          style: _getBannerTextStyle(
+                            fontFamily: banner.fontFamily,
+                            baseStyle: const TextStyle(
+                              fontSize: 9.5,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              letterSpacing: 0.5,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
-                  if (banner.title.trim().isNotEmpty) ...[
-                    Text(
-                      banner.title,
-                      style: _getBannerTextStyle(
-                        fontFamily: banner.fontFamily,
-                        baseStyle: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          height: 1.25,
-                          letterSpacing: -0.2,
+                      const SizedBox(height: 8),
+                    ],
+                    if (banner.title.trim().isNotEmpty) ...[
+                      Text(
+                        banner.title,
+                        style: _getBannerTextStyle(
+                          fontFamily: banner.fontFamily,
+                          baseStyle: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white,
+                            height: 1.25,
+                            letterSpacing: -0.2,
+                          ),
                         ),
                       ),
-                    ),
+                    ],
+                    if (banner.subtitle != null &&
+                        banner.subtitle!.isNotEmpty) ...[
+                      const SizedBox(height: 4),
+                      _buildSubtitle(banner.subtitle!, banner.fontFamily),
+                    ],
+                    if (banner.buttons.isNotEmpty &&
+                        banner.buttonPosition != 'TOP_RIGHT' &&
+                        banner.buttonPosition != 'TOP_LEFT' &&
+                        banner.buttonPosition != 'CUSTOM') ...[
+                      const SizedBox(height: 12),
+                      _buildButtonsContainer(banner),
+                    ],
                   ],
-                  if (banner.subtitle != null &&
-                      banner.subtitle!.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    _buildSubtitle(banner.subtitle!, banner.fontFamily),
-                  ],
-                  if (banner.buttons.isNotEmpty &&
-                      banner.buttonPosition != 'TOP_RIGHT' &&
-                      banner.buttonPosition != 'TOP_LEFT' &&
-                      banner.buttonPosition != 'CUSTOM') ...[
-                    const SizedBox(height: 12),
-                    _buildButtonsContainer(banner),
-                  ],
-                ],
+                ),
               ),
             ),
 
@@ -740,6 +925,46 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
             // 3D Character or Custom Image based on imagePosition
             _buildPositionedMascot(banner, baseUrl),
+
+            // Carousel indicator dots (Stitch style)
+            Positioned(
+              bottom: 8,
+              left: banner.imagePosition == 'LEFT' ? null : 18,
+              right: banner.imagePosition == 'LEFT' ? 18 : null,
+              child: Row(
+                children: List.generate(totalCount > 1 ? totalCount : 3, (
+                  dotIdx,
+                ) {
+                  final isDotActive = dotIdx == currentIndex;
+                  return GestureDetector(
+                    onTap: () {
+                      if (totalCount > 1) {
+                        _stopBannerAutoPlay();
+                        _bannerController.animateToPage(
+                          dotIdx,
+                          duration: const Duration(milliseconds: 500),
+                          curve: Curves.easeInOutCubic,
+                        );
+                        _startBannerAutoPlay(totalCount);
+                      }
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeOutCubic,
+                      margin: const EdgeInsets.only(right: 4),
+                      width: isDotActive ? 16 : 5,
+                      height: 5,
+                      decoration: BoxDecoration(
+                        color: isDotActive
+                            ? Colors.white
+                            : Colors.white.withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(2.5),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            ),
           ],
         ),
       ),
@@ -784,6 +1009,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (text.contains('25% GIÁ TRỊ')) {
       final parts = text.split('25% GIÁ TRỊ');
       return RichText(
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
         text: TextSpan(
           style: baseStyle,
           children: [
@@ -795,20 +1022,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         ),
       );
     }
-    return Text(text, style: baseStyle);
+    return Text(
+      text,
+      style: baseStyle,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 
   EdgeInsets _getBannerTextPadding(String imagePosition) {
     switch (imagePosition) {
       case 'LEFT':
-        return const EdgeInsets.fromLTRB(124, 16, 18, 20);
+        return const EdgeInsets.fromLTRB(126, 14, 18, 16);
       case 'RIGHT_TOP':
-        return const EdgeInsets.fromLTRB(18, 16, 95, 20);
+        return const EdgeInsets.fromLTRB(18, 14, 95, 16);
       case 'NONE':
-        return const EdgeInsets.fromLTRB(18, 16, 18, 20);
+        return const EdgeInsets.fromLTRB(18, 14, 18, 16);
       case 'RIGHT':
       default:
-        return const EdgeInsets.fromLTRB(18, 16, 118, 20);
+        return const EdgeInsets.fromLTRB(18, 14, 118, 16);
     }
   }
 
@@ -816,18 +1048,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     if (banner.imagePosition == 'NONE' || banner.imagePosition == 'EMPTY') {
       return const SizedBox.shrink();
     }
-    // If banner has an uploaded custom image and no specific mascot image is configured, omit mascot
-    if (banner.backgroundImageUrl != null &&
-        banner.backgroundImageUrl!.isNotEmpty &&
-        (banner.imageUrl == null || banner.imageUrl!.isEmpty)) {
-      return const SizedBox.shrink();
-    }
     if (banner.imagePosition == 'LEFT') {
       return Positioned(
         left: 0,
         bottom: 0,
-        width: 120,
-        height: 120,
+        top: 0,
+        width: 150,
         child: _buildBannerImage(banner, baseUrl),
       );
     }
@@ -843,41 +1069,40 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Positioned(
       right: 0,
       bottom: 0,
-      width: 125,
-      height: 125,
+      top: 0,
+      width: 165,
       child: _buildBannerImage(banner, baseUrl),
     );
   }
 
-  String _resolveImageUrl(String? url, String baseUrl) {
-    if (url == null || url.trim().isEmpty) return '';
-    final trimmed = url.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
-      return trimmed;
-    }
-    final cleanBase = baseUrl.endsWith('/')
-        ? baseUrl.substring(0, baseUrl.length - 1)
-        : baseUrl;
-    final cleanPath = trimmed.startsWith('/') ? trimmed : '/$trimmed';
-    return '$cleanBase$cleanPath';
-  }
-
-  Widget _buildBannerImage(AppBanner banner, String baseUrl) {
+  Widget _buildBannerImage(
+    AppBanner banner,
+    String baseUrl, {
+    Alignment? imageAlignment,
+  }) {
     final imgUrl = banner.imageUrl;
+    final alignment =
+        imageAlignment ??
+        (banner.imagePosition == 'LEFT'
+            ? Alignment.bottomLeft
+            : Alignment.bottomRight);
     if (imgUrl != null && imgUrl.isNotEmpty) {
-      final fullUrl = _resolveImageUrl(imgUrl, baseUrl);
+      final fullUrl = imgUrl.startsWith('http') ? imgUrl : '$baseUrl$imgUrl';
       return Image.network(
         fullUrl,
         fit: BoxFit.contain,
+        alignment: alignment,
         errorBuilder: (_, _, _) => Image.asset(
           'assets/images/image_character.png',
           fit: BoxFit.contain,
+          alignment: alignment,
         ),
       );
     }
     return Image.asset(
       'assets/images/image_character.png',
       fit: BoxFit.contain,
+      alignment: alignment,
     );
   }
 
@@ -935,44 +1160,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return const SizedBox.shrink();
     }
 
-    final auth = context.watch<AuthProvider>();
-    final allowedButtons = banner.buttons.where((btn) {
-      if (btn.actionType == 'BOOKING') {
-        return auth.can(AppPermission.manageRepairOrders);
-      }
-      if (btn.actionType == 'REPAIR_ORDER') {
-        return auth.can(AppPermission.viewRepairOrders);
-      }
-      if (btn.actionType == 'SCREEN') {
-        final val = (btn.actionValue ?? '').toLowerCase();
-        if (val.contains('warehouse') || val.contains('kho')) {
-          return auth.can(AppPermission.viewWarehouse);
-        }
-        if (val.contains('message') ||
-            val.contains('chat') ||
-            val.contains('nhắn')) {
-          return auth.can(AppPermission.useMessages);
-        }
-        if (val.contains('employee') || val.contains('nhân viên')) {
-          return auth.canAny({
-            AppPermission.manageEmployees,
-            AppPermission.approveAccounts,
-          });
-        }
-        return auth.can(AppPermission.viewDashboard);
-      }
-      return true;
-    }).toList();
-
-    if (allowedButtons.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
     final brandColor = banner.gradientColorList.length > 2
         ? banner.gradientColorList[2]
         : const Color(0xFF1D4ED8);
 
-    final buttonWidgets = allowedButtons.map((btn) {
+    final buttonWidgets = banner.buttons.map((btn) {
       final isSecondary = btn.styleType == 'SECONDARY';
       final isOutline = btn.styleType == 'OUTLINE';
 
@@ -994,13 +1186,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                btn.text,
-                style: _getBannerTextStyle(
-                  fontFamily: banner.fontFamily,
-                  baseStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  btn.text,
+                  style: _getBannerTextStyle(
+                    fontFamily: banner.fontFamily,
+                    baseStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -1031,13 +1225,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                btn.text,
-                style: _getBannerTextStyle(
-                  fontFamily: banner.fontFamily,
-                  baseStyle: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  btn.text,
+                  style: _getBannerTextStyle(
+                    fontFamily: banner.fontFamily,
+                    baseStyle: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -1068,13 +1264,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              btn.text,
-              style: _getBannerTextStyle(
-                fontFamily: banner.fontFamily,
-                baseStyle: const TextStyle(
-                  fontSize: 11.5,
-                  fontWeight: FontWeight.bold,
+            Flexible(
+              child: Text(
+                btn.text,
+                style: _getBannerTextStyle(
+                  fontFamily: banner.fontFamily,
+                  baseStyle: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
               ),
             ),
@@ -1093,78 +1291,139 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return Wrap(spacing: 8, runSpacing: 6, children: buttonWidgets);
   }
 
-  void _handleBannerButtonAction(AppBannerButton btn) {
+  void _openBannerTab(int tabIndex) {
+    final auth = context.read<AuthProvider>();
+    if (!canAccessMainTab(auth, tabIndex)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Bạn không có quyền truy cập chức năng này.'),
+        ),
+      );
+      return;
+    }
+    _navigateToTab(tabIndex);
+  }
+
+  Future<void> _handleBannerButtonAction(AppBannerButton btn) async {
     if (btn.actionType == 'BOOKING') {
       _showBookingSheet(
         serviceName: btn.actionValue ?? 'Gói bảo trì ưu đãi 25%',
       );
     } else if (btn.actionType == 'REPAIR_ORDER') {
-      _navigateToTab(MainTabs.repairOrders);
-    } else if (btn.actionType == 'CALL') {
-      final phone = btn.actionValue ?? '0912345678';
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gọi hotline: $phone'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
+      _openBannerTab(MainTabs.repairOrders);
     } else if (btn.actionType == 'SCREEN') {
-      final val = (btn.actionValue ?? '').toLowerCase();
-      if (val.contains('warehouse') || val.contains('kho')) {
-        _navigateToTab(MainTabs.warehouse);
-      } else if (val.contains('message') ||
-          val.contains('chat') ||
-          val.contains('nhắn')) {
-        _navigateToTab(MainTabs.messages);
-      } else if (val.contains('employee') || val.contains('nhân viên')) {
-        _navigateToTab(MainTabs.employeeManagement);
-      } else {
-        _navigateToTab(MainTabs.dashboard);
+      final value = (btn.actionValue ?? '').trim().toLowerCase();
+      const routes = {
+        'dashboard': MainTabs.dashboard,
+        'repair_orders': MainTabs.repairOrders,
+        'warehouse': MainTabs.warehouse,
+        'attendance': MainTabs.attendance,
+        'notifications': MainTabs.notifications,
+        'account_approval': MainTabs.accountApproval,
+        'messages': MainTabs.messages,
+        'employee_management': MainTabs.employeeManagement,
+        'profile': MainTabs.profile,
+      };
+      final tabIndex = routes[value];
+      if (tabIndex != null) {
+        _openBannerTab(tabIndex);
+      } else if (value.contains('warehouse') || value.contains('kho')) {
+        _openBannerTab(MainTabs.warehouse);
+      } else if (value.contains('message') ||
+          value.contains('chat') ||
+          value.contains('nhắn')) {
+        _openBannerTab(MainTabs.messages);
+      } else if (value.contains('employee') || value.contains('nhân viên')) {
+        _openBannerTab(MainTabs.employeeManagement);
+      } else if (value.contains('repair') || value.contains('đơn')) {
+        _openBannerTab(MainTabs.repairOrders);
       }
-    } else if (btn.actionType == 'LINK') {
-      if (mounted && btn.actionValue != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Liên kết: ${btn.actionValue}'),
-            duration: const Duration(seconds: 2),
-          ),
+    } else if (btn.actionType == 'LINK' || btn.actionType == 'CALL') {
+      final rawTarget = (btn.actionValue ?? '').trim();
+      final target = btn.actionType == 'CALL'
+          ? rawTarget
+                .replaceFirst(RegExp(r'^tel:', caseSensitive: false), '')
+                .replaceAll(RegExp(r'[\s().-]'), '')
+          : rawTarget;
+      if (btn.actionType == 'CALL' &&
+          !RegExp(r'^\+?[0-9]{3,15}$').hasMatch(target)) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Số điện thoại của banner không hợp lệ.'),
+            ),
+          );
+        }
+        return;
+      }
+      final uri = btn.actionType == 'CALL'
+          ? Uri(scheme: 'tel', path: target)
+          : Uri.tryParse(target);
+      if (target.isEmpty ||
+          uri == null ||
+          (btn.actionType == 'LINK' &&
+              (!['http', 'https'].contains(uri.scheme) || uri.host.isEmpty))) {
+        return;
+      }
+      try {
+        final opened = await launchUrl(
+          uri,
+          mode: LaunchMode.externalApplication,
         );
+        if (!opened && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                btn.actionType == 'CALL'
+                    ? 'Không thể mở ứng dụng Điện thoại.'
+                    : 'Không thể mở liên kết này.',
+              ),
+            ),
+          );
+        }
+      } catch (_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                btn.actionType == 'CALL'
+                    ? 'Không thể mở ứng dụng Điện thoại.'
+                    : 'Không thể mở liên kết này.',
+              ),
+            ),
+          );
+        }
       }
     }
   }
 
   void _handleBannerAction(AppBanner banner) {
-    if (banner.buttons.isNotEmpty) {
-      _handleBannerButtonAction(banner.buttons.first);
-    } else {
-      _handleBannerButtonAction(
-        AppBannerButton(
-          text: banner.buttonText ?? 'Đặt lịch ngay',
-          actionType: banner.actionType,
-          actionValue: banner.actionValue,
-        ),
-      );
-    }
+    _handleBannerButtonAction(
+      AppBannerButton(
+        text: banner.buttonText ?? '',
+        actionType: banner.actionType,
+        actionValue: banner.actionValue,
+      ),
+    );
   }
 
   // 6. Service Categories Grid
   Widget _buildServiceCategories() {
+    final auth = context.watch<AuthProvider>();
+    final categories = auth.isAuthenticated && auth.currentUser != null
+        ? _categories
+              .where(
+                (category) =>
+                    canAccessMainTab(auth, category['tabIndex'] as int),
+              )
+              .toList()
+        : <Map<String, dynamic>>[];
+    if (categories.isEmpty) return const SizedBox.shrink();
+
     int unreadChats = 0;
     try {
       unreadChats = Provider.of<ChatProvider?>(context)?.totalUnreadCount ?? 0;
     } catch (_) {}
-
-    final auth = context.watch<AuthProvider>();
-    final visibleCategories = _categories.where((cat) {
-      final tabIndex = (cat['tabIndex'] as int?) ?? MainTabs.dashboard;
-      return canAccessMainTab(auth, tabIndex);
-    }).toList();
-
-    if (visibleCategories.isEmpty) {
-      return const SizedBox.shrink();
-    }
 
     return Column(
       children: [
@@ -1180,37 +1439,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 letterSpacing: -0.2,
               ),
             ),
-            if (canAccessMainTab(auth, MainTabs.dashboard))
-              InkWell(
-                onTap: () {
-                  _navigateToTab(MainTabs.dashboard);
-                },
-                child: const Text(
-                  'Xem tất cả',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2563EB),
-                  ),
-                ),
-              ),
+            // InkWell(
+            //   onTap: () {
+            //     _navigateToTab(MainTabs.dashboard);
+            //   },
+            //   child: const Text(
+            //     'Xem tất cả',
+            //     style: TextStyle(
+            //       fontSize: 12,
+            //       fontWeight: FontWeight.bold,
+            //       color: Color(0xFF2563EB),
+            //     ),
+            //   ),
+            // ),
           ],
         ),
         const SizedBox(height: 12),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: visibleCategories.length,
+          itemCount: categories.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: visibleCategories.length <= 4
-                ? (visibleCategories.isEmpty ? 1 : visibleCategories.length)
-                : 5,
+            crossAxisCount: 5,
             crossAxisSpacing: 6,
             mainAxisSpacing: 8,
-            mainAxisExtent: 96,
+            mainAxisExtent: 70 + MediaQuery.textScalerOf(context).scale(26),
           ),
           itemBuilder: (context, index) {
-            final cat = visibleCategories[index];
+            final cat = categories[index];
             final tabIndex = (cat['tabIndex'] as int?) ?? MainTabs.dashboard;
             final label = cat['label']?.toString() ?? '';
             final tooltip = cat['tooltip']?.toString() ?? label;
@@ -1229,11 +1485,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
             return Tooltip(
               message: tooltip,
-              child: InkWell(
+              child: InteractiveBounce(
+                scaleDown: 0.94,
                 onTap: () {
+                  final auth = context.read<AuthProvider>();
+                  if (!canAccessMainTab(auth, tabIndex)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'Bạn không có quyền truy cập chức năng $label.',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                    return;
+                  }
                   _navigateToTab(tabIndex);
                 },
-                borderRadius: BorderRadius.circular(16),
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     vertical: 8,
@@ -1366,23 +1634,18 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 ],
               ),
             ),
-            if (canAccessMainTab(
-              context.watch<AuthProvider>(),
-              MainTabs.employeeManagement,
-            )) ...[
-              const SizedBox(width: 8),
-              InkWell(
-                onTap: () => _navigateToTab(MainTabs.employeeManagement),
-                child: const Text(
-                  'Xem tất cả',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF2563EB),
-                  ),
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () => _navigateToTab(MainTabs.employeeManagement),
+              child: const Text(
+                'Xem tất cả',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF2563EB),
                 ),
               ),
-            ],
+            ),
           ],
         ),
         const SizedBox(height: 12),
@@ -1470,21 +1733,21 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            Flexible(
-                              child: Text(
-                                exp['name'] as String,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1E293B),
-                                ),
+                            Text(
+                              exp['name'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF1E293B),
                               ),
                             ),
-                            const SizedBox(width: 6),
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 5,
@@ -1516,14 +1779,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Row(
+                        Wrap(
+                          spacing: 2,
+                          crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
                             const Icon(
                               Icons.star_rounded,
                               size: 14,
                               color: Color(0xFFF59E0B),
                             ),
-                            const SizedBox(width: 2),
                             Text(
                               '${exp['rating']}',
                               style: const TextStyle(
@@ -1532,7 +1796,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 color: Color(0xFF334155),
                               ),
                             ),
-                            const SizedBox(width: 3),
                             Text(
                               '(${exp['reviews']})',
                               style: const TextStyle(
@@ -1558,32 +1821,29 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   ),
 
                   // Action Book Button
-                  if (context.watch<AuthProvider>().can(
-                    AppPermission.manageRepairOrders,
-                  ))
-                    ElevatedButton(
-                      onPressed: () =>
-                          _showBookingSheet(expertName: exp['name'] as String),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF2563EB),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 7,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
+                  InteractiveBounce(
+                    scaleDown: 0.92,
+                    onTap: () =>
+                        _showBookingSheet(expertName: exp['name'] as String),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 7,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2563EB),
+                        borderRadius: BorderRadius.circular(12),
                       ),
                       child: const Text(
                         'Đặt lịch',
                         style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
                     ),
+                  ),
                 ],
               ),
             );

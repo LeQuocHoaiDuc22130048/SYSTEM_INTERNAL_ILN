@@ -80,7 +80,7 @@ bool canAccessMainTab(AuthProvider auth, int tabIndex) {
     case MainTabs.warehouse:
       return auth.can(AppPermission.viewWarehouse);
     case MainTabs.attendance:
-      return false;
+      return !Platform.isIOS && auth.can(AppPermission.viewAttendance);
     case MainTabs.messages:
       return auth.can(AppPermission.useMessages);
     case MainTabs.notifications:

@@ -94,6 +94,7 @@ public class AppBannerController {
             @RequestParam(value = "imageUrl", required = false) String imageUrl,
             @RequestParam(value = "imagePosition", required = false, defaultValue = "RIGHT") String imagePosition,
             @RequestParam(value = "fontFamily", required = false, defaultValue = "Be Vietnam Pro") String fontFamily,
+            @RequestParam(value = "designJson", required = false) String designJson,
             @RequestParam(value = "backgroundImageUrl", required = false) String backgroundImageUrl,
             @RequestParam(value = "darkenOverlay", required = false) Boolean darkenOverlay,
             @RequestParam(value = "gradientColors", required = false) String gradientColors,
@@ -124,6 +125,7 @@ public class AppBannerController {
                 .imageUrl(imageUrl)
                 .imagePosition(imagePosition)
                 .fontFamily(fontFamily)
+                .designJson(designJson)
                 .backgroundImageUrl(backgroundImageUrl)
                 .darkenOverlay(darkenOverlay)
                 .gradientColors(gradientColors)
@@ -170,6 +172,7 @@ public class AppBannerController {
             @RequestParam(value = "imageUrl", required = false) String imageUrl,
             @RequestParam(value = "imagePosition", required = false) String imagePosition,
             @RequestParam(value = "fontFamily", required = false) String fontFamily,
+            @RequestParam(value = "designJson", required = false) String designJson,
             @RequestParam(value = "backgroundImageUrl", required = false) String backgroundImageUrl,
             @RequestParam(value = "darkenOverlay", required = false) Boolean darkenOverlay,
             @RequestParam(value = "gradientColors", required = false) String gradientColors,
@@ -200,6 +203,7 @@ public class AppBannerController {
                 .imageUrl(imageUrl)
                 .imagePosition(imagePosition)
                 .fontFamily(fontFamily)
+                .designJson(designJson)
                 .backgroundImageUrl(backgroundImageUrl)
                 .darkenOverlay(darkenOverlay)
                 .gradientColors(gradientColors)

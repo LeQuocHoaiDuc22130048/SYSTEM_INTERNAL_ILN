@@ -19,27 +19,17 @@ import 'package:system_inverter_likenew/widgets/navigation/mobile_navigation_bar
 import 'package:system_inverter_likenew/theme/app_colors.dart';
 
 class _AuthenticatedUser extends AuthProvider {
-  _AuthenticatedUser(
-    ApiClient api, {
-    this.allowProfile = true,
-    this.customPermissions,
-  }) : super(apiClient: api);
+  _AuthenticatedUser(ApiClient api, {this.allowProfile = true})
+    : super(apiClient: api);
 
   final bool allowProfile;
-  final Set<AppPermission>? customPermissions;
-
   @override
   bool get isAuthenticated => true;
-
   @override
-  bool can(AppPermission permission) {
-    if (customPermissions != null) {
-      return customPermissions!.contains(permission);
-    }
-    return permission == AppPermission.viewNotifications ||
-        permission == AppPermission.useMessages ||
-        (allowProfile && permission == AppPermission.viewProfile);
-  }
+  bool can(AppPermission permission) =>
+      permission == AppPermission.viewNotifications ||
+      permission == AppPermission.useMessages ||
+      (allowProfile && permission == AppPermission.viewProfile);
 }
 
 void main() {
@@ -99,7 +89,6 @@ void main() {
   Future<void> openScreen(
     WidgetTester tester, {
     bool allowProfile = true,
-    Set<AppPermission>? customPermissions,
   }) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -121,11 +110,7 @@ void main() {
       MultiProvider(
         providers: [
           ChangeNotifierProvider<AuthProvider>(
-            create: (_) => _AuthenticatedUser(
-              api,
-              allowProfile: allowProfile,
-              customPermissions: customPermissions,
-            ),
+            create: (_) => _AuthenticatedUser(api, allowProfile: allowProfile),
           ),
           ChangeNotifierProvider(create: (_) => ThemeProvider()),
           ChangeNotifierProvider(create: (_) => notifications),
@@ -154,7 +139,7 @@ void main() {
   }
 
   testWidgets(
-    'functional screen opens quick actions, profile and home from the common navbar',
+    'functional screen opens booking, profile and home from the common navbar',
     (tester) async {
       await openScreen(tester);
       final nav = find.byType(MobileNavigationBar);
@@ -166,9 +151,7 @@ void main() {
         find.descendant(of: nav, matching: find.byIcon(LucideIcons.plus)),
       );
       await tester.pumpAndSettle();
-      expect(find.text('Tạo mới & Thao tác nhanh'), findsOneWidget);
-      expect(find.text('Cuộc trò chuyện mới'), findsOneWidget);
-      expect(find.text('Xác nhận đặt lịch'), findsNothing);
+      expect(find.text('Xác nhận đặt lịch'), findsOneWidget);
       await tester.tap(find.byIcon(LucideIcons.x));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -200,65 +183,4 @@ void main() {
       findsNothing,
     );
   });
-
-  testWidgets(
-    'quick actions sheet displays options flexibly based on user permissions',
-    (tester) async {
-      await openScreen(
-        tester,
-        customPermissions: {
-          AppPermission.manageRepairOrders,
-          AppPermission.manageWarehouse,
-          AppPermission.viewNotifications,
-        },
-      );
-      final nav = find.byType(MobileNavigationBar);
-      await tester.tap(
-        find.descendant(of: nav, matching: find.byIcon(LucideIcons.plus)),
-      );
-      await tester.pumpAndSettle();
-
-      // Permitted actions must appear
-      expect(find.text('Tạo đơn sửa chữa'), findsOneWidget);
-      expect(find.text('Vị trí kho & Kệ hàng'), findsOneWidget);
-      expect(find.text('Kho bo mạch & Linh kiện'), findsOneWidget);
-
-      // Actions without permission must NOT appear
-      expect(find.text('Cuộc trò chuyện mới'), findsNothing);
-      expect(find.text('Chấm công khuôn mặt AI'), findsNothing);
-
-      // Quick booking form is removed from general quick action sheet
-      expect(find.text('Xác nhận đặt lịch'), findsNothing);
-
-      await tester.tap(find.byIcon(LucideIcons.x));
-      await tester.pumpAndSettle();
-    },
-  );
-
-  testWidgets(
-    'face attendance is hidden from quick actions even if user has viewAttendance',
-    (tester) async {
-      await openScreen(
-        tester,
-        customPermissions: {
-          AppPermission.viewAttendance,
-          AppPermission.useMessages,
-        },
-      );
-      final nav = find.byType(MobileNavigationBar);
-      await tester.tap(
-        find.descendant(of: nav, matching: find.byIcon(LucideIcons.plus)),
-      );
-      await tester.pumpAndSettle();
-
-      // Messages must appear
-      expect(find.text('Cuộc trò chuyện mới'), findsOneWidget);
-
-      // Face attendance must NOT appear because it is reserved for the attendance device
-      expect(find.text('Chấm công khuôn mặt AI'), findsNothing);
-
-      await tester.tap(find.byIcon(LucideIcons.x));
-      await tester.pumpAndSettle();
-    },
-  );
 }

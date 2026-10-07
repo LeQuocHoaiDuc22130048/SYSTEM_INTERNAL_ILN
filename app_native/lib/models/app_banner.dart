@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'banner_canvas_design.dart';
 
 class AppBannerButton {
   final String text;
@@ -41,8 +42,7 @@ class AppBanner {
   final String? buttonText;
   final String actionType; // BOOKING, REPAIR_ORDER, LINK, SCREEN, CALL, NONE
   final String? actionValue;
-  final String
-  buttonPosition; // BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT, TOP_RIGHT, TOP_LEFT, CUSTOM
+  final String buttonPosition; // BOTTOM_LEFT, BOTTOM_CENTER, BOTTOM_RIGHT, TOP_RIGHT, TOP_LEFT, CUSTOM
   final double? buttonTop;
   final double? buttonBottom;
   final double? buttonLeft;
@@ -51,6 +51,8 @@ class AppBanner {
   final String? imageUrl;
   final String imagePosition; // RIGHT, LEFT, RIGHT_TOP, NONE
   final String fontFamily;
+  final String? designJson;
+  BannerCanvasDesign? get canvasDesign => BannerCanvasDesign.parse(designJson);
   final String? backgroundImageUrl;
   final bool darkenOverlay;
   final String gradientColors;
@@ -74,6 +76,7 @@ class AppBanner {
     this.imageUrl,
     this.imagePosition = 'RIGHT',
     this.fontFamily = 'Be Vietnam Pro',
+    this.designJson,
     this.backgroundImageUrl,
     this.darkenOverlay = false,
     this.gradientColors = '#2563EB,#4F46E5,#1D4ED8',
@@ -86,10 +89,8 @@ class AppBanner {
     final rawActionType = json['actionType']?.toString() ?? 'BOOKING';
     final rawActionValue = json['actionValue']?.toString();
 
-    final hasButtonsList =
-        json.containsKey('buttons') && json['buttons'] is List;
-    final hasButtonsJson =
-        json.containsKey('buttonsJson') && json['buttonsJson'] != null;
+    final hasButtonsList = json.containsKey('buttons') && json['buttons'] is List;
+    final hasButtonsJson = json.containsKey('buttonsJson') && json['buttonsJson'] != null;
 
     final parsedButtons = <AppBannerButton>[];
     if (json['buttons'] is List) {
@@ -97,21 +98,16 @@ class AppBanner {
         if (item is Map<String, dynamic>) {
           parsedButtons.add(AppBannerButton.fromJson(item));
         } else if (item is Map) {
-          parsedButtons.add(
-            AppBannerButton.fromJson(Map<String, dynamic>.from(item)),
-          );
+          parsedButtons.add(AppBannerButton.fromJson(Map<String, dynamic>.from(item)));
         }
       }
-    } else if (json['buttonsJson'] is String &&
-        json['buttonsJson'].toString().trim().isNotEmpty) {
+    } else if (json['buttonsJson'] is String && json['buttonsJson'].toString().trim().isNotEmpty) {
       try {
         final decoded = jsonDecode(json['buttonsJson']);
         if (decoded is List) {
           for (final item in decoded) {
             if (item is Map) {
-              parsedButtons.add(
-                AppBannerButton.fromJson(Map<String, dynamic>.from(item)),
-              );
+              parsedButtons.add(AppBannerButton.fromJson(Map<String, dynamic>.from(item)));
             }
           }
         }
@@ -119,18 +115,13 @@ class AppBanner {
     }
 
     // Only fallback if buttons list or buttonsJson was not provided at all, and buttonText is not empty
-    if (parsedButtons.isEmpty &&
-        !hasButtonsList &&
-        !hasButtonsJson &&
-        rawBtnText.isNotEmpty) {
-      parsedButtons.add(
-        AppBannerButton(
-          text: rawBtnText,
-          actionType: rawActionType,
-          actionValue: rawActionValue,
-          styleType: 'PRIMARY',
-        ),
-      );
+    if (parsedButtons.isEmpty && !hasButtonsList && !hasButtonsJson && rawBtnText.isNotEmpty) {
+      parsedButtons.add(AppBannerButton(
+        text: rawBtnText,
+        actionType: rawActionType,
+        actionValue: rawActionValue,
+        styleType: 'PRIMARY',
+      ));
     }
 
     return AppBanner(
@@ -150,6 +141,7 @@ class AppBanner {
       imageUrl: json['imageUrl']?.toString(),
       imagePosition: json['imagePosition']?.toString() ?? 'RIGHT',
       fontFamily: json['fontFamily']?.toString() ?? 'Be Vietnam Pro',
+      designJson: json['designJson']?.toString(),
       backgroundImageUrl: json['backgroundImageUrl']?.toString(),
       darkenOverlay: json['darkenOverlay'] == true,
       gradientColors:
@@ -177,6 +169,7 @@ class AppBanner {
       'imageUrl': imageUrl,
       'imagePosition': imagePosition,
       'fontFamily': fontFamily,
+      'designJson': designJson,
       'backgroundImageUrl': backgroundImageUrl,
       'darkenOverlay': darkenOverlay,
       'gradientColors': gradientColors,
@@ -205,7 +198,11 @@ class AppBanner {
         return colors;
       }
     } catch (_) {}
-    return const [Color(0xFF2563EB), Color(0xFF4F46E5), Color(0xFF1D4ED8)];
+    return const [
+      Color(0xFF2563EB),
+      Color(0xFF4F46E5),
+      Color(0xFF1D4ED8),
+    ];
   }
 
   static const AppBanner defaultBanner = AppBanner(
@@ -230,52 +227,4 @@ class AppBanner {
     displayOrder: 1,
     isActive: true,
   );
-
-  static const List<AppBanner> defaultBanners = [
-    defaultBanner,
-    AppBanner(
-      id: 'default-repair',
-      title: 'Sửa Chữa Biến Tần Inverter Like New',
-      badgeText: '⚡ DỊCH VỤ UY TÍN',
-      subtitle: 'Kiểm tra & Báo giá nhanh chóng - Bảo hành 6-12 tháng',
-      buttonText: 'Đặt lịch sửa chữa',
-      actionType: 'BOOKING',
-      actionValue: 'Dịch vụ sửa chữa Like New',
-      buttonPosition: 'BOTTOM_LEFT',
-      buttons: [
-        AppBannerButton(
-          text: 'Đặt lịch sửa chữa',
-          actionType: 'BOOKING',
-          actionValue: 'Dịch vụ sửa chữa Like New',
-          styleType: 'PRIMARY',
-        ),
-      ],
-      imagePosition: 'RIGHT',
-      gradientColors: '#1E293B,#0F172A,#1E3A8A',
-      displayOrder: 2,
-      isActive: true,
-    ),
-    AppBanner(
-      id: 'default-warehouse',
-      title: 'Linh Kiện & Board Mạch Biến Tần',
-      badgeText: '🔥 LIKE NEW 100%',
-      subtitle: 'IGBT, Tụ công suất, Driver board sẵn kho giao ngay',
-      buttonText: 'Xem kho linh kiện',
-      actionType: 'SCREEN',
-      actionValue: 'warehouse',
-      buttonPosition: 'BOTTOM_LEFT',
-      buttons: [
-        AppBannerButton(
-          text: 'Xem kho linh kiện',
-          actionType: 'SCREEN',
-          actionValue: 'warehouse',
-          styleType: 'PRIMARY',
-        ),
-      ],
-      imagePosition: 'RIGHT',
-      gradientColors: '#0F766E,#0D9488,#115E59',
-      displayOrder: 3,
-      isActive: true,
-    ),
-  ];
 }

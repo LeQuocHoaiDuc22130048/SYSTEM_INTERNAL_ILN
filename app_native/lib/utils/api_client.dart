@@ -228,8 +228,7 @@ class ApiClient {
   }
 
   Map<String, String> _diagnosticHeaders() {
-    final requestId =
-        '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+    final requestId = '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
     return {
       'X-Request-Id': requestId,
       'X-Device-Id': _deviceId,

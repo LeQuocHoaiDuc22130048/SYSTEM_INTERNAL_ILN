@@ -10,7 +10,6 @@ import '../models/board.dart';
 import '../models/board_history_item.dart';
 import '../models/part.dart';
 import '../models/store_location.dart';
-import '../models/user.dart';
 import '../widgets/location_picker_dialog.dart';
 import '../widgets/modal_top_bar.dart';
 import 'scanner_page.dart';
@@ -224,7 +223,6 @@ class _WarehousePageState extends State<WarehousePage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backend = context.watch<BackendDataProvider>();
-    final auth = context.watch<AuthProvider>();
     final boards = backend.boards;
     final parts = backend.parts;
 
@@ -291,25 +289,23 @@ class _WarehousePageState extends State<WarehousePage> {
                       ),
                       Row(
                         children: [
-                          if (auth.can(AppPermission.manageWarehouse)) ...[
-                            ElevatedButton.icon(
-                              onPressed: () {
-                                _showAddSelectionSheet();
-                              },
-                              icon: const Icon(Icons.add, size: 16),
-                              label: const Text(
-                                'Thêm',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 10,
-                                ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              _showAddSelectionSheet();
+                            },
+                            icon: const Icon(Icons.add, size: 16),
+                            label: const Text(
+                              'Thêm',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 10,
                               ),
                             ),
-                            const SizedBox(width: 6),
-                          ],
+                          ),
+                          const SizedBox(width: 6),
                           ElevatedButton.icon(
                             onPressed: () async {
                               final result = await Navigator.push(
@@ -3742,9 +3738,10 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final canManageWarehouse = auth.can(AppPermission.manageWarehouse);
-    final canDeleteWarehouse = auth.can(AppPermission.deleteWarehouse);
+    final isEmployee = Provider.of<AuthProvider>(
+      context,
+      listen: false,
+    ).isEmployee;
 
     return Container(
       constraints: BoxConstraints(
@@ -3809,17 +3806,16 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                             ],
                           ),
                         ),
-                        if (canManageWarehouse)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.edit,
-                              size: 20,
-                              color: AppColors.primary,
-                            ),
-                            onPressed: widget.onEdit,
-                            tooltip: 'Chỉnh sửa',
+                        IconButton(
+                          icon: const Icon(
+                            Icons.edit,
+                            size: 20,
+                            color: AppColors.primary,
                           ),
-                        if (canDeleteWarehouse)
+                          onPressed: widget.onEdit,
+                          tooltip: 'Chỉnh sửa',
+                        ),
+                        if (!isEmployee)
                           IconButton(
                             icon: const Icon(
                               Icons.delete,
@@ -4177,48 +4173,47 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        if (canManageWarehouse)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              vertical: 10,
-                              horizontal: 14,
-                            ),
-                            margin: const EdgeInsets.only(bottom: 12),
-                            decoration: BoxDecoration(
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 14,
+                          ),
+                          margin: const EdgeInsets.only(bottom: 12),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? Colors.amber.withValues(alpha: 0.12)
+                                : const Color(0xFFFFFBEB),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
                               color: isDark
-                                  ? Colors.amber.withValues(alpha: 0.12)
-                                  : const Color(0xFFFFFBEB),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(
-                                color: isDark
-                                    ? Colors.amber.withValues(alpha: 0.3)
-                                    : const Color(0xFFFDE68A),
-                              ),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  Icons.qr_code_scanner,
-                                  size: 18,
-                                  color: isDark
-                                      ? Colors.amber
-                                      : const Color(0xFFD97706),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    'Quét mã QR linh kiện để thực hiện thao tác Lấy / Trả bo mạch.',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDark
-                                          ? Colors.amber.shade200
-                                          : const Color(0xFF92400E),
-                                    ),
-                                  ),
-                                ),
-                              ],
+                                  ? Colors.amber.withValues(alpha: 0.3)
+                                  : const Color(0xFFFDE68A),
                             ),
                           ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                Icons.qr_code_scanner,
+                                size: 18,
+                                color: isDark
+                                    ? Colors.amber
+                                    : const Color(0xFFD97706),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Quét mã QR linh kiện để thực hiện thao tác Lấy / Trả bo mạch.',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: isDark
+                                        ? Colors.amber.shade200
+                                        : const Color(0xFF92400E),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                         OutlinedButton(
                           onPressed: () => Navigator.pop(context),
                           style: OutlinedButton.styleFrom(
@@ -4240,8 +4235,7 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                           child: const Text('Đóng'),
                         ),
                       ),
-                      if (canManageWarehouse &&
-                          widget.board.status == BoardStatus.available) ...[
+                      if (widget.board.status == BoardStatus.available) ...[
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
@@ -4253,8 +4247,7 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                           ),
                         ),
                       ],
-                      if (canManageWarehouse &&
-                          widget.board.status == BoardStatus.checkedOut) ...[
+                      if (widget.board.status == BoardStatus.checkedOut) ...[
                         const SizedBox(width: 12),
                         Expanded(
                           child: ElevatedButton(
@@ -4485,9 +4478,6 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final auth = Provider.of<AuthProvider>(context, listen: false);
-    final canManageWarehouse = auth.can(AppPermission.manageWarehouse);
-    final canDeleteWarehouse = auth.can(AppPermission.deleteWarehouse);
     final part = widget.part;
 
     final bool isOutOfStock = part.totalQuantity == 0;
@@ -4584,19 +4574,17 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
                             ],
                           ),
                         ),
-                        if (canManageWarehouse)
-                          IconButton(
-                            icon: const Icon(Icons.edit_outlined),
-                            onPressed: widget.onEdit,
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          onPressed: widget.onEdit,
+                        ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            color: AppColors.error,
                           ),
-                        if (canDeleteWarehouse)
-                          IconButton(
-                            icon: const Icon(
-                              Icons.delete_outline,
-                              color: AppColors.error,
-                            ),
-                            onPressed: widget.onDelete,
-                          ),
+                          onPressed: widget.onDelete,
+                        ),
                       ],
                     ),
                     const Divider(height: 24),
@@ -4736,7 +4724,7 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
                     const SizedBox(height: 20),
                     if (_isLoading)
                       const Center(child: CircularProgressIndicator())
-                    else if (canManageWarehouse)
+                    else
                       Row(
                         children: [
                           Expanded(

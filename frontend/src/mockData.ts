@@ -12,6 +12,7 @@ export interface EmployeeMonthlyStats {
   dailyPattern: string; // p=present, l=late, a=absent, v=leave, h=holiday/weekend, o=overtime, f=future
   dailyWorkDays?: Record<string | number, number>;
   updateNotes?: Record<string | number, string>;
+  dailyTimes?: Record<string | number, string>;
   notes?: string;
 }
 

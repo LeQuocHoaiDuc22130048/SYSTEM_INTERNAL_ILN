@@ -42,9 +42,8 @@ class AppBackButton extends StatelessWidget {
                 : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: effectiveDark
-                  ? AppColors.borderDark
-                  : const Color(0xFFE2E8F0),
+              color:
+                  effectiveDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
             ),
           ),
           child: Center(
@@ -61,7 +60,10 @@ class AppBackButton extends StatelessWidget {
     );
 
     if (tooltip != null && tooltip!.isNotEmpty) {
-      return Tooltip(message: tooltip!, child: button);
+      return Tooltip(
+        message: tooltip!,
+        child: button,
+      );
     }
 
     return button;

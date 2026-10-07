@@ -3,15 +3,13 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../app/app_routes.dart';
-import '../app/theme_provider.dart';
 import '../models/user.dart';
-import '../navigation/main_tabs.dart';
 import '../theme/app_colors.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../utils/notification_provider.dart';
 import '../utils/update_provider.dart';
-import '../widgets/navigation/mobile_dashboard_app_bar.dart';
+import '../widgets/navigation/app_back_button.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/quick_booking_sheet.dart';
 import 'privacy_policy_page.dart';
@@ -39,129 +37,143 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider?>(context);
-    final isDark =
-        themeProvider?.isDark ??
-        (Theme.of(context).brightness == Brightness.dark);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final auth = Provider.of<AuthProvider>(context);
     final user = auth.currentUser;
     final name = user?.name ?? 'Người dùng';
     final initials = _initials(name);
-    final updateProvider = Provider.of<UpdateProvider?>(context);
-    final currentVersion = updateProvider?.currentVersion ?? '1.0.0';
+    final updateProvider = context.watch<UpdateProvider>();
+    final currentVersion = updateProvider.currentVersion;
 
     return Scaffold(
-      backgroundColor: isDark
-          ? AppColors.backgroundDark
-          : const Color(0xFFF8FAFC),
-      appBar: widget.hideTopBar ? null : _buildTopBar(isDark, user),
+      backgroundColor: isDark ? AppColors.backgroundDark : const Color(0xFFF8FAFC),
       body: SafeArea(
-        top: widget.hideTopBar,
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-          child: Column(
-            children: [
-              // Hero Section: Avatar with Camera Badge, Name, Handle, Edit Profile Pill
-              _buildHeroSection(isDark, user, name, initials),
-              const SizedBox(height: 24),
+        child: Column(
+          children: [
+            // Top Navigation Bar matching Stitch
+            if (!widget.hideTopBar) _buildTopBar(isDark, user),
 
-              // Section 1: Thông tin tài khoản (Preserved from old version)
-              _buildSectionHeader(isDark, 'THÔNG TIN TÀI KHOẢN'),
-              const SizedBox(height: 8),
-              _buildAccountInfoCard(isDark, user),
-              const SizedBox(height: 24),
+            // Scrollable Profile Content
+            Expanded(
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+                child: Column(
+                  children: [
+                    // Hero Section: Avatar with Camera Badge, Name, Handle, Edit Profile Pill
+                    _buildHeroSection(isDark, user, name, initials),
+                    const SizedBox(height: 24),
 
-              // Section 2: Cài đặt & Tiện ích (Preserved from old version)
-              _buildSectionHeader(isDark, 'CÀI ĐẶT & HỆ THỐNG'),
-              const SizedBox(height: 8),
-              _buildSettingsCard(isDark, user, currentVersion),
-              const SizedBox(height: 24),
+                    // Section 1: Thông tin tài khoản (Preserved from old version)
+                    _buildSectionHeader(isDark, 'THÔNG TIN TÀI KHOẢN'),
+                    const SizedBox(height: 8),
+                    _buildAccountInfoCard(isDark, user),
+                    const SizedBox(height: 24),
 
-              // Section 3: Tài khoản & Thao tác nguy hiểm (Preserved from old version)
-              _buildSectionHeader(isDark, 'BẢO MẬT & TÀI KHOẢN'),
-              const SizedBox(height: 8),
-              _buildSecurityActionsCard(isDark, user),
-            ],
-          ),
+                    // Section 2: Cài đặt & Tiện ích (Preserved from old version)
+                    _buildSectionHeader(isDark, 'CÀI ĐẶT & HỆ THỐNG'),
+                    const SizedBox(height: 8),
+                    _buildSettingsCard(isDark, user, currentVersion),
+                    const SizedBox(height: 24),
+
+                    // Section 3: Tài khoản & Thao tác nguy hiểm (Preserved from old version)
+                    _buildSectionHeader(isDark, 'BẢO MẬT & TÀI KHOẢN'),
+                    const SizedBox(height: 8),
+                    _buildSecurityActionsCard(isDark, user),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
       bottomNavigationBar: widget.showBottomNav
           ? MobileNavigationBar(
               isDark: isDark,
               profileSelected: true,
-              onHome:
-                  widget.onNavigateToHome ??
-                  () => Navigator.of(
-                    context,
-                  ).pushReplacementNamed(AppRoutes.home),
-              onBooking: auth.isAuthenticated
-                  ? () => showQuickBookingSheet(
-                      context,
-                      onNavigateToTab: widget.onNavigateToTab != null
-                          ? (tabIndex) => widget.onNavigateToTab!(tabIndex)
-                          : null,
-                    )
-                  : null,
+              onHome: widget.onNavigateToHome ??
+                  () => Navigator.of(context).pushReplacementNamed(AppRoutes.home),
+              onBooking: () => showQuickBookingSheet(context),
               onProfile: () {},
             )
           : null,
     );
   }
 
-  // 1. Top Navigation Bar (Synchronized with DashboardMobileAppBar)
-  PreferredSizeWidget _buildTopBar(bool isDark, User? user) {
+  // 1. Top Navigation Bar (Stitch style)
+  Widget _buildTopBar(bool isDark, User? user) {
     final canPop = Navigator.of(context).canPop();
-    final themeProvider = Provider.of<ThemeProvider?>(context);
-    final notificationProvider = Provider.of<NotificationProvider?>(context);
-    final unreadNotifications = notificationProvider?.unreadCount ?? 0;
-    final notificationBadge = unreadNotifications > 99
-        ? '99+'
-        : unreadNotifications.toString();
-    final auth = Provider.of<AuthProvider>(context);
 
-    return DashboardMobileAppBar(
-      isDark: isDark,
-      notificationBadge: notificationBadge,
-      onToggleTheme: () => themeProvider?.toggleTheme(),
-      onToggleNotifications: () {
-        if (widget.onNavigateToTab != null) {
-          widget.onNavigateToTab!(MainTabs.notifications);
-        } else {
-          Navigator.of(
-            context,
-          ).pushNamed(AppRoutes.dashboard, arguments: MainTabs.notifications);
-        }
-      },
-      showNotification: auth.can(AppPermission.viewNotifications),
-      onBack: () {
-        if (widget.onNavigateToHome != null) {
-          widget.onNavigateToHome!();
-        } else if (canPop) {
-          Navigator.of(context).maybePop();
-        } else {
-          Navigator.of(context).pushReplacementNamed(AppRoutes.home);
-        }
-      },
-      title: Text(
-        'Hồ sơ của tôi',
-        style: TextStyle(
-          fontSize: 17,
-          fontWeight: FontWeight.w700,
-          color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
-          letterSpacing: -0.2,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: isDark ? AppColors.borderDark : const Color(0xFFF1F5F9),
+            width: 1.0,
+          ),
         ),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          // Back / Home button
+          AppBackButton(
+            isDark: isDark,
+            icon: (widget.onNavigateToHome != null || canPop)
+                ? LucideIcons.chevronLeft
+                : LucideIcons.house,
+            onPressed: () {
+              if (widget.onNavigateToHome != null) {
+                widget.onNavigateToHome!();
+              } else if (canPop) {
+                Navigator.of(context).maybePop();
+              } else {
+                Navigator.of(context).pushReplacementNamed(AppRoutes.home);
+              }
+            },
+          ),
+
+          // Title
+          Text(
+            'Hồ sơ của tôi',
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
+              letterSpacing: -0.2,
+            ),
+          ),
+
+          // Settings Action Button
+          InkWell(
+            onTap: user == null ? null : () => _showAccountSettings(user),
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+                ),
+              ),
+              child: Icon(
+                LucideIcons.settings,
+                size: 18,
+                color: isDark ? AppColors.textPrimaryDark : const Color(0xFF334155),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
 
   // 2. Hero Avatar & Profile Identity
-  Widget _buildHeroSection(
-    bool isDark,
-    User? user,
-    String name,
-    String initials,
-  ) {
+  Widget _buildHeroSection(bool isDark, User? user, String name, String initials) {
     return Column(
       children: [
         const SizedBox(height: 8),
@@ -204,47 +216,38 @@ class _ProfilePageState extends State<ProfilePage> {
               ),
 
               // Camera Icon Badge at bottom-right
-              if (Provider.of<AuthProvider>(
-                context,
-              ).can(AppPermission.updateOwnProfile))
-                Positioned(
-                  bottom: 0,
-                  right: 0,
-                  child: InkWell(
-                    onTap: user == null
-                        ? null
-                        : () => _showAccountSettings(user),
-                    borderRadius: BorderRadius.circular(20),
-                    child: Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: isDark
-                              ? AppColors.borderDark
-                              : const Color(0xFFCBD5E1),
-                          width: 1.5,
+              Positioned(
+                bottom: 0,
+                right: 0,
+                child: InkWell(
+                  onTap: user == null ? null : () => _showAccountSettings(user),
+                  borderRadius: BorderRadius.circular(20),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: isDark ? AppColors.borderDark : const Color(0xFFCBD5E1),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.10),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
                         ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.10),
-                            blurRadius: 6,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Icon(
-                        LucideIcons.camera,
-                        size: 15,
-                        color: isDark
-                            ? AppColors.textPrimaryDark
-                            : const Color(0xFF475569),
-                      ),
+                      ],
+                    ),
+                    child: Icon(
+                      LucideIcons.camera,
+                      size: 15,
+                      color: isDark ? AppColors.textPrimaryDark : const Color(0xFF475569),
                     ),
                   ),
                 ),
+              ),
             ],
           ),
         ),
@@ -290,43 +293,41 @@ class _ProfilePageState extends State<ProfilePage> {
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : const Color(0xFF94A3B8),
+                color: isDark ? AppColors.textSecondaryDark : const Color(0xFF94A3B8),
               ),
             ),
           ],
         ),
-        if (Provider.of<AuthProvider>(
-          context,
-        ).can(AppPermission.updateOwnProfile)) ...[
-          const SizedBox(height: 16),
-          // Edit Profile Pill Button (Matching Stitch)
-          ElevatedButton(
-            onPressed: user == null ? null : () => _showAccountSettings(user),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
-              foregroundColor: Colors.white,
-              elevation: 3,
-              shadowColor: const Color(0xFF2563EB).withValues(alpha: 0.35),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(24),
-              ),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(LucideIcons.pencil, size: 14),
-                SizedBox(width: 6),
-                Text(
-                  'Chỉnh sửa hồ sơ',
-                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
-                ),
-              ],
+        const SizedBox(height: 16),
+
+        // Edit Profile Pill Button (Matching Stitch)
+        ElevatedButton(
+          onPressed: user == null ? null : () => _showAccountSettings(user),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2563EB),
+            foregroundColor: Colors.white,
+            elevation: 3,
+            shadowColor: const Color(0xFF2563EB).withValues(alpha: 0.35),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
             ),
           ),
-        ],
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(LucideIcons.pencil, size: 14),
+              SizedBox(width: 6),
+              Text(
+                'Chỉnh sửa hồ sơ',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
     );
   }
@@ -356,9 +357,7 @@ class _ProfilePageState extends State<ProfilePage> {
           style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w700,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : const Color(0xFF94A3B8),
+            color: isDark ? AppColors.textSecondaryDark : const Color(0xFF94A3B8),
             letterSpacing: 0.8,
           ),
         ),
@@ -451,20 +450,16 @@ class _ProfilePageState extends State<ProfilePage> {
         borderRadius: BorderRadius.circular(22),
         child: Column(
           children: [
-            if (Provider.of<AuthProvider>(
-              context,
-            ).can(AppPermission.updateOwnProfile)) ...[
-              _buildActionRow(
-                icon: LucideIcons.userCog,
-                iconBg: const Color(0xFFEFF6FF),
-                iconColor: const Color(0xFF2563EB),
-                title: 'Cài đặt tài khoản',
-                subtitle: 'Cập nhật họ tên, điện thoại, bộ phận',
-                isDark: isDark,
-                onTap: user == null ? null : () => _showAccountSettings(user),
-              ),
-              _buildDivider(isDark),
-            ],
+            _buildActionRow(
+              icon: LucideIcons.userCog,
+              iconBg: const Color(0xFFEFF6FF),
+              iconColor: const Color(0xFF2563EB),
+              title: 'Cài đặt tài khoản',
+              subtitle: 'Cập nhật họ tên, điện thoại, bộ phận',
+              isDark: isDark,
+              onTap: user == null ? null : () => _showAccountSettings(user),
+            ),
+            _buildDivider(isDark),
             _buildActionRow(
               icon: LucideIcons.lockKeyhole,
               iconBg: const Color(0xFFEEF2FF),
@@ -484,9 +479,9 @@ class _ProfilePageState extends State<ProfilePage> {
               isDark: isDark,
               onTap: () {
                 context.read<UpdateProvider>().checkForUpdate(
-                  context,
-                  manual: true,
-                );
+                      context,
+                      manual: true,
+                    );
               },
             ),
             _buildDivider(isDark),
@@ -589,9 +584,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w500,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : const Color(0xFF64748B),
+                    color: isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 2),
@@ -600,9 +593,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppColors.textPrimaryDark
-                        : const Color(0xFF1E293B),
+                    color: isDark ? AppColors.textPrimaryDark : const Color(0xFF1E293B),
                   ),
                 ),
               ],
@@ -649,11 +640,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: TextStyle(
                       fontSize: 14.5,
                       fontWeight: FontWeight.w600,
-                      color:
-                          titleColor ??
-                          (isDark
-                              ? AppColors.textPrimaryDark
-                              : const Color(0xFF1E293B)),
+                      color: titleColor ??
+                          (isDark ? AppColors.textPrimaryDark : const Color(0xFF1E293B)),
                     ),
                   ),
                   if (subtitle != null) ...[
@@ -662,9 +650,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       subtitle,
                       style: TextStyle(
                         fontSize: 12,
-                        color: isDark
-                            ? AppColors.textSecondaryDark
-                            : const Color(0xFF64748B),
+                        color: isDark ? AppColors.textSecondaryDark : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -674,11 +660,8 @@ class _ProfilePageState extends State<ProfilePage> {
             Icon(
               LucideIcons.chevronRight,
               size: 16,
-              color:
-                  titleColor ??
-                  (isDark
-                      ? AppColors.textSecondaryDark
-                      : const Color(0xFFCBD5E1)),
+              color: titleColor ??
+                  (isDark ? AppColors.textSecondaryDark : const Color(0xFFCBD5E1)),
             ),
           ],
         ),
@@ -705,13 +688,9 @@ class _ProfilePageState extends State<ProfilePage> {
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: const Text('Đăng xuất'),
-          content: const Text(
-            'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?',
-          ),
+          content: const Text('Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?'),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -722,9 +701,7 @@ class _ProfilePageState extends State<ProfilePage> {
               style: FilledButton.styleFrom(
                 backgroundColor: const Color(0xFFE11D48),
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: const Text('Đăng xuất'),
             ),
@@ -764,10 +741,10 @@ class _ProfilePageState extends State<ProfilePage> {
             setDialogState(() => isSaving = true);
             try {
               await context.read<AuthProvider>().updateProfile(
-                fullName: nameController.text.trim(),
-                phone: phoneController.text.trim(),
-                department: departmentController.text.trim(),
-              );
+                    fullName: nameController.text.trim(),
+                    phone: phoneController.text.trim(),
+                    department: departmentController.text.trim(),
+                  );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -793,9 +770,7 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 title: const Text(
                   'Cài đặt tài khoản',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -863,9 +838,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: isSaving ? null : () => submit(setDialogState),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: isSaving
                         ? const SizedBox(
@@ -911,10 +884,10 @@ class _ProfilePageState extends State<ProfilePage> {
             setDialogState(() => isSaving = true);
             try {
               await context.read<AuthProvider>().changePassword(
-                currentPassword: currentController.text,
-                newPassword: newController.text,
-                confirmPassword: confirmController.text,
-              );
+                    currentPassword: currentController.text,
+                    newPassword: newController.text,
+                    confirmPassword: confirmController.text,
+                  );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -940,9 +913,7 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 title: const Text(
                   'Đổi mật khẩu',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
@@ -1010,9 +981,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     onPressed: isSaving ? null : () => submit(setDialogState),
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF2563EB),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: isSaving
                         ? const SizedBox(
@@ -1069,11 +1038,11 @@ class _ProfilePageState extends State<ProfilePage> {
               await context.read<NotificationProvider>().prepareForLogout();
               if (!mounted) return;
               await context.read<AuthProvider>().deleteAccount(
-                password: passwordController.text,
-                reason: reasonController.text.trim().isEmpty
-                    ? null
-                    : reasonController.text.trim(),
-              );
+                    password: passwordController.text,
+                    reason: reasonController.text.trim().isEmpty
+                        ? null
+                        : reasonController.text.trim(),
+                  );
 
               if (!mounted || !dialogContext.mounted) return;
               Navigator.of(dialogContext).pop();
@@ -1101,9 +1070,7 @@ class _ProfilePageState extends State<ProfilePage> {
           return StatefulBuilder(
             builder: (context, setDialogState) {
               return AlertDialog(
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
                 title: const Row(
                   children: [
                     Icon(
@@ -1284,9 +1251,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     style: FilledButton.styleFrom(
                       backgroundColor: Colors.red,
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     child: isDeleting
                         ? const SizedBox(
@@ -1347,7 +1312,7 @@ class _ProfilePageState extends State<ProfilePage> {
     final words = name.trim().split(RegExp(r'\s+'));
     if (words.isEmpty || words.first.isEmpty) return 'ND';
     if (words.length == 1) return words.first.substring(0, 1).toUpperCase();
-    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'
-        .toUpperCase();
+    return '${words.first.substring(0, 1)}${words.last.substring(0, 1)}'.toUpperCase();
   }
+
 }

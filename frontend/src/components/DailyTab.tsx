@@ -167,80 +167,171 @@ export const DailyTab: React.FC<DailyTabProps> = ({
         </div>
       </section>
 
-      <main className="table-card">
+      <main className="table-card daily-table-card">
         {dailyLoading ? (
           <div className="loading-overlay">Đang tải dữ liệu chấm công ngày...</div>
         ) : filteredDailyEmployees.length === 0 ? (
           <div className="loading-overlay">Không tìm thấy nhân viên phù hợp</div>
         ) : (
-          <table className="attendance-table">
-            <thead>
-              <tr>
-                <th>Nhân viên</th>
-                <th>Ca làm việc</th>
-                <th>Giờ vào (In)</th>
-                <th>Giờ ra (Out)</th>
-                <th>Thời gian làm</th>
-                <th>Trạng thái</th>
-                <th>Hành động</th>
-              </tr>
-            </thead>
-            <tbody>
+          <>
+            {/* Desktop Table with Horizontal Scroll & Sticky First Column */}
+            <div className="table-scroll-container daily-desktop-view">
+              <table className="attendance-table daily-table">
+                <thead>
+                  <tr>
+                    <th>Nhân viên</th>
+                    <th>Ca làm việc</th>
+                    <th>Giờ vào (In)</th>
+                    <th>Giờ ra (Out)</th>
+                    <th>Thời gian làm</th>
+                    <th>Trạng thái</th>
+                    <th>Hành động</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDailyEmployees.map((emp) => {
+                    const report = dailyReportMap[emp.id];
+                    const statusChar = getDailyStatusFromPattern(emp, selectedDate);
+
+                    const isOT = isOvertimeCheckout(report?.checkOut, report?.checkIn);
+                    const checkInText = report?.checkIn ? `In: ${formatTime(report.checkIn)}` : '-';
+                    const checkInClass = report?.checkIn ? (report.isLate ? 'warning' : 'success') : '';
+                    const checkOutText = report?.checkOut ? `Out: ${formatTime(report.checkOut)}` : '-';
+                    const checkOutClass = report?.checkOut ? (report.isEarlyLeave ? 'warning' : isOT ? 'ot' : 'success') : '';
+                    const workingHours = report?.totalMinutes
+                      ? `${(report.totalMinutes / 60).toFixed(1)}h`
+                      : '-';
+
+                    const isStandardShift = !report?.shiftStart || !report?.shiftEnd || (report.shiftStart === '08:30' && report.shiftEnd === '17:30');
+                    const shiftShortName = isStandardShift ? 'Hành chính' : `Ca (${report.shiftStart} - ${report.shiftEnd})`;
+                    const shiftDetailTooltip = isStandardShift ? 'Ca hành chính: 08:30 - 12:00, 13:30 - 17:30' : `Ca làm việc: ${report.shiftStart} - ${report.shiftEnd}`;
+
+                    return (
+                      <tr key={emp.id} className="table-row">
+                        <td>
+                          <div className="employee-cell">
+                            <div className="avatar-badge">{getAvatarLetters(emp.name)}</div>
+                            <div className="emp-info">
+                              <span className="emp-name" title={emp.name}>{emp.name}</span>
+                              <span className="emp-code">{emp.employeeCode}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td>
+                          <span className="shift-badge" title={shiftDetailTooltip}>
+                            {shiftShortName}
+                          </span>
+                        </td>
+                        <td className={`number-cell ${checkInClass}`}>{checkInText}</td>
+                        <td className={`number-cell ${checkOutClass}`}>{checkOutText}</td>
+                        <td className="number-cell">{workingHours}</td>
+                        <td>{getStatusPill(report, statusChar)}</td>
+                        <td>
+                          <button
+                            className="action-btn-outline action-btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setManualEmployee(emp);
+                              setShowManualModal(true);
+                            }}
+                          >
+                            <Plus size={12} />
+                            Ghi công tay
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile Card List View (< 768px) */}
+            <div className="daily-mobile-card-view">
               {filteredDailyEmployees.map((emp) => {
                 const report = dailyReportMap[emp.id];
                 const statusChar = getDailyStatusFromPattern(emp, selectedDate);
 
                 const isOT = isOvertimeCheckout(report?.checkOut, report?.checkIn);
-                const checkInText = report?.checkIn ? `In: ${formatTime(report.checkIn)}` : '-';
-                const checkInClass = report?.checkIn ? (report.isLate ? 'warning' : 'success') : '';
-                const checkOutText = report?.checkOut ? `Out: ${formatTime(report.checkOut)}` : '-';
-                const checkOutClass = report?.checkOut ? (report.isEarlyLeave ? 'warning' : isOT ? 'ot' : 'success') : '';
-                const workingHours = report?.totalMinutes
-                  ? `${(report.totalMinutes / 60).toFixed(1)}h`
-                  : '-';
+                const checkInTime = report?.checkIn ? formatTime(report.checkIn) : null;
+                const checkOutTime = report?.checkOut ? formatTime(report.checkOut) : null;
 
-                const shiftLabel = report?.shiftStart && report?.shiftEnd && (report.shiftStart !== '08:30' || report.shiftEnd !== '17:30')
-                  ? `Ca (${report.shiftStart} - ${report.shiftEnd})`
-                  : 'Ca hành chính (08:30 - 12:00, 13:30 - 17:30)';
+                const checkInClass = report?.checkIn ? (report.isLate ? 'warning' : 'success') : '';
+                const checkOutClass = report?.checkOut ? (report.isEarlyLeave ? 'warning' : isOT ? 'ot' : 'success') : '';
+
+                const isStandardShift = !report?.shiftStart || !report?.shiftEnd || (report.shiftStart === '08:30' && report.shiftEnd === '17:30');
+                const shiftShortName = isStandardShift ? 'Hành chính' : `Ca (${report.shiftStart} - ${report.shiftEnd})`;
+                const shiftDetailTooltip = isStandardShift ? 'Ca hành chính: 08:30 - 12:00, 13:30 - 17:30' : `Ca làm việc: ${report.shiftStart} - ${report.shiftEnd}`;
 
                 return (
-                  <tr key={emp.id} className="table-row">
-                    <td>
+                  <div key={emp.id} className="daily-employee-card">
+                    {/* Header thẻ: Avatar + Tên + Mã NV + Badge Trạng thái */}
+                    <div className="daily-card-header">
                       <div className="employee-cell">
                         <div className="avatar-badge">{getAvatarLetters(emp.name)}</div>
                         <div className="emp-info">
-                          <span className="emp-name">{emp.name}</span>
-                          <span className="emp-code">{emp.employeeCode}</span>
+                          <span className="emp-name" title={emp.name}>{emp.name}</span>
+                          <span className="emp-code">
+                            {emp.employeeCode} {emp.dept ? `• ${emp.dept}` : ''}
+                          </span>
                         </div>
                       </div>
-                    </td>
-                    <td>
-                      <span className="shift-label">
-                        {shiftLabel}
-                      </span>
-                    </td>
-                    <td className={`number-cell ${checkInClass}`}>{checkInText}</td>
-                    <td className={`number-cell ${checkOutClass}`}>{checkOutText}</td>
-                    <td className="number-cell">{workingHours}</td>
-                    <td>{getStatusPill(report, statusChar)}</td>
-                    <td>
+                      <div className="daily-card-status">
+                        {getStatusPill(report, statusChar)}
+                      </div>
+                    </div>
+
+                    {/* Body thẻ: Giờ vào — Giờ ra — Thời gian làm & Ca làm việc */}
+                    <div className="daily-card-body">
+                      <div className="daily-times-grid">
+                        <div className="daily-time-box">
+                          <span className="daily-time-lbl">Giờ vào</span>
+                          <span className={`daily-time-val ${checkInClass}`}>
+                            {checkInTime || '--:--'}
+                          </span>
+                        </div>
+                        <div className="daily-time-box">
+                          <span className="daily-time-lbl">Giờ ra</span>
+                          <span className={`daily-time-val ${checkOutClass}`}>
+                            {checkOutTime || '--:--'}
+                          </span>
+                        </div>
+                        <div className="daily-time-box">
+                          <span className="daily-time-lbl">Thời gian làm</span>
+                          <span className="daily-time-val duration">
+                            {report?.totalMinutes ? `${(report.totalMinutes / 60).toFixed(1)}h` : '--'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="daily-shift-row">
+                        <span className="daily-shift-lbl">Ca làm việc:</span>
+                        <span className="shift-badge" title={shiftDetailTooltip}>
+                          {shiftShortName}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Footer thẻ: Nút bấm [Ghi công tay] trải dài toàn bộ bề ngang dưới cùng */}
+                    <div className="daily-card-footer">
                       <button
-                        className="action-btn-outline action-btn-sm"
+                        type="button"
+                        className="daily-card-manual-btn"
                         onClick={(e) => {
                           e.stopPropagation();
                           setManualEmployee(emp);
                           setShowManualModal(true);
                         }}
                       >
-                        <Plus size={12} />
+                        <Plus size={16} />
                         Ghi công tay
                       </button>
-                    </td>
-                  </tr>
+                    </div>
+                  </div>
                 );
               })}
-            </tbody>
-          </table>
+            </div>
+          </>
         )}
       </main>
     </>

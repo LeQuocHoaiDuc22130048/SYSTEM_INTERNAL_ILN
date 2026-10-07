@@ -45,6 +45,8 @@ public class CreateAppBannerDto {
     @Builder.Default
     private String fontFamily = "Be Vietnam Pro";
 
+    private String designJson;
+
     private String backgroundImageUrl;
 
     @Builder.Default

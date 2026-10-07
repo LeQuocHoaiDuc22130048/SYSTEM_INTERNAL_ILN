@@ -64,6 +64,9 @@ public class AppBanner extends BaseEntity {
     @Builder.Default
     private String fontFamily = "Be Vietnam Pro";
 
+    @Column(name = "design_json", columnDefinition = "TEXT")
+    private String designJson;
+
     @Column(name = "background_image_url", length = 500)
     private String backgroundImageUrl;
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
 import 'app_permission.dart';
-export 'app_permission.dart';
 
 // {{START_USER_ROLE_ENUM}}
 enum UserRole {

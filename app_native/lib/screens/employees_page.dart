@@ -217,7 +217,10 @@ class _EmployeesPageState extends State<EmployeesPage> {
                                       : 2,
                                   mainAxisSpacing: 12,
                                   crossAxisSpacing: 12,
-                                  mainAxisExtent: 245,
+                                  mainAxisExtent:
+                                      MediaQuery.sizeOf(context).width > 760
+                                      ? 255
+                                      : 265,
                                 ),
                             itemCount: filtered.length,
                             itemBuilder: (context, index) {
@@ -275,7 +278,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
       },
       borderRadius: BorderRadius.circular(12),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
           borderRadius: BorderRadius.circular(12),
@@ -284,11 +287,10 @@ class _EmployeesPageState extends State<EmployeesPage> {
           ),
         ),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: 50,
+              height: 50,
               decoration: BoxDecoration(
                 color: avatarColor,
                 shape: BoxShape.circle,
@@ -297,18 +299,18 @@ class _EmployeesPageState extends State<EmployeesPage> {
                 child: Text(
                   user.avatar ?? user.name[0],
                   style: const TextStyle(
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
                   ),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               user.name,
               style: TextStyle(
-                fontSize: 14,
+                fontSize: 13.5,
                 fontWeight: FontWeight.w600,
                 color: isDark
                     ? AppColors.textPrimaryDark
@@ -320,7 +322,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
             ),
             const SizedBox(height: 4),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: isDark
                     ? const Color(0xFF334155)
@@ -338,11 +340,11 @@ class _EmployeesPageState extends State<EmployeesPage> {
                 ),
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               user.employeeId.isEmpty ? user.username : user.employeeId,
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11.5,
                 fontFamily: 'monospace',
                 color: isDark
                     ? AppColors.textSecondaryDark
@@ -366,7 +368,7 @@ class _EmployeesPageState extends State<EmployeesPage> {
                     child: Text(
                       user.department!,
                       style: TextStyle(
-                        fontSize: 12,
+                        fontSize: 11.5,
                         color: isDark
                             ? AppColors.textSecondaryDark
                             : AppColors.textSecondaryLight,
@@ -378,10 +380,10 @@ class _EmployeesPageState extends State<EmployeesPage> {
                 ],
               ),
             ],
-            const SizedBox(height: 8),
+            const Spacer(),
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 6),
+              padding: const EdgeInsets.symmetric(vertical: 5),
               decoration: BoxDecoration(
                 color: user.status == UserStatus.active
                     ? AppColors.successLight
@@ -429,10 +431,8 @@ class _EmployeeDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarColor = _getAvatarColor(user.role);
-    final auth = context.watch<AuthProvider>();
-    final canEnrollFace =
-        !Platform.isIOS && auth.can(AppPermission.manageEmployeeSecurity);
-    final canManageEmployees = auth.can(AppPermission.manageEmployees);
+    final currentRole = context.watch<AuthProvider>().role;
+    final canEnrollFace = !Platform.isIOS && currentRole.isManagerOrAbove;
 
     return Container(
       constraints: BoxConstraints(
@@ -617,29 +617,25 @@ class _EmployeeDetailSheet extends StatelessWidget {
                             child: const Text('Đóng'),
                           ),
                         ),
-                        if (canManageEmployees) ...[
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () {
-                                Navigator.pop(context);
-                                showModalBottomSheet(
-                                  context: context,
-                                  isScrollControlled: true,
-                                  backgroundColor: Colors.transparent,
-                                  builder: (context) =>
-                                      _EditEmployeeSheet(user: user),
-                                );
-                              },
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                ),
-                              ),
-                              child: const Text('Chỉnh sửa'),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                backgroundColor: Colors.transparent,
+                                builder: (context) =>
+                                    _EditEmployeeSheet(user: user),
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
+                            child: const Text('Chỉnh sửa'),
                           ),
-                        ],
+                        ),
                       ],
                     ),
                   ],

@@ -93,6 +93,7 @@ public class AttendanceQueryController {
             DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZONE);
             Map<Integer, String> empUpdateNotes = new LinkedHashMap<>();
             Map<Integer, Double> dailyWorkDays = new LinkedHashMap<>();
+            Map<Integer, String> dailyTimes = new LinkedHashMap<>();
             List<String> formattedNoteList = new ArrayList<>();
 
             for (int d = 1; d <= totalDaysInMonth; d++) {
@@ -141,6 +142,20 @@ public class AttendanceQueryController {
                             .map(AttendanceRecord::getCheckTime)
                             .max(Instant::compareTo)
                             .orElse(null);
+                }
+
+                if (checkIn != null || checkOut != null) {
+                    String inStr = checkIn != null ? timeFormatter.format(checkIn) : null;
+                    String outStr = checkOut != null ? timeFormatter.format(checkOut) : null;
+                    String timeDisplay = "";
+                    if (inStr != null && outStr != null) {
+                        timeDisplay = String.format("Vào: %s | Ra: %s", inStr, outStr);
+                    } else if (inStr != null) {
+                        timeDisplay = String.format("Vào: %s", inStr);
+                    } else {
+                        timeDisplay = String.format("Ra: %s", outStr);
+                    }
+                    dailyTimes.put(d, timeDisplay);
                 }
 
                 if (!dayReasons.isEmpty()) {
@@ -266,7 +281,8 @@ public class AttendanceQueryController {
                     patternBuilder.toString(),
                     dailyWorkDays,
                     empUpdateNotes,
-                    consolidatedNotes
+                    consolidatedNotes,
+                    dailyTimes
             ));
         }
 
@@ -657,7 +673,8 @@ public class AttendanceQueryController {
             String dailyPattern,
             Map<Integer, Double> dailyWorkDays,
             Map<Integer, String> updateNotes,
-            String notes
+            String notes,
+            Map<Integer, String> dailyTimes
     ) {}
 
     public record EmployeeHistoryResponse(

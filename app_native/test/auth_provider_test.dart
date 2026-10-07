@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:system_inverter_likenew/models/app_permission.dart';
 import 'package:system_inverter_likenew/models/user.dart';
 import 'package:system_inverter_likenew/utils/api_client.dart';
 import 'package:system_inverter_likenew/utils/auth_provider.dart';

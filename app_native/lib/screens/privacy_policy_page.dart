@@ -40,7 +40,9 @@ class PrivacyPolicyPage extends StatelessWidget {
         leadingWidth: 58,
         leading: Padding(
           padding: const EdgeInsets.only(left: 16),
-          child: Center(child: AppBackButton(isDark: isDark)),
+          child: Center(
+            child: AppBackButton(isDark: isDark),
+          ),
         ),
         title: const Text('Chính sách bảo mật'),
         actions: [

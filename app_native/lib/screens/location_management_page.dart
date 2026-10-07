@@ -266,7 +266,9 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
         leadingWidth: 58,
         leading: const Padding(
           padding: EdgeInsets.only(left: 16),
-          child: Center(child: AppBackButton()),
+          child: Center(
+            child: AppBackButton(),
+          ),
         ),
         title: const Text(
           'Quản Lý Vị Trí Kho / Kệ',

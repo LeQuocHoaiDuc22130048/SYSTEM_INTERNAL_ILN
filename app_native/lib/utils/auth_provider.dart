@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import '../models/app_permission.dart';
 import '../models/user.dart';
 import 'api_client.dart';
 

@@ -1,3 +1,4 @@
+import { useBannerHistory } from './useBannerHistory';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Plus,
@@ -24,12 +25,15 @@ import {
   ImageIcon,
   Move,
   Type,
-  Crop
+  Crop,
+  ArrowLeft
 } from 'lucide-react';
 import { getAuthHeaders } from '../utils/auth';
 import type { UserInfo } from '../mockData';
 import './BannerTab.css';
 import { ImageCropperModal } from './ImageCropperModal';
+import { BannerCanvas, CanvasInspector } from './BannerCanvas';
+import { defaultDesign, parseDesign, templateDesign, snapPosition, removeButtonDesign, legacyDesign, type BannerDesign } from './bannerDesign';
 
 export interface BannerButton {
   text: string;
@@ -45,7 +49,7 @@ export interface FontOption {
   description: string;
 }
 
-export const BANNER_FONTS: FontOption[] = [
+const BANNER_FONTS: FontOption[] = [
   { id: 'Be Vietnam Pro', name: 'Be Vietnam Pro', family: "'Be Vietnam Pro', sans-serif", description: 'Chuẩn Việt ngữ, hiện đại & tối ưu' },
   { id: 'Inter', name: 'Inter', family: "'Inter', sans-serif", description: 'Công nghệ, tối giản & thanh lịch' },
   { id: 'Roboto', name: 'Roboto', family: "'Roboto', sans-serif", description: 'Rõ ràng, phổ thông & dễ đọc' },
@@ -56,13 +60,14 @@ export const BANNER_FONTS: FontOption[] = [
   { id: 'Lexend', name: 'Lexend', family: "'Lexend', sans-serif", description: 'Đọc lướt nhanh, trực quan & sạch sẽ' },
 ];
 
-export const getBannerFontFamily = (fontName?: string): string => {
+const getBannerFontFamily = (fontName?: string): string => {
   if (!fontName) return "'Be Vietnam Pro', sans-serif";
   const found = BANNER_FONTS.find(f => f.id.toLowerCase() === fontName.toLowerCase());
   return found ? found.family : "'Be Vietnam Pro', sans-serif";
 };
 
 export interface AppBanner {
+  designJson?: string;
   id: string;
   title: string;
   badgeText?: string;
@@ -139,6 +144,43 @@ const GRADIENT_PRESETS = [
   },
 ];
 
+const APP_SCREEN_OPTIONS = [
+  ['dashboard', 'Dashboard'], ['repair_orders', 'Đơn sửa chữa'], ['warehouse', 'Kho linh kiện'],
+  ['attendance', 'Chấm công (Android)'], ['messages', 'Nhắn tin'], ['notifications', 'Thông báo'],
+  ['employee_management', 'Quản lý nhân viên'], ['account_approval', 'Duyệt tài khoản'], ['profile', 'Cá nhân'],
+];
+
+function BannerActionFields({ actionType, actionValue, onTypeChange, onValueChange }: {
+  actionType: BannerButton['actionType']; actionValue: string;
+  onTypeChange: (type: BannerButton['actionType']) => void; onValueChange: (value: string) => void;
+}) {
+  return <div className="form-grid-2 banner-action-fields">
+    <label>Hành động khi bấm
+      <select value={actionType} onChange={e => onTypeChange(e.target.value as BannerButton['actionType'])}>
+        <option value="NONE">Chỉ hiển thị, không điều hướng</option>
+        <option value="SCREEN">Mở màn hình trong app</option>
+        <option value="REPAIR_ORDER">Mở Đơn sửa chữa</option>
+        <option value="BOOKING">Mở đặt dịch vụ</option>
+        <option value="LINK">Mở URL ngoài trình duyệt</option>
+        <option value="CALL">Mở cuộc gọi điện thoại</option>
+      </select>
+    </label>
+    {actionType === 'SCREEN' ? <label>Màn hình đích
+      <select required value={actionValue} onChange={e => onValueChange(e.target.value)}>
+        <option value="">Chọn màn hình</option>
+        {actionValue && !APP_SCREEN_OPTIONS.some(([route]) => route === actionValue) && <option value={actionValue}>{actionValue}</option>}
+        {APP_SCREEN_OPTIONS.map(([route, label]) => <option key={route} value={route}>{label}</option>)}
+      </select>
+    </label> : ['LINK', 'CALL', 'BOOKING'].includes(actionType) ? <label>
+      {actionType === 'LINK' ? 'URL đích' : actionType === 'CALL' ? 'Số điện thoại' : 'Dịch vụ'}
+      <input type={actionType === 'LINK' ? 'url' : actionType === 'CALL' ? 'tel' : 'text'}
+        required={actionType !== 'BOOKING'} value={actionValue} onChange={e => onValueChange(e.target.value)}
+        placeholder={actionType === 'LINK' ? 'https://example.com' : actionType === 'CALL' ? '0901234567 hoặc +84901234567' : 'Tên dịch vụ'} />
+      {actionType === 'CALL' && <small>Mở ứng dụng Điện thoại với số đã nhập để người dùng xác nhận gọi.</small>}
+    </label> : null}
+  </div>;
+}
+
 export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -158,6 +200,14 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
   const [formTitle, setFormTitle] = useState<string>('Bảo Trì & Sửa Chữa Inverter');
   const [formBadgeText, setFormBadgeText] = useState<string>('⚡ ƯU ĐÃI ĐẶC BIỆT');
   const [formSubtitle, setFormSubtitle] = useState<string>('Giảm ngay 25% GIÁ TRỊ cho lượt đặt dịch vụ đầu tiên!');
+
+  const [formActionType, setFormActionType] = useState<BannerButton['actionType']>('NONE');
+  const [formActionValue, setFormActionValue] = useState('');
+  const [bgSource, setBgSource] = useState<'UPLOAD' | 'URL'>('UPLOAD');
+
+  const [design, setDesign] = useState<BannerDesign>(defaultDesign);
+  const [selectedElement, setSelectedElement] = useState('title');
+  const [snapToGrid, setSnapToGrid] = useState(true);
 
   // Form Fields - Buttons & Position
   const [formButtonPosition, setFormButtonPosition] = useState<
@@ -206,13 +256,49 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
   // Custom Background / Banner Image & Darken Overlay
   const [formDarkenOverlay, setFormDarkenOverlay] = useState<boolean>(false);
 
+  const [previewDevice, setPreviewDevice] = useState("390");
+  const [previewDark, setPreviewDark] = useState(false);
+  const editorSnapshot = useMemo(() => ({ formTitle, formBadgeText, formSubtitle, formActionType, formActionValue, bgSource, design, formButtonPosition, formButtonTop, formButtonBottom, formButtonLeft, formButtonRight, formButtons, formFontFamily, bgMode, formGradient, formCustomGradient, colorStop1, colorStop2, colorStop3, formBackgroundImageUrl, selectedBgFile, bgFilePreviewUrl, formDisplayOrder, formIsActive, imageType, formImageUrl, formImagePosition, selectedFile, filePreviewUrl, formDarkenOverlay }), [formTitle, formBadgeText, formSubtitle, formActionType, formActionValue, bgSource, design, formButtonPosition, formButtonTop, formButtonBottom, formButtonLeft, formButtonRight, formButtons, formFontFamily, bgMode, formGradient, formCustomGradient, colorStop1, colorStop2, colorStop3, formBackgroundImageUrl, selectedBgFile, bgFilePreviewUrl, formDisplayOrder, formIsActive, imageType, formImageUrl, formImagePosition, selectedFile, filePreviewUrl, formDarkenOverlay]);
+  const history = useBannerHistory(editorSnapshot, showModal, snapshot => {
+    setFormTitle(snapshot.formTitle);
+    setFormBadgeText(snapshot.formBadgeText);
+    setFormSubtitle(snapshot.formSubtitle);
+    setFormActionType(snapshot.formActionType);
+    setFormActionValue(snapshot.formActionValue);
+    setBgSource(snapshot.bgSource);
+    setDesign(snapshot.design);
+    setFormButtonPosition(snapshot.formButtonPosition);
+    setFormButtonTop(snapshot.formButtonTop);
+    setFormButtonBottom(snapshot.formButtonBottom);
+    setFormButtonLeft(snapshot.formButtonLeft);
+    setFormButtonRight(snapshot.formButtonRight);
+    setFormButtons(snapshot.formButtons);
+    setFormFontFamily(snapshot.formFontFamily);
+    setBgMode(snapshot.bgMode);
+    setFormGradient(snapshot.formGradient);
+    setFormCustomGradient(snapshot.formCustomGradient);
+    setColorStop1(snapshot.colorStop1);
+    setColorStop2(snapshot.colorStop2);
+    setColorStop3(snapshot.colorStop3);
+    setFormBackgroundImageUrl(snapshot.formBackgroundImageUrl);
+    setSelectedBgFile(snapshot.selectedBgFile);
+    setBgFilePreviewUrl(snapshot.bgFilePreviewUrl);
+    setFormDisplayOrder(snapshot.formDisplayOrder);
+    setFormIsActive(snapshot.formIsActive);
+    setImageType(snapshot.imageType);
+    setFormImageUrl(snapshot.formImageUrl);
+    setFormImagePosition(snapshot.formImagePosition);
+    setSelectedFile(snapshot.selectedFile);
+    setFilePreviewUrl(snapshot.filePreviewUrl);
+    setFormDarkenOverlay(snapshot.formDarkenOverlay);
+  });
+
   // Image Cropper State & File Refs
   const [cropperOpen, setCropperOpen] = useState<boolean>(false);
   const [cropSourceSrc, setCropSourceSrc] = useState<string>('');
   const [cropFileName, setCropFileName] = useState<string>('banner.jpg');
   const [cropTarget, setCropTarget] = useState<'BANNER_IMAGE' | 'BACKGROUND' | 'MASCOT'>('BANNER_IMAGE');
   const quickUploadInputRef = useRef<HTMLInputElement>(null);
-  const modalBannerUploadRef = useRef<HTMLInputElement>(null);
   const modalBgUploadRef = useRef<HTMLInputElement>(null);
 
   // Select file from PC to open in Cropper
@@ -271,9 +357,9 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
       setSelectedBgFile(croppedFile);
       setBgFilePreviewUrl(previewUrl);
       setBgMode('CUSTOM_BG');
+      setBgSource('UPLOAD');
       // Background upload from device: DO DARKEN overlay to ensure text and buttons stand out legibly!
-      setFormDarkenOverlay(true);
-      showToast('Đã tải ảnh nền từ thiết bị (bật làm tối 35% để làm nổi bật chữ & nút bấm)!');
+      showToast('Đã cắt và áp dụng ảnh nền.');
     } else {
       setSelectedFile(croppedFile);
       setFilePreviewUrl(previewUrl);
@@ -284,20 +370,13 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
 
   // Re-crop background/banner image
   const handleReCropBackground = () => {
-    const target = formDarkenOverlay ? 'BACKGROUND' : 'BANNER_IMAGE';
-    if (cropSourceSrc) {
-      setCropTarget(target);
-      setCropperOpen(true);
-    } else if (bgFilePreviewUrl || formBackgroundImageUrl) {
-      setCropTarget(target);
-      setCropSourceSrc(bgFilePreviewUrl || formBackgroundImageUrl);
+    const source = bgFilePreviewUrl || formBackgroundImageUrl;
+    if (source) {
+      setCropTarget('BACKGROUND');
+      setCropSourceSrc(source);
       setCropperOpen(true);
     } else {
-      if (target === 'BANNER_IMAGE') {
-        modalBannerUploadRef.current?.click();
-      } else {
-        modalBgUploadRef.current?.click();
-      }
+      modalBgUploadRef.current?.click();
     }
   };
 
@@ -398,7 +477,9 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
       try {
         const parsed = JSON.parse(banner.buttonsJson);
         if (Array.isArray(parsed)) return parsed;
-      } catch (_) {}
+      } catch {
+        /* ignore json parse error */
+      }
     }
     if (banner.buttonText && banner.buttonText.trim()) {
       return [
@@ -435,6 +516,11 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
   // Open Create Modal
   const handleOpenCreateModal = () => {
     setEditingBanner(null);
+    setDesign(defaultDesign());
+    setSelectedElement('title');
+    setFormActionType('NONE');
+    setFormActionValue('');
+    setBgSource('UPLOAD');
     setFormTitle('');
     setFormBadgeText('⚡ ƯU ĐÃI ĐẶC BIỆT');
     setFormSubtitle('');
@@ -444,14 +530,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
     setFormButtonLeft('');
     setFormButtonRight('');
     setFormFontFamily('Be Vietnam Pro');
-    setFormButtons([
-      {
-        text: 'Đặt lịch ngay',
-        actionType: 'BOOKING',
-        actionValue: 'Gói bảo trì ưu đãi 25%',
-        styleType: 'PRIMARY',
-      },
-    ]);
+    setFormButtons([]);
     setBgMode('GRADIENT');
     setFormGradient('#2563EB,#4F46E5,#1D4ED8');
     setFormCustomGradient('');
@@ -476,6 +555,11 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
   // Open Edit Modal
   const handleOpenEditModal = (banner: AppBanner) => {
     setEditingBanner(banner);
+    setDesign(parseDesign(banner.designJson) || legacyDesign(banner));
+    setSelectedElement('title');
+    setFormActionType(banner.actionType || 'NONE');
+    setFormActionValue(banner.actionValue || '');
+    setBgSource(banner.backgroundImageUrl?.startsWith('/api/v1/banners/images/') ? 'UPLOAD' : 'URL');
     setFormTitle(banner.title);
     setFormBadgeText(banner.badgeText || '');
     setFormSubtitle(banner.subtitle || '');
@@ -520,7 +604,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
     setFormIsActive(banner.isActive);
 
     // Mascot
-    if (banner.imagePosition === 'NONE' || (!banner.imageUrl && banner.backgroundImageUrl)) {
+    if (banner.imagePosition === 'NONE') {
       setImageType('none');
       setFormImageUrl('');
     } else if (!banner.imageUrl) {
@@ -549,9 +633,9 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
     setFormButtons(prev => [
       ...prev,
       {
-        text: 'Hotline tư vấn',
-        actionType: 'CALL',
-        actionValue: '0901234567',
+        text: 'Nút mới',
+        actionType: 'NONE',
+        actionValue: '',
         styleType: prev.length === 0 ? 'PRIMARY' : 'SECONDARY',
       },
     ]);
@@ -559,12 +643,21 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
 
   const handleRemoveButton = (idx: number) => {
     setFormButtons(prev => prev.filter((_, i) => i !== idx));
+    setDesign(prev => removeButtonDesign(prev, idx));
+    setSelectedElement('title');
   };
 
   const handleUpdateButton = (idx: number, field: keyof BannerButton, value: any) => {
     setFormButtons(prev =>
       prev.map((btn, i) => (i === idx ? { ...btn, [field]: value } : btn))
     );
+    if (field === 'styleType') {
+      setDesign(prev => ({ ...prev, nodes: { ...prev.nodes,
+        [`button${idx}`]: { ...prev.nodes[`button${idx}`], gradient: undefined,
+          background: value === 'OUTLINE' ? 'transparent' : value === 'SECONDARY' ? '#ffffff33' : '#ffffff',
+          color: value === 'PRIMARY' ? '#2563eb' : '#ffffff' } } }));
+      setSelectedElement(`button${idx}`);
+    }
   };
 
   // Handle Mascot File change
@@ -654,6 +747,46 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
     }
   };
 
+  const chooseButtonPosition = (position: typeof formButtonPosition) => {
+    setFormButtonPosition(position);
+    if (position === 'CUSTOM') return;
+    setDesign(prev => ({ ...prev, nodes: Object.fromEntries(Object.entries(prev.nodes).map(([id, node]) => {
+      if (!id.startsWith('button')) return [id, node];
+      const index = Number(id.slice(6));
+      const x = position.endsWith('CENTER') ? 50 - node.width / 2 : position.endsWith('RIGHT') ? 96 - node.width : 4;
+      const y = position.startsWith('TOP') ? 4 : 96 - node.height;
+      return [id, snapPosition(node, x, y - index * (node.height + 2), false)];
+    })) }));
+  };
+
+  const chooseMascotPosition = (position: typeof formImagePosition) => {
+    setFormImagePosition(position);
+    if (position === 'NONE') { setImageType('none'); return; }
+    if (imageType === 'none') setImageType('default');
+    setDesign(prev => {
+      const node = prev.nodes.mascot;
+      const next = position === 'RIGHT_TOP' ? { ...node, x: 74, y: 4, width: 22, height: 44 }
+        : { ...node, x: position === 'LEFT' ? 2 : 68, y: 12, width: 30, height: 86 };
+      return { ...prev, nodes: { ...prev.nodes, mascot: next } };
+    });
+  };
+
+  const applyTemplate = (template: 'promotion' | 'information' | 'image') => {
+    history.checkpoint();
+    setFormButtonPosition(template === 'information' ? 'BOTTOM_LEFT' : 'BOTTOM_CENTER');
+    setDesign(templateDesign(template)); setSelectedElement(template === 'image' ? 'button0' : 'title');
+    setFormFontFamily('Be Vietnam Pro'); setFormActionType('NONE'); setFormActionValue('');
+    setFormButtons([{ text: template === 'promotion' ? 'Đặt lịch ngay' : template === 'image' ? 'Tìm hiểu thêm' : 'Liên hệ', actionType: 'NONE', actionValue: '', styleType: 'PRIMARY' }]);
+    setFormTitle(template === 'promotion' ? 'ƯU ĐÃI ĐẶC BIỆT' : template === 'information' ? 'INVERTER LIKE NEW' : '');
+    setFormBadgeText(template === 'promotion' ? 'KHUYẾN MÃI' : template === 'information' ? 'SỬA CHỮA BIẾN TẦN' : '');
+    setFormSubtitle(template === 'promotion' ? 'Nhập nội dung ưu đãi của bạn' : template === 'information' ? 'Nhập địa chỉ và thông tin liên hệ' : '');
+    setImageType(template === 'information' ? 'default' : 'none');
+    setFormImagePosition(template === 'information' ? 'RIGHT' : 'NONE');
+    setSelectedFile(null); setFilePreviewUrl(null); setFormImageUrl('');
+    if (template === 'image') { setBgMode('CUSTOM_BG'); setBgSource('UPLOAD'); setFormDarkenOverlay(false); }
+    else { setBgMode('GRADIENT'); setSelectedBgFile(null); setBgFilePreviewUrl(null); setFormCustomGradient(''); setFormGradient(template === 'promotion' ? '#1e3a8a,#2563eb,#172554' : '#0e7490,#155e75,#164e63'); }
+  };
+
   // Submit Form (Create / Update)
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -662,17 +795,30 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
       return;
     }
 
+    const actions = [{ actionType: formActionType, actionValue: formActionValue }, ...formButtons];
+    if (actions.some(action => action.actionType === 'LINK' && !/^https?:\/\//i.test(action.actionValue?.trim() || ''))) {
+      showToast('Liên kết phải bắt đầu bằng https:// hoặc http://.');
+      return;
+    }
+    if (actions.some(action => ['SCREEN', 'CALL'].includes(action.actionType) && !action.actionValue?.trim())) {
+      showToast('Vui lòng chọn màn hình đích hoặc nhập số điện thoại cho hành động.');
+      return;
+    }
+    if (actions.some(action => action.actionType === 'CALL' && !/^\+?[0-9]{3,15}$/.test((action.actionValue || '').trim().replace(/^tel:/i, '').replace(/[\s().-]/g, '')))) {
+      showToast('Số điện thoại phải có 3–15 chữ số, có thể bắt đầu bằng +.');
+      return;
+    }
     setSubmitting(true);
     const finalGradient = formCustomGradient.trim() || formGradient;
     const firstBtn = formButtons.length > 0 ? formButtons[0] : null;
     const primaryButtonText = firstBtn ? firstBtn.text.trim() : '';
-    const primaryActionType = firstBtn ? firstBtn.actionType : 'NONE';
-    const primaryActionValue = firstBtn ? (firstBtn.actionValue || '').trim() : '';
+    const primaryActionType = formActionType;
+    const primaryActionValue = formActionValue.trim();
 
-    const bTop = formButtonTop !== '' ? Number(formButtonTop) : null;
-    const bBottom = formButtonBottom !== '' ? Number(formButtonBottom) : null;
-    const bLeft = formButtonLeft !== '' ? Number(formButtonLeft) : null;
-    const bRight = formButtonRight !== '' ? Number(formButtonRight) : null;
+    const bTop = formButtonPosition === 'CUSTOM' && formButtonTop !== '' ? Number(formButtonTop) : null;
+    const bBottom = formButtonPosition === 'CUSTOM' && formButtonBottom !== '' ? Number(formButtonBottom) : null;
+    const bLeft = formButtonPosition === 'CUSTOM' && formButtonLeft !== '' ? Number(formButtonLeft) : null;
+    const bRight = formButtonPosition === 'CUSTOM' && formButtonRight !== '' ? Number(formButtonRight) : null;
 
     try {
       if (selectedFile || selectedBgFile) {
@@ -692,7 +838,9 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
         if (bRight !== null) formData.append('buttonRight', String(bRight));
         const finalImagePos = imageType === 'none' ? 'NONE' : formImagePosition;
         formData.append('imagePosition', finalImagePos);
+        if (!selectedFile) formData.append('imageUrl', imageType === 'default' || imageType === 'none' ? '' : formImageUrl.trim());
         formData.append('fontFamily', formFontFamily);
+        formData.append('designJson', JSON.stringify(design));
         formData.append('gradientColors', finalGradient);
         formData.append('displayOrder', String(formDisplayOrder));
         formData.append('isActive', String(formIsActive));
@@ -705,7 +853,8 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
         } else if (bgMode === 'CUSTOM_BG' && formBackgroundImageUrl.trim()) {
           formData.append('backgroundImageUrl', formBackgroundImageUrl.trim());
         }
-        formData.append('darkenOverlay', String(formDarkenOverlay));
+        if (bgMode === 'GRADIENT' || (!selectedBgFile && !formBackgroundImageUrl.trim())) formData.append('backgroundImageUrl', '');
+        formData.append('darkenOverlay', String(bgMode === 'CUSTOM_BG' && formDarkenOverlay));
 
         const url = editingBanner ? `/api/v1/banners/${editingBanner.id}` : '/api/v1/banners';
         const method = editingBanner ? 'PUT' : 'POST';
@@ -739,11 +888,12 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
           buttonRight: bRight,
           buttonsJson: JSON.stringify(formButtons),
           buttons: formButtons,
-          imageUrl: (imageType === 'default' || imageType === 'none') ? null : formImageUrl.trim() || null,
+          imageUrl: (imageType === 'default' || imageType === 'none') ? '' : formImageUrl.trim(),
           imagePosition: imageType === 'none' ? 'NONE' : formImagePosition,
           fontFamily: formFontFamily,
-          backgroundImageUrl: bgMode === 'CUSTOM_BG' ? formBackgroundImageUrl.trim() || null : null,
-          darkenOverlay: formDarkenOverlay,
+          designJson: JSON.stringify(design),
+          backgroundImageUrl: bgMode === 'CUSTOM_BG' ? formBackgroundImageUrl.trim() : '',
+          darkenOverlay: bgMode === 'CUSTOM_BG' && formDarkenOverlay,
           gradientColors: finalGradient,
           displayOrder: formDisplayOrder,
           isActive: formIsActive,
@@ -793,7 +943,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
   ) => {
     if (!btns || btns.length === 0) return null;
 
-    let posClass = 'pos-bottom-left';
+    let posClass: string;
     const customStyle: React.CSSProperties = {};
 
     if (position === 'CUSTOM') {
@@ -872,11 +1022,11 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
 
   return (
     <div className="banner-container">
-      {/* 1. Header & Stats Grid */}
+      {/* 1. Header & Stats Grid (Gom 3 thẻ lên 1 hàng ngang: grid-cols-3 gap-2) */}
       <div className="banner-stats-grid">
         <div className="banner-stat-card">
           <div className="banner-stat-icon total">
-            <Sparkles size={24} />
+            <Sparkles size={18} />
           </div>
           <div className="banner-stat-info">
             <span className="banner-stat-label">Tổng số banner</span>
@@ -886,7 +1036,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
 
         <div className="banner-stat-card">
           <div className="banner-stat-icon active">
-            <Eye size={24} />
+            <Eye size={18} />
           </div>
           <div className="banner-stat-info">
             <span className="banner-stat-label">Đang hiển thị trên App</span>
@@ -898,7 +1048,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
 
         <div className="banner-stat-card">
           <div className="banner-stat-icon inactive">
-            <EyeOff size={24} />
+            <EyeOff size={18} />
           </div>
           <div className="banner-stat-info">
             <span className="banner-stat-label">Đang tạm ẩn</span>
@@ -909,156 +1059,14 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
         </div>
       </div>
 
-      {/* 2. Live Mobile App Banner Simulator */}
-      <div className="banner-preview-section">
-        <div className="preview-header">
-          <div className="preview-title">
-            <Smartphone size={20} />
-            <span>Mô phỏng hiển thị trên ứng dụng di động</span>
-          </div>
-          <div className="preview-device-toggle">
-            <CheckCircle2 size={16} color="#10b981" />
-            <span>Đồng bộ nút bấm, vị trí & màu sắc thời gian thực</span>
-          </div>
-        </div>
-
-        <div className="mobile-simulator-wrapper">
-          <div className="mobile-simulator-notch" />
-
-          {activeBanners.length > 0 ? (
-            (() => {
-              const currentBanner = activeBanners[activePreviewIndex] || activeBanners[0];
-              const bannerBg = getBannerBackgroundStyle(currentBanner);
-              const mascotSrc = currentBanner.imageUrl || '/image_character.png';
-              const currentBtns = getBannerButtons(currentBanner);
-              const pos = currentBanner.buttonPosition || 'BOTTOM_LEFT';
-              const imgPos = currentBanner.imagePosition || 'RIGHT';
-              const imgPosClass = imgPos.toLowerCase().replace('_', '-');
-
-              return (
-                <div
-                  className="stitch-banner-card"
-                  style={{
-                    background: bannerBg,
-                    fontFamily: getBannerFontFamily(currentBanner.fontFamily),
-                  }}
-                >
-                  <div className="stitch-banner-bg-orb" />
-
-                  {/* Absolute Positioned Buttons (TOP_RIGHT, TOP_LEFT, CUSTOM) */}
-                  {(pos === 'TOP_RIGHT' || pos === 'TOP_LEFT' || pos === 'CUSTOM') &&
-                    renderBannerButtonsGroup(currentBtns, pos, false, {
-                      top: currentBanner.buttonTop,
-                      bottom: currentBanner.buttonBottom,
-                      left: currentBanner.buttonLeft,
-                      right: currentBanner.buttonRight,
-                    })}
-
-                  <div className={`stitch-banner-content mascot-${imgPosClass}`}>
-                    {currentBanner.badgeText && (
-                      <div className="stitch-banner-badge">
-                        <span>{currentBanner.badgeText}</span>
-                      </div>
-                    )}
-
-                    {currentBanner.title && (
-                      <h4 className="stitch-banner-title">{currentBanner.title}</h4>
-                    )}
-
-                    {currentBanner.subtitle && (
-                      <div className="stitch-banner-subtitle">
-                        <span>{currentBanner.subtitle}</span>
-                      </div>
-                    )}
-
-                    {/* Bottom positioned buttons */}
-                    {pos !== 'TOP_RIGHT' && pos !== 'TOP_LEFT' && pos !== 'CUSTOM' &&
-                      renderBannerButtonsGroup(currentBtns, pos, false)}
-                  </div>
-
-                  {imgPos !== 'NONE' && (currentBanner.imageUrl || (!currentBanner.backgroundImageUrl)) && (
-                    <img
-                      src={mascotSrc}
-                      alt="Banner Mascot"
-                      className={`stitch-banner-mascot pos-${imgPosClass}`}
-                      onError={e => {
-                        (e.target as HTMLImageElement).src = '/image_character.png';
-                      }}
-                    />
-                  )}
-
-                  {/* Indicator Dots */}
-                  <div className={`stitch-banner-dots ${imgPos === 'LEFT' ? 'mascot-left' : ''}`}>
-                    {activeBanners.map((_, idx) => (
-                      <span
-                        key={idx}
-                        className={`stitch-dot ${idx === activePreviewIndex ? 'active' : ''}`}
-                        onClick={() => setActivePreviewIndex(idx)}
-                      />
-                    ))}
-                  </div>
-                </div>
-              );
-            })()
-          ) : (
-            <div
-              className="stitch-banner-card"
-              style={{
-                background: 'linear-gradient(135deg, #2563EB, #4F46E5, #1D4ED8)',
-                padding: '24px',
-                textAlign: 'center',
-              }}
-            >
-              <div className="stitch-banner-bg-orb" />
-              <div style={{ position: 'relative', zIndex: 2 }}>
-                <h4 className="stitch-banner-title">Chưa có banner nào được kích hoạt</h4>
-                <p style={{ fontSize: '12px', color: '#dbeafe', margin: '8px 0 16px' }}>
-                  Bật trạng thái hiển thị cho ít nhất 1 banner để xem trước trên app.
-                </p>
-                <button
-                  type="button"
-                  className="stitch-banner-cta-btn"
-                  onClick={handleOpenCreateModal}
-                >
-                  <Plus size={13} />
-                  <span>Tạo banner ngay</span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {activeBanners.length > 1 && (
-            <div className="preview-controls">
-              <button
-                type="button"
-                className="preview-nav-btn"
-                disabled={activePreviewIndex === 0}
-                onClick={() => setActivePreviewIndex(prev => Math.max(0, prev - 1))}
-                title="Banner trước"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 600 }}>
-                Banner {activePreviewIndex + 1} / {activeBanners.length}
-              </span>
-              <button
-                type="button"
-                className="preview-nav-btn"
-                disabled={activePreviewIndex === activeBanners.length - 1}
-                onClick={() =>
-                  setActivePreviewIndex(prev => Math.min(activeBanners.length - 1, prev + 1))
-                }
-                title="Banner kế tiếp"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* 3. Toolbar */}
-      <div className="banner-toolbar">
+      {/* 2. Main Two-Column Split Layout on Tablet / Desktop */}
+      <div className={`banner-main-split ${showModal ? 'banner-editing' : ''}`}>
+        {/* Left Column: Banner Form (when editing/creating) OR Toolbar + Cards List */}
+        <div className="banner-left-pane">
+          {!showModal && (
+            <>
+              {/* Toolbar */}
+              <div className="banner-toolbar">
         <div className="toolbar-left">
           <div className="search-box">
             <Search size={16} />
@@ -1148,213 +1156,143 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
             const bannerBg = getBannerBackgroundStyle(banner);
             const mascotSrc = banner.imageUrl || '/image_character.png';
             const bannerBtns = getBannerButtons(banner);
-            const pos = banner.buttonPosition || 'BOTTOM_LEFT';
             const imgPos = banner.imagePosition || 'RIGHT';
 
-            const cardPadding =
-              imgPos === 'LEFT'
-                ? '12px 14px 14px 85px'
-                : imgPos === 'RIGHT_TOP'
-                ? '12px 75px 14px 14px'
-                : imgPos === 'NONE'
-                ? '12px 14px 14px 14px'
-                : '12px 90px 14px 14px';
-
-            const cardMascotStyle: React.CSSProperties =
-              imgPos === 'LEFT'
-                ? { left: '6px', right: 'auto', bottom: 0, width: '80px', height: '110px' }
-                : imgPos === 'RIGHT_TOP'
-                ? { right: '8px', top: '8px', bottom: 'auto', left: 'auto', width: '60px', height: '60px' }
-                : { right: '6px', bottom: 0, width: '90px', height: '120px' };
+            const previewIdx = activeBanners.findIndex(b => b.id === banner.id);
 
             return (
-              <div key={banner.id} className="banner-item-card">
-                {/* Visual Preview Header */}
-                <div className="banner-card-top-preview">
+              <div
+                key={banner.id}
+                className={`banner-item-card ${previewIdx === activePreviewIndex ? 'active-preview-card' : ''}`}
+                onClick={() => {
+                  if (previewIdx >= 0) setActivePreviewIndex(previewIdx);
+                }}
+                style={{ cursor: previewIdx >= 0 ? 'pointer' : 'default' }}
+                title={previewIdx >= 0 ? 'Bấm để xem trên mô phỏng điện thoại' : undefined}
+              >
+                {/* 1. Left: 16:9 Thumbnail */}
+                <div className="banner-card-thumb-col">
                   <div
-                    className="stitch-banner-card"
+                    className="banner-card-thumbnail"
                     style={{
                       background: bannerBg,
-                      minHeight: '145px',
                       fontFamily: getBannerFontFamily(banner.fontFamily),
                     }}
                   >
-                    <div className="stitch-banner-bg-orb" />
-
-                    {(pos === 'TOP_RIGHT' || pos === 'TOP_LEFT' || pos === 'CUSTOM') &&
-                      renderBannerButtonsGroup(bannerBtns, pos, true, {
-                        top: banner.buttonTop,
-                        bottom: banner.buttonBottom,
-                        left: banner.buttonLeft,
-                        right: banner.buttonRight,
-                      })}
-
-                    <div className="stitch-banner-content" style={{ padding: cardPadding }}>
-                      {banner.badgeText && (
-                        <div
-                          className="stitch-banner-badge"
-                          style={{ fontSize: '9px', padding: '2px 8px' }}
-                        >
-                          <span>{banner.badgeText}</span>
-                        </div>
-                      )}
-                      <h4
-                        className="stitch-banner-title"
-                        style={{ fontSize: '14px', marginBottom: '2px' }}
-                      >
-                        {banner.title || (
-                          <span style={{ opacity: 0.65, fontStyle: 'italic', fontWeight: 500 }}>
-                            (Banner hình ảnh - Không có chữ)
-                          </span>
-                        )}
-                      </h4>
-                      {banner.subtitle && (
-                        <div
-                          className="stitch-banner-subtitle"
-                          style={{ fontSize: '10px', marginBottom: '8px' }}
-                        >
-                          {banner.subtitle}
-                        </div>
-                      )}
-
-                      {pos !== 'TOP_RIGHT' && pos !== 'TOP_LEFT' && pos !== 'CUSTOM' &&
-                        renderBannerButtonsGroup(bannerBtns, pos, true)}
-                    </div>
-
-                    {imgPos !== 'NONE' && (banner.imageUrl || (!banner.backgroundImageUrl)) && (
+                    {banner.backgroundImageUrl ? (
                       <img
-                        src={mascotSrc}
-                        alt="Mascot"
-                        className="stitch-banner-mascot"
-                        style={cardMascotStyle}
-                        onError={e => {
-                          (e.target as HTMLImageElement).src = '/image_character.png';
-                        }}
+                        src={banner.backgroundImageUrl}
+                        alt={banner.title || 'Banner'}
+                        className="banner-thumb-img"
                       />
+                    ) : (
+                      <>
+                        <div className="banner-thumb-orb" />
+                        {banner.badgeText && (
+                          <span className="banner-thumb-badge">{banner.badgeText}</span>
+                        )}
+                        {imgPos !== 'NONE' && (
+                          <img
+                            src={mascotSrc}
+                            alt=""
+                            className={`banner-thumb-mascot pos-${imgPos.toLowerCase().replace('_', '-')}`}
+                            onError={e => {
+                              (e.target as HTMLImageElement).src = '/image_character.png';
+                            }}
+                          />
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
 
-                {/* Body Meta Details */}
-                <div className="banner-card-body">
-                  <div className="banner-card-meta">
-                    <span className="banner-order-badge">Thứ tự: #{banner.displayOrder}</span>
-                    <span
-                      className={`banner-status-badge ${banner.isActive ? 'active' : 'inactive'}`}
-                    >
-                      <span className="banner-status-dot" />
-                      {banner.isActive ? 'Hiển thị trên App' : 'Đang tạm ẩn'}
-                    </span>
-                  </div>
-
-                  <div className="banner-info-row">
-                    <strong>Vị trí nút:</strong>
-                    <span>
-                      {bannerBtns.length === 0 ? (
-                        <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Không có nút bấm</span>
-                      ) : pos === 'CUSTOM' ? (
-                        `Tùy chỉnh (${[
-                          banner.buttonTop != null ? `T:${banner.buttonTop}px` : null,
-                          banner.buttonBottom != null ? `B:${banner.buttonBottom}px` : null,
-                          banner.buttonLeft != null ? `L:${banner.buttonLeft}px` : null,
-                          banner.buttonRight != null ? `R:${banner.buttonRight}px` : null,
-                        ].filter(Boolean).join(', ') || 'Chưa đặt tọa độ'})`
-                      ) : pos === 'TOP_LEFT' ? (
-                        'Góc trái - trên'
-                      ) : pos === 'TOP_RIGHT' ? (
-                        'Góc phải - trên'
-                      ) : pos === 'BOTTOM_CENTER' ? (
-                        'Ở giữa - dưới'
-                      ) : pos === 'BOTTOM_RIGHT' ? (
-                        'Góc phải - dưới'
-                      ) : (
-                        'Góc trái - dưới (Mặc định)'
+                {/* 2. Middle: Content Info */}
+                <div className="banner-card-info-col">
+                  <div className="banner-card-title-row">
+                    <h4 className="banner-card-title">
+                      {banner.title || (
+                        <span className="banner-title-empty">(Banner hình ảnh - Không có chữ)</span>
                       )}
-                    </span>
+                    </h4>
+                    {banner.badgeText && (
+                      <span className="banner-card-badge-pill">{banner.badgeText}</span>
+                    )}
                   </div>
 
-                  <div className="banner-info-row">
-                    <strong>Vị trí ảnh:</strong>
-                    <span>
-                      {imgPos === 'RIGHT' && 'Góc phải - dưới (Mặc định)'}
-                      {imgPos === 'LEFT' && 'Góc trái - dưới'}
-                      {imgPos === 'RIGHT_TOP' && 'Góc phải - trên'}
-                      {imgPos === 'NONE' && 'Ẩn ảnh minh họa'}
-                    </span>
-                  </div>
+                  {banner.subtitle && (
+                    <div className="banner-card-subtitle">{banner.subtitle}</div>
+                  )}
 
-                  <div className="banner-info-row">
-                    <strong>Nút bấm ({bannerBtns.length}):</strong>
-                    <span>
-                      {bannerBtns.length === 0 ? (
-                        <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>Không có nút hành động (0 nút)</span>
-                      ) : (
-                        bannerBtns.map(b => b.text).join(' • ')
-                      )}
+                  <div className="banner-card-meta-chips">
+                    <span className="meta-chip order-chip">#{banner.displayOrder}</span>
+                    <span className="meta-chip">
+                      <Palette size={11} />
+                      <span>{banner.backgroundImageUrl ? 'Ảnh nền' : 'Gradient'}</span>
                     </span>
-                  </div>
-
-                  <div className="banner-info-row">
-                    <strong>Phông chữ:</strong>
-                    <span style={{ fontFamily: getBannerFontFamily(banner.fontFamily), fontWeight: 600 }}>
-                      {banner.fontFamily || 'Be Vietnam Pro'}
+                    <span className="meta-chip">
+                      <Type size={11} />
+                      <span>{banner.fontFamily || 'Be Vietnam Pro'}</span>
                     </span>
-                  </div>
-
-                  <div className="banner-info-row">
-                    <strong>Màu / Nền:</strong>
-                    <span>
-                      {banner.backgroundImageUrl
-                        ? (banner.darkenOverlay
-                            ? 'Ảnh nền (Có làm tối 35%)'
-                            : 'Ảnh banner tải lên (Không làm tối)')
-                        : 'Màu gradient'}
-                    </span>
+                    {bannerBtns.length > 0 ? (
+                      <span className="meta-chip buttons-chip">
+                        <span>{bannerBtns.length} nút ({bannerBtns.map(b => b.text).join(', ')})</span>
+                      </span>
+                    ) : (
+                      <span className="meta-chip muted">0 nút bấm</span>
+                    )}
                   </div>
                 </div>
 
-                {/* Card Actions */}
-                <div className="banner-card-actions">
-                  <button
-                    type="button"
-                    className={`btn-toggle-switch ${banner.isActive ? 'active' : 'inactive'}`}
+                {/* 3. Right: Action Bar */}
+                <div className="banner-card-action-bar" onClick={e => e.stopPropagation()}>
+                  {/* Switch Toggle (Bật / Tắt nhanh) */}
+                  <div
+                    className="banner-switch-container"
+                    title={banner.isActive ? 'Đang hiển thị trên App (Bấm để ẩn)' : 'Đang tạm ẩn (Bấm để hiển thị)'}
                     onClick={() => handleToggleActive(banner)}
-                    title={banner.isActive ? 'Bấm để ẩn khỏi App' : 'Bấm để kích hoạt trên App'}
                   >
-                    {banner.isActive ? <Eye size={15} /> : <EyeOff size={15} />}
-                    <span>{banner.isActive ? 'Đang bật' : 'Đã tắt'}</span>
-                  </button>
+                    <div className={`banner-switch-track ${banner.isActive ? 'active' : ''}`}>
+                      <div className="banner-switch-thumb" />
+                    </div>
+                    <span className={`banner-switch-text ${banner.isActive ? 'active' : ''}`}>
+                      {banner.isActive ? 'Bật' : 'Tắt'}
+                    </span>
+                  </div>
 
-                  <div className="action-buttons-group">
+                  <div className="banner-action-buttons">
                     <button
                       type="button"
-                      className="btn-icon-action"
+                      className="btn-card-action"
                       disabled={index === 0}
                       onClick={() => handleMove(index, 'UP')}
                       title="Chuyển lên trước"
                     >
-                      <ArrowUp size={14} />
+                      <ArrowUp size={13} />
                     </button>
                     <button
                       type="button"
-                      className="btn-icon-action"
+                      className="btn-card-action"
                       disabled={index === banners.length - 1}
                       onClick={() => handleMove(index, 'DOWN')}
                       title="Chuyển xuống sau"
                     >
-                      <ArrowDown size={14} />
+                      <ArrowDown size={13} />
                     </button>
+
+                    {/* Icon bút chì (Chỉnh sửa) */}
                     <button
                       type="button"
-                      className="btn-icon-action"
+                      className="btn-card-action edit-btn"
                       onClick={() => handleOpenEditModal(banner)}
                       title="Chỉnh sửa banner"
                     >
                       <Edit size={14} />
                     </button>
+
+                    {/* Icon thùng rác đỏ (Xóa) */}
                     <button
                       type="button"
-                      className="btn-icon-action delete"
+                      className="btn-card-action delete-btn"
                       onClick={() => handleDelete(banner)}
                       title="Xóa banner"
                     >
@@ -1367,206 +1305,70 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
           })}
         </div>
       )}
+            </>
+          )}
 
-      {/* 5. Create / Edit Banner Modal */}
-      {showModal && (
-        <div className="banner-modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="banner-modal-content" onClick={e => e.stopPropagation()}>
-            <div className="banner-modal-header">
-              <h3>{editingBanner ? 'Chỉnh sửa Banner Ứng Dụng' : 'Tạo Mới Banner Ứng Dụng'}</h3>
-              <button
-                type="button"
-                className="modal-close-btn"
-                onClick={() => setShowModal(false)}
-                title="Đóng"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit}>
-              <div className="banner-modal-body">
-                {/* Live Real-time Preview Inside Modal */}
-                <div style={{ marginBottom: '8px' }}>
-                  <label style={{ fontSize: '13px', fontWeight: 600, color: '#334155', display: 'block', marginBottom: '8px' }}>
-                    Xem trước banner theo thời gian thực (Cập nhật vị trí nút, hành động & màu sắc):
-                  </label>
-                  <div
-                    className="stitch-banner-card"
-                    style={{
-                      background: bgMode === 'CUSTOM_BG'
-                        ? getBannerBackgroundStyle({ darkenOverlay: formDarkenOverlay }, bgFilePreviewUrl || formBackgroundImageUrl, formDarkenOverlay)
-                        : getGradientStyle(formCustomGradient.trim() || formGradient),
-                      minHeight: '150px',
-                      fontFamily: getBannerFontFamily(formFontFamily),
+          {/* Form Card (Hiển thị ở cột trái khi tạo / chỉnh sửa banner) */}
+          {showModal && (
+            <div className="banner-form-card">
+              <div className="banner-form-header">
+                <div className="banner-form-header-left">
+                  <button
+                    type="button"
+                    className="btn-back-to-list"
+                    onClick={() => {
+                      setShowModal(false);
+                      setEditingBanner(null);
                     }}
+                    title="Quay lại danh sách banner"
                   >
-                    {(formButtonPosition === 'TOP_RIGHT' || formButtonPosition === 'TOP_LEFT' || formButtonPosition === 'CUSTOM') &&
-                      renderBannerButtonsGroup(formButtons, formButtonPosition, false, {
-                        top: formButtonTop,
-                        bottom: formButtonBottom,
-                        left: formButtonLeft,
-                        right: formButtonRight,
-                      })}
-
-                    <div className={`stitch-banner-content mascot-${formImagePosition.toLowerCase().replace('_', '-')}`}>
-                      {formBadgeText && (
-                        <div className="stitch-banner-badge">
-                          <span>{formBadgeText}</span>
-                        </div>
-                      )}
-                      {formTitle ? (
-                        <h4 className="stitch-banner-title">{formTitle}</h4>
-                      ) : null}
-                      {formSubtitle ? (
-                        <div className="stitch-banner-subtitle">
-                          {formSubtitle}
-                        </div>
-                      ) : null}
-
-                      {formButtonPosition !== 'TOP_RIGHT' && formButtonPosition !== 'TOP_LEFT' && formButtonPosition !== 'CUSTOM' &&
-                        renderBannerButtonsGroup(formButtons, formButtonPosition, false)}
-                    </div>
-
-                    {formImagePosition !== 'NONE' && imageType !== 'none' && (
-                      <img
-                        src={
-                          filePreviewUrl ||
-                          (imageType === 'url' && formImageUrl ? formImageUrl : '/image_character.png')
-                        }
-                        alt="Banner Mascot Preview"
-                        className={`stitch-banner-mascot pos-${formImagePosition.toLowerCase().replace('_', '-')}`}
-                        onError={e => {
-                          (e.target as HTMLImageElement).src = '/image_character.png';
-                        }}
-                      />
-                    )}
-                  </div>
+                    <ArrowLeft size={16} />
+                    <span>Danh sách banner</span>
+                  </button>
+                  <span className="banner-form-header-divider">/</span>
+                  <h3>{editingBanner ? 'Chỉnh sửa Banner Ứng Dụng' : 'Tạo Mới Banner Ứng Dụng'}</h3>
                 </div>
+                <button
+                  type="button"
+                  className="modal-close-btn"
+                  onClick={() => {
+                    setShowModal(false);
+                    setEditingBanner(null);
+                  }}
+                  title="Đóng form"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-                {/* Dedicated Banner Image Upload & Cropper Section */}
-                <div className="banner-upload-cropper-card">
-                  <input
-                    type="file"
-                    ref={modalBannerUploadRef}
-                    accept="image/png, image/jpeg, image/webp"
-                    style={{ display: 'none' }}
-                    onChange={e => handleSelectFileForCrop(e, 'BANNER_IMAGE')}
-                  />
-
-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Crop size={16} color="#2563eb" />
-                      <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e293b' }}>
-                        Tải ảnh banner từ máy tính (Có công cụ Cắt & Căn chỉnh tỉ lệ chuẩn App)
-                      </span>
-                    </div>
-                    {bgMode === 'CUSTOM_BG' && (bgFilePreviewUrl || formBackgroundImageUrl) && (
-                      <span className="cropped-thumb-badge">
-                        <Sparkles size={11} />
-                        {formDarkenOverlay ? 'Ảnh nền (Có làm tối)' : 'Ảnh banner gốc (Không làm tối)'}
-                      </span>
-                    )}
+              <form onSubmit={handleSubmit}>
+              <div className="banner-modal-body">
+                <details className="banner-editor-group" open><summary>Mẫu banner & công cụ thiết kế</summary><div className="banner-editor-fields">
+                  <div className="banner-template-picker">
+                    <button type="button" onClick={() => applyTemplate('promotion')}>Khuyến mãi / Ưu đãi</button>
+                    <button type="button" onClick={() => applyTemplate('information')}>Thông tin / Địa chỉ</button>
+                    <button type="button" onClick={() => applyTemplate('image')}>Banner thuần ảnh</button>
                   </div>
+                  <p className="form-hint">Áp dụng mẫu sẽ thay nội dung và định dạng hiện tại. Kéo phần tử trên preview hoặc dùng phím mũi tên để căn chỉnh.</p>
+                  <label className="canvas-toggle"><input type="checkbox" checked={snapToGrid} onChange={e => setSnapToGrid(e.target.checked)} />Căn lưới & đường giữa (giữ Alt để kéo tự do)</label>
+                  <div className="canvas-element-picker">
+                    {['badge', 'title', 'subtitle', 'mascot', ...formButtons.map((_, index) => `button${index}`)].map(id =>
+                      <button type="button" key={id} className={selectedElement === id ? 'active' : ''} onClick={() => setSelectedElement(id)}>
+                        {({ badge: 'Tag', title: 'Tiêu đề', subtitle: 'Mô tả', mascot: 'Mascot' } as Record<string, string>)[id] || `Nút ${Number(id.slice(6)) + 1}`}
+                      </button>)}
+                  </div>
+                  <CanvasInspector design={design} selected={selectedElement} fonts={[formFontFamily, ...BANNER_FONTS.map(font => font.id).filter(font => font !== formFontFamily)]}
+                    text={selectedElement === 'title' ? formTitle : selectedElement === 'subtitle' ? formSubtitle : selectedElement === 'badge' ? formBadgeText : ''}
+                    onChange={setDesign} />
+                </div></details>
 
-                  {bgMode === 'CUSTOM_BG' && (bgFilePreviewUrl || formBackgroundImageUrl) ? (
-                    <div>
-                      <div className="banner-cropped-active-box">
-                        <img
-                          src={bgFilePreviewUrl || formBackgroundImageUrl}
-                          alt="Banner Preview"
-                          className="cropped-thumb-preview"
-                        />
-                        <div className="cropped-thumb-info">
-                          <span className="cropped-thumb-name">
-                            {selectedBgFile ? selectedBgFile.name : 'Ảnh banner đã tải lên'}
-                          </span>
-                          <div className="cropped-thumb-meta">
-                            <span className="cropped-thumb-badge">✓ Chuẩn tỉ lệ App (2:1)</span>
-                            {selectedBgFile && (
-                              <span>{Math.round(selectedBgFile.size / 1024)} KB</span>
-                            )}
-                          </div>
-                          <div className="cropped-thumb-actions">
-                            <button
-                              type="button"
-                              className="btn-recrop"
-                              onClick={handleReCropBackground}
-                            >
-                              <Crop size={13} />
-                              <span>Cắt lại / Căn chỉnh ảnh</span>
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-change-crop"
-                              onClick={() => modalBannerUploadRef.current?.click()}
-                            >
-                              Đổi ảnh khác
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-remove-crop"
-                              onClick={() => {
-                                setSelectedBgFile(null);
-                                setBgFilePreviewUrl(null);
-                                setFormBackgroundImageUrl('');
-                                setBgMode('GRADIENT');
-                              }}
-                            >
-                              Xóa ảnh
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Darken Overlay Toggle */}
-                      <div style={{ marginTop: '10px', padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
-                          <input
-                            type="checkbox"
-                            checked={formDarkenOverlay}
-                            onChange={e => setFormDarkenOverlay(e.target.checked)}
-                            style={{ width: '16px', height: '16px' }}
-                          />
-                          <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
-                            Làm mờ tối ảnh banner (Darken Overlay 35%)
-                          </span>
-                        </label>
-                        <span className="form-hint" style={{ marginTop: '4px', display: 'block', fontSize: '12px', color: '#64748b' }}>
-                          {formDarkenOverlay
-                            ? '✓ Đang bật làm tối ảnh banner (35% Dark Overlay).'
-                            : '✓ Không làm mờ tối ảnh: Giữ nguyên 100% màu sắc và độ sáng gốc của ảnh banner tải lên.'}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      className="banner-crop-dropzone"
-                      onClick={() => modalBannerUploadRef.current?.click()}
-                    >
-                      <div className="dropzone-icon-box">
-                        <UploadCloud size={24} />
-                      </div>
-                      <span className="dropzone-title">
-                        Bấm để tải ảnh banner từ máy tính lên
-                      </span>
-                      <span className="dropzone-desc">
-                        Hỗ trợ PNG, JPG, WebP. Hệ thống sẽ tự động mở công cụ cắt ảnh để căn chỉnh vừa vặn với kích thước banner ứng dụng (720x360 px).
-                      </span>
-                      <span className="dropzone-badge-tag">
-                        <Crop size={12} />
-                        Có xem trước & cắt ảnh trực quan 2:1
-                      </span>
-                    </div>
-                  )}
-                </div>
-
+<details className="banner-editor-group" open><summary>Nội dung & kiểu chữ</summary><div className="banner-editor-fields">
                 {/* Content Inputs */}
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label>Tiêu đề banner (Có thể để trống nếu dùng ảnh tự thiết kế)</label>
-                    <input
-                      type="text"
+                    <textarea
+                      rows={2}
                       placeholder="Ví dụ: Bảo Trì & Sửa Chữa Inverter (hoặc để trống)"
                       value={formTitle}
                       onChange={e => setFormTitle(e.target.value)}
@@ -1594,354 +1396,31 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                   />
                 </div>
 
-                {/* FONT FAMILY SELECTION */}
                 <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Type size={15} color="#2563eb" />
-                    <span>Phông chữ hiển thị trên banner (Typography)</span>
-                  </label>
-                  <div className="font-options-grid">
-                    {BANNER_FONTS.map(font => {
-                      const isSelected = formFontFamily.toLowerCase() === font.id.toLowerCase();
-                      return (
-                        <button
-                          key={font.id}
-                          type="button"
-                          className={`font-option-card ${isSelected ? 'selected' : ''}`}
-                          onClick={() => setFormFontFamily(font.id)}
-                          style={{ fontFamily: font.family }}
-                        >
-                          <div className="font-card-top">
-                            <span className="font-card-name">{font.name}</span>
-                            {isSelected && (
-                              <span className="font-card-check">
-                                <Check size={12} color="#ffffff" />
-                              </span>
-                            )}
-                          </div>
-                          <div className="font-card-preview">
-                            Ưu Đãi Inverter 2026
-                          </div>
-                          <div className="font-card-desc">
-                            {font.description}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <label><Type size={15} /> Font mặc định của banner</label>
+                  <select value={formFontFamily} onChange={e => setFormFontFamily(e.target.value)}>
+                    {BANNER_FONTS.map(font => <option key={font.id} value={font.id}>{font.name}</option>)}
+                  </select>
+                  <small>Áp dụng cho phần tử chọn “Font mặc định”. Font riêng được chỉnh trong Định dạng.</small>
                 </div>
 
-                {/* 1. BUTTON POSITION SELECTION */}
-                <div className="form-group">
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <Move size={15} color="#2563eb" />
-                    <span>Vị trí nút bấm trên banner</span>
-                  </label>
-                  <div className="position-options-grid">
-                    <button
-                      type="button"
-                      className={`position-option-btn ${formButtonPosition === 'BOTTOM_LEFT' ? 'selected' : ''}`}
-                      onClick={() => setFormButtonPosition('BOTTOM_LEFT')}
-                    >
-                      <div className="position-icon-box">
-                        <span className="position-dot bottom-left" />
-                      </div>
-                      <span>Trái - Dưới (Mặc định)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`position-option-btn ${formButtonPosition === 'BOTTOM_CENTER' ? 'selected' : ''}`}
-                      onClick={() => setFormButtonPosition('BOTTOM_CENTER')}
-                    >
-                      <div className="position-icon-box">
-                        <span className="position-dot bottom-center" />
-                      </div>
-                      <span>Ở giữa - Dưới</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`position-option-btn ${formButtonPosition === 'BOTTOM_RIGHT' ? 'selected' : ''}`}
-                      onClick={() => setFormButtonPosition('BOTTOM_RIGHT')}
-                    >
-                      <div className="position-icon-box">
-                        <span className="position-dot bottom-right" />
-                      </div>
-                      <span>Phải - Dưới</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`position-option-btn ${formButtonPosition === 'TOP_LEFT' ? 'selected' : ''}`}
-                      onClick={() => setFormButtonPosition('TOP_LEFT')}
-                    >
-                      <div className="position-icon-box">
-                        <span className="position-dot top-left" />
-                      </div>
-                      <span>Trái - Trên</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`position-option-btn ${formButtonPosition === 'TOP_RIGHT' ? 'selected' : ''}`}
-                      onClick={() => setFormButtonPosition('TOP_RIGHT')}
-                    >
-                      <div className="position-icon-box">
-                        <span className="position-dot top-right" />
-                      </div>
-                      <span>Phải - Trên</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      className={`position-option-btn ${formButtonPosition === 'CUSTOM' ? 'selected' : ''}`}
-                      onClick={() => setFormButtonPosition('CUSTOM')}
-                    >
-                      <div className="position-icon-box">
-                        <span className="position-dot custom" />
-                      </div>
-                      <span>Tùy chỉnh tọa độ</span>
-                    </button>
-                  </div>
-
-                  {/* Custom Coordinates Inputs */}
-                  {formButtonPosition === 'CUSTOM' && (
-                    <div className="button-coords-box">
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
-                        <Move size={14} color="#2563eb" />
-                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>
-                          Thông số tọa độ vị trí nút (pixel - px):
-                        </span>
-                      </div>
-                      <p style={{ fontSize: '11.5px', color: '#64748b', margin: '0 0 10px 0' }}>
-                        Nhập khoảng cách từ mép banner tới nút bấm. Bạn có thể kết hợp Top/Bottom và Left/Right để định vị tự do.
-                      </p>
-                      <div className="button-coords-grid">
-                        <div className="button-coord-item">
-                          <label className="button-coord-label">Cách mép Trên (Top)</label>
-                          <div className="button-coord-input-wrap">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="VD: 14"
-                              value={formButtonTop}
-                              onChange={e =>
-                                setFormButtonTop(e.target.value === '' ? '' : Number(e.target.value))
-                              }
-                            />
-                            <span className="button-coord-unit">px</span>
-                          </div>
-                        </div>
-
-                        <div className="button-coord-item">
-                          <label className="button-coord-label">Cách mép Dưới (Bottom)</label>
-                          <div className="button-coord-input-wrap">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="VD: 14"
-                              value={formButtonBottom}
-                              onChange={e =>
-                                setFormButtonBottom(e.target.value === '' ? '' : Number(e.target.value))
-                              }
-                            />
-                            <span className="button-coord-unit">px</span>
-                          </div>
-                        </div>
-
-                        <div className="button-coord-item">
-                          <label className="button-coord-label">Cách mép Trái (Left)</label>
-                          <div className="button-coord-input-wrap">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="VD: 16"
-                              value={formButtonLeft}
-                              onChange={e =>
-                                setFormButtonLeft(e.target.value === '' ? '' : Number(e.target.value))
-                              }
-                            />
-                            <span className="button-coord-unit">px</span>
-                          </div>
-                        </div>
-
-                        <div className="button-coord-item">
-                          <label className="button-coord-label">Cách mép Phải (Right)</label>
-                          <div className="button-coord-input-wrap">
-                            <input
-                              type="number"
-                              min="0"
-                              placeholder="VD: 16"
-                              value={formButtonRight}
-                              onChange={e =>
-                                setFormButtonRight(e.target.value === '' ? '' : Number(e.target.value))
-                              }
-                            />
-                            <span className="button-coord-unit">px</span>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* 2. MULTIPLE BUTTONS & ACTIONS MANAGER */}
-                <div className="form-group">
-                  <div className="buttons-manager-header">
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
-                      <Layers size={15} color="#2563eb" />
-                      <span>Các nút bấm và hành động trên banner ({formButtons.length}/3)</span>
-                    </label>
-                    {formButtons.length < 3 && (
-                      <button
-                        type="button"
-                        className="btn-add-button"
-                        onClick={handleAddButton}
-                      >
-                        <Plus size={14} />
-                        <span>Thêm nút bấm</span>
-                      </button>
-                    )}
-                  </div>
-
-                  {formButtons.length === 0 ? (
-                    <div className="button-empty-state">
-                      <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 10px 0' }}>
-                        Hiện banner chưa có nút bấm hành động nào (0 nút). Banner sẽ hiển thị nội dung thông tin / quảng bá thuần túy.
-                      </p>
-                      <button
-                        type="button"
-                        className="btn-add-button"
-                        onClick={handleAddButton}
-                      >
-                        <Plus size={14} />
-                        <span>Thêm nút bấm</span>
-                      </button>
-                    </div>
-                  ) : (
-                    formButtons.map((btn, bIdx) => (
-                      <div key={bIdx} className="button-item-card">
-                        <div className="button-item-top">
-                          <span className="button-badge-num">
-                            <span>Nút #{bIdx + 1}</span>
-                            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
-                              {btn.styleType === 'PRIMARY' ? '(Nút chính)' : btn.styleType === 'SECONDARY' ? '(Nút phụ)' : '(Viền ngoài)'}
-                            </span>
-                          </span>
-                          <button
-                            type="button"
-                            className="btn-remove-button"
-                            onClick={() => handleRemoveButton(bIdx)}
-                            title="Xóa nút này"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-
-                      <div className="form-grid-2">
-                        <div>
-                          <label style={{ fontSize: '11.5px', color: '#475569' }}>Tên nút bấm</label>
-                          <input
-                            type="text"
-                            required
-                            placeholder="Ví dụ: Đặt lịch ngay"
-                            value={btn.text}
-                            onChange={e => handleUpdateButton(bIdx, 'text', e.target.value)}
-                            style={{ fontSize: '12.5px' }}
-                          />
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: '11.5px', color: '#475569' }}>Kiểu giao diện nút</label>
-                          <select
-                            value={btn.styleType}
-                            onChange={e => handleUpdateButton(bIdx, 'styleType', e.target.value)}
-                            style={{ fontSize: '12.5px' }}
-                          >
-                            <option value="PRIMARY">Nút chính (Nền trắng nổi bật)</option>
-                            <option value="SECONDARY">Nút phụ (Kính mờ viền trắng)</option>
-                            <option value="OUTLINE">Nút viền trong suốt</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="form-grid-2" style={{ marginTop: '8px' }}>
-                        <div>
-                          <label style={{ fontSize: '11.5px', color: '#475569' }}>Hành động khi bấm</label>
-                          <select
-                            value={btn.actionType}
-                            onChange={e => handleUpdateButton(bIdx, 'actionType', e.target.value)}
-                            style={{ fontSize: '12.5px' }}
-                          >
-                            <option value="BOOKING">Mở khung Đặt dịch vụ (Booking Sheet)</option>
-                            <option value="CALL">Gọi điện thoại Hotline</option>
-                            <option value="REPAIR_ORDER">Mở danh sách Đơn sửa chữa</option>
-                            <option value="LINK">Mở liên kết Web (URL)</option>
-                            <option value="SCREEN">Chuyển hướng màn hình App</option>
-                            <option value="NONE">Không có hành động</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label style={{ fontSize: '11.5px', color: '#475569' }}>
-                            {btn.actionType === 'BOOKING'
-                              ? 'Tên dịch vụ đặt hẹn'
-                              : btn.actionType === 'CALL'
-                              ? 'Số điện thoại hotline'
-                              : btn.actionType === 'LINK'
-                              ? 'Đường dẫn liên kết (URL)'
-                              : 'Tham số / Tên màn hình'}
-                          </label>
-                          <input
-                            type="text"
-                            placeholder={
-                              btn.actionType === 'BOOKING'
-                                ? 'Ví dụ: Gói bảo trì ưu đãi 25%'
-                                : btn.actionType === 'CALL'
-                                ? 'Ví dụ: 0901234567'
-                                : btn.actionType === 'LINK'
-                                ? 'https://example.com'
-                                : 'warehouse, messages'
-                            }
-                            value={btn.actionValue || ''}
-                            onChange={e => handleUpdateButton(bIdx, 'actionValue', e.target.value)}
-                            style={{ fontSize: '12.5px' }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-                </div>
-
+</div></details>
+<details className="banner-editor-group" open><summary>Giao diện & loại nền</summary><div className="banner-editor-fields">
                 {/* 3. COLOR PALETTE, PICKER & CUSTOM BACKGROUND */}
                 <div className="form-group">
                   <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Palette size={15} color="#2563eb" />
-                    <span>Màu sắc & Nền banner</span>
+                    <span>Loại nền banner</span>
                   </label>
 
-                  {/* Mode Tabs */}
-                  <div className="bg-mode-tabs">
-                    <button
-                      type="button"
-                      className={`bg-mode-tab ${bgMode === 'GRADIENT' ? 'active' : ''}`}
-                      onClick={() => setBgMode('GRADIENT')}
-                    >
-                      <Palette size={14} />
-                      <span>Bảng màu Gradient & Tự chọn mã màu</span>
-                    </button>
-                    <button
-                      type="button"
-                      className={`bg-mode-tab ${bgMode === 'CUSTOM_BG' ? 'active' : ''}`}
-                      onClick={() => setBgMode('CUSTOM_BG')}
-                    >
-                      <ImageIcon size={14} />
-                      <span>Tải ảnh nền banner tự thiết kế / custom</span>
-                    </button>
-                  </div>
-
+<div className="bg-mode-tabs" role="group" aria-label="Loại nền">
+<button type="button" className={`bg-mode-tab ${bgMode === 'CUSTOM_BG' && bgSource === 'UPLOAD' ? 'active' : ''}`}
+ onClick={() => { setBgMode('CUSTOM_BG'); setBgSource('UPLOAD'); }}><UploadCloud size={14} />Ảnh tải lên</button>
+<button type="button" className={`bg-mode-tab ${bgMode === 'CUSTOM_BG' && bgSource === 'URL' ? 'active' : ''}`}
+ onClick={() => { setBgMode('CUSTOM_BG'); setBgSource('URL'); setSelectedBgFile(null); setBgFilePreviewUrl(null); }}><ExternalLink size={14} />URL trực tuyến</button>
+<button type="button" className={`bg-mode-tab ${bgMode === 'GRADIENT' ? 'active' : ''}`}
+ onClick={() => { setBgMode('GRADIENT'); setSelectedBgFile(null); setBgFilePreviewUrl(null); }}><Palette size={14} />Màu Gradient</button>
+</div>
                   {bgMode === 'GRADIENT' ? (
                     <div>
                       {/* Presets */}
@@ -2049,6 +1528,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                   ) : (
                     /* Custom Background Image Upload / URL */
                     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '14px' }}>
+{bgSource === 'UPLOAD' && (<>
                       <input
                         type="file"
                         ref={modalBgUploadRef}
@@ -2106,25 +1586,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                           </div>
                         </div>
 
-                        {/* Darken Overlay Toggle for Background */}
-                        <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
-                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
-                            <input
-                              type="checkbox"
-                              checked={formDarkenOverlay}
-                              onChange={e => setFormDarkenOverlay(e.target.checked)}
-                              style={{ width: '16px', height: '16px' }}
-                            />
-                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
-                              Làm mờ tối ảnh nền (Darken Overlay 35%)
-                            </span>
-                          </label>
-                          <span className="form-hint" style={{ marginTop: '4px', display: 'block', fontSize: '12px', color: '#64748b' }}>
-                            {formDarkenOverlay
-                              ? '✓ Đang bật làm tối ảnh nền để chữ và các nút bấm màu trắng nổi bật rõ ràng.'
-                              : '✓ Không làm tối: Ảnh nền giữ nguyên 100% độ sáng gốc.'}
-                          </span>
-                        </div>
+
                       </>
                     ) : (
                         <div
@@ -2148,8 +1610,10 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                         </div>
                       )}
 
+</>)}
+{bgSource === 'URL' && (
                       <div>
-                        <label style={{ fontSize: '12px', color: '#475569' }}>Hoặc nhập URL ảnh nền trực tuyến:</label>
+                        <label style={{ fontSize: '12px', color: '#475569' }}>URL ảnh nền trực tuyến:</label>
                         <input
                           type="url"
                           placeholder="https://example.com/images/banner_bg.jpg"
@@ -2157,7 +1621,30 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                           onChange={e => setFormBackgroundImageUrl(e.target.value)}
                           style={{ fontSize: '12.5px' }}
                         />
+                        {formBackgroundImageUrl && <button type="button" className="btn-recrop" onClick={handleReCropBackground}>
+                          <Crop size={13} />Cắt ảnh này
+                        </button>}
                       </div>
+)}
+                        {/* Darken Overlay Toggle for Background */}
+                        <div style={{ marginBottom: '12px', padding: '10px 14px', background: '#ffffff', border: '1px solid #e2e8f0', borderRadius: '10px' }}>
+                          <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', margin: 0 }}>
+                            <input
+                              type="checkbox"
+                              checked={formDarkenOverlay}
+                              onChange={e => setFormDarkenOverlay(e.target.checked)}
+                              style={{ width: '16px', height: '16px' }}
+                            />
+                            <span style={{ fontSize: '13px', fontWeight: 600, color: '#1e293b' }}>
+                              Làm mờ tối ảnh nền (Darken Overlay 35%)
+                            </span>
+                          </label>
+                          <span className="form-hint" style={{ marginTop: '4px', display: 'block', fontSize: '12px', color: '#64748b' }}>
+                            {formDarkenOverlay
+                              ? '✓ Đang bật làm tối ảnh nền để chữ và các nút bấm màu trắng nổi bật rõ ràng.'
+                              : '✓ Không làm tối: Ảnh nền giữ nguyên 100% độ sáng gốc.'}
+                          </span>
+                        </div>
                     </div>
                   )}
                 </div>
@@ -2178,7 +1665,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                       <button
                         type="button"
                         className={`position-option-btn ${formImagePosition === 'RIGHT' ? 'selected' : ''}`}
-                        onClick={() => setFormImagePosition('RIGHT')}
+                        onClick={() => chooseMascotPosition('RIGHT')}
                       >
                         <div className="image-pos-box">
                           <span className="image-pos-shape right-bottom" />
@@ -2189,7 +1676,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                       <button
                         type="button"
                         className={`position-option-btn ${formImagePosition === 'LEFT' ? 'selected' : ''}`}
-                        onClick={() => setFormImagePosition('LEFT')}
+                        onClick={() => chooseMascotPosition('LEFT')}
                       >
                         <div className="image-pos-box">
                           <span className="image-pos-shape left-bottom" />
@@ -2200,7 +1687,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                       <button
                         type="button"
                         className={`position-option-btn ${formImagePosition === 'RIGHT_TOP' ? 'selected' : ''}`}
-                        onClick={() => setFormImagePosition('RIGHT_TOP')}
+                        onClick={() => chooseMascotPosition('RIGHT_TOP')}
                       >
                         <div className="image-pos-box">
                           <span className="image-pos-shape right-top" />
@@ -2317,6 +1804,259 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                 </div>
 
                 {/* Display Order & Active */}
+</div></details>
+<details className="banner-editor-group" open><summary>Nút bấm (CTA)</summary><div className="banner-editor-fields">
+                {/* 2. MULTIPLE BUTTONS & ACTIONS MANAGER */}
+                <div className="form-group">
+                  <div className="buttons-manager-header">
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', margin: 0 }}>
+                      <Layers size={15} color="#2563eb" />
+                      <span>Các nút bấm và hành động trên banner ({formButtons.length}/3)</span>
+                    </label>
+                    {formButtons.length < 3 && (
+                      <button
+                        type="button"
+                        className="btn-add-button"
+                        onClick={handleAddButton}
+                      >
+                        <Plus size={14} />
+                        <span>Thêm nút bấm</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {formButtons.length === 0 ? (
+                    <div className="button-empty-state">
+                      <p style={{ fontSize: '13px', color: '#64748b', margin: '0 0 10px 0' }}>
+                        Chưa có nút CTA. Bạn vẫn có thể cấu hình hành động khi bấm toàn bộ banner ở mục Điều hướng.
+                      </p>
+                      <button
+                        type="button"
+                        className="btn-add-button"
+                        onClick={handleAddButton}
+                      >
+                        <Plus size={14} />
+                        <span>Thêm nút bấm</span>
+                      </button>
+                    </div>
+                  ) : (
+                    formButtons.map((btn, bIdx) => (
+                      <div key={bIdx} className="button-item-card">
+                        <div className="button-item-top">
+                          <span className="button-badge-num">
+                            <span>Nút #{bIdx + 1}</span>
+                            <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 'normal' }}>
+                              {btn.styleType === 'PRIMARY' ? '(Nút chính)' : btn.styleType === 'SECONDARY' ? '(Nút phụ)' : '(Viền ngoài)'}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            className="btn-remove-button"
+                            onClick={() => handleRemoveButton(bIdx)}
+                            title="Xóa nút này"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+
+                      <div className="form-grid-2">
+                        <div>
+                          <label style={{ fontSize: '11.5px', color: '#475569' }}>Tên nút bấm</label>
+                          <input
+                            type="text"
+                            required
+                            placeholder="Ví dụ: Đặt lịch ngay"
+                            value={btn.text}
+                            onChange={e => handleUpdateButton(bIdx, 'text', e.target.value)}
+                            style={{ fontSize: '12.5px' }}
+                          />
+                        </div>
+
+                        <div>
+                          <label style={{ fontSize: '11.5px', color: '#475569' }}>Kiểu giao diện nút</label>
+                          <select
+                            value={btn.styleType}
+                            onChange={e => handleUpdateButton(bIdx, 'styleType', e.target.value)}
+                            style={{ fontSize: '12.5px' }}
+                          >
+                            <option value="PRIMARY">Nút chính (Nền trắng nổi bật)</option>
+                            <option value="SECONDARY">Nút phụ (Kính mờ viền trắng)</option>
+                            <option value="OUTLINE">Nút viền trong suốt</option>
+                          </select>
+                        </div>
+                      </div>
+
+<BannerActionFields actionType={btn.actionType} actionValue={btn.actionValue || ''}
+ onTypeChange={type => { handleUpdateButton(bIdx, 'actionType', type); handleUpdateButton(bIdx, 'actionValue', ''); }}
+ onValueChange={value => handleUpdateButton(bIdx, 'actionValue', value)} />
+                    </div>
+                  ))
+                )}
+                </div>
+
+{formButtons.length > 0 && (<>
+                {/* 1. BUTTON POSITION SELECTION */}
+                <div className="form-group">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Move size={15} color="#2563eb" />
+                    <span>Vị trí nút bấm trên banner</span>
+                  </label>
+                  <div className="position-options-grid">
+                    <button
+                      type="button"
+                      className={`position-option-btn ${formButtonPosition === 'BOTTOM_LEFT' ? 'selected' : ''}`}
+                      onClick={() => chooseButtonPosition('BOTTOM_LEFT')}
+                    >
+                      <div className="position-icon-box">
+                        <span className="position-dot bottom-left" />
+                      </div>
+                      <span>Trái - Dưới (Mặc định)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`position-option-btn ${formButtonPosition === 'BOTTOM_CENTER' ? 'selected' : ''}`}
+                      onClick={() => chooseButtonPosition('BOTTOM_CENTER')}
+                    >
+                      <div className="position-icon-box">
+                        <span className="position-dot bottom-center" />
+                      </div>
+                      <span>Ở giữa - Dưới</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`position-option-btn ${formButtonPosition === 'BOTTOM_RIGHT' ? 'selected' : ''}`}
+                      onClick={() => chooseButtonPosition('BOTTOM_RIGHT')}
+                    >
+                      <div className="position-icon-box">
+                        <span className="position-dot bottom-right" />
+                      </div>
+                      <span>Phải - Dưới</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`position-option-btn ${formButtonPosition === 'TOP_LEFT' ? 'selected' : ''}`}
+                      onClick={() => chooseButtonPosition('TOP_LEFT')}
+                    >
+                      <div className="position-icon-box">
+                        <span className="position-dot top-left" />
+                      </div>
+                      <span>Trái - Trên</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      className={`position-option-btn ${formButtonPosition === 'TOP_RIGHT' ? 'selected' : ''}`}
+                      onClick={() => chooseButtonPosition('TOP_RIGHT')}
+                    >
+                      <div className="position-icon-box">
+                        <span className="position-dot top-right" />
+                      </div>
+                      <span>Phải - Trên</span>
+                    </button>
+
+                  </div>
+<details className="banner-advanced" open={formButtonPosition === 'CUSTOM'}><summary>Nâng cao: tọa độ tùy chỉnh</summary><p className="form-hint">Ưu tiên preset để bố cục thích ứng với màn hình di động.</p>
+                    <button
+                      type="button"
+                      className={`position-option-btn ${formButtonPosition === 'CUSTOM' ? 'selected' : ''}`}
+                      onClick={() => chooseButtonPosition('CUSTOM')}
+                    >
+                      <div className="position-icon-box">
+                        <span className="position-dot custom" />
+                      </div>
+                      <span>Tùy chỉnh tọa độ</span>
+                    </button>
+                  {/* Custom Coordinates Inputs */}
+                  {formButtonPosition === 'CUSTOM' && (
+                    <div className="button-coords-box">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+                        <Move size={14} color="#2563eb" />
+                        <span style={{ fontSize: '12px', fontWeight: 600, color: '#1e293b' }}>
+                          Thông số tọa độ vị trí nút (pixel - px):
+                        </span>
+                      </div>
+                      <p style={{ fontSize: '11.5px', color: '#64748b', margin: '0 0 10px 0' }}>
+                        Nhập khoảng cách từ mép banner tới nút bấm. Bạn có thể kết hợp Top/Bottom và Left/Right để định vị tự do.
+                      </p>
+                      <div className="button-coords-grid">
+                        <div className="button-coord-item">
+                          <label className="button-coord-label">Cách mép Trên (Top)</label>
+                          <div className="button-coord-input-wrap">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="VD: 14"
+                              value={formButtonTop}
+                              onChange={e =>
+                                setFormButtonTop(e.target.value === '' ? '' : Number(e.target.value))
+                              }
+                            />
+                            <span className="button-coord-unit">px</span>
+                          </div>
+                        </div>
+
+                        <div className="button-coord-item">
+                          <label className="button-coord-label">Cách mép Dưới (Bottom)</label>
+                          <div className="button-coord-input-wrap">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="VD: 14"
+                              value={formButtonBottom}
+                              onChange={e =>
+                                setFormButtonBottom(e.target.value === '' ? '' : Number(e.target.value))
+                              }
+                            />
+                            <span className="button-coord-unit">px</span>
+                          </div>
+                        </div>
+
+                        <div className="button-coord-item">
+                          <label className="button-coord-label">Cách mép Trái (Left)</label>
+                          <div className="button-coord-input-wrap">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="VD: 16"
+                              value={formButtonLeft}
+                              onChange={e =>
+                                setFormButtonLeft(e.target.value === '' ? '' : Number(e.target.value))
+                              }
+                            />
+                            <span className="button-coord-unit">px</span>
+                          </div>
+                        </div>
+
+                        <div className="button-coord-item">
+                          <label className="button-coord-label">Cách mép Phải (Right)</label>
+                          <div className="button-coord-input-wrap">
+                            <input
+                              type="number"
+                              min="0"
+                              placeholder="VD: 16"
+                              value={formButtonRight}
+                              onChange={e =>
+                                setFormButtonRight(e.target.value === '' ? '' : Number(e.target.value))
+                              }
+                            />
+                            <span className="button-coord-unit">px</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+</details>
+                </div>
+
+</>)}
+</div></details>
+<details className="banner-editor-group" open><summary>Điều hướng khi bấm banner</summary><div className="banner-editor-fields">
+<p className="form-hint">Chọn Mở cuộc gọi điện thoại để gán số liên hệ, hoặc Mở màn hình trong app để chọn trang đích. Mỗi nút bấm có hành động riêng.</p>
+<BannerActionFields actionType={formActionType} actionValue={formActionValue}
+ onTypeChange={type => { setFormActionType(type); setFormActionValue(''); }} onValueChange={setFormActionValue} /></div></details>
                 <div className="form-grid-2">
                   <div className="form-group">
                     <label>Thứ tự hiển thị (Ưu tiên)</label>
@@ -2368,9 +2108,207 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                 </button>
               </div>
             </form>
+            </div>
+          )}
+        </div>
+
+        {/* Right Column (Sticky): Fixed Mobile Simulator */}
+        <div className="banner-right-pane">
+          <div className="banner-preview-section">
+            <div className="preview-header">
+              <div className="preview-title">
+                <Smartphone size={18} />
+                <span>{showModal ? 'Xem trước trực tiếp' : 'Mô phỏng hiển thị trên App'}</span>
+              </div>
+              {showModal ? (
+                <div className="preview-live-badge">
+                  <span className="live-indicator-dot" />
+                  <span>Thời gian thực</span>
+                </div>
+              ) : (
+                <div className="preview-device-toggle">
+                  <CheckCircle2 size={15} color="#10b981" />
+                  <span>Đang hiển thị trên App</span>
+                </div>
+              )}
+            </div>
+
+            {showModal && <div className="preview-canvas-tools">
+              <button type="button" disabled={!history.canUndo} onClick={history.undo}>↶ Hoàn tác</button>
+              <button type="button" disabled={!history.canRedo} onClick={history.redo}>↷ Làm lại</button>
+              <label>Thiết bị<select value={previewDevice} onChange={e => setPreviewDevice(e.target.value)}>
+                <option value="390">iPhone · 390px</option><option value="360">Android · 360px</option><option value="430">Màn hình lớn · 430px</option>
+              </select></label>
+              <label className="canvas-toggle"><input type="checkbox" checked={previewDark} onChange={e => setPreviewDark(e.target.checked)} /> Giao diện tối</label>
+            </div>}
+            <div className={`mobile-simulator-wrapper ${showModal && previewDark ? 'preview-dark' : ''}`}
+              style={showModal ? { width: `${Number(previewDevice) / 430 * 100}%`, marginInline: 'auto' } : undefined}>
+              <div className="mobile-simulator-notch" />
+
+              {showModal ? (
+                /* Live Preview of Form state */
+                (() => {
+                  const bannerBg =
+                    bgMode === 'CUSTOM_BG'
+                      ? getBannerBackgroundStyle(
+                          { darkenOverlay: formDarkenOverlay },
+                          bgFilePreviewUrl || formBackgroundImageUrl,
+                          formDarkenOverlay
+                        )
+                      : getGradientStyle(formCustomGradient.trim() || formGradient);
+                  const mascotSrc =
+                    filePreviewUrl ||
+                    (formImageUrl || '/image_character.png');
+                  const imgPos = formImagePosition || 'RIGHT';
+
+                  return <BannerCanvas design={design} title={formTitle} badge={formBadgeText} subtitle={formSubtitle}
+                    buttons={formButtons} mascot={imgPos !== 'NONE' && imageType !== 'none' ? mascotSrc : undefined}
+                    background={bannerBg} fontFamily={formFontFamily} editable selected={selectedElement} snap={snapToGrid}
+                    onSelect={setSelectedElement} onChange={setDesign} onInteractionStart={history.begin} onInteractionEnd={history.end} />;
+                })()
+              ) : activeBanners.length > 0 ? (
+                (() => {
+                  const currentBanner = activeBanners[activePreviewIndex] || activeBanners[0];
+                  const savedDesign = parseDesign(currentBanner.designJson);
+                  if (savedDesign) return <BannerCanvas design={savedDesign} title={currentBanner.title} badge={currentBanner.badgeText || ''}
+                    subtitle={currentBanner.subtitle || ''} buttons={getBannerButtons(currentBanner)}
+                    mascot={currentBanner.imagePosition !== 'NONE' ? currentBanner.imageUrl || '/image_character.png' : undefined}
+                    background={getBannerBackgroundStyle(currentBanner)} fontFamily={currentBanner.fontFamily || 'Be Vietnam Pro'} />;
+                  const bannerBg = getBannerBackgroundStyle(currentBanner);
+                  const mascotSrc = currentBanner.imageUrl || '/image_character.png';
+                  const currentBtns = getBannerButtons(currentBanner);
+                  const pos = currentBanner.buttonPosition || 'BOTTOM_LEFT';
+                  const imgPos = currentBanner.imagePosition || 'RIGHT';
+                  const imgPosClass = imgPos.toLowerCase().replace('_', '-');
+
+                  return (
+                    <div
+                      className="stitch-banner-card"
+                      style={{
+                        background: bannerBg,
+                        fontFamily: getBannerFontFamily(currentBanner.fontFamily),
+                      }}
+                    >
+                      <div className="stitch-banner-bg-orb" />
+
+                      {(pos === 'TOP_RIGHT' || pos === 'TOP_LEFT' || pos === 'CUSTOM') &&
+                        renderBannerButtonsGroup(currentBtns, pos, false, {
+                          top: currentBanner.buttonTop,
+                          bottom: currentBanner.buttonBottom,
+                          left: currentBanner.buttonLeft,
+                          right: currentBanner.buttonRight,
+                        })}
+
+                      <div className={`stitch-banner-content mascot-${imgPosClass}`}>
+                        {currentBanner.badgeText && (
+                          <div className="stitch-banner-badge">
+                            <span>{currentBanner.badgeText}</span>
+                          </div>
+                        )}
+
+                        {currentBanner.title && (
+                          <h4 className="stitch-banner-title">{currentBanner.title}</h4>
+                        )}
+
+                        {currentBanner.subtitle && (
+                          <div className="stitch-banner-subtitle">
+                            <span>{currentBanner.subtitle}</span>
+                          </div>
+                        )}
+
+                        {pos !== 'TOP_RIGHT' &&
+                          pos !== 'TOP_LEFT' &&
+                          pos !== 'CUSTOM' &&
+                          renderBannerButtonsGroup(currentBtns, pos, false)}
+                      </div>
+
+                      {imgPos !== 'NONE' && (
+                        <img
+                          src={mascotSrc}
+                          alt="Banner Mascot"
+                          className={`stitch-banner-mascot pos-${imgPosClass}`}
+                          onError={e => {
+                            (e.target as HTMLImageElement).src = '/image_character.png';
+                          }}
+                        />
+                      )}
+
+                      <div className={`stitch-banner-dots ${imgPos === 'LEFT' ? 'mascot-left' : ''}`}>
+                        {activeBanners.map((_, idx) => (
+                          <span
+                            key={idx}
+                            className={`stitch-dot ${idx === activePreviewIndex ? 'active' : ''}`}
+                            onClick={() => setActivePreviewIndex(idx)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()
+              ) : (
+                <div
+                  className="stitch-banner-card"
+                  style={{
+                    background: 'linear-gradient(135deg, #2563EB, #4F46E5, #1D4ED8)',
+                    padding: '24px',
+                    textAlign: 'center',
+                  }}
+                >
+                  <div className="stitch-banner-bg-orb" />
+                  <div style={{ position: 'relative', zIndex: 2 }}>
+                    <h4 className="stitch-banner-title">Chưa có banner nào được kích hoạt</h4>
+                    <p style={{ fontSize: '12px', color: '#dbeafe', margin: '8px 0 16px' }}>
+                      Bật trạng thái hiển thị cho ít nhất 1 banner để xem trước trên app.
+                    </p>
+                    <button
+                      type="button"
+                      className="stitch-banner-cta-btn"
+                      onClick={handleOpenCreateModal}
+                    >
+                      <Plus size={13} />
+                      <span>Tạo banner ngay</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!showModal && activeBanners.length > 1 && (
+                <div className="preview-controls">
+                  <button
+                    type="button"
+                    className="preview-nav-btn"
+                    disabled={activePreviewIndex === 0}
+                    onClick={() => setActivePreviewIndex(prev => Math.max(0, prev - 1))}
+                    title="Banner trước"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  <span style={{ fontSize: '12.5px', color: '#64748b', fontWeight: 600 }}>
+                    Banner {activePreviewIndex + 1} / {activeBanners.length}
+                  </span>
+                  <button
+                    type="button"
+                    className="preview-nav-btn"
+                    disabled={activePreviewIndex === activeBanners.length - 1}
+                    onClick={() =>
+                      setActivePreviewIndex(prev => Math.min(activeBanners.length - 1, prev + 1))
+                    }
+                    title="Banner kế tiếp"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
+              {showModal && <div className="preview-shortcuts">
+                <strong>Kéo thả để thiết kế</strong>
+                <p>Bấm chữ, mascot hoặc nút để chọn đúng phần Định dạng. Kéo 4 góc của khung nét đứt để đổi kích thước.</p>
+                <p><kbd>← ↑ ↓ →</kbd> dịch 1% · <kbd>Shift + mũi tên</kbd> dịch 5% · <kbd>Alt + kéo</kbd> bỏ snap.</p>
+                <p>Chọn Mascot để chỉnh thanh Kích thước (%) và Lật ảnh ngang.</p>
+              </div>}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Interactive Image Cropper Modal */}
       <ImageCropperModal

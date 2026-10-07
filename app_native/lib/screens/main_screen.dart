@@ -348,8 +348,7 @@ class _MainScreenState extends State<MainScreen> {
         onHome: () => Navigator.of(
           context,
         ).pushNamedAndRemoveUntil(AppRoutes.home, (route) => false),
-        onBooking: () =>
-            showQuickBookingSheet(context, onNavigateToTab: _setCurrentIndex),
+        onBooking: () => showQuickBookingSheet(context),
         onProfile: auth.can(AppPermission.viewProfile)
             ? () => _setCurrentIndex(MainTabs.profile)
             : null,

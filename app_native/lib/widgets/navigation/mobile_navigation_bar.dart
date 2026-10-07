@@ -2,13 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../theme/app_colors.dart';
+import '../interactive_bounce.dart';
 
 class MobileNavigationBar extends StatelessWidget {
   const MobileNavigationBar({
     super.key,
     required this.isDark,
     required this.onHome,
-    this.onBooking,
+    required this.onBooking,
     this.onProfile,
     this.homeSelected = false,
     this.profileSelected = false,
@@ -18,7 +19,7 @@ class MobileNavigationBar extends StatelessWidget {
   final bool homeSelected;
   final bool profileSelected;
   final VoidCallback onHome;
-  final VoidCallback? onBooking;
+  final VoidCallback onBooking;
   final VoidCallback? onProfile;
 
   @override
@@ -66,56 +67,51 @@ class MobileNavigationBar extends StatelessWidget {
                     ),
                   ),
                   Expanded(
-                    child: onBooking == null
-                        ? const SizedBox.shrink()
-                        : Align(
-                            alignment: Alignment.topCenter,
-                            child: Semantics(
-                              button: true,
-                              label: 'Tạo mới & thao tác nhanh',
-                              child: Tooltip(
-                                message: 'Tạo mới & thao tác nhanh',
-                                child: InkWell(
-                                  onTap: onBooking,
-                                  customBorder: const CircleBorder(),
-                                  child: Ink(
-                                    width: 54,
-                                    height: 54,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFF2563EB),
-                                          Color(0xFF4F46E5),
-                                          Color(0xFF3B82F6),
-                                        ],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(
-                                            0xFF2563EB,
-                                          ).withValues(alpha: 0.45),
-                                          blurRadius: 16,
-                                          offset: const Offset(0, 6),
-                                        ),
-                                      ],
-                                      border: Border.all(
-                                        color: surface,
-                                        width: 3.5,
-                                      ),
-                                    ),
-                                    child: const Icon(
-                                      LucideIcons.plus,
-                                      size: 24,
-                                      color: Colors.white,
-                                    ),
-                                  ),
+                    child: Align(
+                      alignment: Alignment.topCenter,
+                      child: Semantics(
+                        button: true,
+                        label: 'Đặt lịch dịch vụ mới',
+                        child: Tooltip(
+                          message: 'Đặt lịch dịch vụ mới',
+                          child: InteractiveBounce(
+                            scaleDown: 0.88,
+                            onTap: onBooking,
+                            child: Container(
+                              width: 54,
+                              height: 54,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                gradient: const LinearGradient(
+                                  colors: [
+                                    Color(0xFF2563EB),
+                                    Color(0xFF4F46E5),
+                                    Color(0xFF3B82F6),
+                                  ],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
                                 ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: const Color(
+                                      0xFF2563EB,
+                                    ).withValues(alpha: 0.45),
+                                    blurRadius: 16,
+                                    offset: const Offset(0, 6),
+                                  ),
+                                ],
+                                border: Border.all(color: surface, width: 3.5),
+                              ),
+                              child: const Icon(
+                                LucideIcons.plus,
+                                size: 24,
+                                color: Colors.white,
                               ),
                             ),
                           ),
+                        ),
+                      ),
+                    ),
                   ),
                   Expanded(
                     child: onProfile == null
@@ -145,13 +141,15 @@ class MobileNavigationBar extends StatelessWidget {
       child: Semantics(
         selected: selected,
         button: true,
-        child: InkWell(
+        child: InteractiveBounce(
+          scaleDown: 0.92,
           onTap: onTap,
-          borderRadius: BorderRadius.circular(24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
                 width: 40,
                 height: 34,
                 decoration: BoxDecoration(

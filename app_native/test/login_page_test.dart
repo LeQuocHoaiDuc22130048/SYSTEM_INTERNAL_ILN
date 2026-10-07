@@ -19,135 +19,118 @@ void main() {
   const channel = MethodChannel('plugins.it_nomads.com/flutter_secure_storage');
   TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
       .setMockMethodCallHandler(channel, (MethodCall methodCall) async {
-        if (methodCall.method == 'write') {
-          final String key = methodCall.arguments['key'];
-          final String value = methodCall.arguments['value'];
-          mockSecureStorage[key] = value;
-          return null;
-        } else if (methodCall.method == 'read') {
-          final String key = methodCall.arguments['key'];
-          return mockSecureStorage[key];
-        } else if (methodCall.method == 'delete') {
-          final String key = methodCall.arguments['key'];
-          mockSecureStorage.remove(key);
-          return null;
-        } else if (methodCall.method == 'readAll') {
-          return mockSecureStorage;
-        } else if (methodCall.method == 'deleteAll') {
-          mockSecureStorage.clear();
-          return null;
-        } else if (methodCall.method == 'containsKey') {
-          final String key = methodCall.arguments['key'];
-          return mockSecureStorage.containsKey(key);
-        }
-        return null;
-      });
+    if (methodCall.method == 'write') {
+      final String key = methodCall.arguments['key'];
+      final String value = methodCall.arguments['value'];
+      mockSecureStorage[key] = value;
+      return null;
+    } else if (methodCall.method == 'read') {
+      final String key = methodCall.arguments['key'];
+      return mockSecureStorage[key];
+    } else if (methodCall.method == 'delete') {
+      final String key = methodCall.arguments['key'];
+      mockSecureStorage.remove(key);
+      return null;
+    } else if (methodCall.method == 'readAll') {
+      return mockSecureStorage;
+    } else if (methodCall.method == 'deleteAll') {
+      mockSecureStorage.clear();
+      return null;
+    } else if (methodCall.method == 'containsKey') {
+      final String key = methodCall.arguments['key'];
+      return mockSecureStorage.containsKey(key);
+    }
+    return null;
+  });
 
   Widget createLoginPageWidget({required AuthProvider auth}) {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: auth),
-        ChangeNotifierProvider(
-          create: (_) => BackendDataProvider(api: auth.api),
-        ),
+        ChangeNotifierProvider(create: (_) => BackendDataProvider(api: auth.api)),
         ChangeNotifierProvider(create: (_) => NetworkProvider()),
       ],
       child: MaterialApp(
         home: const LoginPage(),
         routes: {
           AppRoutes.home: (_) => const Scaffold(body: Text('TRANG CHỦ SCREEN')),
-          AppRoutes.dashboard: (_) =>
-              const Scaffold(body: Text('DASHBOARD SCREEN')),
+          AppRoutes.dashboard: (_) => const Scaffold(body: Text('DASHBOARD SCREEN')),
         },
       ),
     );
   }
 
-  testWidgets(
-    'Start page renders Login and Register buttons from Stitch design',
-    (tester) async {
-      mockSecureStorage.clear();
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('Start page renders Login and Register buttons from Stitch design', (tester) async {
+    mockSecureStorage.clear();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      final auth = AuthProvider(
-        apiClient: ApiClient(
-          client: MockClient((request) async {
-            return http.Response(
-              jsonEncode({'message': 'Unauthenticated'}),
-              401,
-            );
-          }),
-        ),
-      );
+    final auth = AuthProvider(
+      apiClient: ApiClient(
+        client: MockClient((request) async {
+          return http.Response(jsonEncode({'message': 'Unauthenticated'}), 401);
+        }),
+      ),
+    );
 
-      await tester.pumpWidget(createLoginPageWidget(auth: auth));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpWidget(createLoginPageWidget(auth: auth));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-      // Verify Start screen shows the Stitch action buttons by Key
-      expect(find.byKey(const Key('btn-welcome-login')), findsOneWidget);
-      expect(find.byKey(const Key('btn-welcome-register')), findsOneWidget);
-      expect(find.text('Chính sách bảo mật'), findsWidgets);
-      expect(find.text('SYSTEM INVERTER LIKENEW'), findsOneWidget);
-    },
-  );
+    // Verify Start screen shows the Stitch action buttons by Key
+    expect(find.byKey(const Key('btn-welcome-login')), findsOneWidget);
+    expect(find.byKey(const Key('btn-welcome-register')), findsOneWidget);
+    expect(find.text('Chính sách bảo mật'), findsWidgets);
+    expect(find.text('INVERTER LIKE NEW'), findsOneWidget);
+  });
 
-  testWidgets(
-    'Tapping Login opens bottom sheet in Login mode and can be closed',
-    (tester) async {
-      mockSecureStorage.clear();
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('Tapping Login opens bottom sheet in Login mode and can be closed', (tester) async {
+    mockSecureStorage.clear();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      final auth = AuthProvider(
-        apiClient: ApiClient(
-          client: MockClient((request) async {
-            return http.Response(
-              jsonEncode({'message': 'Unauthenticated'}),
-              401,
-            );
-          }),
-        ),
-      );
+    final auth = AuthProvider(
+      apiClient: ApiClient(
+        client: MockClient((request) async {
+          return http.Response(jsonEncode({'message': 'Unauthenticated'}), 401);
+        }),
+      ),
+    );
 
-      await tester.pumpWidget(createLoginPageWidget(auth: auth));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpWidget(createLoginPageWidget(auth: auth));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-      // Tap Login button
-      final loginBtnFinder = find.byKey(const Key('btn-welcome-login'));
-      expect(loginBtnFinder, findsOneWidget);
-      await tester.tap(loginBtnFinder);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+    // Tap Login button
+    final loginBtnFinder = find.byKey(const Key('btn-welcome-login'));
+    expect(loginBtnFinder, findsOneWidget);
+    await tester.tap(loginBtnFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-      // Sheet should be open with subtitle and username input
-      expect(find.text('Nhập thông tin tài khoản để tiếp tục'), findsOneWidget);
-      expect(find.text('Tên đăng nhập'), findsOneWidget);
-      expect(find.text('Quên mật khẩu?'), findsOneWidget);
-      expect(find.byKey(const Key('btn-auth-submit')), findsOneWidget);
+    // Sheet should be open with subtitle and username input
+    expect(find.text('Nhập thông tin tài khoản để tiếp tục'), findsOneWidget);
+    expect(find.text('Tên đăng nhập'), findsOneWidget);
+    expect(find.text('Quên mật khẩu?'), findsOneWidget);
+    expect(find.byKey(const Key('btn-auth-submit')), findsOneWidget);
 
-      // Tap close button (X)
-      final closeBtnFinder = find.byKey(const Key('btn-auth-close'));
-      expect(closeBtnFinder, findsOneWidget);
-      await tester.tap(closeBtnFinder);
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+    // Tap close button (X)
+    final closeBtnFinder = find.byKey(const Key('btn-auth-close'));
+    expect(closeBtnFinder, findsOneWidget);
+    await tester.tap(closeBtnFinder);
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-      // Should return to Start screen with buttons
-      expect(find.byKey(const Key('btn-welcome-login')), findsOneWidget);
-      expect(find.byKey(const Key('btn-welcome-register')), findsOneWidget);
-    },
-  );
+    // Should return to Start screen with buttons
+    expect(find.byKey(const Key('btn-welcome-login')), findsOneWidget);
+    expect(find.byKey(const Key('btn-welcome-register')), findsOneWidget);
+  });
 
-  testWidgets('Tapping Register opens bottom sheet in Register mode', (
-    tester,
-  ) async {
+  testWidgets('Tapping Register opens bottom sheet in Register mode', (tester) async {
     mockSecureStorage.clear();
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
@@ -174,66 +157,55 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400));
 
     // Sheet should be open with register fields
-    expect(
-      find.text('Điền thông tin để đăng ký tài khoản mới'),
-      findsOneWidget,
-    );
+    expect(find.text('Điền thông tin để đăng ký tài khoản mới'), findsOneWidget);
     expect(find.text('Họ và tên'), findsOneWidget);
     expect(find.text('Số điện thoại'), findsOneWidget);
     expect(find.text('Tên đăng nhập'), findsOneWidget);
     expect(find.text('Mật khẩu'), findsOneWidget);
   });
 
-  testWidgets(
-    'Opening modal keeps app logo visible in top area and tapping top area closes modal',
-    (tester) async {
-      mockSecureStorage.clear();
-      tester.view.physicalSize = const Size(390, 844);
-      tester.view.devicePixelRatio = 1;
-      addTearDown(tester.view.resetPhysicalSize);
-      addTearDown(tester.view.resetDevicePixelRatio);
+  testWidgets('Opening modal keeps app logo visible in top area and tapping top area closes modal', (tester) async {
+    mockSecureStorage.clear();
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
 
-      final auth = AuthProvider(
-        apiClient: ApiClient(
-          client: MockClient((request) async {
-            return http.Response(
-              jsonEncode({'message': 'Unauthenticated'}),
-              401,
-            );
-          }),
-        ),
-      );
+    final auth = AuthProvider(
+      apiClient: ApiClient(
+        client: MockClient((request) async {
+          return http.Response(jsonEncode({'message': 'Unauthenticated'}), 401);
+        }),
+      ),
+    );
 
-      await tester.pumpWidget(createLoginPageWidget(auth: auth));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 500));
+    await tester.pumpWidget(createLoginPageWidget(auth: auth));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 500));
 
-      // Initially logo is visible
-      expect(find.text('SYSTEM INVERTER LIKENEW'), findsOneWidget);
+    // Initially logo is visible
+    expect(find.text('INVERTER LIKE NEW'), findsOneWidget);
 
-      // Open login modal
-      await tester.tap(find.byKey(const Key('btn-welcome-login')));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+    // Open login modal
+    await tester.tap(find.byKey(const Key('btn-welcome-login')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-      // Logo remains visible in top frame
-      expect(find.text('SYSTEM INVERTER LIKENEW'), findsOneWidget);
-      expect(find.text('Nhập thông tin tài khoản để tiếp tục'), findsOneWidget);
+    // Logo remains visible in top frame
+    expect(find.text('INVERTER LIKE NEW'), findsOneWidget);
+    expect(find.text('Nhập thông tin tài khoản để tiếp tục'), findsOneWidget);
 
-      // Tap in top area (Y=80) to dismiss modal
-      await tester.tapAt(const Offset(195, 80));
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 400));
+    // Tap in top area (Y=80) to dismiss modal
+    await tester.tapAt(const Offset(195, 80));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
 
-      // Modal closed, welcome buttons back
-      expect(find.byKey(const Key('btn-welcome-login')), findsOneWidget);
-      expect(find.byKey(const Key('btn-welcome-register')), findsOneWidget);
-    },
-  );
+    // Modal closed, welcome buttons back
+    expect(find.byKey(const Key('btn-welcome-login')), findsOneWidget);
+    expect(find.byKey(const Key('btn-welcome-register')), findsOneWidget);
+  });
 
-  testWidgets('Successful login navigates to Home Screen first', (
-    tester,
-  ) async {
+  testWidgets('Successful login navigates to Home Screen first', (tester) async {
     mockSecureStorage.clear();
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;

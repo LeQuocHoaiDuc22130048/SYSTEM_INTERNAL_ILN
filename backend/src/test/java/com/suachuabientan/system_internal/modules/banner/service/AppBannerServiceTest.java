@@ -3,6 +3,9 @@ package com.suachuabientan.system_internal.modules.banner.service;
 import com.suachuabientan.system_internal.modules.banner.dto.AppBannerDto;
 import com.suachuabientan.system_internal.modules.banner.dto.CreateAppBannerDto;
 import com.suachuabientan.system_internal.modules.banner.dto.UpdateAppBannerDto;
+import com.suachuabientan.system_internal.modules.banner.dto.BannerButtonDto;
+import com.suachuabientan.system_internal.modules.banner.dto.UpdateAppBannerDto;
+import com.suachuabientan.system_internal.modules.banner.dto.BannerButtonDto;
 import com.suachuabientan.system_internal.modules.banner.entity.AppBanner;
 import com.suachuabientan.system_internal.modules.banner.repository.AppBannerRepository;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,6 +35,84 @@ class AppBannerServiceTest {
     @BeforeEach
     void setUp() {
         bannerService = new AppBannerService(bannerRepository);
+    }
+
+    @Test
+    void canvasDesignPersistsThroughCreateUpdateAndResponse() {
+        String design = "{\"version\":1,\"nodes\":{\"title\":{\"x\":5,\"y\":10,\"width\":90,\"height\":30,\"fontSize\":24,\"color\":\"#facc15\"}}}";
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(call -> call.getArgument(0));
+        AppBannerDto created = bannerService.createBanner(CreateAppBannerDto.builder()
+                .title("Canvas").designJson(design).build(), null, null, UUID.randomUUID());
+        assertEquals(design, created.getDesignJson());
+        UUID id = UUID.randomUUID();
+        AppBanner existing = AppBanner.builder().title("Canvas").designJson(design).build();
+        existing.setId(id);
+        when(bannerRepository.findById(id)).thenReturn(Optional.of(existing));
+        AppBannerDto updated = bannerService.updateBanner(id,
+                UpdateAppBannerDto.builder().title("New title").build(), null, null, UUID.randomUUID());
+        assertEquals(design, updated.getDesignJson());
+    }
+
+    @Test
+    void invalidCanvasIsRejectedBeforeSaving() {
+        for (String json : List.of("{", "{\"version\":2,\"nodes\":{}}",
+                "{\"version\":1,\"nodes\":{\"title\":{\"x\":95,\"y\":0,\"width\":20,\"height\":20}}}")) {
+            assertThrows(com.suachuabientan.system_internal.common.exception.BusinessException.class,
+                () -> bannerService.createBanner(CreateAppBannerDto.builder().title("Invalid")
+                        .designJson(json).build(), null, null, UUID.randomUUID()));
+        }
+        verify(bannerRepository, never()).save(any());
+    }
+
+    @Test
+    void bannerActionRemainsIndependentOfCtaAndEmptyButtons() {
+        UUID id = UUID.randomUUID();
+        AppBanner banner = AppBanner.builder().title("Banner").build();
+        banner.setId(id);
+        when(bannerRepository.findById(id)).thenReturn(Optional.of(banner));
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(call -> call.getArgument(0));
+        UpdateAppBannerDto dto = UpdateAppBannerDto.builder().title("Banner")
+                .actionType("SCREEN").actionValue("repair_orders")
+                .buttons(List.of(BannerButtonDto.builder().text("Kho")
+                        .actionType("SCREEN").actionValue("warehouse").styleType("PRIMARY").build()))
+                .build();
+        bannerService.updateBanner(id, dto, null, null, UUID.randomUUID());
+        assertEquals("SCREEN", banner.getActionType());
+        assertEquals("repair_orders", banner.getActionValue());
+        assertTrue(banner.getButtonsJson().contains("warehouse"));
+        dto.setButtons(List.of());
+        bannerService.updateBanner(id, dto, null, null, UUID.randomUUID());
+        assertEquals("repair_orders", banner.getActionValue());
+        assertEquals("[]", banner.getButtonsJson());
+    }
+
+    @Test
+    void explicitEmptyImagesClearExistingBackgroundAndMascot() {
+        UUID id = UUID.randomUUID();
+        AppBanner banner = AppBanner.builder().title("Banner")
+                .backgroundImageUrl("/old-bg.png").imageUrl("/old-mascot.png").build();
+        banner.setId(id);
+        when(bannerRepository.findById(id)).thenReturn(Optional.of(banner));
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(call -> call.getArgument(0));
+        UpdateAppBannerDto dto = UpdateAppBannerDto.builder()
+                .title("Banner").backgroundImageUrl("").imageUrl("").build();
+        bannerService.updateBanner(id, dto, null, null, UUID.randomUUID());
+        assertEquals("", banner.getBackgroundImageUrl());
+        assertEquals("", banner.getImageUrl());
+    }
+
+    @Test
+    void omittedImageFieldsPreserveExistingImages() {
+        UUID id = UUID.randomUUID();
+        AppBanner banner = AppBanner.builder().title("Banner")
+                .backgroundImageUrl("/old-bg.png").imageUrl("/old-mascot.png").build();
+        banner.setId(id);
+        when(bannerRepository.findById(id)).thenReturn(Optional.of(banner));
+        when(bannerRepository.save(any(AppBanner.class))).thenAnswer(call -> call.getArgument(0));
+        bannerService.updateBanner(id, UpdateAppBannerDto.builder().title("Updated").build(),
+                null, null, UUID.randomUUID());
+        assertEquals("/old-bg.png", banner.getBackgroundImageUrl());
+        assertEquals("/old-mascot.png", banner.getImageUrl());
     }
 
     @Test

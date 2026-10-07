@@ -64,9 +64,8 @@ class _LoginPageState extends State<LoginPage> {
           isManagerOrAbove: auth.isManagerOrAbove,
         );
       }
-      final targetRoute = auth.isAttendanceAccount
-          ? AppRoutes.dashboard
-          : AppRoutes.home;
+      final targetRoute =
+          auth.isAttendanceAccount ? AppRoutes.dashboard : AppRoutes.home;
       Navigator.of(context).pushReplacementNamed(targetRoute);
     } else {
       setState(() {
@@ -208,9 +207,8 @@ class _LoginPageState extends State<LoginPage> {
           isManagerOrAbove: auth.isManagerOrAbove,
         );
       }
-      final targetRoute = auth.isAttendanceAccount
-          ? AppRoutes.dashboard
-          : AppRoutes.home;
+      final targetRoute =
+          auth.isAttendanceAccount ? AppRoutes.dashboard : AppRoutes.home;
       Navigator.of(context).pushReplacementNamed(targetRoute);
     } on ApiException catch (error) {
       if (!mounted) return;
@@ -597,59 +595,59 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         // Brand Wordmark Pill with Live Status Indicator (Stitch style)
         Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: isMobile ? 16 : 20,
-                vertical: isMobile ? 6 : 8,
+          padding: EdgeInsets.symmetric(
+            horizontal: isMobile ? 16 : 20,
+            vertical: isMobile ? 6 : 8,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 14,
               ),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.14),
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.12),
-                    blurRadius: 14,
-                  ),
-                ],
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'SYSTEM INVERTER LIKENEW',
+                style: TextStyle(
+                  fontSize: isMobile ? 13.5 : 15,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.9,
+                ),
               ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    'SYSTEM INVERTER LIKENEW',
-                    style: TextStyle(
-                      fontSize: isMobile ? 13.5 : 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: 0.9,
+              const SizedBox(width: 8),
+              Container(
+                width: 7,
+                height: 7,
+                decoration: const BoxDecoration(
+                  color: AppColors.success,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.success,
+                      blurRadius: 6,
+                      spreadRadius: 1,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                        width: 7,
-                        height: 7,
-                        decoration: const BoxDecoration(
-                          color: AppColors.success,
-                          shape: BoxShape.circle,
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.success,
-                              blurRadius: 6,
-                              spreadRadius: 1,
-                            ),
-                          ],
-                        ),
-                      )
-                      .animate(onPlay: (c) => c.repeat(reverse: true))
-                      .scale(
-                        begin: const Offset(0.85, 0.85),
-                        end: const Offset(1.25, 1.25),
-                        duration: 900.ms,
-                      )
-                      .fade(begin: 0.5, end: 1.0, duration: 900.ms),
-                ],
-              ),
-            )
+                  ],
+                ),
+              )
+                  .animate(onPlay: (c) => c.repeat(reverse: true))
+                  .scale(
+                    begin: const Offset(0.85, 0.85),
+                    end: const Offset(1.25, 1.25),
+                    duration: 900.ms,
+                  )
+                  .fade(begin: 0.5, end: 1.0, duration: 900.ms),
+            ],
+          ),
+        )
             .animate(target: 1)
             .fadeIn(duration: 500.ms)
             .slideY(begin: -0.3, end: 0, duration: 500.ms),
@@ -666,28 +664,26 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               // Breathing glowing halo behind the logo (matching Stitch @keyframes logoGlow)
               Container(
-                    width: 220 * scale,
-                    height: 220 * scale,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          const Color(0xFF38BDF8).withValues(alpha: 0.50),
-                          const Color(0xFF2563EB).withValues(alpha: 0.28),
-                          Colors.transparent,
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(
-                            0xFF00F2FE,
-                          ).withValues(alpha: 0.40),
-                          blurRadius: 55 * scale,
-                          spreadRadius: 20 * scale,
-                        ),
-                      ],
+                width: 220 * scale,
+                height: 220 * scale,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      const Color(0xFF38BDF8).withValues(alpha: 0.50),
+                      const Color(0xFF2563EB).withValues(alpha: 0.28),
+                      Colors.transparent,
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00F2FE).withValues(alpha: 0.40),
+                      blurRadius: 55 * scale,
+                      spreadRadius: 20 * scale,
                     ),
-                  )
+                  ],
+                ),
+              )
                   .animate(
                     onPlay: (controller) => controller.repeat(reverse: true),
                   )
@@ -706,13 +702,13 @@ class _LoginPageState extends State<LoginPage> {
 
               // 3D Logo with levitation & subtle tilt (matching Stitch @keyframes logoLevitate)
               SizedBox(
-                    width: 270 * scale,
-                    height: 270 * scale,
-                    child: Image.asset(
-                      'assets/images/app_logo.png',
-                      fit: BoxFit.contain,
-                    ),
-                  )
+                width: 270 * scale,
+                height: 270 * scale,
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  fit: BoxFit.contain,
+                ),
+              )
                   .animate(
                     onPlay: (controller) => controller.repeat(reverse: true),
                   )
@@ -822,9 +818,16 @@ class _LoginPageState extends State<LoginPage> {
           Container(
             width: 22 * effectiveScale,
             height: 22 * effectiveScale,
-            decoration: BoxDecoration(color: iconBg, shape: BoxShape.circle),
+            decoration: BoxDecoration(
+              color: iconBg,
+              shape: BoxShape.circle,
+            ),
             child: Center(
-              child: Icon(icon, size: 13 * effectiveScale, color: iconColor),
+              child: Icon(
+                icon,
+                size: 13 * effectiveScale,
+                color: iconColor,
+              ),
             ),
           ),
           SizedBox(width: 6 * effectiveScale),
@@ -855,7 +858,10 @@ class _LoginPageState extends State<LoginPage> {
               child: Row(
                 children: [
                   Expanded(
-                    child: _buildBrandingSection(scale: 1.1, isMobile: false),
+                    child: _buildBrandingSection(
+                      scale: 1.1,
+                      isMobile: false,
+                    ),
                   ),
                   const SizedBox(width: 70),
                   Expanded(
@@ -1115,11 +1121,7 @@ class _LoginPageState extends State<LoginPage> {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  LucideIcons.shieldCheck,
-                  size: 14,
-                  color: Color(0xFF2563EB),
-                ),
+                Icon(LucideIcons.shieldCheck, size: 14, color: Color(0xFF2563EB)),
                 SizedBox(width: 6),
                 Text(
                   'System Inverter Likenew',
@@ -1204,7 +1206,10 @@ class _LoginPageState extends State<LoginPage> {
                 children: [
                   Text(
                     'Đăng ký tài khoản mới',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   SizedBox(width: 8),
                   Icon(LucideIcons.userPlus, size: 18),
@@ -1370,22 +1375,22 @@ class _LoginPageState extends State<LoginPage> {
             children: [
               if (!_isLogin) ...[
                 _buildInputField(
-                      label: 'Họ và tên',
-                      hint: 'Nhập họ và tên...',
-                      controller: _fullNameController,
-                      icon: LucideIcons.user,
-                    )
+                  label: 'Họ và tên',
+                  hint: 'Nhập họ và tên...',
+                  controller: _fullNameController,
+                  icon: LucideIcons.user,
+                )
                     .animate()
                     .fadeIn(duration: 220.ms)
                     .slideY(begin: -0.08, end: 0),
                 const SizedBox(height: 16),
                 _buildInputField(
-                      label: 'Số điện thoại',
-                      hint: 'Nhập số điện thoại...',
-                      controller: _phoneController,
-                      icon: LucideIcons.phone,
-                      keyboardType: TextInputType.phone,
-                    )
+                  label: 'Số điện thoại',
+                  hint: 'Nhập số điện thoại...',
+                  controller: _phoneController,
+                  icon: LucideIcons.phone,
+                  keyboardType: TextInputType.phone,
+                )
                     .animate()
                     .fadeIn(duration: 220.ms)
                     .slideY(begin: -0.08, end: 0),
@@ -1424,7 +1429,9 @@ class _LoginPageState extends State<LoginPage> {
             decoration: BoxDecoration(
               color: const Color(0xFFFEF2F2),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFCA5A5)),
+              border: Border.all(
+                color: const Color(0xFFFCA5A5),
+              ),
             ),
             child: Row(
               children: [
@@ -1486,7 +1493,11 @@ class _LoginPageState extends State<LoginPage> {
           style: const TextStyle(color: Color(0xFF0F172A), fontSize: 15),
           decoration: InputDecoration(
             hintText: hint,
-            prefixIcon: Icon(icon, size: 19, color: const Color(0xFF94A3B8)),
+            prefixIcon: Icon(
+              icon,
+              size: 19,
+              color: const Color(0xFF94A3B8),
+            ),
             suffixIcon: isPassword
                 ? IconButton(
                     icon: Icon(
@@ -1496,21 +1507,27 @@ class _LoginPageState extends State<LoginPage> {
                       size: 18,
                       color: const Color(0xFF94A3B8),
                     ),
-                    onPressed:
-                        onTogglePassword ??
+                    onPressed: onTogglePassword ??
                         () => setState(() => _showPassword = !_showPassword),
                   )
                 : null,
-            hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+            hintStyle: const TextStyle(
+              color: Color(0xFF94A3B8),
+              fontSize: 14,
+            ),
             filled: true,
             fillColor: const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+              ),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
-              borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+              borderSide: const BorderSide(
+                color: Color(0xFFE2E8F0),
+              ),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(14),
@@ -1534,11 +1551,7 @@ class _LoginPageState extends State<LoginPage> {
       alignment: Alignment.centerRight,
       child: TextButton.icon(
         onPressed: _loading ? null : _showForgotPasswordDialog,
-        icon: const Icon(
-          LucideIcons.keyRound,
-          size: 15,
-          color: Color(0xFF2563EB),
-        ),
+        icon: const Icon(LucideIcons.keyRound, size: 15, color: Color(0xFF2563EB)),
         label: const Text(
           'Quên mật khẩu?',
           style: TextStyle(
@@ -1561,7 +1574,10 @@ class _LoginPageState extends State<LoginPage> {
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
         gradient: const LinearGradient(
-          colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+          colors: [
+            Color(0xFF2563EB),
+            Color(0xFF4F46E5),
+          ],
         ),
         boxShadow: [
           BoxShadow(
@@ -1617,15 +1633,22 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         Row(
           children: [
-            const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+            const Expanded(
+              child: Divider(color: Color(0xFFE2E8F0)),
+            ),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 14),
               child: Text(
                 'hoặc',
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Color(0xFF94A3B8),
+                ),
               ),
             ),
-            const Expanded(child: Divider(color: Color(0xFFE2E8F0))),
+            const Expanded(
+              child: Divider(color: Color(0xFFE2E8F0)),
+            ),
           ],
         ),
         const SizedBox(height: 14),
@@ -1735,101 +1758,98 @@ class LoginBackground extends StatelessWidget {
           Positioned(
             top: -size.height * 0.2,
             right: -size.width * 0.1,
-            child:
-                Container(
-                      width: 400,
-                      height: 400,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.blue.withValues(alpha: 0.1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.withValues(alpha: 0.12),
-                            blurRadius: 120,
-                            spreadRadius: 40,
-                          ),
-                        ],
-                      ),
-                    )
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .scale(
-                      begin: const Offset(0.95, 0.95),
-                      end: const Offset(1.12, 1.12),
-                      duration: 5000.ms,
-                      curve: Curves.easeInOut,
-                    )
-                    .fade(
-                      begin: 0.7,
-                      end: 1.0,
-                      duration: 5000.ms,
-                      curve: Curves.easeInOut,
-                    ),
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blue.withValues(alpha: 0.1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.12),
+                    blurRadius: 120,
+                    spreadRadius: 40,
+                  ),
+                ],
+              ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(0.95, 0.95),
+                  end: const Offset(1.12, 1.12),
+                  duration: 5000.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(
+                  begin: 0.7,
+                  end: 1.0,
+                  duration: 5000.ms,
+                  curve: Curves.easeInOut,
+                ),
           ),
           Positioned(
             bottom: -size.height * 0.2,
             left: -size.width * 0.1,
-            child:
-                Container(
-                      width: 400,
-                      height: 400,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.indigo.withValues(alpha: 0.1),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.indigo.withValues(alpha: 0.12),
-                            blurRadius: 120,
-                            spreadRadius: 40,
-                          ),
-                        ],
-                      ),
-                    )
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .scale(
-                      begin: const Offset(1.12, 1.12),
-                      end: const Offset(0.95, 0.95),
-                      duration: 5500.ms,
-                      curve: Curves.easeInOut,
-                    )
-                    .fade(
-                      begin: 0.6,
-                      end: 1.0,
-                      duration: 5500.ms,
-                      curve: Curves.easeInOut,
-                    ),
+            child: Container(
+              width: 400,
+              height: 400,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.indigo.withValues(alpha: 0.1),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.indigo.withValues(alpha: 0.12),
+                    blurRadius: 120,
+                    spreadRadius: 40,
+                  ),
+                ],
+              ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(1.12, 1.12),
+                  end: const Offset(0.95, 0.95),
+                  duration: 5500.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(
+                  begin: 0.6,
+                  end: 1.0,
+                  duration: 5500.ms,
+                  curve: Curves.easeInOut,
+                ),
           ),
           Positioned(
             top: size.height / 2 - 250,
             left: size.width / 2 - 250,
-            child:
-                Container(
-                      width: 500,
-                      height: 500,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: Colors.blue.withValues(alpha: 0.15),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.blue.withValues(alpha: 0.15),
-                            blurRadius: 150,
-                            spreadRadius: 50,
-                          ),
-                        ],
-                      ),
-                    )
-                    .animate(onPlay: (c) => c.repeat(reverse: true))
-                    .scale(
-                      begin: const Offset(0.95, 0.95),
-                      end: const Offset(1.08, 1.08),
-                      duration: 4000.ms,
-                      curve: Curves.easeInOut,
-                    )
-                    .fade(
-                      begin: 0.8,
-                      end: 1.0,
-                      duration: 4000.ms,
-                      curve: Curves.easeInOut,
-                    ),
+            child: Container(
+              width: 500,
+              height: 500,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.blue.withValues(alpha: 0.15),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.blue.withValues(alpha: 0.15),
+                    blurRadius: 150,
+                    spreadRadius: 50,
+                  ),
+                ],
+              ),
+            )
+                .animate(onPlay: (c) => c.repeat(reverse: true))
+                .scale(
+                  begin: const Offset(0.95, 0.95),
+                  end: const Offset(1.08, 1.08),
+                  duration: 4000.ms,
+                  curve: Curves.easeInOut,
+                )
+                .fade(
+                  begin: 0.8,
+                  end: 1.0,
+                  duration: 4000.ms,
+                  curve: Curves.easeInOut,
+                ),
           ),
           Positioned.fill(child: CustomPaint(painter: GridPainter())),
         ],

@@ -2,7 +2,6 @@ import React from 'react';
 import {
   WifiOff,
   RefreshCw,
-  Wifi,
   ChevronLeft,
   ChevronRight,
   Calendar,
@@ -23,6 +22,8 @@ interface HeaderProps {
   handleRetryConnection: () => void;
   onToggleSidebar?: () => void;
   isSidebarOpen?: boolean;
+  onRefreshData?: () => void;
+  isRefreshing?: boolean;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,7 +39,23 @@ export const Header: React.FC<HeaderProps> = ({
   handleRetryConnection,
   onToggleSidebar,
   isSidebarOpen = false,
+  onRefreshData,
+  isRefreshing = false,
 }) => {
+  // Định dạng ngày tháng tiếng Việt cho Header
+  const getVietnameseDate = (): string => {
+    const date = new Date();
+    const weekdays = [
+      'Chủ Nhật',
+      'Thứ Hai',
+      'Thứ Ba',
+      'Thứ Tư',
+      'Thứ Năm',
+      'Thứ Sáu',
+      'Thứ Bảy',
+    ];
+    return `${weekdays[date.getDay()]}, ${date.getDate()} tháng ${date.getMonth() + 1}, ${date.getFullYear()}`;
+  };
 
   return (
     <>
@@ -61,67 +78,50 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       )}
 
-      {/* Connection success banner removed as requested */}
-
       <header className="header">
         <div className="header-left">
           {onToggleSidebar && (
             <button
               type="button"
-              className="sidebar-toggle-btn"
+              className="sidebar-toggle-btn mobile-only"
               onClick={onToggleSidebar}
-              title={isSidebarOpen ? "Ẩn thanh điều hướng" : "Mở thanh điều hướng"}
-              aria-label={isSidebarOpen ? "Ẩn thanh điều hướng" : "Mở thanh điều hướng"}
+              title={isSidebarOpen ? 'Ẩn thanh điều hướng' : 'Mở thanh điều hướng'}
+              aria-label={isSidebarOpen ? 'Ẩn thanh điều hướng' : 'Mở thanh điều hướng'}
             >
               {isSidebarOpen ? <X size={22} /> : <Menu size={22} />}
             </button>
           )}
-          <h1 className="title">
-            {activeTab === 'dashboard'
-              ? 'Dashboard tổng hợp'
-              : activeTab === 'monthly'
-              ? 'Chấm công theo tháng'
-              : activeTab === 'daily'
-              ? 'Chấm công theo ngày'
-              : activeTab === 'devices'
-              ? 'Trạng thái Thiết bị'
-              : activeTab === 'updates'
-              ? 'Cập nhật ứng dụng'
-              : activeTab === 'banners'
-              ? 'Banner ứng dụng'
-              : activeTab === 'orders'
-              ? 'Quản lý đơn sửa chữa'
-              : activeTab === 'locations'
-              ? 'Vị trí & Kệ kho'
-              : activeTab === 'accounts'
-              ? 'Quản lý tài khoản'
-              : 'Kho bo mạch & Linh kiện'}
-          </h1>
+          <div className="header-title-box">
+            <h1 className="title">
+              {activeTab === 'dashboard'
+                ? 'Dashboard tổng hợp'
+                : activeTab === 'monthly'
+                ? 'Chấm công theo tháng'
+                : activeTab === 'daily'
+                ? 'Chấm công theo ngày'
+                : activeTab === 'devices'
+                ? 'Trạng thái Thiết bị'
+                : activeTab === 'updates'
+                ? 'Cập nhật ứng dụng'
+                : activeTab === 'banners'
+                ? 'Banner ứng dụng'
+                : activeTab === 'orders'
+                ? 'Quản lý đơn sửa chữa'
+                : activeTab === 'locations'
+                ? 'Vị trí & Kệ kho'
+                : activeTab === 'accounts'
+                ? 'Quản lý tài khoản'
+                : 'Kho bo mạch & Linh kiện'}
+            </h1>
+            <span className="header-date">
+              <Calendar size={13} className="header-date-icon" />
+              <span>{getVietnameseDate()}</span>
+            </span>
+          </div>
         </div>
 
         <div className="header-right">
-          <div className="connection-indicator">
-            {dataSource === 'api' ? (
-              <span className="conn-badge connected"><Wifi size={14} /> API Connected</span>
-            ) : dataSource === 'error' ? (
-              <span
-                className="conn-badge disconnected"
-                onClick={handleRetryConnection}
-                title="Click để thử kết nối lại"
-              >
-                <WifiOff size={14} /> Connection Error
-              </span>
-            ) : (
-              <span className="conn-badge loading"><RefreshCw size={14} className="spin" /> Đang kết nối...</span>
-            )}
-          </div>
-
-          {activeTab === 'dashboard' ? (
-            <div className="month-navigator real-time-indicator" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0' }}>
-              <span className="real-time-dot" style={{ backgroundColor: '#10b981', boxShadow: '0 0 0 0.15rem rgba(16, 185, 129, 0.4)' }} />
-              <span className="real-time-text" style={{ color: '#047857' }}>Hệ thống bình thường</span>
-            </div>
-          ) : activeTab === 'monthly' ? (
+          {activeTab === 'monthly' ? (
             <div className="month-navigator">
               <button id="btn-prev-month" className="nav-btn" onClick={prevMonth}>
                 <ChevronLeft size={18} />
@@ -142,31 +142,20 @@ export const Header: React.FC<HeaderProps> = ({
                 onChange={(e) => handleDateChange(e.target.value)}
               />
             </div>
-          ) : activeTab === 'devices' ? (
-            <div className="month-navigator real-time-indicator">
-              <span className="real-time-dot" />
-              <span className="real-time-text">Thời gian thực</span>
-            </div>
-          ) : activeTab === 'updates' ? (
-            <div className="month-navigator real-time-indicator" style={{ background: '#f5f3ff', border: '1px solid #ddd6fe' }}>
-              <span className="real-time-dot" style={{ backgroundColor: '#8b5cf6', boxShadow: '0 0 0 0.15rem rgba(139, 92, 246, 0.4)' }} />
-              <span className="real-time-text" style={{ color: '#6d28d9' }}>Phát hành phiên bản</span>
-            </div>
-          ) : activeTab === 'orders' ? (
-            <div className="month-navigator real-time-indicator" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0' }}>
-              <span className="real-time-dot" style={{ backgroundColor: '#10b981', boxShadow: '0 0 0 0.15rem rgba(16, 185, 129, 0.4)' }} />
-              <span className="real-time-text" style={{ color: '#047857' }}>Hệ thống sửa chữa</span>
-            </div>
-          ) : activeTab === 'accounts' ? (
-            <div className="month-navigator real-time-indicator" style={{ background: '#eff6ff', border: '1px solid #bfdbfe' }}>
-              <span className="real-time-dot" style={{ backgroundColor: '#3b82f6', boxShadow: '0 0 0 0.15rem rgba(59, 130, 246, 0.4)' }} />
-              <span className="real-time-text" style={{ color: '#1d4ed8' }}>Quản lý tài khoản</span>
-            </div>
-          ) : (
-            <div className="month-navigator real-time-indicator" style={{ background: '#fff7ed', border: '1px solid #ffedd5' }}>
-              <span className="real-time-dot" style={{ backgroundColor: '#f97316', boxShadow: '0 0 0 0.15rem rgba(249, 115, 22, 0.4)' }} />
-              <span className="real-time-text" style={{ color: '#c2410c' }}>Quản lý linh kiện</span>
-            </div>
+          ) : null}
+
+          {/* Nút Làm mới dữ liệu đưa lên Header */}
+          {onRefreshData && (
+            <button
+              type="button"
+              className="btn-header-refresh"
+              onClick={onRefreshData}
+              disabled={isRefreshing}
+              title="Làm mới dữ liệu"
+            >
+              <RefreshCw size={15} className={isRefreshing ? 'spin' : ''} />
+              <span>Làm mới dữ liệu</span>
+            </button>
           )}
         </div>
       </header>

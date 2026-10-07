@@ -34,6 +34,8 @@ public class AppBannerDto {
     private String imageUrl;
     private String imagePosition;
     private String fontFamily;
+
+    private String designJson;
     private String backgroundImageUrl;
     @Builder.Default
     private Boolean darkenOverlay = false;
@@ -82,6 +84,7 @@ public class AppBannerDto {
                 .buttons(parsedButtons)
                 .imageUrl(banner.getImageUrl())
                 .imagePosition(StringUtils.hasText(banner.getImagePosition()) ? banner.getImagePosition() : "RIGHT")
+                .designJson(banner.getDesignJson())
                 .fontFamily(StringUtils.hasText(banner.getFontFamily()) ? banner.getFontFamily() : "Be Vietnam Pro")
                 .backgroundImageUrl(banner.getBackgroundImageUrl())
                 .darkenOverlay(banner.getDarkenOverlay() != null ? banner.getDarkenOverlay() : false)

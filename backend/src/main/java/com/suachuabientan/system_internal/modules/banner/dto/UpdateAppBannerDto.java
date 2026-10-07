@@ -40,6 +40,8 @@ public class UpdateAppBannerDto {
     private String imagePosition;
     private String fontFamily;
 
+    private String designJson;
+
     private String backgroundImageUrl;
 
     private Boolean darkenOverlay;

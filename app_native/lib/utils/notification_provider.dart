@@ -113,8 +113,8 @@ class NotificationProvider extends ChangeNotifier {
         clickNotification(notification);
       });
 
-      final initialMessage = await FirebaseMessaging.instance
-          .getInitialMessage();
+      final initialMessage =
+          await FirebaseMessaging.instance.getInitialMessage();
       if (initialMessage != null && apiHasToken) {
         _log('FCM getInitialMessage triggered');
         final notification = _parseNotificationFromPayload(
