@@ -5,14 +5,12 @@ import '../models/app_permission.dart';
 import '../navigation/main_tabs.dart';
 import '../screens/repair_orders_page.dart';
 import '../utils/auth_provider.dart';
-import 'home_attendance.dart';
 
 enum QuickAction {
   createRepair,
   repairOrders,
   warehouse,
   messages,
-  attendance,
   employees,
   notifications,
   profile,
@@ -27,7 +25,6 @@ bool canUseQuickAction(AuthProvider auth, QuickAction action) {
     QuickAction.repairOrders => auth.can(AppPermission.viewRepairOrders),
     QuickAction.warehouse => auth.can(AppPermission.viewWarehouse),
     QuickAction.messages => auth.can(AppPermission.useMessages),
-    QuickAction.attendance => auth.can(AppPermission.viewAttendance),
     QuickAction.employees => auth.canAny({
       AppPermission.manageEmployees,
       AppPermission.approveAccounts,
@@ -56,22 +53,6 @@ Future<void> showAppQuickActions(
     await showCreateRepairOrderSheet(context);
     return;
   }
-  if (action == QuickAction.attendance) {
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (_) => SafeArea(
-        child: SingleChildScrollView(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: const HomeAttendance(),
-          ),
-        ),
-      ),
-    );
-    return;
-  }
   final tab = switch (action) {
     QuickAction.repairOrders => MainTabs.repairOrders,
     QuickAction.warehouse => MainTabs.warehouse,
@@ -98,7 +79,6 @@ class _QuickActionsSheet extends StatelessWidget {
       QuickAction.repairOrders: 'Đơn sửa chữa',
       QuickAction.warehouse: 'Kho linh kiện',
       QuickAction.messages: 'Nhắn tin',
-      QuickAction.attendance: 'Chấm công hôm nay',
       QuickAction.employees: 'Quản lý nhân viên',
       QuickAction.notifications: 'Thông báo',
       QuickAction.profile: 'Cá nhân',
@@ -108,7 +88,6 @@ class _QuickActionsSheet extends StatelessWidget {
       QuickAction.repairOrders: Icons.build_outlined,
       QuickAction.warehouse: Icons.inventory_2_outlined,
       QuickAction.messages: Icons.chat_bubble_outline,
-      QuickAction.attendance: Icons.access_time,
       QuickAction.employees: Icons.people_outline,
       QuickAction.notifications: Icons.notifications_outlined,
       QuickAction.profile: Icons.person_outline,
