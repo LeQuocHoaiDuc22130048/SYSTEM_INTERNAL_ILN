@@ -17,6 +17,9 @@ public record DailyAttendanceResponse(
         Boolean isEarlyLeave,   // Về sớm so với lịch
         String shiftStart,      // Ca làm việc quy định
         String shiftEnd,
-        List<AttendanceResponse> records  // Toàn bộ bản ghi trong ngày
+        List<AttendanceResponse> records,  // Toàn bộ bản ghi trong ngày
+        java.util.UUID employeeId,
+        FieldWorkDayResponse fieldWork,
+        Double fieldWorkCredit // Chỉ phần công được ghi nhận từ đi công trình (0 hoặc 1)
 ) {
 }

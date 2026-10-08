@@ -28,6 +28,32 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AttendanceServiceTest {
     @Mock
+    private com.suachuabientan.system_internal.modules.attendance.repository.FieldWorkDayRepository fieldWorkDayRepository;
+
+    @Test
+    void fieldWorkWithoutPunchesAppearsInDailyAndReport() {
+        var date = java.time.LocalDate.of(2026, 9, 21);
+        var day = new com.suachuabientan.system_internal.modules.attendance.entity.FieldWorkDay();
+        day.setEmployeeId(employeeId);
+        day.setWorkDate(date);
+        day.setNote("Nhà máy ABC");
+        when(fieldWorkDayRepository.findByEmployeeIdAndWorkDateAndIsDeletedFalse(employeeId, date))
+                .thenReturn(Optional.of(day));
+        org.mockito.Mockito.lenient().when(fieldWorkDayRepository.findByWorkDateAndIsDeletedFalse(date))
+                .thenReturn(List.of(day));
+        employee.setRole(com.suachuabientan.system_internal.modules.auth.enums.UserRole.EMPLOYEE);
+        org.mockito.Mockito.lenient().when(userRepository.findAll()).thenReturn(List.of(employee));
+        var response = attendanceService.getDaily(employeeId, date);
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().valueToTree(response);
+        assertEquals("Nhà máy ABC", json.path("fieldWork").path("note").asText());
+        assertEquals(1.0, json.path("fieldWorkCredit").asDouble());
+        assertEquals(employeeId.toString(), json.path("employeeId").asText());
+        assertEquals(null, response.checkIn());
+        assertEquals(null, response.checkOut());
+        assertEquals(false, response.isLate());
+        assertEquals(1, attendanceService.getReport(date).size());
+    }
+    @Mock
     private AttendanceRecordRepository attendanceRecordRepository;
     @Mock
     private WorkScheduleRepository workScheduleRepository;
@@ -53,7 +79,7 @@ class AttendanceServiceTest {
                 faceRecognitionService,
                 notificationService,
                 faceRecognitionMonitoringService,
-                org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class));
+                org.mockito.Mockito.mock(org.springframework.transaction.PlatformTransactionManager.class), fieldWorkDayRepository);
         employeeId = UUID.randomUUID();
         employee = new UserEntity();
         employee.setId(employeeId);

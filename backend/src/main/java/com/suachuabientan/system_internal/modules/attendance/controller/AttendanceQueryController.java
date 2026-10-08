@@ -3,6 +3,9 @@ package com.suachuabientan.system_internal.modules.attendance.controller;
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.attendance.entity.AttendanceRecord;
 import com.suachuabientan.system_internal.modules.attendance.entity.WorkSchedule;
+import com.suachuabientan.system_internal.modules.attendance.entity.FieldWorkDay;
+import com.suachuabientan.system_internal.modules.attendance.repository.FieldWorkDayRepository;
+import com.suachuabientan.system_internal.modules.attendance.service.FieldWorkService;
 import com.suachuabientan.system_internal.modules.attendance.enums.AttendanceType;
 import com.suachuabientan.system_internal.modules.attendance.repository.AttendanceRecordRepository;
 import com.suachuabientan.system_internal.modules.attendance.repository.WorkScheduleRepository;
@@ -32,6 +35,7 @@ public class AttendanceQueryController {
     private final UserRepository userRepository;
     private final AttendanceRecordRepository attendanceRecordRepository;
     private final WorkScheduleRepository workScheduleRepository;
+    private final FieldWorkDayRepository fieldWorkDayRepository;
 
     private static final ZoneId ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final LocalTime DEFAULT_SHIFT_START = LocalTime.of(8, 30);
@@ -60,6 +64,10 @@ public class AttendanceQueryController {
 
         List<AttendanceRecord> monthRecords = attendanceRecordRepository.findByCheckTimeBetween(monthStart, monthEnd);
         List<WorkSchedule> monthSchedules = workScheduleRepository.findByWorkDateBetween(startLocalDate, endLocalDate);
+        Map<UUID, Map<LocalDate, FieldWorkDay>> fieldDaysByEmployee = fieldWorkDayRepository
+                .findByWorkDateBetweenAndIsDeletedFalse(startLocalDate, endLocalDate).stream()
+                .collect(Collectors.groupingBy(FieldWorkDay::getEmployeeId,
+                        Collectors.toMap(FieldWorkDay::getWorkDate, day -> day)));
 
         Map<UUID, List<AttendanceRecord>> recordsByEmployee = monthRecords.stream()
                 .collect(Collectors.groupingBy(AttendanceRecord::getEmployeeId));
@@ -103,11 +111,15 @@ public class AttendanceQueryController {
 
                 List<AttendanceRecord> dayRecords = recordsByDate.getOrDefault(date, Collections.emptyList());
                 WorkSchedule schedule = empSchedules.get(date);
+                FieldWorkDay fieldDay = fieldDaysByEmployee.getOrDefault(empId, Collections.emptyMap()).get(date);
                 LocalTime shiftStart = schedule != null ? schedule.getShiftStart() : DEFAULT_SHIFT_START;
                 LocalTime shiftEnd = schedule != null ? schedule.getShiftEnd() : DEFAULT_SHIFT_END;
 
                 // Thu thập lý do cập nhật/ghi chú và giờ vào/ra trong ngày d
                 Set<String> dayReasons = new LinkedHashSet<>();
+                if (fieldDay != null) {
+                    dayReasons.add(FieldWorkService.displayNote(fieldDay));
+                }
                 for (AttendanceRecord rec : dayRecords) {
                     if (rec.getNote() != null && !rec.getNote().isBlank()) {
                         String n = rec.getNote().trim();
@@ -176,6 +188,11 @@ public class AttendanceQueryController {
 
                 if (date.isAfter(today)) {
                     patternBuilder.append("f");
+                } else if (fieldDay != null) {
+                    patternBuilder.append("p");
+                    dailyWorkDays.put(d, 1.0);
+                    workDays += 1.0;
+                    totalHours += fieldWorkRecordedHours(date, checkIn, checkOut);
                 } else if (isWeekend && dayRecords.isEmpty()) {
                     patternBuilder.append("h");
                 } else {
@@ -320,6 +337,9 @@ public class AttendanceQueryController {
 
         List<AttendanceRecord> monthRecords = attendanceRecordRepository.findByEmployeeIdAndCheckTimeBetween(employeeId, monthStart, monthEnd);
         List<WorkSchedule> monthSchedules = workScheduleRepository.findByEmployeeAndDateRange(employeeId, startLocalDate, endLocalDate);
+        Map<LocalDate, FieldWorkDay> fieldDays = fieldWorkDayRepository
+                .findByEmployeeIdAndWorkDateBetweenAndIsDeletedFalseOrderByWorkDateAsc(employeeId, startLocalDate, endLocalDate)
+                .stream().collect(Collectors.toMap(FieldWorkDay::getWorkDate, day -> day));
 
         Map<LocalDate, WorkSchedule> schedulesByDate = monthSchedules.stream()
                 .collect(Collectors.toMap(WorkSchedule::getWorkDate, ws -> ws, (ws1, ws2) -> ws1));
@@ -348,18 +368,26 @@ public class AttendanceQueryController {
 
             List<AttendanceRecord> dayRecords = recordsByDate.getOrDefault(date, Collections.emptyList());
             WorkSchedule schedule = schedulesByDate.get(date);
+            FieldWorkDay fieldDay = fieldDays.get(date);
             LocalTime shiftStart = schedule != null ? schedule.getShiftStart() : DEFAULT_SHIFT_START;
             LocalTime shiftEnd = schedule != null ? schedule.getShiftEnd() : DEFAULT_SHIFT_END;
 
             String status = "PRESENT";
             List<HistoryEvent> events = new ArrayList<>();
-            Instant checkIn = null;
-            Instant checkOut = null;
+            Instant checkIn = dayRecords.stream().filter(r -> r.getType() == AttendanceType.IN)
+                    .map(AttendanceRecord::getCheckTime).min(Instant::compareTo).orElse(null);
+            Instant checkOut = dayRecords.stream().filter(r -> r.getType() == AttendanceType.OUT)
+                    .map(AttendanceRecord::getCheckTime).max(Instant::compareTo).orElse(null);
             double dayActualHours = 0.0;
             double dayOtHours = 0.0;
 
             if (date.isAfter(today)) {
                 status = "FUTURE";
+            } else if (fieldDay != null) {
+                status = "FIELD_WORK";
+                workDays += 1.0;
+                dayActualHours = fieldWorkRecordedHours(date, checkIn, checkOut);
+                totalHours += dayActualHours;
             } else if (isWeekend && dayRecords.isEmpty()) {
                 status = "HOLIDAY";
             } else {
@@ -476,6 +504,9 @@ public class AttendanceQueryController {
             String checkInStr = checkIn != null ? timeFormatter.format(checkIn) : null;
             String checkOutStr = checkOut != null ? timeFormatter.format(checkOut) : null;
             String dayNote = schedule != null && schedule.getNote() != null ? schedule.getNote() : "";
+            if (fieldDay != null) {
+                dayNote = FieldWorkService.displayNote(fieldDay) + (dayNote.isBlank() ? "" : "; " + dayNote);
+            }
 
             daysList.add(new DailyHistoryLog(
                     d,
@@ -699,6 +730,16 @@ public class AttendanceQueryController {
             int absentDays,
             double overtimeHours
     ) {}
+
+    private static double fieldWorkRecordedHours(LocalDate date, Instant checkIn, Instant checkOut) {
+        if (checkIn == null || checkOut == null || checkOut.isBefore(checkIn)) return 0.0;
+        Instant lunchStart = date.atTime(MORNING_SHIFT_END).atZone(ZONE).toInstant();
+        Instant lunchEnd = date.atTime(AFTERNOON_SHIFT_START).atZone(ZONE).toInstant();
+        Instant overlapStart = checkIn.isAfter(lunchStart) ? checkIn : lunchStart;
+        Instant overlapEnd = checkOut.isBefore(lunchEnd) ? checkOut : lunchEnd;
+        long lunchMinutes = Math.max(0, Duration.between(overlapStart, overlapEnd).toMinutes());
+        return Math.max(0, Duration.between(checkIn, checkOut).toMinutes() - lunchMinutes) / 60.0;
+    }
 
     public record DailyHistoryLog(
             int day,

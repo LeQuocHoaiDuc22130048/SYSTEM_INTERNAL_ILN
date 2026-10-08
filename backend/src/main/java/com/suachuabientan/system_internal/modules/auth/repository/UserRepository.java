@@ -16,6 +16,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
+    /** Serialize field-work mutations for one employee, including first-time inserts. */
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from UserEntity u where u.id = :id and u.isDeleted = false")
+    Optional<UserEntity> findForFieldWorkUpdate(@Param("id") UUID id);
 
     Optional<UserEntity> findByUsernameAndIsDeletedFalse(String username);
 

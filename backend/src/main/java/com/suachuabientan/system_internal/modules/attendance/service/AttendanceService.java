@@ -15,6 +15,8 @@ import com.suachuabientan.system_internal.modules.attendance.dto.response.Attend
 import com.suachuabientan.system_internal.modules.attendance.dto.response.DailyAttendanceResponse;
 import com.suachuabientan.system_internal.modules.attendance.dto.response.WorkScheduleResponse;
 import com.suachuabientan.system_internal.modules.attendance.entity.AttendanceRecord;
+import com.suachuabientan.system_internal.modules.attendance.entity.FieldWorkDay;
+import com.suachuabientan.system_internal.modules.attendance.repository.FieldWorkDayRepository;
 import com.suachuabientan.system_internal.modules.attendance.entity.WorkSchedule;
 import com.suachuabientan.system_internal.modules.attendance.enums.AttendanceType;
 import com.suachuabientan.system_internal.modules.attendance.repository.AttendanceRecordRepository;
@@ -68,6 +70,7 @@ public class AttendanceService {
     private final NotificationService notificationService;
     private final FaceRecognitionMonitoringService faceRecognitionMonitoringService;
     private final PlatformTransactionManager transactionManager;
+    private final FieldWorkDayRepository fieldWorkDayRepository;
 
     @Value("${app.attendance.face.match-threshold}")
     private double faceMatchThreshold;
@@ -530,7 +533,9 @@ public class AttendanceService {
                 .findByEmployeeIdAndWorkDateAndIsDeletedFalse(employeeId, date)
                 .orElse(null);
 
-        return toDailyResponse(date, records, schedule);
+        FieldWorkDay fieldDay = fieldWorkDayRepository
+                .findByEmployeeIdAndWorkDateAndIsDeletedFalse(employeeId, date).orElse(null);
+        return toDailyResponse(employeeId, date, records, schedule, fieldDay);
     }
 
     @Transactional(readOnly = true)
@@ -571,12 +576,16 @@ public class AttendanceService {
                 .filter(schedule -> allowedUserIds.contains(schedule.getEmployeeId()))
                 .collect(Collectors.toMap(WorkSchedule::getEmployeeId, schedule -> schedule));
 
-        return byEmployee.entrySet().stream()
-                .map(entry -> toDailyResponse(reportDate,
-                        entry.getValue().stream()
-                                .sorted(Comparator.comparing(AttendanceRecord::getCheckTime))
-                                .toList(),
-                        schedules.get(entry.getKey())))
+        Map<UUID, FieldWorkDay> fieldDays = fieldWorkDayRepository.findByWorkDateAndIsDeletedFalse(reportDate)
+                .stream().filter(day -> allowedUserIds.contains(day.getEmployeeId()))
+                .collect(Collectors.toMap(FieldWorkDay::getEmployeeId, day -> day));
+        java.util.Set<UUID> reportEmployeeIds = new java.util.LinkedHashSet<>(byEmployee.keySet());
+        reportEmployeeIds.addAll(fieldDays.keySet());
+        return reportEmployeeIds.stream()
+                .map(employeeId -> toDailyResponse(employeeId, reportDate,
+                        byEmployee.getOrDefault(employeeId, List.of()).stream()
+                                .sorted(Comparator.comparing(AttendanceRecord::getCheckTime)).toList(),
+                        schedules.get(employeeId), fieldDays.get(employeeId)))
                 .toList();
     }
 
@@ -612,7 +621,7 @@ public class AttendanceService {
                 .toList();
     }
 
-    private DailyAttendanceResponse toDailyResponse(LocalDate date, List<AttendanceRecord> records, WorkSchedule schedule) {
+    private DailyAttendanceResponse toDailyResponse(UUID employeeId, LocalDate date, List<AttendanceRecord> records, WorkSchedule schedule, FieldWorkDay fieldDay) {
         Instant checkIn = records.stream()
                 .filter(record -> record.getType() == AttendanceType.IN)
                 .map(AttendanceRecord::getCheckTime)
@@ -638,11 +647,14 @@ public class AttendanceService {
                 checkIn,
                 checkOut,
                 totalMinutes,
-                checkIn != null && checkIn.isAfter(shiftStartInstant.plus(LATE_GRACE)),
-                checkOut != null && checkOut.isBefore(shiftEndInstant),
+                fieldDay == null && checkIn != null && checkIn.isAfter(shiftStartInstant.plus(LATE_GRACE)),
+                fieldDay == null && checkOut != null && checkOut.isBefore(shiftEndInstant),
                 shiftStart.toString(),
                 shiftEnd.toString(),
-                records.stream().map(record -> toAttendanceResponse(record, null)).toList()
+                records.stream().map(record -> toAttendanceResponse(record, null)).toList(),
+                employeeId,
+                fieldDay != null ? FieldWorkService.toResponse(fieldDay) : null,
+                fieldDay != null ? 1.0 : 0.0
         );
     }
 

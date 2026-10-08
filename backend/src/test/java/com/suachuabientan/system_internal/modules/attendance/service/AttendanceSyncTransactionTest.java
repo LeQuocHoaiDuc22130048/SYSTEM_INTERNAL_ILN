@@ -87,7 +87,7 @@ class AttendanceSyncTransactionTest {
         when(faces.verify(anyString(), anyString(), anyString()))
                 .thenReturn(new FaceRecognitionService.FaceVerificationResult(true, 0.98));
         var target = new AttendanceService(records, mock(WorkScheduleRepository.class), users, faces,
-                mock(NotificationService.class), mock(FaceRecognitionMonitoringService.class), manager);
+                mock(NotificationService.class), mock(FaceRecognitionMonitoringService.class), manager, mock(com.suachuabientan.system_internal.modules.attendance.repository.FieldWorkDayRepository.class));
         var proxy = new ProxyFactory(target);
         proxy.setProxyTargetClass(true);
         proxy.addAdvice(new TransactionInterceptor(manager, new AnnotationTransactionAttributeSource()));

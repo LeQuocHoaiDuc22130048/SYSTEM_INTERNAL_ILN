@@ -1,0 +1,17 @@
+# Windows workaround: Docker/WSL cannot currently bind mount drive E.
+# Firebase and releases were copied into %LOCALAPPDATA%\SIBackendRuntime.
+# Database and other named volumes remain defined by docker-compose.yml.
+services:
+  backend:
+    volumes:
+      - type: bind
+        source: ${LOCALAPPDATA:?LOCALAPPDATA must be set}/SIBackendRuntime/firebase-service-account.json
+        target: /app/firebase-service-account.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${LOCALAPPDATA:?LOCALAPPDATA must be set}/SIBackendRuntime/releases
+        target: /app/releases
+        bind:
+          create_host_path: false
