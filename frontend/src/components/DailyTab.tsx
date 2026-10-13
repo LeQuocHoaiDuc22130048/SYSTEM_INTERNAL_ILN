@@ -79,6 +79,21 @@ export const DailyTab: React.FC<DailyTabProps> = ({
     const isPast = isPastDate(selectedDate, todayStr);
     const isFuture = isFutureDate(selectedDate, todayStr);
 
+    if (isFuture || statusChar === 'f') {
+      return <span className="pill-badge holiday">Chưa diễn ra</span>;
+    }
+
+    if (report?.fieldWork || statusChar === 'p') {
+      return (
+        <span
+          className="pill-badge field-work"
+          style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f59e0b' }}
+        >
+          Đi công trình
+        </span>
+      );
+    }
+
     if (report) {
       const hasIn = !!report.checkIn;
       const hasOut = !!report.checkOut;

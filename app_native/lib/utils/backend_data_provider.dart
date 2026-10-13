@@ -302,6 +302,55 @@ class BackendDataProvider extends ChangeNotifier {
     }
   }
 
+  Future<FieldWorkDay> saveFieldWork(DateTime date, String note) async {
+    final dateStr =
+        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final res = await api.put(
+      '/api/attendance/me/field-work/$dateStr',
+      body: {'note': note.trim()},
+    );
+    final data = res is Map<String, dynamic> && res['data'] is Map<String, dynamic>
+        ? res['data'] as Map<String, dynamic>
+        : (res is Map<String, dynamic> ? res : <String, dynamic>{});
+    final saved = FieldWorkDay.fromJson(data);
+    await loadMyTodayAttendance(notify: false);
+    await loadMyAttendance(year: date.year, month: date.month, notify: true);
+    return saved;
+  }
+
+  Future<void> removeFieldWork(DateTime date) async {
+    final dateStr =
+        '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    await api.delete('/api/attendance/me/field-work/$dateStr');
+    await loadMyTodayAttendance(notify: false);
+    await loadMyAttendance(year: date.year, month: date.month, notify: true);
+  }
+
+  Future<List<FieldWorkDay>> getFieldWorkDays({
+    DateTime? from,
+    DateTime? to,
+  }) async {
+    final params = <String, dynamic>{};
+    if (from != null) {
+      params['from'] =
+          '${from.year.toString().padLeft(4, '0')}-${from.month.toString().padLeft(2, '0')}-${from.day.toString().padLeft(2, '0')}';
+    }
+    if (to != null) {
+      params['to'] =
+          '${to.year.toString().padLeft(4, '0')}-${to.month.toString().padLeft(2, '0')}-${to.day.toString().padLeft(2, '0')}';
+    }
+    final res = await api.get(
+      '/api/attendance/me/field-work',
+      queryParameters: params,
+    );
+    final list = res is Map<String, dynamic> && res['data'] is List
+        ? res['data'] as List
+        : (res is List ? res : []);
+    return list
+        .map((e) => FieldWorkDay.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<void> approveUser(User user) async {
     await api.put(
       '/api/v1/auth/pending/${user.id}',

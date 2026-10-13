@@ -98,6 +98,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
       LEAVE: <span className="pill-badge leave">Nghỉ phép</span>,
       HOLIDAY: <span className="pill-badge holiday">Nghỉ lễ/CN</span>,
       OVERTIME: <span className="pill-badge ot">Tăng ca</span>,
+      FIELD_WORK: <span className="pill-badge field-work" style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f59e0b' }}>Đi công trình</span>,
       HALF_DAY_MORNING: <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (Sáng)</span>,
       HALF_DAY_AFTERNOON: <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (Chiều)</span>,
       HALF_DAY: <span className="pill-badge present" style={{ backgroundColor: '#e0f2fe', color: '#0369a1', borderColor: '#0284c7' }}>Nửa công (0.5)</span>,
@@ -260,16 +261,24 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                           <div className="day-chips">
                             {checkInEvent ? (
                               <span className="chip-io in"><LogIn size={12} />{checkInEvent.logTime}</span>
-                            ) : dayLog.status !== 'HOLIDAY' && dayLog.status !== 'LEAVE' && dayLog.status !== 'FUTURE' ? (
+                            ) : dayLog.status === 'FIELD_WORK' ? null : dayLog.status !== 'HOLIDAY' && dayLog.status !== 'LEAVE' && dayLog.status !== 'FUTURE' ? (
                               <span className="chip-io absent">Không check-in</span>
                             ) : null}
 
                             {checkOutEvent ? (
                               <span className="chip-io out"><LogOut size={12} />{checkOutEvent.logTime}</span>
-                            ) : checkInEvent ? (
+                            ) : dayLog.status === 'FIELD_WORK' ? null : checkInEvent ? (
                               <span className="chip-io absent">Không check-out</span>
                             ) : null}
 
+                            {dayLog.status === 'FIELD_WORK' && (
+                              <span
+                                className="chip-badge"
+                                style={{ backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #f59e0b' }}
+                              >
+                                Đi công trình
+                              </span>
+                            )}
                             {hasLate && <span className="chip-badge warning">Muộn</span>}
                             {hasOT && <span className="chip-badge info">OT</span>}
                             {hasManual && <span className="chip-badge holiday">Thủ công</span>}
@@ -283,8 +292,31 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
 
                       {!isCollapsed && (
                         <div className="day-details">
+                          {dayLog.note && (
+                            <div
+                              className="day-note-banner"
+                              style={{
+                                padding: '8px 12px',
+                                marginBottom: '10px',
+                                borderRadius: '6px',
+                                backgroundColor: '#fffbeb',
+                                border: '1px solid #fef3c7',
+                                color: '#92400e',
+                                fontSize: '13px',
+                                display: 'flex',
+                                gap: '6px',
+                              }}
+                            >
+                              <strong>Ghi chú:</strong>
+                              <span>{dayLog.note}</span>
+                            </div>
+                          )}
                           {dayLog.events.length === 0 ? (
-                            <p className="no-data-text">Không ghi nhận dữ liệu chấm công.</p>
+                            <p className="no-data-text">
+                              {dayLog.status === 'FIELD_WORK'
+                                ? 'Đi công trình (tính đủ 1 công, không có lượt quét camera tại trụ sở).'
+                                : 'Không ghi nhận dữ liệu chấm công.'}
+                            </p>
                           ) : (
                             <div className="timeline">
                               {dayLog.events.map((evt, evtIdx) => (

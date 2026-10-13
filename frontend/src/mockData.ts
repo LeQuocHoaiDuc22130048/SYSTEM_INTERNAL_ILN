@@ -45,7 +45,8 @@ export interface HistoryEvent {
 export interface DailyHistoryLog {
   date: string;
   dayOfWeek: string;
-  status: 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'OVERTIME' | 'HALF_DAY_MORNING' | 'HALF_DAY_AFTERNOON' | 'HALF_DAY' | 'FUTURE';
+  status: 'PRESENT' | 'LATE' | 'ABSENT' | 'LEAVE' | 'HOLIDAY' | 'OVERTIME' | 'FIELD_WORK' | 'HALF_DAY_MORNING' | 'HALF_DAY_AFTERNOON' | 'HALF_DAY' | 'FUTURE';
+  note?: string;
   events: HistoryEvent[];
 }
 

@@ -471,6 +471,7 @@ export async function exportEmployeeHistoryExcel(
       LEAVE: 'Nghỉ phép',
       HOLIDAY: 'Cuối tuần / Lễ',
       OVERTIME: 'Tăng ca',
+      FIELD_WORK: 'Đi công trình',
       HALF_DAY_MORNING: 'Nửa công (Ca sáng)',
       HALF_DAY_AFTERNOON: 'Nửa công (Ca chiều)',
       HALF_DAY: 'Nửa công (0.5)',
@@ -492,7 +493,7 @@ export async function exportEmployeeHistoryExcel(
     }
     const statusLabel = STATUS_MAP[effectiveStatus as keyof typeof STATUS_MAP] || effectiveStatus;
 
-    // Lấy ghi chú thủ công / lý do cập nhật
+    // Lấy ghi chú từ day.note (ví dụ: ngày đi công trình) và từ các sự kiện
     const manualNotes = day.events
       .filter(e => e.source === 'MANUAL' && e.note)
       .map(e => e.note.trim());
@@ -503,13 +504,20 @@ export async function exportEmployeeHistoryExcel(
       .map(e => e.note.trim());
 
     let noteText = '';
+    if (day.note && day.note.trim()) {
+      const cleanDayNote = day.note.trim();
+      noteText = cleanDayNote.startsWith('Đi công trình') ? cleanDayNote : `Đi công trình — ${cleanDayNote}`;
+    }
+
     if (manualNotes.length > 0) {
-      noteText = `Lý do cập nhật: ${Array.from(new Set(manualNotes)).join('; ')}`;
+      const manualPart = `Lý do cập nhật: ${Array.from(new Set(manualNotes)).join('; ')}`;
+      noteText = noteText ? `${noteText}; ${manualPart}` : manualPart;
       if (otherNotes.length > 0) {
         noteText += ` (${Array.from(new Set(otherNotes)).join('; ')})`;
       }
     } else if (otherNotes.length > 0) {
-      noteText = Array.from(new Set(otherNotes)).join('; ');
+      const otherPart = Array.from(new Set(otherNotes)).join('; ');
+      noteText = noteText ? `${noteText}; ${otherPart}` : otherPart;
     }
 
     row.getCell(1).value = idx + 1;

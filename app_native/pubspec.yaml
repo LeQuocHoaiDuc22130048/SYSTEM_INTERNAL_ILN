@@ -68,11 +68,14 @@ dev_dependencies:
   flutter_lints: ^6.0.0
 
 flutter:
+  config:
+    enable-swift-package-manager: false
   uses-material-design: true
   assets:
     - assets/images/
     - assets/models/
     - assets/model/
+  
 
 flutter_launcher_icons:
   android: "launcher_icon"
@@ -80,5 +83,3 @@ flutter_launcher_icons:
   image_path: "assets/images/icon.png"
   adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/images/icon.png"
-
-

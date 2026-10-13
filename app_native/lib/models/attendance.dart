@@ -1,4 +1,4 @@
-enum AttendanceStatus { onTime, late, absent }
+enum AttendanceStatus { onTime, late, absent, fieldWork }
 
 class AttendanceRecord {
   final String id;
@@ -27,6 +27,8 @@ class AttendanceRecord {
         return 'Muộn';
       case AttendanceStatus.absent:
         return 'Vắng';
+      case AttendanceStatus.fieldWork:
+        return 'Đi công trình';
     }
   }
 
@@ -241,6 +243,8 @@ class DailyHistoryLog {
         return 'Về sớm';
       case 'PRESENT':
         return 'Đủ công';
+      case 'FIELD_WORK':
+        return 'Đi công trình';
       case 'LEAVE':
         return 'Nghỉ phép';
       case 'ABSENT':
@@ -305,6 +309,8 @@ class MyTodayAttendance {
   final bool isEarlyLeave;
   final String? shiftStart;
   final String? shiftEnd;
+  final bool fieldWork;
+  final int fieldWorkCredit;
 
   const MyTodayAttendance({
     this.date,
@@ -315,6 +321,8 @@ class MyTodayAttendance {
     this.isEarlyLeave = false,
     this.shiftStart,
     this.shiftEnd,
+    this.fieldWork = false,
+    this.fieldWorkCredit = 0,
   });
 
   factory MyTodayAttendance.fromJson(Map<String, dynamic> json) {
@@ -327,6 +335,8 @@ class MyTodayAttendance {
       isEarlyLeave: json['isEarlyLeave'] == true,
       shiftStart: json['shiftStart']?.toString(),
       shiftEnd: json['shiftEnd']?.toString(),
+      fieldWork: json['fieldWork'] == true,
+      fieldWorkCredit: (json['fieldWorkCredit'] as num?)?.toInt() ?? 0,
     );
   }
 
@@ -340,5 +350,42 @@ class MyTodayAttendance {
     if (checkOut == null) return null;
     final local = checkOut!.toLocal();
     return '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+}
+
+class FieldWorkDay {
+  final String id;
+  final String employeeId;
+  final DateTime workDate;
+  final String note;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const FieldWorkDay({
+    required this.id,
+    required this.employeeId,
+    required this.workDate,
+    required this.note,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory FieldWorkDay.fromJson(Map<String, dynamic> json) {
+    return FieldWorkDay(
+      id: json['id']?.toString() ?? '',
+      employeeId: json['employeeId']?.toString() ?? '',
+      workDate:
+          DateTime.tryParse(json['workDate']?.toString() ?? '') ??
+          DateTime.now(),
+      note: json['note']?.toString() ?? '',
+      createdAt:
+          json['createdAt'] != null
+              ? DateTime.tryParse(json['createdAt'].toString())
+              : null,
+      updatedAt:
+          json['updatedAt'] != null
+              ? DateTime.tryParse(json['updatedAt'].toString())
+              : null,
+    );
   }
 }

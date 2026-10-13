@@ -128,6 +128,12 @@ class StatusBadge extends StatelessWidget {
             'bgColor': AppColors.errorLight,
             'textColor': AppColors.error,
           };
+        case AttendanceStatus.fieldWork:
+          return {
+            'label': 'Đi công trình',
+            'bgColor': const Color(0xFFFFFBEB),
+            'textColor': const Color(0xFFD97706),
+          };
       }
     }
 

@@ -2,13 +2,14 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Wrench, Activity, CheckCircle2, Cpu, Users, UserPlus,
   AlertTriangle, RefreshCw, ArrowRight, UserCheck,
-  CalendarCheck, Clock, LogIn, LogOut,
+  CalendarCheck, Clock, LogIn, LogOut, Briefcase,
   Calendar, Zap, CalendarDays, CalendarRange, SlidersHorizontal, Inbox
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { getAuthHeaders } from '../utils/auth';
 import { getAvatarLetters } from '../utils/employee';
 import { isAdminOrAbove } from '../utils/permissions';
+import { FieldWorkModal } from './FieldWorkModal';
 import './DashboardTab.css';
 
 export type TimeRangePreset = 'today' | '7days' | 'month' | 'custom';
@@ -85,6 +86,8 @@ interface AttendanceReportRecord {
   isEarlyLeave: boolean;
   shiftStart?: string;
   shiftEnd?: string;
+  fieldWork?: boolean;
+  fieldWorkCredit?: number;
   records?: AttendanceResponseRecord[];
 }
 
@@ -101,6 +104,7 @@ interface PersonalHistoryDay {
   date: string;
   dayOfWeek: string;
   status: string;
+  note?: string;
   events: PersonalEvent[];
 }
 
@@ -121,6 +125,8 @@ interface MyTodayAttendance {
   isEarlyLeave: boolean;
   shiftStart?: string;
   shiftEnd?: string;
+  fieldWork?: boolean;
+  fieldWorkCredit?: number;
   records?: AttendanceResponseRecord[];
 }
 
@@ -152,6 +158,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   });
   const [customEndDate, setCustomEndDate] = useState<string>(() => toLocalDateStr(new Date()));
   const [hoveredSlotIndex, setHoveredSlotIndex] = useState<number | null>(null);
+
+  // Modal ghi nhận ngày đi công trình
+  const [showFieldWorkModal, setShowFieldWorkModal] = useState<boolean>(false);
+  const [selectedFieldWorkDate, setSelectedFieldWorkDate] = useState<string | undefined>(undefined);
+  const [selectedFieldWorkNote, setSelectedFieldWorkNote] = useState<string>('');
+  const [isExistingFieldWork, setIsExistingFieldWork] = useState<boolean>(false);
+
+  const handleOpenFieldWork = (dateStr?: string, note?: string, isExisting = false) => {
+    setSelectedFieldWorkDate(dateStr || toLocalDateStr(new Date()));
+    setSelectedFieldWorkNote(note || '');
+    setIsExistingFieldWork(isExisting);
+    setShowFieldWorkModal(true);
+  };
 
   const isAdmin = useMemo(() => isAdminOrAbove(currentUser), [currentUser]);
 
@@ -696,6 +715,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // Helper to format checkin status pill
   const getAttendanceStatusBadge = (rec: AttendanceReportRecord) => {
+    if (rec.fieldWork) {
+      return (
+        <span
+          className="att-badge warning"
+          style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f59e0b' }}
+        >
+          Đi công trình
+        </span>
+      );
+    }
     if (rec.isLate && rec.isEarlyLeave) {
       return <span className="att-badge warning">Muộn & Về sớm</span>;
     }
@@ -728,6 +757,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   // Helper to format personal attendance status badge
   const getPersonalDayBadge = (status: string) => {
     switch (status.toUpperCase()) {
+      case 'FIELD_WORK':
+        return (
+          <span
+            className="att-badge warning"
+            style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f59e0b' }}
+          >
+            Đi công trình
+          </span>
+        );
       case 'PRESENT':
         return <span className="att-badge success">Đủ công</span>;
       case 'LATE':
@@ -1416,26 +1454,54 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     {personalSummary ? `${personalSummary.workDays} công` : 'Cá nhân'}
                   </span>
                 </div>
-                {onViewPersonalAttendance && currentUser && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button
-                    className="btn-link"
-                    onClick={() => onViewPersonalAttendance({
-                      id: currentUser.id || '',
-                      name: currentUser.fullName || currentUser.username,
-                      dept: currentUser.department || 'Nhân viên'
-                    })}
+                    className="action-btn-outline action-btn-sm"
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      fontSize: '12px',
+                      padding: '4px 10px',
+                      backgroundColor: '#fffbeb',
+                      color: '#b45309',
+                      borderColor: '#fde68a'
+                    }}
+                    onClick={() => handleOpenFieldWork(toLocalDateStr(new Date()), '', myToday?.fieldWork)}
                   >
-                    <span>Xem chi tiết tháng</span>
-                    <ArrowRight size={14} />
+                    <Briefcase size={13} />
+                    <span>{myToday?.fieldWork ? 'Sửa công trình' : 'Báo đi công trình'}</span>
                   </button>
-                )}
+                  {onViewPersonalAttendance && currentUser && (
+                    <button
+                      className="btn-link"
+                      onClick={() => onViewPersonalAttendance({
+                        id: currentUser.id || '',
+                        name: currentUser.fullName || currentUser.username,
+                        dept: currentUser.department || 'Nhân viên'
+                      })}
+                    >
+                      <span>Xem chi tiết tháng</span>
+                      <ArrowRight size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Thẻ chấm công hôm nay */}
               <div className="personal-today-card">
                 <div className="ptc-header">
                   <span className="ptc-date">Hôm nay ({new Date().toLocaleDateString('vi-VN')})</span>
-                  {myToday?.checkIn ? (
+                  {myToday?.fieldWork ? (
+                    <span
+                      className="att-badge warning"
+                      style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f59e0b', cursor: 'pointer' }}
+                      onClick={() => handleOpenFieldWork(toLocalDateStr(new Date()), '', true)}
+                      title="Bấm để chỉnh sửa ghi chú công trình"
+                    >
+                      Đi công trình (1.0 công) ✏️
+                    </span>
+                  ) : myToday?.checkIn ? (
                     myToday.isLate && myToday.isEarlyLeave ? (
                       <span className="att-badge warning">Muộn & Về sớm</span>
                     ) : myToday.isLate ? (
@@ -1514,12 +1580,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       <div
                         key={index}
                         className={`list-item clickable personal-day-row ${day.status.toLowerCase()}`}
-                        onClick={() => onViewPersonalAttendance && currentUser && onViewPersonalAttendance({
-                          id: currentUser.id || '',
-                          name: currentUser.fullName || currentUser.username,
-                          dept: currentUser.department || 'Nhân viên'
-                        })}
-                        title="Bấm để xem chi tiết lịch sử"
+                        onClick={() => {
+                          if (day.status === 'FIELD_WORK') {
+                            handleOpenFieldWork(day.date, day.note, true);
+                          } else if (onViewPersonalAttendance && currentUser) {
+                            onViewPersonalAttendance({
+                              id: currentUser.id || '',
+                              name: currentUser.fullName || currentUser.username,
+                              dept: currentUser.department || 'Nhân viên'
+                            });
+                          }
+                        }}
+                        title={day.status === 'FIELD_WORK' ? 'Bấm để chỉnh sửa ghi chú công trình' : 'Bấm để xem chi tiết lịch sử'}
                       >
                         <div className="day-date-badge">
                           <span className="dd-dow">{day.dayOfWeek}</span>
@@ -1535,7 +1607,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                             )}
                           </div>
                           <span className="item-secondary-info">
-                            {inOut.checkIn || inOut.checkOut
+                            {day.status === 'FIELD_WORK'
+                              ? (day.note || 'Đi công trình (tính đủ 1 công)')
+                              : inOut.checkIn || inOut.checkOut
                               ? `Vào: ${inOut.checkIn || '--:--'} · Ra: ${inOut.checkOut || '--:--'}`
                               : 'Không có quẹt thẻ'}
                           </span>
@@ -1588,6 +1662,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
         </div>
       </div>
+
+      {showFieldWorkModal && (
+        <FieldWorkModal
+          initialDate={selectedFieldWorkDate}
+          initialNote={selectedFieldWorkNote}
+          isExisting={isExistingFieldWork}
+          onClose={() => setShowFieldWorkModal(false)}
+          showToast={showToast}
+          onSuccess={() => {
+            fetchDashboardData();
+          }}
+        />
+      )}
     </div>
   );
 };

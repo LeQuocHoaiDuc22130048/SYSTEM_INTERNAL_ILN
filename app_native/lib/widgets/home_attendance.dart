@@ -68,7 +68,9 @@ class _HomeAttendanceState extends State<HomeAttendance> {
                 date: DateTime.now(),
                 checkIn: own.checkInTimeStr,
                 checkOut: own.checkOutTimeStr,
-                status: own.checkIn == null
+                status: own.fieldWork
+                    ? AttendanceStatus.fieldWork
+                    : own.checkIn == null
                     ? AttendanceStatus.absent
                     : own.isLate
                     ? AttendanceStatus.late
@@ -148,7 +150,9 @@ class _HomeAttendanceState extends State<HomeAttendance> {
                           Text(
                             r.statusLabel,
                             style: TextStyle(
-                              color: r.status == AttendanceStatus.onTime
+                              color: r.status == AttendanceStatus.fieldWork
+                                  ? Colors.amber.shade800
+                                  : r.status == AttendanceStatus.onTime
                                   ? Colors.green
                                   : colors.error,
                             ),
