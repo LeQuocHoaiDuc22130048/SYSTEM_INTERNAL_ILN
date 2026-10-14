@@ -6,6 +6,7 @@ import '../models/repair_device.dart';
 import '../models/repair_order.dart';
 import '../models/board_history_item.dart';
 import '../models/user.dart';
+import '../models/part_checkout.dart';
 import '../models/part.dart';
 import '../models/store_location.dart';
 import '../models/app_banner.dart';
@@ -23,7 +24,7 @@ class BackendDataProvider extends ChangeNotifier {
   List<Part> parts = [];
   List<StoreLocation> locations = [];
   List<AttendanceRecord> attendanceRecords = [];
-  List<AppBanner> banners = [AppBanner.defaultBanner];
+  List<AppBanner> banners = [];
   EmployeeHistoryData? myAttendanceHistory;
   MyTodayAttendance? myTodayAttendance;
   bool isLoadingMyAttendance = false;
@@ -40,7 +41,7 @@ class BackendDataProvider extends ChangeNotifier {
     parts = [];
     locations = [];
     attendanceRecords = [];
-    banners = [AppBanner.defaultBanner];
+    banners = [];
     myAttendanceHistory = null;
     myTodayAttendance = null;
     isLoadingMyAttendance = false;
@@ -524,6 +525,48 @@ class BackendDataProvider extends ChangeNotifier {
     };
     await api.post('/api/v1/parts/$partId/checkout', body: body);
     if (reload) await loadParts();
+  }
+
+  Future<List<PartCheckout>> getOpenPartCheckouts(String partId) async {
+    final checkouts = <PartCheckout>[];
+    var page = 0;
+    int totalPages;
+    do {
+      final data = await api.get(
+        '/api/v1/parts/checkouts/history',
+        queryParameters: {
+          'partId': partId,
+          'status': 'OPEN',
+          'size': 200,
+          'page': page,
+        },
+      );
+      checkouts.addAll(_content(data).map(PartCheckout.fromJson));
+      totalPages = data is Map<String, dynamic>
+          ? (data['totalPages'] as num?)?.toInt() ?? 1
+          : 1;
+      page++;
+    } while (page < totalPages);
+    return checkouts
+        .where((checkout) => checkout.remainingQuantity > 0)
+        .toList();
+  }
+
+  Future<void> returnPart(
+    String checkoutId, {
+    required double quantity,
+    required String conditionStatus,
+    String? notes,
+  }) async {
+    await api.post(
+      '/api/v1/parts/checkouts/$checkoutId/return',
+      body: {
+        'returnedQuantity': quantity,
+        'conditionStatus': conditionStatus,
+        if (notes != null && notes.isNotEmpty) 'notes': notes,
+      },
+    );
+    await Future.wait([loadParts(), loadLocations()]);
   }
 
   Future<void> loadLocations({bool notify = true}) async {

@@ -6,7 +6,7 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final hz in [60, 90, 120, 144]) {
-    testWidgets('same animation progress after 450ms at $hz Hz', (
+    testWidgets('same animation progress after 100ms at $hz Hz', (
       tester,
     ) async {
       Widget page(String id) => MaterialApp(
@@ -21,8 +21,8 @@ void main() {
       await tester.pump();
       final frame = (1000000 / hz).round();
       var elapsed = 0;
-      while (elapsed < 450000) {
-        final step = (450000 - elapsed).clamp(0, frame);
+      while (elapsed < 100000) {
+        final step = (100000 - elapsed).clamp(0, frame);
         await tester.pump(Duration(microseconds: step));
         elapsed += step;
       }
@@ -124,58 +124,25 @@ void main() {
     expect(find.text('Page 1'), findsNothing);
   });
 
-  testWidgets('DirectionalSlideSwitcher slides backward (from left to right)', (
+  testWidgets('back restores previous page immediately even during a push', (
     tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: DirectionalSlideSwitcher(
-            isForward: false,
-            child: SizedBox(key: ValueKey('page_2'), child: Text('Page 2')),
-          ),
+    Widget page(String id, bool forward) => MaterialApp(
+      home: Scaffold(
+        body: DirectionalSlideSwitcher(
+          isForward: forward,
+          child: SizedBox.expand(key: ValueKey(id), child: Text(id)),
         ),
       ),
     );
-
-    expect(find.text('Page 2'), findsOneWidget);
-
-    // Switch back to page 1 (backward)
-    await tester.pumpWidget(
-      const MaterialApp(
-        home: Scaffold(
-          body: DirectionalSlideSwitcher(
-            isForward: false,
-            child: SizedBox(key: ValueKey('page_1'), child: Text('Page 1')),
-          ),
-        ),
-      ),
-    );
-
-    // Mid-animation
-    await tester.pump(const Duration(milliseconds: 150));
-    expect(find.text('Page 2'), findsOneWidget);
-    expect(find.text('Page 1'), findsOneWidget);
-
-    final slideFinderPage1 = find.ancestor(
-      of: find.text('Page 1'),
-      matching: find.byType(SlideTransition),
-    );
-    final slidePage1 = tester.widget<SlideTransition>(slideFinderPage1.first);
-    // Page 1 enters from left (X < 0)
-    expect(slidePage1.position.value.dx, lessThan(0.0));
-
-    final slideFinderPage2 = find.ancestor(
-      of: find.text('Page 2'),
-      matching: find.byType(SlideTransition),
-    );
-    final slidePage2 = tester.widget<SlideTransition>(slideFinderPage2.first);
-    // Page 2 exits to right (X > 0)
-    expect(slidePage2.position.value.dx, greaterThan(0.0));
-
-    // Finish animation
+    await tester.pumpWidget(page('A', true));
+    await tester.pumpWidget(page('B', true));
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpWidget(page('A', false));
+    expect(find.text('B'), findsNothing);
+    expect(find.text('A'), findsOneWidget);
+    expect(tester.getTopLeft(find.byKey(const ValueKey('A'))).dx, 0);
     await tester.pumpAndSettle();
-    expect(find.text('Page 1'), findsOneWidget);
-    expect(find.text('Page 2'), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 }

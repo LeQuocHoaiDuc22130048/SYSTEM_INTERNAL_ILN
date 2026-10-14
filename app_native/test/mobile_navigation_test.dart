@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
@@ -35,6 +36,115 @@ class _AuthenticatedUser extends AuthProvider {
 
 void main() {
   testWidgets(
+    'selected tabs are pastel and profile uses neutral or blue accents',
+    (tester) async {
+      for (final selected in [false, true]) {
+        await tester.pumpWidget(
+          MaterialApp(
+            home: Scaffold(
+              bottomNavigationBar: MobileNavigationBar(
+                isDark: false,
+                homeSelected: true,
+                profileSelected: selected,
+                onHome: () {},
+                onBooking: () {},
+                onProfile: () {},
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final home = find.byKey(const ValueKey('bottom-nav-home-tab'));
+        final background =
+            tester
+                    .widget<AnimatedContainer>(
+                      find.descendant(
+                        of: home,
+                        matching: find.byType(AnimatedContainer),
+                      ),
+                    )
+                    .decoration!
+                as BoxDecoration;
+        expect(
+          background.color,
+          const Color(0xFF2563EB).withValues(alpha: 0.12),
+        );
+        expect(background.boxShadow, isNull);
+        expect(
+          tester.widget<Icon>(find.byIcon(LucideIcons.house)).color,
+          const Color(0xFF2563EB),
+        );
+        final avatar = tester.widget<Container>(
+          find.byKey(const ValueKey('bottom-account-avatar')),
+        );
+        final decoration = avatar.decoration! as BoxDecoration;
+        final accent = selected
+            ? const Color(0xFF2563EB)
+            : const Color(0xFF64748B);
+        expect((decoration.border! as Border).top.color, accent);
+        expect(tester.widget<Text>(find.text('U')).style!.color, accent);
+        expect(tester.widget<Text>(find.text('Cá nhân')).style!.color, accent);
+      }
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('all five labels share a baseline at text scale $scale', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(320, 640);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MediaQuery(
+            data: MediaQueryData(
+              textScaler: TextScaler.linear(scale),
+              padding: const EdgeInsets.only(bottom: 34),
+            ),
+            child: Scaffold(
+              bottomNavigationBar: MobileNavigationBar(
+                isDark: false,
+                homeSelected: true,
+                onHome: () {},
+                onBooking: () {},
+                onProfile: () {},
+              ),
+            ),
+          ),
+        ),
+      );
+      double baseline(String label) {
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(
+            of: find.text(label),
+            matching: find.byType(RichText),
+          ),
+        );
+        final painter = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout(maxWidth: paragraph.size.width);
+        final y = paragraph
+            .localToGlobal(
+              Offset(0, painter.computeLineMetrics().first.baseline),
+            )
+            .dy;
+        painter.dispose();
+        return y;
+      }
+
+      final expected = baseline('Trang chủ');
+      for (final label in ['Đơn hàng', 'Tạo nhanh', 'Thông báo', 'Cá nhân']) {
+        expect(baseline(label), closeTo(expected, 0.01), reason: label);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
     'raised action remains tappable with a bottom inset in dark mode',
     (tester) async {
       var bookingOpened = false;
@@ -66,7 +176,10 @@ void main() {
       final nav = find.byType(MobileNavigationBar);
       final centerBtn = find.byKey(const ValueKey('bottom-nav-booking-button'));
       expect(centerBtn, findsOneWidget);
-      expect(find.byKey(const ValueKey('bottom-nav-center-logo')), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('bottom-nav-center-icon')),
+        findsOneWidget,
+      );
       final navTop = tester.getTopLeft(nav).dy;
       await tester.tapAt(Offset(tester.getCenter(centerBtn).dx, navTop + 8));
       expect(bookingOpened, isTrue);
@@ -226,25 +339,79 @@ void main() {
     );
   });
 
-  testWidgets('center button displays app logo image instead of plus icon', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          bottomNavigationBar: MobileNavigationBar(
-            isDark: false,
-            onHome: () {},
-            onBooking: () {},
+  testWidgets(
+    'center button displays action icon and label instead of repeating app logo',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            bottomNavigationBar: MobileNavigationBar(
+              isDark: false,
+              onHome: () {},
+              onBooking: () {},
+            ),
           ),
         ),
-      ),
-    );
-    expect(find.byIcon(LucideIcons.plus), findsNothing);
-    final logoFinder = find.byKey(const ValueKey('bottom-nav-center-logo'));
-    expect(logoFinder, findsOneWidget);
-    final imageWidget = tester.widget<Image>(logoFinder);
-    expect(imageWidget.image, isA<AssetImage>());
-    expect((imageWidget.image as AssetImage).assetName, 'assets/images/app_logo.png');
-  });
+      );
+      expect(find.byIcon(LucideIcons.plus), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('bottom-nav-center-icon')),
+        findsOneWidget,
+      );
+      expect(find.text('Tạo nhanh'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey('bottom-nav-center-logo')),
+        findsNothing,
+      );
+    },
+  );
+
+  testWidgets(
+    'DashboardMobileAppBar keeps logo horizontally centered with and without back button',
+    (tester) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            appBar: DashboardMobileAppBar(
+              isDark: false,
+              showBack: false,
+              notificationBadge: '',
+              onToggleTheme: () {},
+              onToggleNotifications: () {},
+            ),
+          ),
+        ),
+      );
+      final appBarRect = tester.getRect(find.byType(DashboardMobileAppBar));
+      final logoWithoutBack = tester.getCenter(
+        find.descendant(
+          of: find.byType(DashboardMobileAppBar),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(logoWithoutBack.dx, closeTo(appBarRect.center.dx, 0.5));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            appBar: DashboardMobileAppBar(
+              isDark: false,
+              showBack: true,
+              notificationBadge: '',
+              onToggleTheme: () {},
+              onToggleNotifications: () {},
+            ),
+          ),
+        ),
+      );
+      final logoWithBack = tester.getCenter(
+        find.descendant(
+          of: find.byType(DashboardMobileAppBar),
+          matching: find.byType(Image),
+        ),
+      );
+      expect(logoWithBack.dx, closeTo(appBarRect.center.dx, 0.5));
+      expect(logoWithoutBack.dx, closeTo(logoWithBack.dx, 0.5));
+    },
+  );
 }

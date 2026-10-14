@@ -4,7 +4,7 @@ import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 /// Durations are wall-clock time; Flutter's ticker samples at the display vsync.
 class AppMotion {
   const AppMotion._();
-  static const page = Duration(milliseconds: 900);
+  static const page = Duration(milliseconds: 200);
   static const banner = Duration(milliseconds: 1200);
   static const bannerHold = Duration(seconds: 6);
   static const curve = Curves.easeInOutSine;
@@ -61,7 +61,7 @@ class _AndroidTransitions extends FadeForwardsPageTransitionsBuilder {
   @override
   Duration get transitionDuration => AppMotion.page;
   @override
-  Duration get reverseTransitionDuration => AppMotion.page;
+  Duration get reverseTransitionDuration => Duration.zero;
 }
 
 class _CupertinoTransitions extends CupertinoPageTransitionsBuilder {
@@ -69,5 +69,5 @@ class _CupertinoTransitions extends CupertinoPageTransitionsBuilder {
   @override
   Duration get transitionDuration => AppMotion.page;
   @override
-  Duration get reverseTransitionDuration => AppMotion.page;
+  Duration get reverseTransitionDuration => Duration.zero;
 }

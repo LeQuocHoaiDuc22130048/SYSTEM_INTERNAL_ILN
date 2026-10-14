@@ -182,13 +182,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     },
     {
       'id': 'repair_orders',
-      'label': 'Đơn',
+      'label': 'Đơn hàng',
       'tooltip': 'Đơn sửa chữa',
       'tabIndex': MainTabs.repairOrders,
       'icon': LucideIcons.wrench,
-      'bgColor': Color(0xFFFFFBEB),
-      'textColor': Color(0xFFD97706),
-      'borderColor': Color(0xFFFDE68A),
+      'bgColor': Color(0xFFEFF6FF),
+      'textColor': Color(0xFF2563EB),
+      'borderColor': Color(0xFFBFDBFE),
     },
     {
       'id': 'warehouse',
@@ -196,9 +196,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'tooltip': 'Kho linh kiện',
       'tabIndex': MainTabs.warehouse,
       'icon': LucideIcons.boxes,
-      'bgColor': Color(0xFFECFDF5),
-      'textColor': Color(0xFF059669),
-      'borderColor': Color(0xFFA7F3D0),
+      'bgColor': Color(0xFFEFF6FF),
+      'textColor': Color(0xFF2563EB),
+      'borderColor': Color(0xFFBFDBFE),
     },
     {
       'id': 'messages',
@@ -212,13 +212,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     },
     {
       'id': 'employee_management',
-      'label': 'Quản lý nhân viên',
+      'label': 'Nhân viên',
       'tooltip': 'Quản lý nhân viên & tài khoản',
       'tabIndex': MainTabs.employeeManagement,
       'icon': LucideIcons.users,
-      'bgColor': Color(0xFFFAF5FF),
-      'textColor': Color(0xFF7C3AED),
-      'borderColor': Color(0xFFE9D5FF),
+      'bgColor': Color(0xFFEEF2FF),
+      'textColor': Color(0xFF4F46E5),
+      'borderColor': Color(0xFFC7D2FE),
     },
   ];
 
@@ -270,6 +270,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     final unreadCount = notificationProvider.unreadCount;
     final userName =
         auth.currentUser?.name ?? auth.currentUser?.username ?? 'Alex';
+    final roleLabel = auth.currentUser?.roleLabel;
 
     final Widget middleContent;
     if (_currentNavTab == 2) {
@@ -298,25 +299,25 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             physics: const BouncingScrollPhysics(
               parent: AlwaysScrollableScrollPhysics(),
             ),
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // User Greeting Section
-                _buildGreeting(userName, isDark),
-                const SizedBox(height: 18),
+                _buildGreeting(userName, roleLabel, isDark),
+                const SizedBox(height: 6),
 
                 // Promotional Banner with 3D Character (assets/images/image_character.png)
                 _buildPromotionalBanner(),
-                const SizedBox(height: 22),
+                const SizedBox(height: 12),
 
                 // Service Categories Grid
                 _buildServiceCategories(isDark),
-                const SizedBox(height: 22),
+                const SizedBox(height: 12),
 
-                // Top Rated Experts
+                // Today's Attendance
                 const HomeAttendance(),
-                const SizedBox(height: 20),
+                const SizedBox(height: 16),
               ],
             ),
           ),
@@ -325,6 +326,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
 
     if (widget.embedded) return middleContent;
+
+    final badgeStr = unreadCount == 0
+        ? ''
+        : unreadCount > 99
+        ? '99+'
+        : '$unreadCount';
 
     return PopScope(
       canPop: _currentNavTab == 0,
@@ -340,14 +347,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         appBar: DashboardMobileAppBar(
           isDark: isDark,
           showBack: _currentNavTab != 0 || Navigator.canPop(context),
-          notificationBadge: unreadCount == 0
-              ? ''
-              : unreadCount > 99
-              ? '99+'
-              : '$unreadCount',
+          notificationBadge: badgeStr,
           onToggleTheme: () => context.read<ThemeProvider>().toggleTheme(),
           onToggleNotifications: () => _navigateToTab(MainTabs.notifications),
-          showNotification: auth.can(AppPermission.viewNotifications),
+          showNotification: false,
           onBack: _currentNavTab == 2
               ? _goBackHome
               : () => Navigator.of(context).maybePop(),
@@ -371,8 +374,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ? MobileNavigationBar(
                 isDark: isDark,
                 homeSelected: _currentNavTab == 0,
+                ordersSelected: false,
+                notificationsSelected: false,
                 profileSelected: _currentNavTab == 2,
+                notificationBadge: badgeStr,
                 onHome: () => _switchToTab(0, isBack: true),
+                onOrders: auth.can(AppPermission.viewRepairOrders)
+                    ? () => _navigateToTab(MainTabs.repairOrders)
+                    : null,
                 onBooking: () => showAppQuickActions(
                   context,
                   onNavigateToTab: (tab) {
@@ -383,6 +392,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     }
                   },
                 ),
+                onNotifications: auth.can(AppPermission.viewNotifications)
+                    ? () => _navigateToTab(MainTabs.notifications)
+                    : null,
                 onProfile: auth.can(AppPermission.viewProfile)
                     ? () => _switchToTab(2, isBack: false)
                     : null,
@@ -392,35 +404,76 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
+  static String _formatVietnameseDate(DateTime date) {
+    const weekdays = {
+      DateTime.monday: 'Thứ Hai',
+      DateTime.tuesday: 'Thứ Ba',
+      DateTime.wednesday: 'Thứ Tư',
+      DateTime.thursday: 'Thứ Năm',
+      DateTime.friday: 'Thứ Sáu',
+      DateTime.saturday: 'Thứ Bảy',
+      DateTime.sunday: 'Chủ Nhật',
+    };
+    final weekday = weekdays[date.weekday] ?? '';
+    final day = date.day.toString().padLeft(2, '0');
+    final month = date.month.toString().padLeft(2, '0');
+    return '$weekday, $day/$month/${date.year}';
+  }
+
   // 2. User Greeting Section
-  Widget _buildGreeting(String userName, bool isDark) {
+  Widget _buildGreeting(String userName, String? roleLabel, bool isDark) {
+    final dateStr = _formatVietnameseDate(DateTime.now());
+    final subtitleText = (roleLabel != null && roleLabel.trim().isNotEmpty)
+        ? '$dateStr  •  Ca trực: $roleLabel'
+        : dateStr;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           'Xin chào, $userName 👋',
           style: TextStyle(
-            fontSize: 22,
+            fontSize: 20,
+            height: 1.15,
             fontWeight: FontWeight.w800,
             color: isDark ? AppColors.textPrimaryDark : const Color(0xFF0F172A),
             letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(height: 3),
-        Text(
-          '',
-          style: TextStyle(
-            fontSize: 13,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : const Color(0xFF64748B),
-          ),
+        const SizedBox(height: 2),
+        Row(
+          children: [
+            Icon(
+              LucideIcons.calendarDays,
+              size: 13,
+              color: isDark
+                  ? AppColors.textSecondaryDark
+                  : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 5),
+            Expanded(
+              child: Text(
+                subtitleText,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12,
+                  height: 1.15,
+                  fontWeight: FontWeight.w500,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : const Color(0xFF64748B),
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
   }
 
-  // 3. Dynamic Promotional Banner with 3D Character or Custom Image
+  // 3. Dynamic Promotional Banner matching the web editor's 2:1 canvas.
   Widget _buildPromotionalBanner() {
     final backendProvider = Provider.of<BackendDataProvider?>(context);
     final banners =
@@ -434,6 +487,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     return LayoutBuilder(
       builder: (context, constraints) {
         final bannerHeight = (constraints.maxWidth - 12) / 2;
+        if (backendProvider != null && backendProvider.banners.isEmpty) {
+          _stopBannerAutoPlay();
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6),
+            child: SizedBox(
+              key: const ValueKey('banner-loading'),
+              height: bannerHeight,
+              width: double.infinity,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(18),
+                ),
+              ),
+            ),
+          );
+        }
         if (banners.length == 1) {
           _stopBannerAutoPlay();
           return SizedBox(
@@ -519,7 +589,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         width: double.infinity,
         height: double.infinity,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           gradient:
               (banner.backgroundImageUrl == null ||
                   banner.backgroundImageUrl!.isEmpty)
@@ -549,8 +619,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               : null,
           boxShadow: [
             BoxShadow(
-              color: banner.gradientColorList.first.withValues(alpha: 0.25),
-              blurRadius: 16,
+              color: banner.gradientColorList.first.withValues(alpha: 0.22),
+              blurRadius: 14,
               offset: const Offset(0, 4),
             ),
           ],
@@ -563,8 +633,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               right: 0,
               bottom: 0,
               child: Container(
-                width: 160,
-                height: 160,
+                width: 110,
+                height: 110,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
@@ -590,8 +660,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         banner.badgeText!.isNotEmpty) ...[
                       Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
+                          horizontal: 6,
+                          vertical: 1.5,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.22),
@@ -605,26 +675,28 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           style: _getBannerTextStyle(
                             fontFamily: banner.fontFamily,
                             baseStyle: const TextStyle(
-                              fontSize: 9.5,
+                              fontSize: 8.5,
                               fontWeight: FontWeight.bold,
                               color: Colors.white,
-                              letterSpacing: 0.5,
+                              letterSpacing: 0.4,
                             ),
                           ),
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 3),
                     ],
                     if (banner.title.trim().isNotEmpty) ...[
                       Text(
                         banner.title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: _getBannerTextStyle(
                           fontFamily: banner.fontFamily,
                           baseStyle: const TextStyle(
-                            fontSize: 16,
+                            fontSize: 13.5,
                             fontWeight: FontWeight.w800,
                             color: Colors.white,
-                            height: 1.25,
+                            height: 1.18,
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -632,14 +704,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     ],
                     if (banner.subtitle != null &&
                         banner.subtitle!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
+                      const SizedBox(height: 2),
                       _buildSubtitle(banner.subtitle!, banner.fontFamily),
                     ],
                     if (banner.buttons.isNotEmpty &&
                         banner.buttonPosition != 'TOP_RIGHT' &&
                         banner.buttonPosition != 'TOP_LEFT' &&
                         banner.buttonPosition != 'CUSTOM') ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 5),
                       _buildButtonsContainer(banner),
                     ],
                   ],
@@ -655,9 +727,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
             // Carousel indicator dots (Stitch style)
             Positioned(
-              bottom: 8,
-              left: banner.imagePosition == 'LEFT' ? null : 18,
-              right: banner.imagePosition == 'LEFT' ? 18 : null,
+              bottom: 5,
+              left: banner.imagePosition == 'LEFT' ? null : 14,
+              right: banner.imagePosition == 'LEFT' ? 14 : null,
               child: Row(
                 children: List.generate(totalCount > 1 ? totalCount : 3, (
                   dotIdx,
@@ -673,8 +745,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       duration: const Duration(milliseconds: 250),
                       curve: Curves.easeOutCubic,
                       margin: const EdgeInsets.only(right: 4),
-                      width: isDotActive ? 16 : 5,
-                      height: 5,
+                      width: isDotActive ? 14 : 4.5,
+                      height: 4.5,
                       decoration: BoxDecoration(
                         color: isDotActive
                             ? Colors.white
@@ -709,28 +781,51 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   Widget _buildSubtitle(String text, [String? fontFamily]) {
+    final normalized = text
+        .replaceAll(
+          RegExp(r'^(Địa chỉ|Đ/c|Address)\s*:\s*', caseSensitive: false),
+          '',
+        )
+        .replaceAll('\n', ' • ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
     final baseStyle = _getBannerTextStyle(
       fontFamily: fontFamily,
       baseStyle: TextStyle(
-        fontSize: 11,
-        color: Colors.blue.shade100,
-        height: 1.3,
+        fontSize: 10,
+        fontWeight: FontWeight.w600,
+        color: Colors.white.withValues(alpha: 0.96),
+        height: 1.2,
+        shadows: const [
+          Shadow(
+            color: Color(0xB3000000),
+            blurRadius: 5,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
     );
     final highlightStyle = _getBannerTextStyle(
       fontFamily: fontFamily,
       baseStyle: const TextStyle(
-        fontSize: 11,
+        fontSize: 10,
         color: Color(0xFFFDE047),
         fontWeight: FontWeight.bold,
-        height: 1.3,
+        height: 1.2,
+        shadows: [
+          Shadow(
+            color: Color(0xB3000000),
+            blurRadius: 5,
+            offset: Offset(0, 1),
+          ),
+        ],
       ),
     );
 
-    if (text.contains('25% GIÁ TRỊ')) {
-      final parts = text.split('25% GIÁ TRỊ');
+    if (normalized.contains('25% GIÁ TRỊ')) {
+      final parts = normalized.split('25% GIÁ TRỊ');
       return RichText(
-        maxLines: 2,
+        maxLines: 1,
         overflow: TextOverflow.ellipsis,
         text: TextSpan(
           style: baseStyle,
@@ -744,9 +839,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       );
     }
     return Text(
-      text,
+      normalized,
       style: baseStyle,
-      maxLines: 2,
+      maxLines: 1,
       overflow: TextOverflow.ellipsis,
     );
   }
@@ -754,14 +849,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   EdgeInsets _getBannerTextPadding(String imagePosition) {
     switch (imagePosition) {
       case 'LEFT':
-        return const EdgeInsets.fromLTRB(126, 14, 18, 16);
+        return const EdgeInsets.fromLTRB(104, 8, 14, 10);
       case 'RIGHT_TOP':
-        return const EdgeInsets.fromLTRB(18, 14, 95, 16);
+        return const EdgeInsets.fromLTRB(14, 8, 76, 10);
       case 'NONE':
-        return const EdgeInsets.fromLTRB(18, 14, 18, 16);
+        return const EdgeInsets.fromLTRB(14, 8, 14, 10);
       case 'RIGHT':
       default:
-        return const EdgeInsets.fromLTRB(18, 14, 118, 16);
+        return const EdgeInsets.fromLTRB(14, 8, 98, 10);
     }
   }
 
@@ -774,16 +869,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         left: 0,
         bottom: 0,
         top: 0,
-        width: 150,
+        width: 104,
         child: _buildBannerImage(banner, baseUrl),
       );
     }
     if (banner.imagePosition == 'RIGHT_TOP') {
       return Positioned(
         right: 8,
-        top: 8,
-        width: 85,
-        height: 85,
+        top: 4,
+        width: 60,
+        height: 60,
         child: _buildBannerImage(banner, baseUrl),
       );
     }
@@ -791,7 +886,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       right: 0,
       bottom: 0,
       top: 0,
-      width: 165,
+      width: 112,
       child: _buildBannerImage(banner, baseUrl),
     );
   }
@@ -895,11 +990,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.white.withValues(alpha: 0.22),
             foregroundColor: Colors.white,
+            minimumSize: const Size(0, 30),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
             side: BorderSide(
               color: Colors.white.withValues(alpha: 0.5),
               width: 1.2,
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -913,7 +1011,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   style: _getBannerTextStyle(
                     fontFamily: banner.fontFamily,
                     baseStyle: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -924,7 +1022,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 btn.actionType == 'CALL'
                     ? LucideIcons.phone
                     : LucideIcons.arrowRight,
-                size: 12,
+                size: 11,
               ),
             ],
           ),
@@ -937,8 +1035,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           style: OutlinedButton.styleFrom(
             backgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
+            minimumSize: const Size(0, 30),
+            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            visualDensity: VisualDensity.compact,
             side: const BorderSide(color: Colors.white, width: 1.2),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 5),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
             ),
@@ -952,7 +1053,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   style: _getBannerTextStyle(
                     fontFamily: banner.fontFamily,
                     baseStyle: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 10.5,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -963,7 +1064,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 btn.actionType == 'CALL'
                     ? LucideIcons.phone
                     : LucideIcons.arrowRight,
-                size: 12,
+                size: 11,
               ),
             ],
           ),
@@ -976,7 +1077,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.white,
           foregroundColor: brandColor,
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          minimumSize: const Size(0, 30),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: VisualDensity.compact,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(20),
           ),
@@ -991,7 +1095,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 style: _getBannerTextStyle(
                   fontFamily: banner.fontFamily,
                   baseStyle: const TextStyle(
-                    fontSize: 11.5,
+                    fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -1002,7 +1106,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
               btn.actionType == 'CALL'
                   ? LucideIcons.phone
                   : LucideIcons.arrowRight,
-              size: 13,
+              size: 12,
             ),
           ],
         ),
@@ -1154,7 +1258,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             Text(
               'Chức năng',
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 16,
                 fontWeight: FontWeight.w800,
                 color: isDark
                     ? AppColors.textPrimaryDark
@@ -1164,7 +1268,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -1173,7 +1277,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             crossAxisCount: 5,
             crossAxisSpacing: 6,
             mainAxisSpacing: 8,
-            mainAxisExtent: 70 + MediaQuery.textScalerOf(context).scale(26),
+            mainAxisExtent: 68 + MediaQuery.textScalerOf(context).scale(24),
           ),
           itemBuilder: (context, index) {
             final cat = categories[index];
@@ -1207,6 +1311,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
             return Tooltip(
               message: tooltip,
               child: InteractiveBounce(
+                key: ValueKey('category-$catId'),
                 scaleDown: 0.94,
                 onTap: () {
                   final auth = context.read<AuthProvider>();
@@ -1226,7 +1331,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     vertical: 8,
-                    horizontal: 2,
+                    horizontal: 3,
                   ),
                   decoration: BoxDecoration(
                     color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -1234,13 +1339,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     border: Border.all(
                       color: isDark
                           ? AppColors.borderDark
-                          : const Color(0xFFF1F5F9),
+                          : const Color(0xFFE2E8F0),
                       width: 1.0,
                     ),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withValues(
-                          alpha: isDark ? 0.2 : 0.02,
+                          alpha: isDark ? 0.2 : 0.025,
                         ),
                         blurRadius: 8,
                         offset: const Offset(0, 2),
@@ -1260,7 +1365,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                               color: iconBgColor,
                               borderRadius: BorderRadius.circular(14),
                               border: Border.all(
-                                color: iconBorderColor.withValues(alpha: 0.8),
+                                color: iconBorderColor.withValues(alpha: 0.85),
                                 width: 1.0,
                               ),
                             ),
@@ -1317,11 +1422,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         overflow: TextOverflow.ellipsis,
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 10.5,
+                          fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: isDark
                               ? AppColors.textPrimaryDark
-                              : const Color(0xFF334155),
+                              : const Color(0xFF1E293B),
                           height: 1.15,
                         ),
                       ),

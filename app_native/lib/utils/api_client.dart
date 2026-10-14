@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 
 class ApiException implements Exception {
   final int statusCode;
@@ -172,6 +173,7 @@ class ApiClient {
     required Map<String, String> fields,
     required String filename,
     required Uint8List bytes,
+    String? contentType,
   }) async {
     return _send(
       method: 'POST',
@@ -184,9 +186,16 @@ class ApiClient {
           })
           ..fields.addAll(fields)
           ..files.add(
-            http.MultipartFile.fromBytes('file', bytes, filename: filename),
+            http.MultipartFile.fromBytes(
+              'file',
+              bytes,
+              filename: filename,
+              contentType: contentType == null
+                  ? null
+                  : MediaType.parse(contentType),
+            ),
           );
-        return http.Response.fromStream(await request.send());
+        return http.Response.fromStream(await _client.send(request));
       },
       timeout: const Duration(seconds: 60),
     );
@@ -228,7 +237,8 @@ class ApiClient {
   }
 
   Map<String, String> _diagnosticHeaders() {
-    final requestId = '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
+    final requestId =
+        '${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
     return {
       'X-Request-Id': requestId,
       'X-Device-Id': _deviceId,
@@ -415,6 +425,28 @@ class ApiClient {
     }
     final normalizedPath = path.startsWith('/') ? path : '/$path';
     return '$activeBaseUrl$normalizedPath';
+  }
+
+  Map<String, String> mediaHeadersFor(String url) {
+    final token = accessToken;
+    final uri = Uri.tryParse(url);
+    if (token == null ||
+        token.isEmpty ||
+        uri == null ||
+        !uri.hasAuthority ||
+        !['https', 'http'].contains(uri.scheme)) {
+      return const {};
+    }
+    final backend = Uri.parse(activeBaseUrl);
+    final protectedMedia =
+        uri.path.startsWith('/api/v1/message-media/') ||
+        uri.path.startsWith('/api/v1/repair-media/');
+    if (uri.origin != backend.origin ||
+        uri.userInfo.isNotEmpty ||
+        !protectedMedia) {
+      return const {};
+    }
+    return {'Authorization': 'Bearer $token'};
   }
 
   static void _assertHttpsBaseUrl(String value) {

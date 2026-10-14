@@ -1,7 +1,6 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -13,13 +12,29 @@ import '../theme/app_colors.dart';
 import '../models/conversation.dart';
 import '../models/chat_message.dart';
 import '../models/user.dart';
+import '../models/app_permission.dart';
+import '../models/chat_repair_order_card.dart';
 import '../utils/chat_provider.dart';
+import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
+import '../utils/media_auth_headers.dart';
 import '../services/giphy_service.dart';
 import '../widgets/modal_top_bar.dart';
+import '../widgets/directional_slide_switcher.dart';
 import '../widgets/navigation/app_back_button.dart';
 import '../widgets/video_player_dialog.dart';
+import '../widgets/image_preview_dialog.dart';
+import '../widgets/chat/chat_media_image.dart';
+import '../widgets/chat/chat_message_gestures.dart';
+import '../widgets/chat/message_presentation.dart';
+import '../widgets/chat/typing_indicator.dart';
+import '../widgets/chat/add_members_dialog.dart';
+import '../widgets/chat/repair_order_picker_dialog.dart';
+import '../widgets/chat/repair_order_message_card.dart';
+import '../widgets/chat/voice_record_button.dart';
+import '../widgets/chat/voice_message_player.dart';
+import '../services/voice_recorder.dart';
 
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key});
@@ -29,6 +44,7 @@ class MessagesPage extends StatefulWidget {
 }
 
 class _MessagesPageState extends State<MessagesPage> {
+  String _conversationFilter = 'all';
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -50,29 +66,47 @@ class _MessagesPageState extends State<MessagesPage> {
         ),
       );
 
-      return _ChatDetailPage(
-        conversation: currentConv,
-        isDark: isDark,
-        onBack: () {
-          chatProvider.clearActiveChat();
-        },
+      return DirectionalSlideSwitcher(
+        isForward: true,
+        child: _ChatDetailPage(
+          key: ValueKey(activeId),
+          conversation: currentConv,
+          isDark: isDark,
+          onBack: () {
+            chatProvider.clearActiveChat();
+          },
+        ),
       );
     }
 
-    return _ConversationListPage(
-      isDark: isDark,
-      onSelect: (conversation) {
-        chatProvider.loadMessages(conversation.id);
-      },
+    return DirectionalSlideSwitcher(
+      isForward: false,
+      child: _ConversationListPage(
+        key: const ValueKey('conversation-list'),
+        filter: _conversationFilter,
+        onFilterChanged: (value) => setState(() => _conversationFilter = value),
+        isDark: isDark,
+        onSelect: (conversation) {
+          chatProvider.loadMessages(conversation.id);
+        },
+      ),
     );
   }
 }
 
 class _ConversationListPage extends StatefulWidget {
+  final String filter;
+  final ValueChanged<String> onFilterChanged;
   final bool isDark;
   final ValueChanged<ChatConversation> onSelect;
 
-  const _ConversationListPage({required this.isDark, required this.onSelect});
+  const _ConversationListPage({
+    super.key,
+    required this.filter,
+    required this.onFilterChanged,
+    required this.isDark,
+    required this.onSelect,
+  });
 
   @override
   State<_ConversationListPage> createState() => _ConversationListPageState();
@@ -113,6 +147,8 @@ class _ConversationListPageState extends State<_ConversationListPage> {
     final wide = MediaQuery.sizeOf(context).width > 760;
 
     final filteredConversations = chatProvider.conversations.where((conv) {
+      if (widget.filter == 'unread' && conv.unreadCount == 0) return false;
+      if (widget.filter == 'group' && conv.type != 'GROUP') return false;
       final query = _searchQuery.toLowerCase();
       final matchesName = conv.name.toLowerCase().contains(query);
       final matchesMsg =
@@ -228,60 +264,130 @@ class _ConversationListPageState extends State<_ConversationListPage> {
                 ),
               ),
             ),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(22, 0, 22, 12),
+              child: Row(
+                children: [
+                  for (final option in [
+                    ('all', 'Tất cả'),
+                    (
+                      'unread',
+                      'Chưa đọc (${chatProvider.conversations.where((c) => c.unreadCount > 0).length})',
+                    ),
+                    ('group', 'Nhóm'),
+                  ])
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ChoiceChip(
+                        label: Text(option.$2),
+                        labelStyle: const TextStyle(fontSize: 12),
+                        showCheckmark: false,
+                        visualDensity: VisualDensity.compact,
+                        selected: widget.filter == option.$1,
+                        onSelected: (_) => widget.onFilterChanged(option.$1),
+                      ),
+                    ),
+                ],
+              ),
+            ),
             Divider(
               height: 1,
               color: isDark ? AppColors.borderDark : AppColors.borderLight,
             ),
             Expanded(
-              child: chatProvider.isLoadingConversations
-                  ? const Center(child: CircularProgressIndicator())
-                  : filteredConversations.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            LucideIcons.searchX,
-                            size: 48,
-                            color: isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            chatProvider.conversationsError != null
-                                ? 'Lỗi tải dữ liệu. Vui lòng thử lại.'
-                                : 'Không tìm thấy cuộc trò chuyện',
-                            style: TextStyle(
-                              color: isDark
-                                  ? AppColors.textSecondaryDark
-                                  : AppColors.textSecondaryLight,
-                            ),
-                          ),
-                        ],
+              child: RefreshIndicator(
+                onRefresh: chatProvider.loadConversations,
+                child: ListView.separated(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.zero,
+                  itemCount: filteredConversations.isEmpty
+                      ? 1
+                      : filteredConversations.length,
+                  separatorBuilder: (context, index) => Divider(
+                    height: 1,
+                    indent: (wide ? 20 : 22) + 50,
+                    color: isDark
+                        ? AppColors.borderDark
+                        : AppColors.borderLight,
+                  ),
+                  itemBuilder: (context, index) {
+                    if (filteredConversations.isEmpty) {
+                      return SizedBox(
+                        height: 300,
+                        child: chatProvider.isLoadingConversations
+                            ? const Center(child: CircularProgressIndicator())
+                            : Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      LucideIcons.searchX,
+                                      size: 48,
+                                      color: isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      chatProvider.conversationsError != null
+                                          ? 'Lỗi tải dữ liệu. Vui lòng thử lại.'
+                                          : 'Không tìm thấy cuộc trò chuyện',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      );
+                    }
+                    final conversation = filteredConversations[index];
+                    return Dismissible(
+                      key: ValueKey('conversation-row-${conversation.id}'),
+                      background: _conversationSwipeBackground(
+                        conversation.isPinned
+                            ? Icons.push_pin
+                            : Icons.push_pin_outlined,
+                        Alignment.centerLeft,
+                        AppColors.primary,
                       ),
-                    )
-                  : ListView.separated(
-                      padding: EdgeInsets.zero,
-                      itemCount: filteredConversations.length,
-                      separatorBuilder: (context, index) => Divider(
-                        height: 1,
-                        indent: 78,
-                        color: isDark
-                            ? AppColors.borderDark
-                            : AppColors.borderLight,
+                      secondaryBackground: _conversationSwipeBackground(
+                        conversation.notificationsMuted
+                            ? Icons.notifications_active_outlined
+                            : Icons.notifications_off_outlined,
+                        Alignment.centerRight,
+                        Colors.orange,
                       ),
-                      itemBuilder: (context, index) {
-                        final conversation = filteredConversations[index];
-                        return _ConversationTile(
-                          conversation: conversation,
-                          isDark: isDark,
-                          onTap: () => widget.onSelect(conversation),
-                          onLongPress: () =>
-                              _showConversationActions(context, conversation),
+                      confirmDismiss: (direction) async {
+                        await _runChatAction(
+                          context,
+                          (provider) => direction == DismissDirection.startToEnd
+                              ? provider.pinConversation(
+                                  conversation.id,
+                                  !conversation.isPinned,
+                                )
+                              : provider.setNotificationsMuted(
+                                  conversation.id,
+                                  !conversation.notificationsMuted,
+                                ),
                         );
+                        return false;
                       },
-                    ),
+                      child: _ConversationTile(
+                        conversation: conversation,
+                        isDark: isDark,
+                        horizontalPadding: wide ? 20 : 22,
+                        onTap: () => widget.onSelect(conversation),
+                        onLongPress: () =>
+                            _showConversationActions(context, conversation),
+                      ),
+                    );
+                  },
+                ),
+              ),
             ),
           ],
         ),
@@ -290,33 +396,219 @@ class _ConversationListPageState extends State<_ConversationListPage> {
   }
 }
 
+Widget _conversationSwipeBackground(
+  IconData icon,
+  Alignment alignment,
+  Color color,
+) => Container(
+  color: color.withValues(alpha: 0.12),
+  alignment: alignment,
+  padding: const EdgeInsets.symmetric(horizontal: 22),
+  child: Icon(icon, color: color),
+);
+
+Future<void> _runChatAction(
+  BuildContext context,
+  Future<void> Function(ChatProvider) action,
+) async {
+  try {
+    await action(context.read<ChatProvider>());
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Không thể thực hiện thao tác. Vui lòng thử lại.'),
+        ),
+      );
+    }
+  }
+}
+
 void _showConversationActions(
   BuildContext context,
   ChatConversation conversation,
 ) {
+  HapticFeedback.mediumImpact();
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final colors = Theme.of(context).colorScheme;
+  final provider = context.read<ChatProvider>();
+
+  void openPage(Widget page) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ChangeNotifierProvider.value(value: provider, child: page),
+      ),
+    );
+  }
+
+  void openSearch() => openPage(
+    _ConversationSearchPage(conversationId: conversation.id, isDark: isDark),
+  );
+  void openGallery() => openPage(
+    _ConversationGalleryPage(conversationId: conversation.id, isDark: isDark),
+  );
+  Future<void> toggleMute() => _runChatAction(context, (provider) {
+    final current =
+        provider.conversations
+            .where((item) => item.id == conversation.id)
+            .firstOrNull ??
+        conversation;
+    return provider.setNotificationsMuted(
+      conversation.id,
+      !current.notificationsMuted,
+    );
+  });
+
   showModalBottomSheet<void>(
     context: context,
-    builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const ModalTopBar(),
-          ListTile(
-            leading: const Icon(Icons.push_pin_outlined),
-            title: Text(
-              conversation.isPinned ? 'Bo ghim hoi thoai' : 'Ghim hoi thoai',
-            ),
-            onTap: () async {
-              Navigator.pop(sheetContext);
-              await context.read<ChatProvider>().pinConversation(
-                conversation.id,
-                !conversation.isPinned,
-              );
-            },
-          ),
-        ],
-      ),
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: isDark
+        ? AppColors.backgroundDark
+        : AppColors.backgroundLight,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
+    builder: (sheetContext) {
+      Widget action(
+        IconData icon,
+        String title,
+        Color color,
+        VoidCallback onTap,
+      ) => ListTile(
+        leading: CircleAvatar(
+          radius: 19,
+          backgroundColor: color.withValues(alpha: isDark ? 0.2 : 0.1),
+          child: Icon(icon, color: color, size: 20),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+        ),
+        onTap: () {
+          Navigator.pop(sheetContext);
+          onTap();
+        },
+      );
+      Widget group(List<Widget> children) => Material(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: Column(mainAxisSize: MainAxisSize.min, children: children),
+      );
+      final name = conversation.name.trim();
+      return SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                contentPadding: const EdgeInsets.only(bottom: 12),
+                leading: CircleAvatar(
+                  radius: 25,
+                  backgroundColor: colors.primaryContainer,
+                  foregroundColor: colors.onPrimaryContainer,
+                  foregroundImage: conversation.avatarUrl?.isNotEmpty == true
+                      ? NetworkImage(
+                          conversation.avatarUrl!,
+                          headers: mediaAuthHeaders(
+                            context,
+                            conversation.avatarUrl!,
+                          ),
+                        )
+                      : null,
+                  child: Text(
+                    name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+                  ),
+                ),
+                title: Text(
+                  conversation.name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                subtitle: Text(
+                  conversation.type == 'GROUP'
+                      ? '${conversation.members.length} thành viên'
+                      : 'Trò chuyện trực tiếp',
+                ),
+              ),
+              group([
+                action(
+                  Icons.push_pin_outlined,
+                  conversation.isPinned
+                      ? 'Bỏ ghim hội thoại'
+                      : 'Ghim hội thoại',
+                  AppColors.primary,
+                  () => _runChatAction(
+                    context,
+                    (provider) => provider.pinConversation(
+                      conversation.id,
+                      !conversation.isPinned,
+                    ),
+                  ),
+                ),
+                action(
+                  conversation.notificationsMuted
+                      ? Icons.notifications_active_outlined
+                      : Icons.notifications_off_outlined,
+                  conversation.notificationsMuted
+                      ? 'Bật thông báo'
+                      : 'Tắt thông báo',
+                  Colors.orange,
+                  toggleMute,
+                ),
+                if (conversation.unreadCount > 0)
+                  action(
+                    Icons.mark_email_read_outlined,
+                    'Đánh dấu đã đọc',
+                    Colors.green,
+                    () => _runChatAction(
+                      context,
+                      (provider) => provider.markAsRead(conversation.id),
+                    ),
+                  ),
+              ]),
+              const SizedBox(height: 12),
+              group([
+                action(
+                  Icons.photo_library_outlined,
+                  'Xem ảnh, file & liên kết',
+                  Colors.purple,
+                  openGallery,
+                ),
+                action(
+                  Icons.search,
+                  'Tìm kiếm tin nhắn',
+                  AppColors.primary,
+                  openSearch,
+                ),
+                action(
+                  Icons.info_outline,
+                  'Thông tin cuộc trò chuyện',
+                  Colors.teal,
+                  () => openPage(
+                    _ChatDetailInfoPage(
+                      conversation: conversation,
+                      isDark: isDark,
+                      onMuteToggle: toggleMute,
+                      onSearch: openSearch,
+                      onGallery: openGallery,
+                    ),
+                  ),
+                ),
+              ]),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 
@@ -325,12 +617,14 @@ class _ConversationTile extends StatelessWidget {
   final bool isDark;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
+  final double horizontalPadding;
 
   const _ConversationTile({
     required this.conversation,
     required this.isDark,
     required this.onTap,
     required this.onLongPress,
+    required this.horizontalPadding,
   });
 
   String get _avatarText {
@@ -382,10 +676,16 @@ class _ConversationTile extends StatelessWidget {
       onTap: onTap,
       onLongPress: onLongPress,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(30, 12, 30, 12),
+        padding: EdgeInsets.fromLTRB(
+          horizontalPadding,
+          12,
+          horizontalPadding,
+          12,
+        ),
         child: Row(
           children: [
             Container(
+              key: ValueKey('conversation-avatar-${conversation.id}'),
               width: 38,
               height: 38,
               decoration: BoxDecoration(
@@ -524,6 +824,7 @@ class _ChatDetailPage extends StatefulWidget {
   final VoidCallback onBack;
 
   const _ChatDetailPage({
+    super.key,
     required this.conversation,
     required this.isDark,
     required this.onBack,
@@ -534,10 +835,16 @@ class _ChatDetailPage extends StatefulWidget {
 }
 
 class _ChatDetailPageState extends State<_ChatDetailPage> {
+  late final ChatProvider _chatProvider;
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final FocusNode _inputFocus = FocusNode();
+  final Set<String> _expandedMetadata = {};
+  bool _showScrollToBottom = false;
+  double _edgeBackDistance = 0;
   final ImagePicker _imagePicker = ImagePicker();
   bool _isUploading = false;
+  bool _voiceBusy = false;
   bool _isTyping = false;
   ChatMessage? _replyingToMessage;
 
@@ -547,25 +854,110 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
   @override
   void initState() {
     super.initState();
+    _chatProvider = context.read<ChatProvider>();
     _controller.addListener(_onTextChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatProvider>().loadMessages(widget.conversation.id);
-    });
+    _scrollController.addListener(_onScroll);
   }
 
   @override
   void dispose() {
+    _chatProvider.updateTyping(false);
     _controller.removeListener(_onTextChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ChatProvider>().clearActiveChat();
-    });
+    _scrollController.removeListener(_onScroll);
+    _inputFocus.dispose();
     _controller.dispose();
     _scrollController.dispose();
     super.dispose();
   }
 
+  void _onScroll() {
+    final show = _scrollController.hasClients && _scrollController.offset > 180;
+    if (show != _showScrollToBottom) setState(() => _showScrollToBottom = show);
+    if (_scrollController.hasClients &&
+        _scrollController.position.maxScrollExtent - _scrollController.offset <
+            180 &&
+        _chatProvider.olderMessagesError == null) {
+      _chatProvider.loadOlderMessages();
+    }
+  }
+
+  void _replyTo(ChatMessage message) {
+    setState(() => _replyingToMessage = message);
+    _inputFocus.requestFocus();
+  }
+
+  Future<void> _showAttachments() async {
+    final canShareOrder = context.read<AuthProvider>().can(
+      AppPermission.viewRepairOrders,
+    );
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final item in [
+              ('file', Icons.attach_file, 'Đính kèm tệp'),
+              ('camera', Icons.camera_alt_outlined, 'Chụp ảnh'),
+              ('gallery', Icons.photo_library_outlined, 'Ảnh và video'),
+              if (canShareOrder)
+                ('order', Icons.build_circle_outlined, 'Gửi thẻ đơn sửa chữa'),
+            ])
+              ListTile(
+                leading: Icon(item.$2),
+                title: Text(item.$3),
+                onTap: () => Navigator.pop(sheetContext, item.$1),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'file':
+        await _pickFile();
+      case 'camera':
+        await _pickCamera();
+      case 'gallery':
+        await _pickMedia();
+      case 'order':
+        final provider = context.read<ChatProvider>();
+        final parentId = _replyingToMessage?.id;
+        await showDialog<void>(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => RepairOrderPickerDialog(
+            api: provider.api,
+            onSend: (order) async {
+              await provider.sendMessage(
+                widget.conversation.id,
+                ChatRepairOrderCard.fromOrder(order).toContent(),
+                parentMessageId: parentId,
+              );
+              if (mounted) setState(() => _replyingToMessage = null);
+            },
+          ),
+        );
+    }
+  }
+
+  Future<void> _sendVoice(RecordedVoice voice) async {
+    await _chatProvider.sendMediaMessage(
+      widget.conversation.id,
+      bytes: voice.bytes,
+      filename: voice.filename,
+      messageType: 'FILE',
+      contentType: 'audio/mp4',
+      content: 'Tin nhắn thoại (${voice.duration.inSeconds}s)',
+      parentMessageId: _replyingToMessage?.id,
+    );
+    if (mounted) setState(() => _replyingToMessage = null);
+  }
+
   void _onTextChanged() {
     final isTyping = _controller.text.trim().isNotEmpty;
+    _chatProvider.updateTyping(isTyping);
     if (isTyping != _isTyping) {
       setState(() {
         _isTyping = isTyping;
@@ -1051,10 +1443,17 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
   }
 
   Future<void> _toggleConversationMute() async {
-    await context.read<ChatProvider>().setNotificationsMuted(
-      widget.conversation.id,
-      !widget.conversation.notificationsMuted,
-    );
+    await _runChatAction(context, (provider) {
+      final current =
+          provider.conversations
+              .where((c) => c.id == widget.conversation.id)
+              .firstOrNull ??
+          widget.conversation;
+      return provider.setNotificationsMuted(
+        current.id,
+        !current.notificationsMuted,
+      );
+    });
   }
 
   String get _avatarText {
@@ -1081,6 +1480,10 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
         : AppColors.backgroundLight;
     final chatProvider = context.watch<ChatProvider>();
     final currentUser = context.watch<AuthProvider>().currentUser;
+    final latestOutgoingId = chatProvider.activeMessages
+        .where((m) => m.sender.userId == currentUser?.id && !m.isRecalled)
+        .firstOrNull
+        ?.id;
 
     return Scaffold(
       backgroundColor: background,
@@ -1112,58 +1515,67 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                       onPressed: widget.onBack,
                     ),
                   ),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: _avatarColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: widget.conversation.type == 'GROUP'
-                        ? const Icon(
-                            LucideIcons.usersRound,
-                            color: Colors.white,
-                            size: 16,
-                          )
-                        : Center(
-                            child: Text(
-                              _avatarText,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w800,
+                  GestureDetector(
+                    onTap: _showConversationTools,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: _avatarColor,
+                        shape: BoxShape.circle,
+                      ),
+                      child: widget.conversation.type == 'GROUP'
+                          ? const Icon(
+                              LucideIcons.usersRound,
+                              color: Colors.white,
+                              size: 16,
+                            )
+                          : Center(
+                              child: Text(
+                                _avatarText,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
-                          ),
+                    ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.conversation.name,
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: widget.isDark
-                                ? AppColors.textPrimaryDark
-                                : AppColors.textPrimaryLight,
+                    child: InkWell(
+                      key: const ValueKey('chat-header-info'),
+                      onTap: _showConversationTools,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.conversation.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: widget.isDark
+                                  ? AppColors.textPrimaryDark
+                                  : AppColors.textPrimaryLight,
+                            ),
                           ),
-                        ),
-                        Text(
-                          widget.conversation.type == 'GROUP'
-                              ? '${widget.conversation.members.length} thành viên'
-                              : 'Đang hoạt động',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: widget.isDark
-                                ? AppColors.textSecondaryDark
-                                : AppColors.textSecondaryLight,
+                          Text(
+                            widget.conversation.type == 'GROUP'
+                                ? '${widget.conversation.members.length} thành viên'
+                                : 'Đang hoạt động',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: widget.isDark
+                                  ? AppColors.textSecondaryDark
+                                  : AppColors.textSecondaryLight,
+                            ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                   IconButton(
@@ -1181,64 +1593,190 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                 isDark: widget.isDark,
               ),
             Expanded(
-              child: chatProvider.isLoadingMessages
-                  ? const Center(child: CircularProgressIndicator())
-                  : chatProvider.activeMessages.isEmpty
-                  ? Center(
-                      child: Text(
-                        'Chưa có tin nhắn. Bắt đầu cuộc trò chuyện!',
-                        style: TextStyle(
-                          color: widget.isDark
-                              ? AppColors.textSecondaryDark
-                              : AppColors.textSecondaryLight,
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      controller: _scrollController,
-                      reverse: true, // Auto-scrolls to bottom
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 22,
-                        vertical: 14,
-                      ),
-                      itemCount: chatProvider.activeMessages.length,
-                      itemBuilder: (context, index) {
-                        final message = chatProvider.activeMessages[index];
-                        final isMe = message.sender.userId == currentUser?.id;
-
-                        if (isMe) {
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: _OutgoingMessage(
-                              message: message,
-                              isDark: widget.isDark,
-                              onReply: () {
-                                setState(() {
-                                  _replyingToMessage = message;
-                                });
-                              },
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: chatProvider.isLoadingMessages
+                        ? const Center(child: CircularProgressIndicator())
+                        : chatProvider.activeMessages.isEmpty
+                        ? Center(
+                            child: Text(
+                              'Chưa có tin nhắn. Bắt đầu cuộc trò chuyện!',
+                              style: TextStyle(
+                                color: widget.isDark
+                                    ? AppColors.textSecondaryDark
+                                    : AppColors.textSecondaryLight,
+                              ),
                             ),
-                          );
-                        }
+                          )
+                        : ListView.builder(
+                            key: const ValueKey('chat-message-list'),
+                            controller: _scrollController,
+                            keyboardDismissBehavior:
+                                ScrollViewKeyboardDismissBehavior.onDrag,
+                            reverse: true, // Auto-scrolls to bottom
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 14,
+                            ),
+                            itemCount:
+                                chatProvider.activeMessages.length +
+                                (chatProvider.hasMoreMessages ||
+                                        chatProvider.olderMessagesError != null
+                                    ? 1
+                                    : 0),
+                            itemBuilder: (context, index) {
+                              if (index == chatProvider.activeMessages.length) {
+                                return Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: chatProvider.isLoadingOlderMessages
+                                      ? const Center(
+                                          child: SizedBox(
+                                            width: 22,
+                                            height: 22,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          ),
+                                        )
+                                      : TextButton(
+                                          onPressed:
+                                              chatProvider.loadOlderMessages,
+                                          child: Text(
+                                            chatProvider.olderMessagesError ==
+                                                    null
+                                                ? 'Tải tin nhắn cũ'
+                                                : 'Không thể tải tin nhắn cũ. Thử lại',
+                                          ),
+                                        ),
+                                );
+                              }
+                              final message =
+                                  chatProvider.activeMessages[index];
+                              final isMe =
+                                  message.sender.userId == currentUser?.id;
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 12),
-                          child: _IncomingMessage(
-                            message: message,
-                            isDark: widget.isDark,
-                            onReply: () {
-                              setState(() {
-                                _replyingToMessage = message;
-                              });
+                              if (message.messageType == 'SYSTEM') {
+                                return Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 12,
+                                  ),
+                                  child: Text(
+                                    message.content,
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: widget.isDark
+                                          ? AppColors.textSecondaryDark
+                                          : AppColors.textSecondaryLight,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                );
+                              }
+                              final groupedWithNewer =
+                                  index > 0 &&
+                                  messagesBelongToSameGroup(
+                                    message,
+                                    chatProvider.activeMessages[index - 1],
+                                  );
+                              final groupedWithOlder =
+                                  index + 1 <
+                                      chatProvider.activeMessages.length &&
+                                  messagesBelongToSameGroup(
+                                    message,
+                                    chatProvider.activeMessages[index + 1],
+                                  );
+                              return Padding(
+                                key: ValueKey('chat-message-${message.id}'),
+                                padding: EdgeInsets.only(
+                                  bottom: groupedWithNewer ? 4 : 12,
+                                ),
+                                child: _ChatMessageBubble(
+                                  message: message,
+                                  isDark: widget.isDark,
+                                  isOutgoing: isMe,
+                                  showMetadata:
+                                      !groupedWithNewer ||
+                                      _expandedMetadata.contains(message.id),
+                                  showSender: !groupedWithOlder,
+                                  showAvatar: !groupedWithNewer,
+                                  showDeliveryStatus:
+                                      message.id == latestOutgoingId,
+                                  onReply: () => _replyTo(message),
+                                  onTap: () => setState(() {
+                                    if (!_expandedMetadata.add(message.id)) {
+                                      _expandedMetadata.remove(message.id);
+                                    }
+                                  }),
+                                ),
+                              );
                             },
                           ),
-                        );
-                      },
+                  ),
+                  if (_showScrollToBottom)
+                    Positioned(
+                      right: 16,
+                      bottom: 12,
+                      child: FloatingActionButton.small(
+                        heroTag: null,
+                        tooltip: 'Tin nhắn mới nhất',
+                        onPressed: () => _scrollController.animateTo(
+                          0,
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                        ),
+                        child: const Icon(Icons.arrow_downward),
+                      ),
                     ),
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    width: 18,
+                    child: Listener(
+                      onPointerCancel: (_) => _edgeBackDistance = 0,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onHorizontalDragStart: (_) => _edgeBackDistance = 0,
+                        onHorizontalDragUpdate: (details) =>
+                            _edgeBackDistance += details.delta.dx,
+                        onHorizontalDragEnd: (_) {
+                          if (_edgeBackDistance >= 50) {
+                            _inputFocus.unfocus();
+                            widget.onBack();
+                          }
+                        },
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
+            if (chatProvider.typingUserIds.any((id) => id != currentUser?.id))
+              TypingIndicator(
+                names: chatProvider.typingUserIds
+                    .where((id) => id != currentUser?.id)
+                    .map(
+                      (id) =>
+                          widget.conversation.members
+                              .where((m) => m.userId == id)
+                              .firstOrNull
+                              ?.fullName ??
+                          (widget.conversation.type == 'DIRECT'
+                              ? widget.conversation.name
+                              : 'Người dùng'),
+                    )
+                    .toList(),
+              ),
             _buildMentionSuggestions(),
             Container(
-              padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
+              padding: EdgeInsets.fromLTRB(
+                8,
+                8,
+                8,
+                8 + MediaQuery.paddingOf(context).bottom,
+              ),
               decoration: BoxDecoration(
                 color: surface,
                 border: Border(
@@ -1263,25 +1801,13 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                         maintainSize: false,
                         maintainAnimation: false,
                         maintainState: false,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            IconButton(
-                              onPressed: _isUploading ? null : _pickFile,
-                              icon: const Icon(Icons.attach_file, size: 24),
-                              color: AppColors.primary,
-                            ),
-                            IconButton(
-                              onPressed: _isUploading ? null : _pickCamera,
-                              icon: const Icon(Icons.camera_alt, size: 24),
-                              color: AppColors.primary,
-                            ),
-                            IconButton(
-                              onPressed: _isUploading ? null : _pickMedia,
-                              icon: const Icon(Icons.photo_library, size: 24),
-                              color: AppColors.primary,
-                            ),
-                          ],
+                        child: IconButton(
+                          onPressed: _isUploading || _voiceBusy
+                              ? null
+                              : _showAttachments,
+                          tooltip: 'Thêm nội dung',
+                          icon: const Icon(Icons.add_circle_outline, size: 24),
+                          color: AppColors.primary,
                         ),
                       ),
                       Visibility(
@@ -1313,6 +1839,8 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                               Expanded(
                                 child: TextField(
                                   controller: _controller,
+                                  enabled: !_voiceBusy,
+                                  focusNode: _inputFocus,
                                   onSubmitted: (_) => _handleSend(),
                                   style: TextStyle(
                                     fontSize: 14,
@@ -1345,13 +1873,22 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                         ),
                       ),
                       const SizedBox(width: 4),
+                      VoiceRecordButton(
+                        onSend: _sendVoice,
+                        enabled: !_isUploading,
+                        onBusyChanged: (busy) {
+                          if (mounted) setState(() => _voiceBusy = busy);
+                        },
+                      ),
                       Visibility(
                         visible: _isTyping,
                         maintainSize: false,
                         maintainAnimation: false,
                         maintainState: false,
                         child: InkWell(
-                          onTap: _isUploading ? null : _handleSend,
+                          onTap: _isUploading || _voiceBusy
+                              ? null
+                              : _handleSend,
                           borderRadius: BorderRadius.circular(18),
                           child: Container(
                             width: 36,
@@ -1380,7 +1917,7 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                         maintainAnimation: false,
                         maintainState: false,
                         child: IconButton(
-                          onPressed: _sendLike,
+                          onPressed: _voiceBusy ? null : _sendLike,
                           icon: const Icon(Icons.thumb_up, size: 22),
                           color: AppColors.primary,
                         ),
@@ -2015,20 +2552,32 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
         if (mediaUrl == null) return const SizedBox.shrink();
 
         return InkWell(
-          onTap: () => launchUrl(
-            Uri.parse(mediaUrl),
-            mode: LaunchMode.externalApplication,
+          onTap: () => showDialog<void>(
+            context: context,
+            barrierColor: item.messageType == 'VIDEO' ? Colors.transparent : Colors.black54,
+            builder: (_) => item.messageType == 'VIDEO'
+                ? VideoPlayerDialog(videoUrl: mediaUrl, title: 'Video', senderName: item.sender.fullName)
+                : ImagePreviewDialog(imageUrl: mediaUrl),
           ),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              mediaUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const ColoredBox(
-                color: Color(0xFFE5E7EB),
-                child: Center(child: Icon(Icons.image_not_supported_outlined)),
-              ),
-            ),
+            child: item.messageType == 'VIDEO'
+                ? const ColoredBox(
+                    color: Color(0xFFE5E7EB),
+                    child: Center(child: Icon(Icons.play_circle_outline)),
+                  )
+                : Image.network(
+                    mediaUrl,
+                    headers: mediaAuthHeaders(context, mediaUrl),
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const ColoredBox(
+                          color: Color(0xFFE5E7EB),
+                          child: Center(
+                            child: Icon(Icons.image_not_supported_outlined),
+                          ),
+                        ),
+                  ),
           ),
         );
       },
@@ -2250,7 +2799,7 @@ class _PinnedMessageBanner extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Bo ghim tin nhan',
+            tooltip: 'Bỏ ghim tin nhắn',
             onPressed: () async {
               await context.read<ChatProvider>().unpinMessage(conversation.id);
             },
@@ -2262,258 +2811,156 @@ class _PinnedMessageBanner extends StatelessWidget {
   }
 }
 
-class _IncomingMessage extends StatelessWidget {
+class _ChatMessageBubble extends StatelessWidget {
   final ChatMessage message;
   final bool isDark;
+  final bool isOutgoing;
+  final bool showMetadata;
+  final bool showSender;
+  final bool showAvatar;
+  final bool showDeliveryStatus;
   final VoidCallback onReply;
+  final VoidCallback onTap;
 
-  const _IncomingMessage({
+  const _ChatMessageBubble({
     required this.message,
     required this.isDark,
+    required this.isOutgoing,
+    required this.showMetadata,
+    required this.showSender,
+    required this.showAvatar,
+    required this.showDeliveryStatus,
     required this.onReply,
+    required this.onTap,
   });
-
-  String get _avatarText {
-    final name = message.sender.fullName;
-    if (name.isEmpty) return '?';
-    final parts = name.trim().split(' ');
-    if (parts.length >= 2) {
-      return (parts[parts.length - 2][0] + parts[parts.length - 1][0])
-          .toUpperCase();
-    }
-    return name[0].toUpperCase();
-  }
-
-  Color get _avatarColor {
-    final hash = message.sender.fullName.hashCode;
-    final index = hash.abs() % Colors.primaries.length;
-    return Colors.primaries[index];
-  }
 
   @override
   Widget build(BuildContext context) {
-    final timeStr = DateFormat('HH:mm').format(message.sentAt.toLocal());
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        CircleAvatar(
-          radius: 12,
-          backgroundColor: _avatarColor,
-          child: Text(
-            _avatarText,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(left: 4, bottom: 4),
-                child: Text(
-                  message.sender.fullName,
-                  style: TextStyle(
-                    fontSize: 11,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  Flexible(
-                    child: GestureDetector(
-                      onLongPress: () => _showIncomingActions(context),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 11,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isDark ? AppColors.surfaceDark : Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: isDark
-                                ? AppColors.borderDark
-                                : AppColors.borderLight,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.05),
-                              blurRadius: 4,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (message.parentMessage != null)
-                              _ReplyPreviewWidget(
-                                parentMessage: message.parentMessage!,
-                                isOutgoing: false,
-                                isDark: isDark,
-                              ),
-                            _MessageContent(
-                              message: message,
-                              isOutgoing: false,
-                              isDark: isDark,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    icon: const Icon(Icons.more_vert, size: 20),
-                    onPressed: () => _showIncomingActions(context),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                    color: isDark ? Colors.white54 : Colors.black45,
-                  ),
-                ],
-              ),
-              if (message.reactions.isNotEmpty) ...[
-                const SizedBox(height: 4),
-                _ReactionPill(message: message),
-              ],
-              const SizedBox(height: 4),
-              Padding(
-                padding: const EdgeInsets.only(left: 4),
-                child: Text(
-                  timeStr,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: isDark
-                        ? AppColors.textSecondaryDark
-                        : AppColors.textSecondaryLight,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showIncomingActions(BuildContext context) {
-    _showMessageActionSheet(
-      context,
-      message: message,
-      canEdit: false,
-      canRecall: false,
+    final plain = hasPlainBubble(message);
+    final secondary = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final name = message.sender.fullName.trim();
+    final initials = name.isEmpty
+        ? '?'
+        : name.split(' ').last.characters.first.toUpperCase();
+    final bubble = ChatMessageGestures(
+      key: ValueKey('message-gestures-${message.id}'),
+      enabled: !message.isRecalled,
       onReply: onReply,
-    );
-  }
-}
-
-class _OutgoingMessage extends StatelessWidget {
-  final ChatMessage message;
-  final bool isDark;
-  final VoidCallback onReply;
-
-  const _OutgoingMessage({
-    required this.message,
-    required this.isDark,
-    required this.onReply,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final timeStr = DateFormat('HH:mm').format(message.sentAt.toLocal());
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.more_vert, size: 20),
-              onPressed: () => _showOutgoingActions(context),
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-              color: isDark ? Colors.white54 : Colors.black45,
-            ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: GestureDetector(
-                onLongPress: () => _showOutgoingActions(context),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 11,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (message.parentMessage != null)
-                        _ReplyPreviewWidget(
-                          parentMessage: message.parentMessage!,
-                          isOutgoing: true,
-                          isDark: isDark,
-                        ),
-                      _MessageContent(
-                        message: message,
-                        isOutgoing: true,
-                        isDark: isDark,
+      onTap: message.messageType == 'TEXT' ? onTap : null,
+      onDoubleTap: () => _runChatAction(
+        context,
+        (provider) =>
+            provider.reactToMessage(message.conversationId, message.id, '❤️'),
+      ),
+      onLongPress: () => _showMessageActionSheet(
+        context,
+        message: message,
+        canEdit:
+            isOutgoing && message.messageType == 'TEXT' && !message.isRecalled,
+        canRecall: isOutgoing && !message.isRecalled,
+        onReply: onReply,
+      ),
+      child: Container(
+        padding: plain
+            ? const EdgeInsets.symmetric(horizontal: 14, vertical: 10)
+            : EdgeInsets.zero,
+        decoration: plain
+            ? BoxDecoration(
+                color: isOutgoing
+                    ? AppColors.primary
+                    : (isDark ? AppColors.surfaceDark : Colors.white),
+                borderRadius: BorderRadius.circular(12),
+                border: isOutgoing
+                    ? null
+                    : Border.all(
+                        color: isDark
+                            ? AppColors.borderDark
+                            : AppColors.borderLight,
                       ),
-                    ],
-                  ),
-                ),
+              )
+            : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (message.parentMessage != null)
+              _ReplyPreviewWidget(
+                parentMessage: message.parentMessage!,
+                isOutgoing: isOutgoing && plain,
+                isDark: isDark,
               ),
+            _MessageContent(
+              message: message,
+              isOutgoing: isOutgoing,
+              isDark: isDark,
             ),
           ],
         ),
+      ),
+    );
+    final content = Column(
+      crossAxisAlignment: isOutgoing
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (!isOutgoing && showSender)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 4),
+            child: Text(
+              message.sender.fullName,
+              style: TextStyle(fontSize: 11, color: secondary),
+            ),
+          ),
+        bubble,
         if (message.reactions.isNotEmpty) ...[
           const SizedBox(height: 4),
           _ReactionPill(message: message),
         ],
-        const SizedBox(height: 6),
-        Text(
-          '$timeStr ${_deliveryLabel(message)}',
-          style: TextStyle(
-            fontSize: 10,
-            color: isDark
-                ? AppColors.textSecondaryDark
-                : AppColors.textSecondaryLight,
+        if (showMetadata) ...[
+          const SizedBox(height: 4),
+          Text(
+            '${DateFormat('HH:mm').format(message.sentAt.toLocal())}${isOutgoing && showDeliveryStatus ? (message.readByUserIds.any((id) => id != message.sender.userId) ? ' Đã xem' : ' Đã gửi') : ''}',
+            key: ValueKey('message-metadata-${message.id}'),
+            style: TextStyle(fontSize: 10, color: secondary),
           ),
-        ),
+        ],
       ],
     );
-  }
-
-  String _deliveryLabel(ChatMessage message) {
-    final seenByOther = message.readByUserIds.any(
-      (userId) => userId != message.sender.userId,
-    );
-    return seenByOther ? 'Đã xem' : 'Đã gửi';
-  }
-
-  void _showOutgoingActions(BuildContext context) {
-    _showMessageActionSheet(
-      context,
-      message: message,
-      canEdit: message.messageType == 'TEXT' && !message.isRecalled,
-      canRecall: !message.isRecalled,
-      onReply: onReply,
+    return Row(
+      mainAxisAlignment: isOutgoing
+          ? MainAxisAlignment.end
+          : MainAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (!isOutgoing) ...[
+          SizedBox(
+            width: 24,
+            height: 24,
+            child: showAvatar
+                ? CircleAvatar(
+                    radius: 12,
+                    backgroundColor:
+                        Colors.primaries[message.sender.fullName.hashCode
+                                .abs() %
+                            Colors.primaries.length],
+                    child: Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  )
+                : null,
+          ),
+          const SizedBox(width: 10),
+        ],
+        Flexible(child: content),
+      ],
     );
   }
 }
@@ -2527,89 +2974,120 @@ void _showMessageActionSheet(
   required bool canRecall,
   required VoidCallback onReply,
 }) {
+  FocusManager.instance.primaryFocus?.unfocus();
   showModalBottomSheet<void>(
     context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
     builder: (sheetContext) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const ModalTopBar(),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: _reactionEmojis
-                  .map(
-                    (emoji) => TextButton(
-                      onPressed: () async {
-                        Navigator.pop(sheetContext);
-                        await context.read<ChatProvider>().reactToMessage(
-                          message.conversationId,
-                          message.id,
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const ModalTopBar(),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 6),
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                children: _reactionEmojis
+                    .map(
+                      (emoji) => TextButton(
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                          padding: const EdgeInsets.all(8),
+                        ),
+                        onPressed: () async {
+                          Navigator.pop(sheetContext);
+                          await _runChatAction(
+                            context,
+                            (provider) => provider.reactToMessage(
+                              message.conversationId,
+                              message.id,
+                              emoji,
+                            ),
+                          );
+                        },
+                        child: Text(
                           emoji,
-                        );
-                      },
-                      child: Text(emoji, style: const TextStyle(fontSize: 22)),
-                    ),
-                  )
-                  .toList(),
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
             ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.reply_outlined),
-            title: const Text('Trả lời'),
-            onTap: () {
-              Navigator.pop(sheetContext);
-              onReply();
-            },
-          ),
-          if (canEdit)
             ListTile(
-              leading: const Icon(Icons.edit_outlined),
-              title: const Text('Sửa tin nhắn'),
+              leading: const Icon(Icons.reply_outlined),
+              title: const Text('Trả lời'),
               onTap: () {
                 Navigator.pop(sheetContext);
-                _showEditMessageDialog(context, message);
+                onReply();
               },
             ),
-          if (!message.isRecalled)
+            if (!message.isRecalled && message.content.isNotEmpty)
+              ListTile(
+                leading: const Icon(Icons.copy_outlined),
+                title: const Text('Sao chép'),
+                onTap: () async {
+                  await Clipboard.setData(ClipboardData(text: message.content));
+                  if (sheetContext.mounted) Navigator.pop(sheetContext);
+                },
+              ),
+            if (canEdit)
+              ListTile(
+                leading: const Icon(Icons.edit_outlined),
+                title: const Text('Sửa tin nhắn'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  _showEditMessageDialog(context, message);
+                },
+              ),
+            if (!message.isRecalled)
+              ListTile(
+                leading: const Icon(Icons.push_pin_outlined),
+                title: const Text('Ghim tin nhắn'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await _runChatAction(
+                    context,
+                    (provider) =>
+                        provider.pinMessage(message.conversationId, message.id),
+                  );
+                },
+              ),
             ListTile(
-              leading: const Icon(Icons.push_pin_outlined),
-              title: const Text('Ghim tin nhan'),
+              leading: const Icon(Icons.delete_outline),
+              title: const Text('Xóa phía tôi'),
               onTap: () async {
                 Navigator.pop(sheetContext);
-                await context.read<ChatProvider>().pinMessage(
-                  message.conversationId,
-                  message.id,
+                await _runChatAction(
+                  context,
+                  (provider) => provider.deleteMessage(
+                    message.conversationId,
+                    message.id,
+                    forEveryone: false,
+                  ),
                 );
               },
             ),
-          ListTile(
-            leading: const Icon(Icons.delete_outline),
-            title: const Text('Xóa phía tôi'),
-            onTap: () async {
-              Navigator.pop(sheetContext);
-              await context.read<ChatProvider>().deleteMessage(
-                message.conversationId,
-                message.id,
-                forEveryone: false,
-              );
-            },
-          ),
-          if (canRecall)
-            ListTile(
-              leading: const Icon(Icons.undo_outlined),
-              title: const Text('Thu hồi mọi người'),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await context.read<ChatProvider>().deleteMessage(
-                  message.conversationId,
-                  message.id,
-                  forEveryone: true,
-                );
-              },
-            ),
-        ],
+            if (canRecall)
+              ListTile(
+                leading: const Icon(Icons.undo_outlined),
+                title: const Text('Thu hồi mọi người'),
+                onTap: () async {
+                  Navigator.pop(sheetContext);
+                  await _runChatAction(
+                    context,
+                    (provider) => provider.deleteMessage(
+                      message.conversationId,
+                      message.id,
+                      forEveryone: true,
+                    ),
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     ),
   );
@@ -2672,7 +3150,7 @@ class _MessageContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mediaPath = message.mediaUrl;
-    final textColor = isOutgoing
+    final textColor = isOutgoing && hasPlainBubble(message)
         ? Colors.white
         : (isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight);
     final textStyle = TextStyle(
@@ -2684,6 +3162,17 @@ class _MessageContent extends StatelessWidget {
 
     if (message.isRecalled) {
       return Text('Tin nhắn đã bị thu hồi', style: textStyle);
+    }
+
+    final orderCard = message.messageType == 'TEXT'
+        ? ChatRepairOrderCard.tryParse(message.content)
+        : null;
+    if (orderCard != null) {
+      return RepairOrderMessageCard(card: orderCard, color: textColor);
+    }
+
+    if (isJumboEmoji(message)) {
+      return Text(message.content.trim(), style: const TextStyle(fontSize: 42));
     }
 
     if (message.messageType == 'SYSTEM') {
@@ -2711,25 +3200,19 @@ class _MessageContent extends StatelessWidget {
     }
 
     final mediaUrl = context.read<ChatProvider>().mediaUrl(mediaPath);
+    if (message.messageType == 'FILE' && isVoiceAttachment(mediaPath)) {
+      return VoiceMessagePlayer(url: mediaUrl, color: textColor);
+    }
     if (message.messageType == 'IMAGE' ||
         message.messageType == 'STICKER' ||
         message.messageType == 'GIF') {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              mediaUrl,
-              width: message.messageType == 'STICKER' ? 150 : 220,
-              height: message.messageType == 'STICKER' ? 150 : 180,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) => const SizedBox(
-                width: 220,
-                height: 100,
-                child: Center(child: Icon(Icons.image_not_supported_outlined)),
-              ),
-            ),
+          ChatMediaImage(
+            imageUrl: mediaUrl,
+            caption: message.content.isEmpty ? null : message.content,
+            isSticker: message.messageType == 'STICKER',
           ),
           if (message.content.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -2743,7 +3226,7 @@ class _MessageContent extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _VideoMessageWidget(videoUrl: mediaUrl),
+          _VideoMessageWidget(videoUrl: mediaUrl, senderName: message.sender.fullName),
           if (message.content.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(message.content, style: textStyle),
@@ -3059,7 +3542,7 @@ class _NewChatDialogState extends State<_NewChatDialog> {
   }
 }
 
-class _ChatDetailInfoPage extends StatelessWidget {
+class _ChatDetailInfoPage extends StatefulWidget {
   final ChatConversation conversation;
   final bool isDark;
   final Future<void> Function() onMuteToggle;
@@ -3073,6 +3556,168 @@ class _ChatDetailInfoPage extends StatelessWidget {
     required this.onSearch,
     required this.onGallery,
   });
+
+  @override
+  State<_ChatDetailInfoPage> createState() => _ChatDetailInfoPageState();
+}
+
+class _ChatDetailInfoPageState extends State<_ChatDetailInfoPage> {
+  bool _busy = false;
+  ChatConversation get conversation => widget.conversation;
+  bool get isDark => widget.isDark;
+  VoidCallback get onSearch => widget.onSearch;
+  VoidCallback get onGallery => widget.onGallery;
+  Future<void> Function() get onMuteToggle => widget.onMuteToggle;
+
+  Future<bool> _perform(Future<void> Function() action) async {
+    if (_busy) return false;
+    setState(() => _busy = true);
+    try {
+      await action();
+      return true;
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              error is ApiException
+                  ? error.message
+                  : 'Không thể thực hiện thao tác. Vui lòng thử lại.',
+            ),
+          ),
+        );
+      }
+      return false;
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<bool> _confirm(
+    String title,
+    String description,
+    String action,
+  ) async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text(title),
+          content: Text(description),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Hủy'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: Text(action),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  Future<void> _addMembers(ChatConversation conversation) async {
+    final backend = context.read<BackendDataProvider>();
+    if (!await _perform(() => backend.loadEmployees(notify: false)) ||
+        !mounted) {
+      return;
+    }
+    final ids = conversation.members.map((m) => m.userId).toSet();
+    final selected = await showDialog<List<String>>(
+      context: context,
+      builder: (_) => AddMembersDialog(
+        employees: backend.employees
+            .where(
+              (user) =>
+                  !ids.contains(user.id) && user.status == UserStatus.active,
+            )
+            .toList(),
+      ),
+    );
+    if (selected == null || selected.isEmpty || !mounted) return;
+    await _perform(
+      () => context.read<ChatProvider>().addMembers(conversation.id, selected),
+    );
+  }
+
+  Future<void> _leaveGroup(ChatConversation conversation) async {
+    if (!await _confirm(
+          'Rời khỏi nhóm?',
+          'Bạn sẽ không còn nhận tin nhắn từ ${conversation.name}.',
+          'Rời nhóm',
+        ) ||
+        !mounted) {
+      return;
+    }
+    final success = await _perform(
+      () => context.read<ChatProvider>().leaveConversation(conversation.id),
+    );
+    if (success && mounted) Navigator.pop(context);
+  }
+
+  Future<void> _manageMember(
+    ChatConversation conversation,
+    ConversationMemberInfo member,
+  ) async {
+    final action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: Text(
+                member.fullName,
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: Text(
+                member.isAdmin
+                    ? 'Bỏ quyền quản trị viên'
+                    : 'Đặt làm quản trị viên',
+              ),
+              onTap: () => Navigator.pop(sheetContext, 'role'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person_remove_outlined),
+              title: const Text('Xóa khỏi nhóm'),
+              onTap: () => Navigator.pop(sheetContext, 'remove'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (action == null || !mounted) return;
+    final label = action == 'remove'
+        ? 'Xóa khỏi nhóm'
+        : member.isAdmin
+        ? 'Bỏ quyền quản trị viên'
+        : 'Đặt làm quản trị viên';
+    if (!await _confirm(
+          '$label?',
+          'Áp dụng cho ${member.fullName}.',
+          'Xác nhận',
+        ) ||
+        !mounted) {
+      return;
+    }
+    await _perform(
+      () => action == 'remove'
+          ? context.read<ChatProvider>().removeMember(
+              conversation.id,
+              member.userId,
+            )
+          : context.read<ChatProvider>().updateMemberRole(
+              conversation.id,
+              member.userId,
+              member.isAdmin ? 'MEMBER' : 'ADMIN',
+            ),
+    );
+  }
 
   String get _avatarText {
     if (conversation.name.isEmpty) return '??';
@@ -3092,6 +3737,13 @@ class _ChatDetailInfoPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final conversation =
+        context
+            .watch<ChatProvider>()
+            .conversations
+            .where((item) => item.id == this.conversation.id)
+            .firstOrNull ??
+        this.conversation;
     final textPrimaryColor = isDark
         ? AppColors.textPrimaryDark
         : AppColors.textPrimaryLight;
@@ -3102,6 +3754,11 @@ class _ChatDetailInfoPage extends StatelessWidget {
         ? AppColors.backgroundDark
         : AppColors.backgroundLight;
     final surface = isDark ? AppColors.surfaceDark : Colors.white;
+
+    final currentUserId = context.read<AuthProvider>().currentUser?.id;
+    final canManage = conversation.members.any(
+      (m) => m.userId == currentUserId && (m.isAdmin || m.role == 'ADMIN'),
+    );
 
     return Scaffold(
       backgroundColor: background,
@@ -3177,63 +3834,19 @@ class _ChatDetailInfoPage extends StatelessWidget {
               style: TextStyle(fontSize: 13, color: textSecondaryColor),
             ),
             const SizedBox(height: 28),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildQuickAction(
-                  icon: conversation.notificationsMuted
-                      ? Icons.notifications_off
-                      : Icons.notifications,
-                  label: conversation.notificationsMuted
-                      ? 'Bật thông báo'
-                      : 'Tắt thông báo',
-                  onTap: () async {
-                    await onMuteToggle();
-                    if (context.mounted) {
-                      Navigator.pop(context);
-                    }
-                  },
-                ),
-                const SizedBox(width: 32),
-                _buildQuickAction(
-                  icon: Icons.search,
-                  label: 'Tìm kiếm',
-                  onTap: () {
-                    Navigator.pop(context);
-                    onSearch();
-                  },
-                ),
-                const SizedBox(width: 32),
-                _buildQuickAction(
-                  icon: Icons.folder_open,
-                  label: 'Tài nguyên',
-                  onTap: () {
-                    Navigator.pop(context);
-                    onGallery();
-                  },
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
             _buildSectionHeader('File phương tiện & tài liệu'),
             _buildMenuItem(
               icon: Icons.image_outlined,
               iconColor: Colors.green,
               title: 'Ảnh, file & liên kết',
-              onTap: () {
-                Navigator.pop(context);
-                onGallery();
-              },
+              onTap: onGallery,
             ),
             _buildSectionHeader('Cài đặt cuộc trò chuyện'),
             _buildMenuItem(
               icon: Icons.search,
               iconColor: Colors.blue,
               title: 'Tìm kiếm trong cuộc trò chuyện',
-              onTap: () {
-                Navigator.pop(context);
-                onSearch();
-              },
+              onTap: onSearch,
             ),
             _buildMenuItem(
               icon: conversation.notificationsMuted
@@ -3245,13 +3858,17 @@ class _ChatDetailInfoPage extends StatelessWidget {
                   : 'Tắt thông báo',
               onTap: () async {
                 await onMuteToggle();
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
               },
             ),
             if (conversation.type == 'GROUP') ...[
               _buildSectionHeader('Thành viên nhóm'),
+              if (canManage)
+                _buildMenuItem(
+                  icon: Icons.person_add_outlined,
+                  iconColor: AppColors.primary,
+                  title: 'Thêm thành viên',
+                  onTap: () => _addMembers(conversation),
+                ),
               ListView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -3266,6 +3883,15 @@ class _ChatDetailInfoPage extends StatelessWidget {
                       .primaries[memberHash.abs() % Colors.primaries.length];
 
                   return ListTile(
+                    trailing: canManage && member.userId != currentUserId
+                        ? IconButton(
+                            icon: const Icon(Icons.manage_accounts_outlined),
+                            tooltip: 'Quản lý ${member.fullName}',
+                            onPressed: _busy
+                                ? null
+                                : () => _manageMember(conversation, member),
+                          )
+                        : null,
                     leading: Container(
                       width: 36,
                       height: 36,
@@ -3307,14 +3933,15 @@ class _ChatDetailInfoPage extends StatelessWidget {
               title: 'Báo cáo sự cố',
               onTap: () {},
             ),
-            _buildMenuItem(
-              icon: conversation.type == 'GROUP' ? Icons.logout : Icons.block,
-              iconColor: Colors.red,
-              title: conversation.type == 'GROUP'
-                  ? 'Rời khỏi nhóm'
-                  : 'Chặn người dùng',
-              onTap: () {},
-            ),
+            if (conversation.type == 'GROUP')
+              _buildMenuItem(
+                icon: conversation.type == 'GROUP' ? Icons.logout : Icons.block,
+                iconColor: Colors.red,
+                title: conversation.type == 'GROUP'
+                    ? 'Rời khỏi nhóm'
+                    : 'Chặn người dùng',
+                onTap: () => _leaveGroup(conversation),
+              ),
             const SizedBox(height: 32),
           ],
         ),
@@ -3374,52 +4001,16 @@ class _ChatDetailInfoPage extends StatelessWidget {
           const Icon(Icons.chevron_right, size: 18, color: Colors.grey),
         ],
       ),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildQuickAction({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    final circleBg = isDark ? AppColors.borderDark : const Color(0xFFF1F5F9);
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Column(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(color: circleBg, shape: BoxShape.circle),
-            child: Icon(
-              icon,
-              color: isDark ? Colors.white : AppColors.textPrimaryLight,
-              size: 22,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-          ),
-        ],
-      ),
+      onTap: _busy ? null : onTap,
     );
   }
 }
 
 class _VideoMessageWidget extends StatefulWidget {
   final String videoUrl;
+  final String senderName;
 
-  const _VideoMessageWidget({required this.videoUrl});
+  const _VideoMessageWidget({required this.videoUrl, required this.senderName});
 
   @override
   State<_VideoMessageWidget> createState() => _VideoMessageWidgetState();
@@ -3437,23 +4028,27 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
   }
 
   void _initializeController() {
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..initialize()
-          .then((_) {
-            if (mounted) {
-              setState(() {
-                _initialized = true;
+    _controller =
+        VideoPlayerController.networkUrl(
+            Uri.parse(widget.videoUrl),
+            httpHeaders: mediaAuthHeaders(context, widget.videoUrl),
+          )
+          ..initialize()
+              .then((_) {
+                if (mounted) {
+                  setState(() {
+                    _initialized = true;
+                  });
+                }
+              })
+              .catchError((error) {
+                debugPrint('Error initializing video player: $error');
+                if (mounted) {
+                  setState(() {
+                    _hasError = true;
+                  });
+                }
               });
-            }
-          })
-          .catchError((error) {
-            debugPrint('Error initializing video player: $error');
-            if (mounted) {
-              setState(() {
-                _hasError = true;
-              });
-            }
-          });
   }
 
   @override
@@ -3517,8 +4112,9 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
         onTap: () {
           showDialog(
             context: context,
+            barrierColor: Colors.transparent,
             builder: (context) =>
-                VideoPlayerDialog(videoUrl: widget.videoUrl, title: 'Video'),
+                VideoPlayerDialog(videoUrl: widget.videoUrl, title: 'Video', senderName: widget.senderName),
           );
         },
         child: Container(

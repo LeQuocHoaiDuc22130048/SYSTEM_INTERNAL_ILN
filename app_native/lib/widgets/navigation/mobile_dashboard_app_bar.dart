@@ -13,7 +13,7 @@ class DashboardMobileAppBar extends StatelessWidget
     required this.notificationBadge,
     required this.onToggleTheme,
     required this.onToggleNotifications,
-    this.showNotification = true,
+    this.showNotification = false,
     this.onBack,
     this.showBack = true,
   });
@@ -27,24 +27,27 @@ class DashboardMobileAppBar extends StatelessWidget
   final bool showBack;
 
   @override
-  Size get preferredSize => const Size.fromHeight(57);
+  Size get preferredSize => const Size.fromHeight(59);
 
   @override
   Widget build(BuildContext context) {
     final canPop = Navigator.canPop(context);
+    const barVerticalPadding = EdgeInsets.only(top: 6, bottom: 4);
 
     return AppBar(
-      toolbarHeight: 56,
+      primary: true,
+      toolbarHeight: 58,
       elevation: 0,
       scrolledUnderElevation: 0,
       backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
-      leadingWidth: 58,
+      titleSpacing: 0,
+      leadingWidth: 64,
       automaticallyImplyLeading: false,
       leading: showBack
           ? Padding(
-              padding: const EdgeInsets.only(left: 16),
+              padding: const EdgeInsets.only(left: 16, top: 6, bottom: 4),
               child: Center(
                 child: AppBackButton(
                   isDark: isDark,
@@ -65,30 +68,40 @@ class DashboardMobileAppBar extends StatelessWidget
               ),
             )
           : null,
-      title: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SizedBox(
-            width: 50,
-            height: 50,
-            child: Image.asset("assets/images/app_logo.png"),
-          ),
-        ],
+      title: Padding(
+        padding: barVerticalPadding,
+        child: Image.asset(
+          "assets/images/app_logo.png",
+          height: 32,
+          fit: BoxFit.contain,
+          alignment: Alignment.center,
+        ),
       ),
       actions: [
-        IconButton(
-          icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, size: 22),
-          onPressed: onToggleTheme,
-          tooltip: 'Giao diện',
+        Padding(
+          padding: barVerticalPadding,
+          child: Center(
+            child: IconButton(
+              icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, size: 22),
+              onPressed: onToggleTheme,
+              tooltip: 'Giao diện',
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
         ),
         if (showNotification)
-          BadgeIconButton(
-            icon: Icons.notifications_outlined,
-            badge: notificationBadge,
-            tooltip: 'Thông báo',
-            onPressed: onToggleNotifications,
+          Padding(
+            padding: barVerticalPadding,
+            child: Center(
+              child: BadgeIconButton(
+                icon: Icons.notifications_outlined,
+                badge: notificationBadge,
+                tooltip: 'Thông báo',
+                onPressed: onToggleNotifications,
+              ),
+            ),
           ),
-        const SizedBox(width: 8),
+        const SizedBox(width: 12),
       ],
       bottom: PreferredSize(
         preferredSize: const Size.fromHeight(1),

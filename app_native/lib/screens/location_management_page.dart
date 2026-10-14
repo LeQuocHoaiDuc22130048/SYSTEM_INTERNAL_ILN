@@ -274,13 +274,6 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
           'Quản Lý Vị Trí Kho / Kệ',
           style: TextStyle(fontWeight: FontWeight.bold),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(LucideIcons.plus),
-            tooltip: 'Thêm vị trí mới',
-            onPressed: () => _showAddEditDialog(),
-          ),
-        ],
       ),
       body: Column(
         children: [
@@ -327,14 +320,6 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                     color: isDark
                         ? AppColors.textSecondaryDark
                         : AppColors.textSecondaryLight,
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: () => _showAddEditDialog(),
-                  icon: const Icon(Icons.add, size: 16),
-                  label: const Text('Thêm mới', style: TextStyle(fontSize: 13)),
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
                   ),
                 ),
               ],
@@ -565,27 +550,6 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                                 ),
                                               ),
                                             ],
-                                          ),
-                                          TextButton.icon(
-                                            onPressed: () =>
-                                                _showAddEditDialog(loc),
-                                            icon: const Icon(
-                                              Icons.edit,
-                                              size: 14,
-                                            ),
-                                            label: const Text(
-                                              'Chỉnh sửa',
-                                              style: TextStyle(fontSize: 12),
-                                            ),
-                                            style: TextButton.styleFrom(
-                                              padding:
-                                                  const EdgeInsets.symmetric(
-                                                    horizontal: 8,
-                                                    vertical: 4,
-                                                  ),
-                                              visualDensity:
-                                                  VisualDensity.compact,
-                                            ),
                                           ),
                                         ],
                                       ),

@@ -533,16 +533,19 @@ class LocationPickerField extends StatelessWidget {
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              isRequired ? '$label *' : label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: isDark
-                    ? AppColors.textSecondaryDark
-                    : AppColors.textSecondaryLight,
+            Expanded(
+              child: Text(
+                isRequired ? '$label *' : label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: isDark
+                      ? AppColors.textSecondaryDark
+                      : AppColors.textSecondaryLight,
+                ),
               ),
             ),
+            const SizedBox(width: 8),
             InkWell(
               onTap: () async {
                 final created = await showCreateStoreLocationDialog(context);

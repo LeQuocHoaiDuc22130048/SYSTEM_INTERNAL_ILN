@@ -8,8 +8,7 @@ import '../theme/app_motion.dart';
 /// - The outgoing view slides out from center to left (Offset.zero -> Offset(-0.18, 0)).
 ///
 /// When [isForward] is false (going back / returning to previous page):
-/// - The incoming view slides in from left to center (Offset(-0.18, 0) -> Offset.zero).
-/// - The outgoing view slides out from center to right (Offset.zero -> Offset(0.18, 0)).
+/// - The previous view appears immediately without animating.
 class DirectionalSlideSwitcher extends StatelessWidget {
   final Widget child;
   final bool isForward;
@@ -29,14 +28,15 @@ class DirectionalSlideSwitcher extends StatelessWidget {
     if (MediaQuery.disableAnimationsOf(context)) return child;
     return ClipRect(
       child: AnimatedSwitcher(
-        duration: duration,
+        duration: isForward ? duration : Duration.zero,
+        reverseDuration: isForward ? duration : Duration.zero,
         switchInCurve: Curves.linear,
         switchOutCurve: Curves.linear,
         layoutBuilder: (Widget? currentChild, List<Widget> previousChildren) {
           return Stack(
             fit: StackFit.expand,
             children: <Widget>[
-              if (previousChildren.isNotEmpty)
+              if (isForward && previousChildren.isNotEmpty)
                 IgnorePointer(
                   child: ExcludeSemantics(child: previousChildren.last),
                 ),
@@ -45,6 +45,7 @@ class DirectionalSlideSwitcher extends StatelessWidget {
           );
         },
         transitionBuilder: (Widget child, Animation<double> animation) {
+          if (!isForward) return child;
           final bool isIncoming = child.key == this.child.key;
           final Offset inOffset = isForward
               ? const Offset(.18, 0.0)

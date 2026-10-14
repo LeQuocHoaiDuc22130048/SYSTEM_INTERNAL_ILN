@@ -20,14 +20,46 @@ class ChatProvider extends ChangeNotifier {
   bool isLoadingMessages = false;
   String? messagesError;
   int _messagesRequestId = 0;
+  int _messagePage = 0;
+  bool hasMoreMessages = false;
+  bool isLoadingOlderMessages = false;
+  String? olderMessagesError;
 
   StreamSubscription? _messageStreamSubscription;
+  StreamSubscription? _eventSubscription;
+  final Map<String, Timer> _typingExpiry = {};
+  Set<String> get typingUserIds => _typingExpiry.keys.toSet();
+  Timer? _typingIdle;
+  DateTime? _lastTypingSent;
+  bool _typingSent = false;
+  String? _currentUserId;
 
   ChatProvider({required this.api, required this.notificationProvider}) {
     _subscribeToMessages();
   }
 
   void _subscribeToMessages() {
+    _eventSubscription?.cancel();
+    _eventSubscription = notificationProvider.conversationEventStream.listen((
+      event,
+    ) {
+      if (event['type'] != 'TYPING' ||
+          event['conversationId'] != activeConversationId) {
+        return;
+      }
+      final payload = event['payload'];
+      if (payload is! Map) return;
+      final userId = payload['userId']?.toString();
+      if (userId == null || userId == _currentUserId) return;
+      _typingExpiry.remove(userId)?.cancel();
+      if (payload['typing'] == true) {
+        _typingExpiry[userId] = Timer(const Duration(seconds: 6), () {
+          _typingExpiry.remove(userId);
+          notifyListeners();
+        });
+      }
+      notifyListeners();
+    });
     _messageStreamSubscription?.cancel();
     _messageStreamSubscription = notificationProvider.messageStream.listen((
       data,
@@ -87,6 +119,7 @@ class ChatProvider extends ChangeNotifier {
     AuthProvider auth,
     NotificationProvider notifications,
   ) {
+    _currentUserId = auth.currentUser?.id;
     notificationProvider = notifications;
     _subscribeToMessages();
     final token = auth.api.accessToken;
@@ -96,6 +129,9 @@ class ChatProvider extends ChangeNotifier {
         loadConversations();
       }
     } else {
+      _resetTyping();
+      notificationProvider.watchConversationEvents(null);
+      _messagesRequestId++;
       _lastToken = null;
       conversations = [];
       activeConversationId = null;
@@ -123,22 +159,37 @@ class ChatProvider extends ChangeNotifier {
   }
 
   Future<void> loadMessages(String conversationId) async {
+    _resetTyping();
+    notificationProvider.watchConversationEvents(conversationId);
     final requestId = ++_messagesRequestId;
     activeConversationId = conversationId;
     isLoadingMessages = true;
     messagesError = null;
     activeMessages = [];
+    _messagePage = 0;
+    hasMoreMessages = false;
+    isLoadingOlderMessages = false;
+    olderMessagesError = null;
     notifyListeners();
 
     try {
       final data = await api.get(
         '/api/v1/conversations/$conversationId/messages',
+        queryParameters: {'page': 0, 'size': 30},
       );
       if (data is Map<String, dynamic> && data['content'] is List) {
         final content = data['content'] as List;
         if (requestId == _messagesRequestId &&
             activeConversationId == conversationId) {
-          activeMessages = content.map((m) => ChatMessage.fromJson(m)).toList();
+          final fetched = content.map((m) => ChatMessage.fromJson(m));
+          final liveIds = activeMessages.map((m) => m.id).toSet();
+          activeMessages = [
+            ...activeMessages,
+            ...fetched.where((m) => !liveIds.contains(m.id)),
+          ];
+          hasMoreMessages = data['last'] is bool
+              ? data['last'] == false
+              : content.length == 30;
         }
       }
       if (requestId == _messagesRequestId &&
@@ -154,6 +205,46 @@ class ChatProvider extends ChangeNotifier {
       if (requestId == _messagesRequestId &&
           activeConversationId == conversationId) {
         isLoadingMessages = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<void> loadOlderMessages() async {
+    final id = activeConversationId;
+    if (id == null ||
+        isLoadingMessages ||
+        isLoadingOlderMessages ||
+        !hasMoreMessages) {
+      return;
+    }
+    final requestId = _messagesRequestId;
+    isLoadingOlderMessages = true;
+    olderMessagesError = null;
+    notifyListeners();
+    try {
+      final data = await api.get(
+        '/api/v1/conversations/$id/messages',
+        queryParameters: {'page': _messagePage + 1, 'size': 30},
+      );
+      if (requestId != _messagesRequestId || activeConversationId != id) return;
+      final fetched = _messagesFromPage(data);
+      final ids = activeMessages.map((m) => m.id).toSet();
+      activeMessages = [
+        ...activeMessages,
+        ...fetched.where((m) => ids.add(m.id)),
+      ];
+      _messagePage++;
+      hasMoreMessages = data is Map && data['last'] is bool
+          ? data['last'] == false
+          : fetched.length == 30;
+    } catch (e) {
+      if (requestId == _messagesRequestId && activeConversationId == id) {
+        olderMessagesError = e.toString();
+      }
+    } finally {
+      if (requestId == _messagesRequestId && activeConversationId == id) {
+        isLoadingOlderMessages = false;
         notifyListeners();
       }
     }
@@ -196,6 +287,7 @@ class ChatProvider extends ChangeNotifier {
     required String messageType,
     String content = '',
     String? parentMessageId,
+    String? contentType,
   }) async {
     try {
       final Map<String, String> fields = {
@@ -211,6 +303,7 @@ class ChatProvider extends ChangeNotifier {
         fields: fields,
         filename: filename,
         bytes: bytes,
+        contentType: contentType,
       );
       _consumeSentMessage(conversationId, data);
     } catch (e) {
@@ -286,6 +379,69 @@ class ChatProvider extends ChangeNotifier {
       );
     } catch (e) {
       debugPrint('[CHAT] Failed to send typing state: $e');
+    }
+  }
+
+  void updateTyping(bool typing) {
+    final id = activeConversationId;
+    if (id == null) return;
+    _typingIdle?.cancel();
+    if (!typing) {
+      if (_typingSent) unawaited(sendTyping(id, false));
+      _typingSent = false;
+      _lastTypingSent = null;
+      return;
+    }
+    final now = DateTime.now();
+    if (!_typingSent ||
+        _lastTypingSent == null ||
+        now.difference(_lastTypingSent!) >= const Duration(seconds: 2)) {
+      _typingSent = true;
+      _lastTypingSent = now;
+      unawaited(sendTyping(id, true));
+    }
+    _typingIdle = Timer(const Duration(seconds: 3), () => updateTyping(false));
+  }
+
+  void _resetTyping() {
+    updateTyping(false);
+    _typingIdle?.cancel();
+    for (final timer in _typingExpiry.values) {
+      timer.cancel();
+    }
+    _typingExpiry.clear();
+  }
+
+  Future<void> addMembers(String id, List<String> memberIds) async {
+    final data = await api.post(
+      '/api/v1/conversations/$id/members',
+      body: {'memberIds': memberIds},
+    );
+    _replaceConversation(data);
+  }
+
+  Future<void> updateMemberRole(String id, String memberId, String role) async {
+    final data = await api.patch(
+      '/api/v1/conversations/$id/members/$memberId/role',
+      body: {'role': role},
+    );
+    _replaceConversation(data);
+  }
+
+  Future<void> removeMember(String id, String memberId) async {
+    final data = await api.delete(
+      '/api/v1/conversations/$id/members/$memberId',
+    );
+    _replaceConversation(data);
+  }
+
+  Future<void> leaveConversation(String id) async {
+    await api.post('/api/v1/conversations/$id/leave');
+    conversations.removeWhere((c) => c.id == id);
+    if (activeConversationId == id) {
+      clearActiveChat();
+    } else {
+      notifyListeners();
     }
   }
 
@@ -511,6 +667,13 @@ class ChatProvider extends ChangeNotifier {
   }
 
   void clearActiveChat() {
+    _resetTyping();
+    notificationProvider.watchConversationEvents(null);
+    _messagesRequestId++;
+    isLoadingMessages = false;
+    isLoadingOlderMessages = false;
+    hasMoreMessages = false;
+    olderMessagesError = null;
     activeConversationId = null;
     activeMessages = [];
     notifyListeners();
@@ -527,6 +690,9 @@ class ChatProvider extends ChangeNotifier {
 
   @override
   void dispose() {
+    _resetTyping();
+    notificationProvider.watchConversationEvents(null);
+    _eventSubscription?.cancel();
     _messageStreamSubscription?.cancel();
     super.dispose();
   }

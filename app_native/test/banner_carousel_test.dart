@@ -380,7 +380,7 @@ void main() {
       ).first;
 
       final bannerSize = tester.getSize(bannerContainer);
-      expect(bannerSize.height, bannerSize.width / 2);
+      expect(bannerSize.width / bannerSize.height, closeTo(2, 0.01));
       expect(bannerSize.width, 346.0);
     });
 

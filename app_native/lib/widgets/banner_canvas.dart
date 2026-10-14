@@ -26,66 +26,73 @@ class BannerCanvas extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final background = banner.backgroundImageUrl;
-    return Align(
-      child: AspectRatio(
-        aspectRatio: 2,
-        child: GestureDetector(
-          onTap: onTap,
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(16),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: banner.gradientColorList,
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                image: background == null || background.isEmpty
-                    ? null
-                    : DecorationImage(
-                        image: NetworkImage(
-                          background.startsWith('http')
-                              ? background
-                              : '$baseUrl$background',
+    Widget content = GestureDetector(
+      onTap: onTap,
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: background == null || background.isEmpty
+                ? LinearGradient(
+                    colors: banner.gradientColorList,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                : null,
+            image: background == null || background.isEmpty
+                ? null
+                : DecorationImage(
+                    image: NetworkImage(
+                      background.startsWith('http')
+                          ? background
+                          : '$baseUrl$background',
+                    ),
+                    fit: BoxFit.cover,
+                    colorFilter: banner.darkenOverlay
+                        ? const ColorFilter.mode(
+                            Color(0x59000000),
+                            BlendMode.darken,
+                          )
+                        : null,
+                  ),
+          ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final scale = constraints.maxWidth / 360;
+              return Stack(
+                children: [
+                  for (final entry in design.nodes.entries)
+                    if (_visible(entry.key))
+                      Positioned(
+                        key: ValueKey('canvas-${entry.key}'),
+                        left: entry.value.x / 100 * constraints.maxWidth,
+                        top: entry.value.y / 100 * constraints.maxHeight,
+                        width: entry.value.width / 100 * constraints.maxWidth,
+                        height:
+                            entry.value.height / 100 * constraints.maxHeight,
+                        child: ClipRect(
+                          child: _element(entry.key, entry.value, scale),
                         ),
-                        fit: BoxFit.cover,
-                        colorFilter: banner.darkenOverlay
-                            ? const ColorFilter.mode(
-                                Color(0x59000000),
-                                BlendMode.darken,
-                              )
-                            : null,
                       ),
-              ),
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final scale = constraints.maxWidth / 360;
-                  return Stack(
-                    children: [
-                      for (final entry in design.nodes.entries)
-                        if (_visible(entry.key))
-                          Positioned(
-                            key: ValueKey('canvas-${entry.key}'),
-                            left: entry.value.x / 100 * constraints.maxWidth,
-                            top: entry.value.y / 100 * constraints.maxHeight,
-                            width:
-                                entry.value.width / 100 * constraints.maxWidth,
-                            height:
-                                entry.value.height /
-                                100 *
-                                constraints.maxHeight,
-                            child: ClipRect(
-                              child: _element(entry.key, entry.value, scale),
-                            ),
-                          ),
-                    ],
-                  );
-                },
-              ),
-            ),
+                ],
+              );
+            },
           ),
         ),
       ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.hasBoundedWidth && constraints.hasBoundedHeight) {
+          return SizedBox.expand(child: content);
+        }
+        return Align(
+          child: AspectRatio(
+            aspectRatio: 2,
+            child: content,
+          ),
+        );
+      },
     );
   }
 
@@ -102,9 +109,21 @@ class BannerCanvas extends StatelessWidget {
   String _text(String id) => switch (id) {
     'badge' => banner.badgeText ?? '',
     'title' => banner.title,
-    'subtitle' => banner.subtitle ?? '',
+    'subtitle' => _compactSubtitle(banner.subtitle ?? ''),
     _ => '',
   };
+
+  static String _compactSubtitle(String raw) {
+    final cleaned = raw
+        .replaceAll(
+          RegExp(r'^(Địa chỉ|Đ/c|Address)\s*:\s*', caseSensitive: false),
+          '',
+        )
+        .replaceAll('\n', ' • ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    return cleaned;
+  }
 
   Widget _element(String id, BannerCanvasNode node, double scale) {
     if (id == 'mascot') {
@@ -118,6 +137,7 @@ class BannerCanvas extends StatelessWidget {
         child: mascot,
       );
     }
+    final isSubtitle = id == 'subtitle';
     final color = BannerCanvasNode.color(node.style['color']) ?? Colors.white;
     final style = textStyle(
       (node.style['fontFamily']?.toString().trim().isNotEmpty ?? false)
@@ -125,12 +145,22 @@ class BannerCanvas extends StatelessWidget {
           : banner.fontFamily,
       TextStyle(
         fontSize: node.number('fontSize', 12, 8, 48) * scale,
-        fontWeight:
-            FontWeight.values[(node.number('fontWeight', 400, 100, 900) / 100)
-                    .round() -
-                1],
-        color: color,
+        fontWeight: isSubtitle
+            ? FontWeight.w600
+            : FontWeight.values[
+                (node.number('fontWeight', 400, 100, 900) / 100).round() - 1
+              ],
+        color: isSubtitle ? Colors.white.withValues(alpha: 0.96) : color,
         height: 1.2,
+        shadows: isSubtitle
+            ? const [
+                Shadow(
+                  color: Color(0xB3000000),
+                  blurRadius: 5,
+                  offset: Offset(0, 1),
+                ),
+              ]
+            : null,
       ),
     );
     final align = switch (node.style['align']) {
@@ -220,7 +250,8 @@ class BannerCanvas extends StatelessWidget {
         width: double.infinity,
         child: RichText(
           textAlign: align,
-          overflow: TextOverflow.clip,
+          maxLines: isSubtitle ? 1 : null,
+          overflow: isSubtitle ? TextOverflow.ellipsis : TextOverflow.clip,
           textScaler: TextScaler.noScaling,
           text: TextSpan(
             style: style,
@@ -231,7 +262,9 @@ class BannerCanvas extends StatelessWidget {
                   style: TextStyle(
                     color: lineColors is List && index < lineColors.length
                         ? BannerCanvasNode.color(lineColors[index]) ?? color
-                        : color,
+                        : (isSubtitle
+                              ? Colors.white.withValues(alpha: 0.96)
+                              : color),
                   ),
                 ),
             ],

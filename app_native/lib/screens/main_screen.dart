@@ -325,6 +325,9 @@ class _MainScreenState extends State<MainScreen> {
     }
 
     final isWide = MediaQuery.sizeOf(context).width > 900;
+    final hasActiveChat =
+        _currentIndex == MainTabs.messages &&
+        context.watch<ChatProvider>().activeConversationId != null;
     final body = _withProfileNotice(
       SmoothTabStack(
         index: _currentIndex,
@@ -335,23 +338,31 @@ class _MainScreenState extends State<MainScreen> {
     );
 
     if (isWide) {
-      return Scaffold(
-        resizeToAvoidBottomInset: false,
-        body: Row(
-          children: [
-            SideNavigation(
-              currentIndex: _currentIndex,
-              isDark: isDark,
-              isExpanded: _isSidebarExpanded,
-              onIndexChanged: _setCurrentIndex,
-              onToggleExpand: () =>
-                  setState(() => _isSidebarExpanded = !_isSidebarExpanded),
-              onToggleTheme: themeProvider.toggleTheme,
-              notificationBadge: notificationBadge,
-              onLogout: _logout,
-            ),
-            Expanded(child: body),
-          ],
+      return PopScope(
+        canPop: !hasActiveChat,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop && hasActiveChat) {
+            context.read<ChatProvider>().clearActiveChat();
+          }
+        },
+        child: Scaffold(
+          resizeToAvoidBottomInset: false,
+          body: Row(
+            children: [
+              SideNavigation(
+                currentIndex: _currentIndex,
+                isDark: isDark,
+                isExpanded: _isSidebarExpanded,
+                onIndexChanged: _setCurrentIndex,
+                onToggleExpand: () =>
+                    setState(() => _isSidebarExpanded = !_isSidebarExpanded),
+                onToggleTheme: themeProvider.toggleTheme,
+                notificationBadge: notificationBadge,
+                onLogout: _logout,
+              ),
+              Expanded(child: body),
+            ],
+          ),
         ),
       );
     }
@@ -359,31 +370,53 @@ class _MainScreenState extends State<MainScreen> {
     return PopScope(
       canPop: _currentIndex == MainTabs.home,
       onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) _setCurrentIndex(MainTabs.home);
+        if (didPop) return;
+        if (hasActiveChat) {
+          context.read<ChatProvider>().clearActiveChat();
+        } else {
+          _setCurrentIndex(MainTabs.home);
+        }
       },
       child: Scaffold(
         resizeToAvoidBottomInset: false,
-        appBar: DashboardMobileAppBar(
-          isDark: isDark,
-          showBack: _currentIndex != MainTabs.home,
-          onBack: () => _setCurrentIndex(MainTabs.home),
-          notificationBadge: notificationBadge,
-          onToggleTheme: themeProvider.toggleTheme,
-          onToggleNotifications: _toggleNotifications,
-          showNotification: auth.can(AppPermission.viewNotifications),
-        ),
+        appBar: hasActiveChat
+            ? null
+            : DashboardMobileAppBar(
+                isDark: isDark,
+                showBack: _currentIndex != MainTabs.home,
+                onBack: () => _setCurrentIndex(MainTabs.home),
+                notificationBadge: notificationBadge,
+                onToggleTheme: themeProvider.toggleTheme,
+                onToggleNotifications: _toggleNotifications,
+                showNotification: false,
+              ),
         body: body,
-        bottomNavigationBar: MobileNavigationBar(
-          isDark: isDark,
-          homeSelected: _currentIndex == MainTabs.home,
-          profileSelected: _currentIndex == MainTabs.profile,
-          onHome: () => _setCurrentIndex(MainTabs.home),
-          onBooking: () =>
-              showAppQuickActions(context, onNavigateToTab: _setCurrentIndex),
-          onProfile: auth.can(AppPermission.viewProfile)
-              ? () => _setCurrentIndex(MainTabs.profile)
-              : null,
-        ),
+        bottomNavigationBar: hasActiveChat
+            ? null
+            : MobileNavigationBar(
+                isDark: isDark,
+                homeSelected: _currentIndex == MainTabs.home,
+                ordersSelected: _currentIndex == MainTabs.repairOrders,
+                notificationsSelected: _currentIndex == MainTabs.notifications,
+                profileSelected: _currentIndex == MainTabs.profile,
+                notificationBadge: unreadNotifications == 0
+                    ? ''
+                    : notificationBadge,
+                onHome: () => _setCurrentIndex(MainTabs.home),
+                onOrders: auth.can(AppPermission.viewRepairOrders)
+                    ? () => _setCurrentIndex(MainTabs.repairOrders)
+                    : null,
+                onBooking: () => showAppQuickActions(
+                  context,
+                  onNavigateToTab: _setCurrentIndex,
+                ),
+                onNotifications: auth.can(AppPermission.viewNotifications)
+                    ? _toggleNotifications
+                    : null,
+                onProfile: auth.can(AppPermission.viewProfile)
+                    ? () => _setCurrentIndex(MainTabs.profile)
+                    : null,
+              ),
       ),
     );
   }

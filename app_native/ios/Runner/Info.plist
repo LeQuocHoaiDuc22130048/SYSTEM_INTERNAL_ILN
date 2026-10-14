@@ -73,7 +73,7 @@
 	<key>NSPhotoLibraryAddUsageDescription</key>
 	<string>Ứng dụng cần quyền lưu hình ảnh và tệp vào thư viện thiết bị.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ứng dụng cần quyền micro khi quay video trong mục tin nhắn hoặc hỗ trợ.</string>
+	<string>Ứng dụng cần quyền micro để ghi âm tin nhắn thoại và quay video trong mục tin nhắn hoặc hỗ trợ.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

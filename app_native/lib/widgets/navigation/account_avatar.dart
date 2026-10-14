@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../utils/auth_provider.dart';
-import '../../models/user.dart';
 
 class AccountAvatar extends StatelessWidget {
   const AccountAvatar({super.key, required this.selected});
@@ -10,7 +9,7 @@ class AccountAvatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider?>();
     final user = auth?.currentUser;
-    final color = user?.role.avatarColor ?? const Color(0xFF2563EB);
+    final color = selected ? const Color(0xFF2563EB) : const Color(0xFF64748B);
     final words = (user?.name ?? '')
         .trim()
         .split(RegExp(r'\s+'))
@@ -43,10 +42,7 @@ class AccountAvatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: selected ? Colors.white : color.withValues(alpha: .14),
-        border: Border.all(
-          color: selected ? color : color.withValues(alpha: .35),
-          width: selected ? 2 : 1,
-        ),
+        border: Border.all(color: color, width: selected ? 2 : 1),
       ),
       child: ClipOval(
         child: url == null

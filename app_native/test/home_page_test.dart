@@ -139,6 +139,25 @@ void main() {
     );
   }
 
+  testWidgets('First home frame reserves space without showing the default banner', (tester) async {
+    final auth = _HomeAuth(_homeUser(UserRole.manager));
+    final backend = _BannerBackend(auth.api, AppBanner.defaultBanner);
+    backend.banners = [];
+    await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend, showBottomNav: false));
+    expect(find.text(AppBanner.defaultBanner.title), findsNothing);
+    final placeholder = find.byKey(const ValueKey('banner-loading'));
+    expect(placeholder, findsOneWidget);
+    final size = tester.getSize(placeholder);
+    expect(size.width / size.height, closeTo(2, 0.01));
+    backend.banners = const [AppBanner(id: 'loaded', title: 'Loaded banner', imagePosition: 'NONE')];
+    backend.notifyListeners();
+    await tester.pump();
+    expect(find.text('Loaded banner'), findsOneWidget);
+    expect(placeholder, findsNothing);
+    await tester.pumpWidget(const SizedBox.shrink());
+    auth.dispose();
+  });
+
   testWidgets('Home refreshes cached banners on entry and app resume', (tester) async {
     final auth = _HomeAuth(_homeUser(UserRole.manager));
     final backend = _RefreshingBannerBackend(auth.api);
@@ -155,7 +174,7 @@ void main() {
     auth.dispose();
   });
 
-  testWidgets('Mixed legacy and custom slides have identical 2:1 frames', (tester) async {
+  testWidgets('Mixed legacy and custom slides match the web preview 2:1 frame', (tester) async {
     final auth = _HomeAuth(_homeUser(UserRole.manager));
     final backend = _BannerBackend(auth.api, const AppBanner(id: 'legacy', title: 'Legacy', imagePosition: 'NONE'));
     backend.banners.add(AppBanner(id: 'custom', title: 'Custom', imagePosition: 'NONE', designJson: jsonEncode({
@@ -165,7 +184,7 @@ void main() {
     await tester.pump();
     final page = tester.widget<PageView>(find.byType(PageView));
     final first = tester.getSize(find.byKey(const ValueKey('banner-slide-legacy')));
-    expect(first.height, (first.width - 12) / 2);
+    expect((first.width - 12) / first.height, closeTo(2, 0.01));
     page.controller!.jumpToPage(1);
     await tester.pump();
     expect(tester.getSize(find.byKey(const ValueKey('banner-slide-custom'))), first);
@@ -192,22 +211,41 @@ void main() {
     auth.dispose();
   });
 
-  testWidgets('Home replaces experts with today attendance and filters other dates', (tester) async {
+  testWidgets('Home replaces experts with today attendance and filters other dates and statuses', (tester) async {
     final auth = _HomeAuth(_homeUser(UserRole.manager));
     final backend = _AttendanceBackend(auth.api);
     final now = DateTime.now();
     backend.attendanceRecords = [
       AttendanceRecord(id: 'today', employeeId: '1', employeeName: 'Nhân viên hôm nay', date: now, checkIn: '08:00', checkOut: '17:00', status: AttendanceStatus.onTime),
+      AttendanceRecord(id: 'today-late', employeeId: '3', employeeName: 'Trần Văn Trễ', date: now, checkIn: '08:45', status: AttendanceStatus.late),
       AttendanceRecord(id: 'old', employeeId: '2', employeeName: 'Dữ liệu cũ', date: now.subtract(const Duration(days: 1)), status: AttendanceStatus.late),
     ];
     await tester.pumpWidget(createHomeScreen(auth: auth, backend: backend));
     await tester.pump();
     expect(find.text('Chấm công hôm nay'), findsOneWidget);
     expect(find.text('Nhân viên hôm nay'), findsOneWidget);
+    expect(find.text('Trần Văn Trễ'), findsOneWidget);
+    expect(find.text('NN'), findsOneWidget);
     expect(find.text('Vào: 08:00'), findsOneWidget);
     expect(find.text('Ra: 17:00'), findsOneWidget);
+    expect(find.text('Vào: 08:45 - Hiện tại'), findsOneWidget);
     expect(find.text('Dữ liệu cũ'), findsNothing);
     expect(find.text('Kỹ thuật viên tiêu biểu'), findsNothing);
+    expect(find.byKey(const ValueKey('attendance-filter-scroll')), findsOneWidget);
+    expect(find.byIcon(Icons.chevron_right_rounded), findsNWidgets(2));
+
+    // Filter by Late status chip
+    await tester.ensureVisible(find.byKey(const ValueKey('attendance-filter-late')));
+    await tester.tap(find.byKey(const ValueKey('attendance-filter-late')));
+    await tester.pump();
+    expect(find.text('Trần Văn Trễ'), findsOneWidget);
+    expect(find.text('Nhân viên hôm nay'), findsNothing);
+
+    // Reset filter to All
+    await tester.tap(find.byKey(const ValueKey('attendance-filter-all')));
+    await tester.pump();
+    expect(find.text('Nhân viên hôm nay'), findsOneWidget);
+
     expect(backend.teamLoads, 1);
     await tester.pumpWidget(const SizedBox.shrink());
     auth.dispose();
@@ -222,6 +260,8 @@ void main() {
     await tester.pump();
     expect(find.text('Chấm công của bạn'), findsOneWidget);
     expect(find.text('Muộn'), findsOneWidget);
+    expect(find.textContaining('Hiện tại'), findsOneWidget);
+    expect(find.text('Ra: --:--'), findsNothing);
     expect(find.text('Thông tin người khác'), findsNothing);
     expect(backend.teamLoads, 0);
     expect(backend.ownLoads, 1);
@@ -378,12 +418,12 @@ void main() {
   }
 
   final visibleFunctionsByRole = {
-    UserRole.superAdmin: ['Dashboard', 'Đơn', 'Kho', 'Nhắn tin', 'Quản lý nhân viên'],
-    UserRole.admin: ['Dashboard', 'Đơn', 'Kho', 'Nhắn tin', 'Quản lý nhân viên'],
-    UserRole.manager: ['Dashboard', 'Đơn', 'Kho', 'Nhắn tin', 'Quản lý nhân viên'],
-    UserRole.technician: ['Dashboard', 'Đơn'],
-    UserRole.warehouse: ['Dashboard', 'Đơn', 'Kho', 'Nhắn tin'],
-    UserRole.employee: ['Dashboard', 'Đơn', 'Kho', 'Nhắn tin'],
+    UserRole.superAdmin: ['Dashboard', 'Đơn hàng', 'Kho', 'Nhắn tin', 'Nhân viên'],
+    UserRole.admin: ['Dashboard', 'Đơn hàng', 'Kho', 'Nhắn tin', 'Nhân viên'],
+    UserRole.manager: ['Dashboard', 'Đơn hàng', 'Kho', 'Nhắn tin', 'Nhân viên'],
+    UserRole.technician: ['Dashboard', 'Đơn hàng'],
+    UserRole.warehouse: ['Dashboard', 'Đơn hàng', 'Kho', 'Nhắn tin'],
+    UserRole.employee: ['Dashboard', 'Đơn hàng', 'Kho', 'Nhắn tin'],
     UserRole.attendance: <String>[],
   };
 
@@ -408,7 +448,7 @@ void main() {
     ));
     await tester.pump();
     expect(find.text('Kho'), findsOneWidget);
-    for (final label in ['Dashboard', 'Đơn', 'Nhắn tin', 'Quản lý nhân viên']) {
+    for (final label in ['Dashboard', 'Đơn hàng', 'Nhắn tin', 'Nhân viên']) {
       expect(find.text(label), findsNothing);
     }
     await tester.ensureVisible(find.text('Kho'));
@@ -418,7 +458,7 @@ void main() {
     auth.updateUser(_homeUser(UserRole.employee, permissions: {AppPermission.approveAccounts}));
     await tester.pump();
     expect(find.text('Kho'), findsNothing);
-    expect(find.text('Quản lý nhân viên'), findsOneWidget);
+    expect(find.text('Nhân viên'), findsOneWidget);
 
     auth.updateUser(_homeUser(UserRole.admin, permissions: {}));
     await tester.pump();
@@ -489,6 +529,7 @@ void main() {
 
     // 2. Greeting section
     expect(find.text('Xin chào, Hoai Duc 👋'), findsOneWidget);
+    expect(find.textContaining('Ca trực: Nhân viên'), findsOneWidget);
 
     // Verify search bar and ongoing booking card are hidden from home page
     expect(find.text('ĐÃ XÁC NHẬN ✓'), findsNothing);
@@ -506,27 +547,29 @@ void main() {
     ).first;
     expect(tester.getSize(bannerContainerFinder).width, 346.0);
 
-    // 5. Functions section (Dashboard, Đơn, Kho, Nhắn tin, Quản lý nhân viên)
+    // 5. Functions section (Dashboard, Đơn hàng, Kho, Nhắn tin, Nhân viên)
     expect(find.text('Chức năng'), findsOneWidget);
     expect(find.text('Dashboard'), findsOneWidget);
-    expect(find.text('Đơn'), findsOneWidget);
+    expect(find.byKey(const ValueKey('category-repair_orders')), findsOneWidget);
     expect(find.text('Kho'), findsOneWidget);
     expect(find.text('Nhắn tin'), findsOneWidget);
-    expect(find.text('Quản lý nhân viên'), findsNothing);
+    expect(find.text('Nhân viên'), findsNothing);
 
     // 6. Top Rated Experts
     expect(find.text('Chấm công hôm nay'), findsOneWidget);
     expect(find.text('David Miller'), findsNothing);
     expect(find.text('Sarah Jenkins'), findsNothing);
 
-    // 7. Stitch Bottom Nav
+    // 7. 4-Tab + Center Button Bottom Nav
     expect(find.text('Trang chủ'), findsOneWidget);
+    expect(find.byKey(const ValueKey('bottom-nav-orders-tab')), findsOneWidget);
+    expect(find.byKey(const ValueKey('bottom-nav-notifications-tab')), findsOneWidget);
     expect(find.text('Cá nhân'), findsOneWidget);
 
     // Tap Book Now button to open booking sheet
     final bookNowBtn = find.byKey(const ValueKey('bottom-nav-booking-button'));
     expect(bookNowBtn, findsOneWidget);
-    expect(find.byKey(const ValueKey('bottom-nav-center-logo')), findsOneWidget);
+    expect(find.byKey(const ValueKey('bottom-nav-center-icon')), findsOneWidget);
     await tester.tap(bookNowBtn);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1000));
@@ -763,8 +806,8 @@ void main() {
     await tester.pump();
     expect(navigatedTab, MainTabs.dashboard);
 
-    // 2. Tap Đơn
-    await tester.tap(find.text('Đơn'));
+    // 2. Tap Đơn hàng in Feature Grid
+    await tester.tap(find.byKey(const ValueKey('category-repair_orders')));
     await tester.pump();
     expect(navigatedTab, MainTabs.repairOrders);
 
@@ -778,8 +821,8 @@ void main() {
     await tester.pump();
     expect(navigatedTab, MainTabs.messages);
 
-    // 5. Tap Quản lý nhân viên (Manager role has permission)
-    await tester.tap(find.text('Quản lý nhân viên'));
+    // 5. Tap Nhân viên (Manager role has permission)
+    await tester.tap(find.text('Nhân viên'));
     await tester.pump();
     expect(navigatedTab, MainTabs.employeeManagement);
   });

@@ -1,9 +1,11 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models/repair_device.dart';
 import '../models/repair_order.dart';
@@ -12,10 +14,61 @@ import '../models/app_permission.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
+import '../utils/media_auth_headers.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/video_player_dialog.dart';
 import '../widgets/image_preview_dialog.dart';
 import '../widgets/modal_top_bar.dart';
+
+Future<void> showRepairOrderDetails(
+  BuildContext context,
+  String orderId,
+) async {
+  if (!context.read<AuthProvider>().can(AppPermission.viewRepairOrders)) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Bạn không có quyền xem đơn sửa chữa.')),
+    );
+    return;
+  }
+  try {
+    final data = await context.read<BackendDataProvider>().api.get(
+      '/api/v1/repair-orders/$orderId',
+    );
+    final order = RepairOrder.fromJson(data as Map<String, dynamic>);
+    if (!context.mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _OrderDetailSheet(order: order),
+    );
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Không thể mở đơn sửa chữa. Đơn có thể đã bị xóa hoặc bạn không có quyền truy cập.',
+          ),
+        ),
+      );
+    }
+  }
+}
+
+Future<void> _callCustomerPhone(BuildContext context, String? rawPhone) async {
+  final cleaned = (rawPhone ?? '').replaceAll(RegExp(r'[^\d+]'), '');
+  if (cleaned.isEmpty) return;
+  final uri = Uri(scheme: 'tel', path: cleaned);
+  try {
+    await launchUrl(uri);
+  } catch (_) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể mở ứng dụng gọi điện tới $cleaned')),
+      );
+    }
+  }
+}
 
 Future<void> showCreateRepairOrderSheet(BuildContext context) async {
   final auth = context.read<AuthProvider>();
@@ -42,7 +95,7 @@ class RepairOrdersPage extends StatefulWidget {
 class _RepairOrdersPageState extends State<RepairOrdersPage> {
   final ValueNotifier<RepairOrderStatus?> _filter = ValueNotifier(null);
   final ValueNotifier<String> _searchQuery = ValueNotifier('');
-  final ValueNotifier<DateTime?> _dateFilter = ValueNotifier(null);
+  final ValueNotifier<DateTimeRange?> _dateFilter = ValueNotifier(null);
   final ValueNotifier<bool?> _warrantyFilter = ValueNotifier(null);
   final ValueNotifier<int> _visibleCount = ValueNotifier(20);
   final ScrollController _scrollController = ScrollController();
@@ -121,29 +174,96 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   }
 
   void _showDatePickerDialog(BuildContext context) {
-    showDialog(
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final presets = [
+      ('Hôm nay', DateTimeRange(start: today, end: today)),
+      ('Hôm qua', DateTimeRange(start: yesterday, end: yesterday)),
+      (
+        '7 ngày qua',
+        DateTimeRange(
+          start: DateTime(now.year, now.month, now.day - 6),
+          end: today,
+        ),
+      ),
+      (
+        'Tháng này',
+        DateTimeRange(
+          start: DateTime(now.year, now.month, 1),
+          end: DateTime(now.year, now.month + 1, 0),
+        ),
+      ),
+    ];
+    showModalBottomSheet<void>(
       context: context,
-      builder: (BuildContext context) {
-        final isDark = Theme.of(context).brightness == Brightness.dark;
-        return Dialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
-            width: 320,
-            height: 380,
-            child: CalendarDatePicker(
-              initialDate: _dateFilter.value ?? DateTime.now(),
-              firstDate: DateTime(2020),
-              lastDate: DateTime.now().add(const Duration(days: 365)),
-              onDateChanged: (DateTime date) {
-                setState(() {
-                  _dateFilter.value = date;
-                });
-                Navigator.pop(context);
-              },
+      isScrollControlled: true,
+      useSafeArea: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetContext) {
+        void select(DateTimeRange? range) {
+          _dateFilter.value = range;
+          Navigator.pop(sheetContext);
+        }
+
+        return SafeArea(
+          top: false,
+          child: SingleChildScrollView(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          'Lọc theo ngày nhận đơn',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => select(null),
+                        child: const Text('Tất cả'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      for (final preset in presets)
+                        ActionChip(
+                          label: Text(preset.$1),
+                          onPressed: () => select(preset.$2),
+                        ),
+                    ],
+                  ),
+                  Localizations.override(
+                    context: sheetContext,
+                    locale: const Locale('vi', 'VN'),
+                    delegates: const [
+                      GlobalMaterialLocalizations.delegate,
+                      GlobalWidgetsLocalizations.delegate,
+                      GlobalCupertinoLocalizations.delegate,
+                    ],
+                    child: CalendarDatePicker(
+                      initialDate: _dateFilter.value?.start ?? today,
+                      firstDate: DateTime(2020),
+                      lastDate: today.add(const Duration(days: 365)),
+                      onDateChanged: (date) =>
+                          select(DateTimeRange(start: date, end: date)),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         );
@@ -181,11 +301,11 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
             (d) => (d.serialNumber?.toLowerCase().contains(query) ?? false),
           );
 
+      final receivedDate = DateUtils.dateOnly(order.createdAt);
       final matchesDate =
           selectedDate == null ||
-          (order.createdAt.year == selectedDate.year &&
-              order.createdAt.month == selectedDate.month &&
-              order.createdAt.day == selectedDate.day);
+          (!receivedDate.isBefore(selectedDate.start) &&
+              !receivedDate.isAfter(selectedDate.end));
 
       final matchesWarranty =
           warrantyVal == null || order.underWarranty == warrantyVal;
@@ -233,14 +353,14 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                 Text(
                                   'Đơn sửa chữa',
                                   style: TextStyle(
-                                    fontSize: 24,
+                                    fontSize: 22,
                                     fontWeight: FontWeight.w700,
                                     color: isDark
                                         ? AppColors.textPrimaryDark
                                         : AppColors.textPrimaryLight,
                                   ),
                                 ),
-                                const SizedBox(height: 4),
+                                const SizedBox(height: 2),
                                 Text(
                                   '${orders.length} đơn tổng cộng',
                                   style: TextStyle(
@@ -253,7 +373,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                               ],
                             ),
                           ),
-                          if (!isEmployee)
+                          if (screenSize.width > 900 && !isEmployee)
                             ElevatedButton.icon(
                               onPressed: () => _showCreateOrderSheet(context),
                               icon: const Icon(Icons.add, size: 18),
@@ -261,106 +381,130 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: 16),
-                      TextField(
-                        onChanged: (value) => _searchQuery.value = value,
-                        decoration: InputDecoration(
-                          hintText:
-                              'Tìm theo mã đơn, số seri, thiết bị, khách...',
-                          prefixIcon: const Icon(Icons.search, size: 20),
-                          filled: true,
-                          fillColor: isDark
-                              ? AppColors.surfaceDark
-                              : Colors.white,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 13,
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 12),
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            if (_dateFilter.value != null)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: InputChip(
-                                  backgroundColor: AppColors.primary.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  selectedColor: AppColors.primary.withValues(
-                                    alpha: 0.2,
-                                  ),
-                                  side: const BorderSide(
-                                    color: AppColors.primary,
-                                  ),
-                                  avatar: const Icon(
-                                    Icons.date_range,
-                                    size: 14,
-                                    color: AppColors.primary,
-                                  ),
-                                  label: Text(
-                                    DateFormat(
-                                      'dd/MM/yyyy',
-                                    ).format(_dateFilter.value!),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDark
-                                          ? Colors.white
-                                          : Colors.black87,
-                                      fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
-                                  deleteIcon: const Icon(
-                                    Icons.cancel,
-                                    size: 16,
-                                    color: AppColors.primary,
-                                  ),
-                                  onDeleted: () {
-                                    setState(() {
-                                      _dateFilter.value = null;
-                                    });
-                                  },
-                                  onPressed: () =>
-                                      _showDatePickerDialog(context),
-                                ),
-                              )
-                            else
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: ActionChip(
-                                  backgroundColor: isDark
-                                      ? AppColors.surfaceDark
-                                      : Colors.white,
-                                  side: BorderSide(
-                                    color: isDark
-                                        ? AppColors.borderDark
-                                        : AppColors.borderLight,
-                                  ),
-                                  avatar: Icon(
-                                    Icons.calendar_today,
-                                    size: 14,
-                                    color: isDark
-                                        ? AppColors.textSecondaryDark
-                                        : AppColors.textSecondaryLight,
-                                  ),
-                                  label: Text(
-                                    DateFormat(
-                                      'dd/MM/yyyy',
-                                    ).format(DateTime.now()),
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: isDark
-                                          ? AppColors.textPrimaryDark
-                                          : AppColors.textPrimaryLight,
-                                    ),
-                                  ),
-                                  onPressed: () =>
-                                      _showDatePickerDialog(context),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              onChanged: (value) => _searchQuery.value = value,
+                              decoration: InputDecoration(
+                                hintText:
+                                    'Tìm mã đơn, số seri, thiết bị, khách...',
+                                prefixIcon: const Icon(Icons.search, size: 20),
+                                filled: true,
+                                fillColor: isDark
+                                    ? AppColors.surfaceDark
+                                    : Colors.white,
+                                contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 12,
                                 ),
                               ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ValueListenableBuilder<DateTimeRange?>(
+                            valueListenable: _dateFilter,
+                            builder: (context, selectedDate, _) {
+                              final hasDate = selectedDate != null;
+                              return Material(
+                                color: hasDate
+                                    ? AppColors.primary.withValues(alpha: 0.12)
+                                    : (isDark
+                                          ? AppColors.surfaceDark
+                                          : Colors.white),
+                                borderRadius: BorderRadius.circular(12),
+                                child: InkWell(
+                                  key: const ValueKey(
+                                    'repair-order-date-filter-button',
+                                  ),
+                                  borderRadius: BorderRadius.circular(12),
+                                  onTap: () => _showDatePickerDialog(context),
+                                  child: Container(
+                                    height: 46,
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: hasDate ? 10 : 12,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      border: Border.all(
+                                        color: hasDate
+                                            ? AppColors.primary
+                                            : (isDark
+                                                  ? AppColors.borderDark
+                                                  : AppColors.borderLight),
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          hasDate
+                                              ? Icons.event_available_outlined
+                                              : Icons.calendar_today_outlined,
+                                          size: 18,
+                                          color: hasDate
+                                              ? AppColors.primary
+                                              : (isDark
+                                                    ? AppColors
+                                                          .textSecondaryDark
+                                                    : AppColors
+                                                          .textSecondaryLight),
+                                        ),
+                                        if (hasDate) ...[
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            selectedDate.start ==
+                                                    selectedDate.end
+                                                ? DateFormat(
+                                                    'dd/MM/yyyy',
+                                                  ).format(selectedDate.start)
+                                                : '${DateFormat('dd/MM').format(selectedDate.start)}–${DateFormat('dd/MM').format(selectedDate.end)}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                              color: isDark
+                                                  ? Colors.white
+                                                  : AppColors.primary,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          GestureDetector(
+                                            key: const ValueKey(
+                                              'repair-order-date-clear-button',
+                                            ),
+                                            onTap: () {
+                                              setState(() {
+                                                _dateFilter.value = null;
+                                              });
+                                            },
+                                            child: const Icon(
+                                              Icons.cancel,
+                                              size: 16,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      SingleChildScrollView(
+                        key: const ValueKey('repair-orders-filter-scroll'),
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8.0),
+                              child: _buildFilterChip('Tất cả', null),
+                            ),
                             Padding(
                               padding: const EdgeInsets.only(right: 8.0),
                               child: _buildWarrantyFilterChip('Bảo hành', true),
@@ -372,8 +516,15 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                 false,
                               ),
                             ),
+                            Container(
+                              width: 1,
+                              height: 20,
+                              margin: const EdgeInsets.only(right: 8),
+                              color: isDark
+                                  ? AppColors.borderDark
+                                  : AppColors.borderLight,
+                            ),
                             ...[
-                              _buildFilterChip('Tất cả', null),
                               _buildFilterChip(
                                 'Chưa kiểm tra',
                                 RepairOrderStatus.pending,
@@ -706,23 +857,96 @@ class _OrderCard extends StatelessWidget {
 
   const _OrderCard({required this.order, required this.isDark});
 
+  String _resolveSerial() {
+    if (order.serialNumber != null && order.serialNumber!.trim().isNotEmpty) {
+      return order.serialNumber!.trim();
+    }
+    for (final d in order.devices) {
+      if (d.serialNumber != null && d.serialNumber!.trim().isNotEmpty) {
+        return d.serialNumber!.trim();
+      }
+    }
+    return 'Không có seri';
+  }
+
+  Widget _buildWarrantyBadge() {
+    final hasWarranty =
+        order.underWarranty || order.devices.any((d) => d.underWarranty);
+    if (!hasWarranty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+        decoration: BoxDecoration(
+          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          ),
+        ),
+        child: Text(
+          'Không BH',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            color: isDark
+                ? AppColors.textSecondaryDark
+                : AppColors.textSecondaryLight,
+          ),
+        ),
+      );
+    }
+
+    final isValid = order.devices.isNotEmpty
+        ? order.devices.any(
+            (d) => d.underWarranty && _isWarrantyValid(d.warrantyExpiry),
+          )
+        : true;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
+      decoration: BoxDecoration(
+        color: isValid ? AppColors.successLight : AppColors.errorLight,
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        isValid ? 'BH • Còn hạn' : 'BH • Hết hạn',
+        style: TextStyle(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: isValid ? AppColors.success : AppColors.error,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final hasPhone =
+        order.customerPhone != null && order.customerPhone!.trim().isNotEmpty;
+    final assigneeText = order.assigneeNames.isNotEmpty
+        ? order.assigneeNames.join(', ')
+        : (order.assignedToName ?? 'Chưa phân công');
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+    final primaryColor = isDark
+        ? AppColors.textPrimaryDark
+        : AppColors.textPrimaryLight;
+
     return InkWell(
       onTap: () => _showOrderDetail(context),
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(14),
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.06),
-              blurRadius: 7,
+              color: Colors.black.withValues(alpha: isDark ? 0.14 : 0.04),
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
@@ -730,23 +954,24 @@ class _OrderCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // ── Header: Device Name + Order Code + Top-Right Badges ──
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  width: 42,
-                  height: 42,
+                  width: 36,
+                  height: 36,
                   decoration: BoxDecoration(
                     color: AppColors.infoLight,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(
                     LucideIcons.wrench,
-                    size: 19,
+                    size: 17,
                     color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -756,14 +981,12 @@ class _OrderCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 16,
+                          fontSize: 15,
                           fontWeight: FontWeight.w700,
-                          color: isDark
-                              ? AppColors.textPrimaryDark
-                              : AppColors.textPrimaryLight,
+                          color: primaryColor,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
                         order.orderNumber,
                         style: const TextStyle(
@@ -776,131 +999,221 @@ class _OrderCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    StatusBadge(status: order.status, size: 'sm'),
-                    if (order.devices.any((d) => d.underWarranty)) ...[
-                      const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color:
-                              order.devices.any(
-                                (d) =>
-                                    d.underWarranty &&
-                                    _isWarrantyValid(d.warrantyExpiry),
-                              )
-                              ? AppColors.successLight
-                              : AppColors.errorLight,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          order.devices.any(
-                                (d) =>
-                                    d.underWarranty &&
-                                    _isWarrantyValid(d.warrantyExpiry),
-                              )
-                              ? 'Còn hạn'
-                              : 'Hết hạn',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,
-                            color:
-                                order.devices.any(
-                                  (d) =>
-                                      d.underWarranty &&
-                                      _isWarrantyValid(d.warrantyExpiry),
-                                )
-                                ? AppColors.success
-                                : AppColors.error,
-                          ),
-                        ),
-                      ),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 180),
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.end,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _buildWarrantyBadge(),
+                      StatusBadge(status: order.status, size: 'sm'),
                     ],
-                  ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            Builder(
-              builder: (context) {
-                final screenWidth = MediaQuery.sizeOf(context).width;
-                final twoColumns = screenWidth >= 560;
-                final cardWidth = screenWidth > 980 ? 980.0 : screenWidth;
-                final children = [
-                  _InfoLine(
-                    icon: Icons.person_outline,
-                    label: 'Khách hàng',
-                    value: order.customerName,
-                    isDark: isDark,
-                  ),
-                  _InfoLine(
-                    icon: Icons.phone_outlined,
-                    label: 'SĐT khách',
-                    value: order.customerPhone ?? 'Chưa có',
-                    isDark: isDark,
-                  ),
-                  _InfoLine(
-                    icon: Icons.engineering_outlined,
-                    label: 'Người sửa',
-                    value: order.assigneeNames.isNotEmpty
-                        ? order.assigneeNames.join('\n')
-                        : (order.assignedToName ?? 'Chưa phân công'),
-                    isDark: isDark,
-                    maxLines: null,
-                  ),
-                  _InfoLine(
-                    icon: Icons.schedule,
-                    label: 'Tiếp nhận',
-                    value: DateFormat(
-                      'dd/MM/yyyy HH:mm',
-                    ).format(order.createdAt.toLocal()),
-                    isDark: isDark,
-                  ),
-                  if (order.serialNumber != null &&
-                      order.serialNumber!.isNotEmpty)
-                    _InfoLine(
-                      icon: Icons.tag,
-                      label: 'Số seri',
-                      value: order.serialNumber!,
-                      isDark: isDark,
-                    ),
-                ];
-
-                if (!twoColumns) {
-                  return Column(children: children);
-                }
-
-                return Wrap(
-                  runSpacing: 10,
-                  children: children
-                      .map(
-                        (child) =>
-                            SizedBox(width: (cardWidth - 64) / 2, child: child),
-                      )
-                      .toList(),
-                );
-              },
-            ),
-            if (order.description != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                order.description!,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  height: 1.35,
+            const SizedBox(height: 10),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: isDark
+                    ? const Color(0xFF0F172A).withValues(alpha: 0.45)
+                    : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
                   color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
+                      ? AppColors.borderDark.withValues(alpha: 0.6)
+                      : const Color(0xFFE2E8F0),
                 ),
               ),
-            ],
+              child: IntrinsicHeight(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Cột trái: Tên khách + SĐT (bấm gọi nhanh) ──
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person_outline,
+                                size: 14,
+                                color: secondaryColor,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  order.customerName,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          InkWell(
+                            key: ValueKey('call-customer-${order.id}'),
+                            onTap: hasPhone
+                                ? () => _callCustomerPhone(
+                                    context,
+                                    order.customerPhone,
+                                  )
+                                : null,
+                            borderRadius: BorderRadius.circular(6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  hasPhone
+                                      ? Icons.phone_in_talk_outlined
+                                      : Icons.phone_outlined,
+                                  size: 13.5,
+                                  color: hasPhone
+                                      ? AppColors.primary
+                                      : secondaryColor,
+                                ),
+                                const SizedBox(width: 5),
+                                Flexible(
+                                  child: Text(
+                                    hasPhone
+                                        ? order.customerPhone!
+                                        : 'Chưa có SĐT',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(
+                                      fontSize: 12.5,
+                                      fontWeight: hasPhone
+                                          ? FontWeight.w600
+                                          : FontWeight.w500,
+                                      color: hasPhone
+                                          ? AppColors.primary
+                                          : secondaryColor,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    VerticalDivider(
+                      width: 16,
+                      thickness: 1,
+                      color: isDark
+                          ? AppColors.borderDark
+                          : const Color(0xFFE2E8F0),
+                    ),
+                    // ── Cột phải: Ngày nhận + Số seri ──
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.schedule,
+                                size: 13.5,
+                                color: secondaryColor,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  DateFormat(
+                                    'dd/MM/yyyy HH:mm',
+                                  ).format(order.createdAt.toLocal()),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w600,
+                                    color: primaryColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.tag,
+                                size: 13.5,
+                                color: secondaryColor,
+                              ),
+                              const SizedBox(width: 5),
+                              Expanded(
+                                child: Text(
+                                  _resolveSerial(),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w500,
+                                    color: secondaryColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // ── Dòng phụ: Kỹ thuật viên phụ trách & Mô tả lỗi ngắn ──
+            Row(
+              children: [
+                Icon(
+                  Icons.engineering_outlined,
+                  size: 14,
+                  color: secondaryColor,
+                ),
+                const SizedBox(width: 5),
+                Flexible(
+                  child: Text(
+                    assigneeText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: primaryColor,
+                    ),
+                  ),
+                ),
+                if (order.description != null &&
+                    order.description!.trim().isNotEmpty) ...[
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: Text(
+                      '•',
+                      style: TextStyle(fontSize: 12, color: secondaryColor),
+                    ),
+                  ),
+                  Expanded(
+                    child: Text(
+                      order.description!.trim(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 12, color: secondaryColor),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ],
         ),
       ),
@@ -913,68 +1226,6 @@ class _OrderCard extends StatelessWidget {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) => _OrderDetailSheet(order: order),
-    );
-  }
-}
-
-class _InfoLine extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final bool isDark;
-  final int? maxLines;
-
-  const _InfoLine({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.isDark,
-    this.maxLines = 1,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final labelStyle = TextStyle(
-      fontSize: 13,
-      color: isDark
-          ? AppColors.textSecondaryDark
-          : AppColors.textSecondaryLight,
-    );
-    final valueStyle = TextStyle(
-      fontSize: 13,
-      fontWeight: FontWeight.w700,
-      color: isDark ? AppColors.textPrimaryDark : AppColors.textPrimaryLight,
-    );
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8, right: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Icon(
-              icon,
-              size: 16,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text('$label: ', style: labelStyle),
-          Expanded(
-            child: Text(
-              value,
-              style: valueStyle,
-              maxLines: maxLines,
-              overflow: maxLines == null
-                  ? TextOverflow.clip
-                  : TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
     );
   }
 }
@@ -1035,10 +1286,64 @@ class _OrderDetailSheet extends StatelessWidget {
     );
   }
 
+  Widget _buildClusterCard({
+    required bool isDark,
+    required IconData icon,
+    required String title,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 16, color: AppColors.primary),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ...children,
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final order =
+        context
+            .watch<BackendDataProvider>()
+            .repairOrders
+            .where((item) => item.id == this.order.id)
+            .firstOrNull ??
+        this.order;
     final canDelete = context.watch<AuthProvider>().isManagerOrAbove;
+    final hasPhone =
+        order.customerPhone != null && order.customerPhone!.trim().isNotEmpty;
 
     return Container(
       constraints: BoxConstraints(
@@ -1053,26 +1358,46 @@ class _OrderDetailSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const ModalTopBar(),
+            ModalTopBar(
+              title: 'Chi tiết đơn sửa chữa',
+              trailing: canDelete
+                  ? IconButton(
+                      key: const ValueKey('order-detail-delete-button'),
+                      tooltip: 'Xóa đơn hàng',
+                      onPressed: () => _confirmDelete(context),
+                      style: IconButton.styleFrom(
+                        backgroundColor: AppColors.error.withValues(alpha: 0.1),
+                        minimumSize: const Size(36, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: AppColors.error,
+                        size: 20,
+                      ),
+                    )
+                  : null,
+            ),
             Flexible(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // ── Tóm tắt thiết bị & trạng thái ──
                     Row(
                       children: [
                         Container(
-                          width: 52,
-                          height: 52,
+                          width: 48,
+                          height: 48,
                           decoration: BoxDecoration(
                             color: AppColors.infoLight,
-                            borderRadius: BorderRadius.circular(14),
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(
                             LucideIcons.wrench,
-                            size: 24,
+                            size: 22,
                             color: AppColors.primary,
                           ),
                         ),
@@ -1084,13 +1409,14 @@ class _OrderDetailSheet extends StatelessWidget {
                               Text(
                                 order.deviceName,
                                 style: TextStyle(
-                                  fontSize: 18,
+                                  fontSize: 17,
                                   fontWeight: FontWeight.w700,
                                   color: isDark
                                       ? AppColors.textPrimaryDark
                                       : AppColors.textPrimaryLight,
                                 ),
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 order.orderNumber,
                                 style: const TextStyle(
@@ -1105,76 +1431,120 @@ class _OrderDetailSheet extends StatelessWidget {
                         StatusBadge(status: order.status),
                       ],
                     ),
-                    const SizedBox(height: 22),
-                    _DetailRow('Khách hàng', order.customerName),
-                    _DetailRow('SĐT khách', order.customerPhone ?? 'Chưa có'),
-                    if (order.devices.length <= 1) ...[
-                      _DetailRow(
-                        'Số seri',
-                        order.devices.isNotEmpty
-                            ? (order.devices.first.serialNumber ?? 'Không có')
-                            : (order.serialNumber ?? 'Không có'),
-                      ),
-                      _DetailRow('Bảo hành', () {
-                        final isUnderWarranty = order.devices.isNotEmpty
-                            ? order.devices.first.underWarranty
-                            : order.underWarranty;
-                        final expiry = order.devices.isNotEmpty
-                            ? order.devices.first.warrantyExpiry
-                            : null;
-                        if (!isUnderWarranty) return 'Không bảo hành';
-                        final isValid = _isWarrantyValid(expiry);
-                        final expiryStr = expiry != null
-                            ? DateFormat('dd/MM/yyyy').format(expiry)
-                            : 'Không rõ';
-                        return '$expiryStr (${isValid ? "Còn hạn" : "Hết hạn"})';
-                      }()),
-                      if (order.devices.isNotEmpty &&
-                          order.devices.first.description != null &&
-                          order.devices.first.description!.isNotEmpty)
-                        _DetailRow(
-                          'Mô tả lỗi',
-                          order.devices.first.description!,
-                        )
-                      else if (order.description != null &&
-                          order.description!.isNotEmpty)
-                        _DetailRow('Mô tả lỗi', order.description!),
-                    ],
-                    _DetailRow(
-                      'Người sửa (đơn)',
-                      order.assigneeNames.isNotEmpty
-                          ? order.assigneeNames.join('\n')
-                          : (order.assignedToName ?? 'Chưa phân công'),
+                    const SizedBox(height: 16),
+                    // ── Cụm 1: Thông tin khách hàng ──
+                    _buildClusterCard(
+                      isDark: isDark,
+                      icon: Icons.person_outline,
+                      title: 'Thông tin khách hàng',
+                      children: [
+                        _DetailRow('Khách hàng', order.customerName),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _DetailRow(
+                                'SĐT khách',
+                                order.customerPhone ?? 'Chưa có',
+                              ),
+                            ),
+                            if (hasPhone)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 8),
+                                child: InkWell(
+                                  onTap: () => _callCustomerPhone(
+                                    context,
+                                    order.customerPhone,
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 10,
+                                      vertical: 5,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.12,
+                                      ),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(
+                                          Icons.phone_in_talk_outlined,
+                                          size: 14,
+                                          color: AppColors.primary,
+                                        ),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Gọi',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w700,
+                                            color: AppColors.primary,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ],
                     ),
-                    _DetailRow(
-                      'Ngày tạo',
-                      DateFormat(
-                        'dd/MM/yyyy HH:mm',
-                      ).format(order.createdAt.toLocal()),
-                    ),
-                    if (order.updatedAt != null)
-                      _DetailRow(
-                        'Cập nhật',
-                        DateFormat(
-                          'dd/MM/yyyy HH:mm',
-                        ).format(order.updatedAt!.toLocal()),
-                      ),
-                    if (order.notes != null && order.notes!.isNotEmpty)
-                      _DetailRow('Ghi chú', order.notes!),
-                    if (order.devices.length > 1) ...[
-                      const SizedBox(height: 20),
-                      // ── Danh sách thiết bị (Legacy) ─────────────────
+                    // ── Cụm 2: Thông tin thiết bị ──
+                    if (order.devices.length <= 1)
+                      _buildClusterCard(
+                        isDark: isDark,
+                        icon: Icons.devices_outlined,
+                        title: 'Thông tin thiết bị',
+                        children: [
+                          _DetailRow(
+                            'Số seri',
+                            order.devices.isNotEmpty
+                                ? (order.devices.first.serialNumber ??
+                                      'Không có')
+                                : (order.serialNumber ?? 'Không có'),
+                          ),
+                          _DetailRow('Bảo hành', () {
+                            final isUnderWarranty = order.devices.isNotEmpty
+                                ? order.devices.first.underWarranty
+                                : order.underWarranty;
+                            final expiry = order.devices.isNotEmpty
+                                ? order.devices.first.warrantyExpiry
+                                : null;
+                            if (!isUnderWarranty) return 'Không bảo hành';
+                            final isValid = _isWarrantyValid(expiry);
+                            final expiryStr = expiry != null
+                                ? DateFormat('dd/MM/yyyy').format(expiry)
+                                : 'Không rõ';
+                            return '$expiryStr (${isValid ? "Còn hạn" : "Hết hạn"})';
+                          }()),
+                          if (order.devices.isNotEmpty &&
+                              order.devices.first.description != null &&
+                              order.devices.first.description!.isNotEmpty)
+                            _DetailRow(
+                              'Mô tả lỗi',
+                              order.devices.first.description!,
+                            )
+                          else if (order.description != null &&
+                              order.description!.isNotEmpty)
+                            _DetailRow('Mô tả lỗi', order.description!),
+                        ],
+                      )
+                    else ...[
                       Text(
                         'Thiết bị (${order.devices.length})',
                         style: TextStyle(
-                          fontSize: 15,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                           color: isDark
                               ? AppColors.textPrimaryDark
                               : AppColors.textPrimaryLight,
                         ),
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 8),
                       ...order.devices.asMap().entries.map(
                         (e) => _DeviceDetailCard(
                           isDark: isDark,
@@ -1189,9 +1559,37 @@ class _OrderDetailSheet extends StatelessWidget {
                         ),
                       ),
                     ],
-
+                    // ── Cụm 3: Phân công & Thời gian ──
+                    _buildClusterCard(
+                      isDark: isDark,
+                      icon: Icons.engineering_outlined,
+                      title: 'Phân công & Tiến độ',
+                      children: [
+                        _DetailRow(
+                          'Người sửa (đơn)',
+                          order.assigneeNames.isNotEmpty
+                              ? order.assigneeNames.join(', ')
+                              : (order.assignedToName ?? 'Chưa phân công'),
+                        ),
+                        _DetailRow(
+                          'Ngày tạo',
+                          DateFormat(
+                            'dd/MM/yyyy HH:mm',
+                          ).format(order.createdAt.toLocal()),
+                        ),
+                        if (order.updatedAt != null)
+                          _DetailRow(
+                            'Cập nhật',
+                            DateFormat(
+                              'dd/MM/yyyy HH:mm',
+                            ).format(order.updatedAt!.toLocal()),
+                          ),
+                        if (order.notes != null && order.notes!.isNotEmpty)
+                          _DetailRow('Ghi chú', order.notes!),
+                      ],
+                    ),
                     if (order.media.isNotEmpty) ...[
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 4),
                       Text(
                         'Đính kèm',
                         style: TextStyle(
@@ -1276,6 +1674,7 @@ class _OrderDetailSheet extends StatelessWidget {
                               borderRadius: BorderRadius.circular(8),
                               child: Image.network(
                                 url,
+                                headers: mediaAuthHeaders(context, url),
                                 fit: BoxFit.cover,
                                 loadingBuilder:
                                     (context, child, loadingProgress) {
@@ -1311,83 +1710,104 @@ class _OrderDetailSheet extends StatelessWidget {
                         },
                       ),
                     ],
-                    if (canDelete) ...[
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.error,
-                            side: const BorderSide(color: AppColors.error),
-                          ),
-                          onPressed: () => _confirmDelete(context),
-                          icon: const Icon(Icons.delete_outline, size: 18),
-                          label: const Text('Xóa đơn hàng'),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton.icon(
-                        onPressed: () async {
-                          final updated = await showDialog<bool>(
-                            context: context,
-                            barrierDismissible: false,
-                            builder: (_) => _OrderStatusDialog(order: order),
-                          );
-                          if (updated == true && context.mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  'Cập nhật trạng thái thành công!',
-                                ),
-                                backgroundColor: AppColors.success,
-                              ),
-                            );
-                          }
-                        },
-                        icon: const Icon(Icons.sync, size: 18),
-                        label: const Text('Cập nhật trạng thái'),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Đóng'),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () async {
-                              final updated = await showModalBottomSheet<bool>(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (context) =>
-                                    _EditOrderSheet(order: order),
-                              );
-                              if (updated == true && context.mounted) {
-                                WidgetsBinding.instance.addPostFrameCallback((
-                                  _,
-                                ) {
-                                  if (context.mounted) {
-                                    Navigator.pop(context);
-                                  }
-                                });
-                              }
-                            },
-                            child: const Text('Chỉnh sửa'),
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
+              ),
+            ),
+            // ── Sticky Bottom Action Row: 2 nút chính nằm ngang ──
+            Container(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              decoration: BoxDecoration(
+                color: isDark ? AppColors.surfaceDark : Colors.white,
+                border: Border(
+                  top: BorderSide(
+                    color: isDark
+                        ? AppColors.borderDark
+                        : AppColors.borderLight,
+                  ),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -3),
+                  ),
+                ],
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () async {
+                        final updated = await showModalBottomSheet<bool>(
+                          context: context,
+                          isScrollControlled: true,
+                          isDismissible: false,
+                          enableDrag: false,
+                          useSafeArea: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (_) => _OrderStatusSheet(order: order),
+                        );
+                        if (updated == true && context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Cập nhật trạng thái thành công!'),
+                              backgroundColor: AppColors.success,
+                            ),
+                          );
+                        }
+                      },
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.sync, size: 17),
+                          SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Cập nhật trạng thái',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        final updated = await showModalBottomSheet<bool>(
+                          context: context,
+                          isScrollControlled: true,
+                          backgroundColor: Colors.transparent,
+                          builder: (context) => _EditOrderSheet(order: order),
+                        );
+                        if (updated == true && context.mounted) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            if (context.mounted) {
+                              Navigator.pop(context);
+                            }
+                          });
+                        }
+                      },
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.edit_outlined, size: 17),
+                          SizedBox(width: 6),
+                          Flexible(
+                            child: Text(
+                              'Chỉnh sửa',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1419,16 +1839,16 @@ String _orderStatusCode(RepairOrderStatus status) => switch (status) {
   RepairOrderStatus.cancelled => 'CANCELLED',
 };
 
-class _OrderStatusDialog extends StatefulWidget {
+class _OrderStatusSheet extends StatefulWidget {
   final RepairOrder order;
 
-  const _OrderStatusDialog({required this.order});
+  const _OrderStatusSheet({required this.order});
 
   @override
-  State<_OrderStatusDialog> createState() => _OrderStatusDialogState();
+  State<_OrderStatusSheet> createState() => _OrderStatusSheetState();
 }
 
-class _OrderStatusDialogState extends State<_OrderStatusDialog> {
+class _OrderStatusSheetState extends State<_OrderStatusSheet> {
   final _noteController = TextEditingController();
   late String _status;
   bool _saving = false;
@@ -1470,73 +1890,172 @@ class _OrderStatusDialogState extends State<_OrderStatusDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
     return PopScope(
       canPop: !_saving,
-      child: AlertDialog(
-        title: const Text('Cập nhật trạng thái'),
-        scrollable: true,
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Đơn hàng: ${widget.order.orderNumber}'),
-            const SizedBox(height: 16),
-            DropdownButtonFormField<String>(
-              initialValue: _status,
-              isExpanded: true,
-              decoration: const InputDecoration(
-                labelText: 'Trạng thái',
-                border: OutlineInputBorder(),
-              ),
-              items: _orderStatuses
-                  .map(
-                    (status) => DropdownMenuItem(
-                      value: status.key,
-                      child: Text(status.value),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: Container(
+          key: const ValueKey('order-status-update-sheet'),
+          constraints: BoxConstraints(
+            maxHeight:
+                (MediaQuery.sizeOf(context).height - keyboardInset) * 0.9,
+          ),
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  ModalTopBar(
+                    title: 'Cập nhật trạng thái',
+                    onClose: _saving ? () {} : () => Navigator.pop(context),
+                  ),
+                  Flexible(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Đơn hàng: ${widget.order.orderNumber}'),
+                          const SizedBox(height: 16),
+                          LayoutBuilder(
+                            builder: (context, constraints) => Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final entry in _orderStatuses)
+                                  SizedBox(
+                                    width: (constraints.maxWidth - 8) / 2,
+                                    child: Builder(
+                                      builder: (context) {
+                                        final visual = _statusVisualForCode(
+                                          entry.key,
+                                          isDark: isDark,
+                                        );
+                                        return ChoiceChip(
+                                          key: ValueKey(
+                                            'update-status-${entry.key}',
+                                          ),
+                                          selected: _status == entry.key,
+                                          onSelected: _saving
+                                              ? null
+                                              : (_) => setState(
+                                                  () => _status = entry.key,
+                                                ),
+                                          showCheckmark: false,
+                                          avatar: Icon(
+                                            visual.icon,
+                                            color: visual.color,
+                                            size: 20,
+                                          ),
+                                          backgroundColor: visual.bgColor,
+                                          selectedColor: visual.color
+                                              .withValues(alpha: 0.2),
+                                          side: BorderSide(
+                                            color: _status == entry.key
+                                                ? visual.color
+                                                : visual.borderColor,
+                                            width: _status == entry.key ? 2 : 1,
+                                          ),
+                                          label: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Container(
+                                                width: 6,
+                                                height: 6,
+                                                decoration: BoxDecoration(
+                                                  color: visual.color,
+                                                  shape: BoxShape.circle,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 6),
+                                              Flexible(
+                                                child: Text(
+                                                  visual.label,
+                                                  style: TextStyle(
+                                                    color: visual.color,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _noteController,
+                            enabled: !_saving,
+                            maxLines: 2,
+                            decoration: const InputDecoration(
+                              labelText: 'Ghi chú (không bắt buộc)',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                          if (_error != null) ...[
+                            const SizedBox(height: 12),
+                            Text(
+                              _error!,
+                              style: const TextStyle(color: AppColors.error),
+                            ),
+                          ],
+                        ],
+                      ),
                     ),
-                  )
-                  .toList(),
-              onChanged: _saving
-                  ? null
-                  : (value) {
-                      if (value != null) setState(() => _status = value);
-                    },
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _noteController,
-              enabled: !_saving,
-              maxLines: 2,
-              decoration: const InputDecoration(
-                labelText: 'Ghi chú (không bắt buộc)',
-                border: OutlineInputBorder(),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: _saving
+                                ? null
+                                : () => Navigator.pop(context),
+                            child: const Text('Hủy'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed:
+                                _saving ||
+                                    _status ==
+                                        _orderStatusCode(widget.order.status)
+                                ? null
+                                : _save,
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Lưu thay đổi'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-            if (_error != null) ...[
-              const SizedBox(height: 12),
-              Text(_error!, style: const TextStyle(color: AppColors.error)),
-            ],
-          ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed:
-                _saving || _status == _orderStatusCode(widget.order.status)
-                ? null
-                : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Lưu'),
-          ),
-        ],
       ),
     );
   }
@@ -2228,6 +2747,37 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     }
   }
 
+  InputDecoration _unifiedInputDecoration(
+    BuildContext context, {
+    required String label,
+    required String hint,
+    required IconData icon,
+    bool alignLabelWithHint = false,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      alignLabelWithHint: alignLabelWithHint,
+      prefixIcon: Icon(icon, size: 20),
+      filled: true,
+      fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    );
+  }
+
   Widget _buildTextField(
     BuildContext context, {
     required TextEditingController controller,
@@ -2238,71 +2788,49 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     int maxLines = 1,
     bool required = true,
   }) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimaryLight,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
-          style: const TextStyle(fontSize: 14),
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: Icon(icon, size: 20),
-            filled: true,
-            fillColor: isDark ? AppColors.surfaceDark : const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
-          ),
-          validator: (value) {
-            if (required && (value == null || value.isEmpty)) {
-              return 'Trường này không được để trống';
-            }
-            return null;
-          },
-        ),
-      ],
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      style: const TextStyle(fontSize: 14),
+      decoration: _unifiedInputDecoration(
+        context,
+        label: label,
+        hint: hint,
+        icon: icon,
+        alignLabelWithHint: maxLines > 1,
+      ),
+      validator: (value) {
+        if (required && (value == null || value.trim().isEmpty)) {
+          return 'Trường này không được để trống';
+        }
+        return null;
+      },
     );
+  }
+
+  String _resolveTechnicianName(String id, BackendDataProvider backend) {
+    if (id.startsWith('name:')) {
+      return id.substring(5);
+    }
+    for (final emp in backend.employees) {
+      if (emp.id == id) return emp.name;
+    }
+    final idx = widget.order.assigneeIds.indexOf(id);
+    if (idx != -1 && idx < widget.order.assigneeNames.length) {
+      return widget.order.assigneeNames[idx];
+    }
+    if (id == widget.order.assignedToId &&
+        widget.order.assignedToName != null) {
+      return widget.order.assignedToName!;
+    }
+    return 'Kỹ thuật viên';
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backend = context.watch<BackendDataProvider>();
-    User? assignedTechnician;
-    for (final employee in backend.employees) {
-      if (employee.id == widget.order.assignedToId) {
-        assignedTechnician = employee;
-        break;
-      }
-    }
     final technicians = backend.employees
         .where(
           (user) =>
@@ -2312,11 +2840,14 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
         )
         .toList();
     final statuses = _availableStatuses();
+    final existingMedias = widget.order.media
+        .where((m) => !_deletedMediaIds.contains(m.id))
+        .toList();
 
     return _KeyboardBottomPadding(
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
         ),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -2328,498 +2859,214 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const ModalTopBar(),
+              ModalTopBar(title: 'Chỉnh sửa ${widget.order.orderNumber}'),
               Flexible(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                   child: Form(
                     key: _formKey,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          'Chỉnh sửa ${widget.order.orderNumber}',
-                          style: const TextStyle(
-                            fontSize: 19,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        _buildTextField(
-                          context,
-                          controller: _customerNameController,
-                          label: 'Tên khách hàng',
-                          hint: 'Nhập tên khách hàng',
+                        // ── Section 1: Thông tin khách hàng ──
+                        _FormSectionCard(
+                          isDark: isDark,
                           icon: Icons.person_outline,
-                        ),
-                        const SizedBox(height: 16),
-                        _buildTextField(
-                          context,
-                          controller: _customerPhoneController,
-                          label: 'Số điện thoại',
-                          hint: '0901 234 567',
-                          icon: Icons.phone_outlined,
-                          keyboardType: TextInputType.phone,
-                          required: false,
-                        ),
-                        const SizedBox(height: 16),
-                        // ── Danh sách thiết bị ─────────────────────
-                        Text(
-                          'Thiết bị sửa chữa',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            color: isDark
-                                ? AppColors.textPrimaryDark
-                                : AppColors.textPrimaryLight,
-                          ),
-                        ),
-                        const SizedBox(height: 12),
-                        ...List.generate(_deviceEntries.length, (index) {
-                          final entry = _deviceEntries[index];
-                          return _DeviceFormCard(
-                            key: ValueKey(entry.id),
-                            index: index,
-                            entry: entry,
-                            isDark: isDark,
-                            canAssign: _canAssign,
-                            technicians: technicians,
-                            canRemove: _deviceEntries.length > 1,
-                            onRemove: () =>
-                                setState(() => _deviceEntries.removeAt(index)),
-                            onChanged: () => setState(() {}),
-                            orderCreatedAt: widget.order.createdAt,
-                          );
-                        }),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Nhân viên đang sửa chữa',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        if (widget.order.assigneeIds.isEmpty &&
-                            widget.order.assignedToId == null)
-                          _AssignedTechnicianCard(
-                            name: 'Chưa phân công',
-                            employeeId: null,
-                            department: null,
-                            phone: null,
-                            isAssigned: false,
-                            isDark: isDark,
-                          )
-                        else ...[
-                          ...widget.order.assigneeIds.map((id) {
-                            final tech = backend.employees.firstWhere(
-                              (t) => t.id == id,
-                              orElse: () => User(
-                                id: id,
-                                name:
-                                    widget.order.assigneeNames.length >
-                                        widget.order.assigneeIds.indexOf(id)
-                                    ? widget.order.assigneeNames[widget
-                                          .order
-                                          .assigneeIds
-                                          .indexOf(id)]
-                                    : 'Kỹ thuật viên',
-                                email: '',
-                                employeeId: '',
-                                role: UserRole.employee,
-                                status: UserStatus.active,
-                              ),
-                            );
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: _AssignedTechnicianCard(
-                                name: tech.name,
-                                employeeId: tech.employeeId,
-                                department: tech.department,
-                                phone: tech.phone,
-                                isAssigned: true,
-                                isDark: isDark,
-                              ),
-                            );
-                          }),
-                          if (widget.order.assigneeIds.isEmpty &&
-                              widget.order.assignedToId != null)
-                            _AssignedTechnicianCard(
-                              name:
-                                  assignedTechnician?.name ??
-                                  widget.order.assignedToName ??
-                                  'Kỹ thuật viên',
-                              employeeId: assignedTechnician?.employeeId,
-                              department: assignedTechnician?.department,
-                              phone: assignedTechnician?.phone,
-                              isAssigned: true,
-                              isDark: isDark,
-                            ),
-                        ],
-                        const SizedBox(height: 18),
-                        if (_canAssign) ...[
-                          const Text(
-                            'Phân công người sửa (Có thể chọn nhiều)',
-                            style: TextStyle(fontWeight: FontWeight.w600),
-                          ),
-                          const SizedBox(height: 8),
-                          InkWell(
-                            onTap: () async {
-                              final selected = await showDialog<Set<String>>(
-                                context: context,
-                                builder: (context) {
-                                  return _TechnicianMultiSelectDialog(
-                                    technicians: technicians,
-                                    initialSelected: _technicianIds,
-                                    isDark: isDark,
-                                  );
-                                },
-                              );
-                              if (selected != null) {
-                                setState(() {
-                                  _technicianIds.clear();
-                                  _technicianIds.addAll(selected);
-                                });
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 14,
-                              ),
-                              decoration: BoxDecoration(
-                                border: Border.all(
-                                  color: isDark
-                                      ? Colors.grey[700]!
-                                      : Colors.grey[400]!,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Row(
-                                children: [
-                                  Expanded(
-                                    child: _technicianIds.isEmpty
-                                        ? Text(
-                                            'Chọn nhân viên',
-                                            style: TextStyle(
-                                              color: isDark
-                                                  ? Colors.grey[400]
-                                                  : Colors.grey[600],
-                                            ),
-                                          )
-                                        : Wrap(
-                                            spacing: 6,
-                                            runSpacing: 6,
-                                            children: _technicianIds.map((id) {
-                                              final name = backend.employees
-                                                  .firstWhere(
-                                                    (t) => t.id == id,
-                                                    orElse: () => User(
-                                                      id: id,
-                                                      name: 'Kỹ thuật viên',
-                                                      email: '',
-                                                      employeeId: '',
-                                                      role: UserRole.employee,
-                                                      status: UserStatus.active,
-                                                    ),
-                                                  )
-                                                  .name;
-                                              return Chip(
-                                                label: Text(
-                                                  name,
-                                                  style: const TextStyle(
-                                                    fontSize: 12,
-                                                  ),
-                                                ),
-                                                padding: EdgeInsets.zero,
-                                                materialTapTargetSize:
-                                                    MaterialTapTargetSize
-                                                        .shrinkWrap,
-                                                onDeleted: () {
-                                                  setState(() {
-                                                    _technicianIds.remove(id);
-                                                  });
-                                                },
-                                              );
-                                            }).toList(),
-                                          ),
-                                  ),
-                                  Icon(
-                                    Icons.arrow_drop_down,
-                                    color: isDark
-                                        ? Colors.grey[400]
-                                        : Colors.grey[600],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                        const Text(
-                          'Đính kèm hình ảnh hoặc video',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (widget.order.media
-                                .where((m) => !_deletedMediaIds.contains(m.id))
-                                .isNotEmpty ||
-                            _selectedMedias.isNotEmpty) ...[
-                          SizedBox(
-                            height: 120,
-                            child: ListView(
-                              scrollDirection: Axis.horizontal,
-                              children: [
-                                ...widget.order.media
-                                    .where(
-                                      (m) => !_deletedMediaIds.contains(m.id),
-                                    )
-                                    .map((m) {
-                                      final url = backend.api.resolveUrl(m.url);
-                                      return Padding(
-                                        padding: const EdgeInsets.only(
-                                          right: 8.0,
-                                        ),
-                                        child: Stack(
-                                          children: [
-                                            ClipRRect(
-                                              borderRadius:
-                                                  BorderRadius.circular(8),
-                                              child: m.isVideo
-                                                  ? Container(
-                                                      width: 120,
-                                                      height: 120,
-                                                      color: AppColors.infoLight
-                                                          .withValues(
-                                                            alpha: 0.2,
-                                                          ),
-                                                      child: const Column(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .center,
-                                                        children: [
-                                                          Icon(
-                                                            Icons
-                                                                .play_circle_outline,
-                                                            size: 36,
-                                                            color: AppColors
-                                                                .primary,
-                                                          ),
-                                                          SizedBox(height: 4),
-                                                          Text(
-                                                            'Video',
-                                                            style: TextStyle(
-                                                              fontSize: 12,
-                                                            ),
-                                                          ),
-                                                        ],
-                                                      ),
-                                                    )
-                                                  : Image.network(
-                                                      url,
-                                                      width: 120,
-                                                      height: 120,
-                                                      fit: BoxFit.cover,
-                                                      errorBuilder:
-                                                          (
-                                                            context,
-                                                            error,
-                                                            stackTrace,
-                                                          ) => Container(
-                                                            width: 120,
-                                                            height: 120,
-                                                            color: Colors
-                                                                .grey[300],
-                                                            child: const Icon(
-                                                              Icons
-                                                                  .broken_image,
-                                                            ),
-                                                          ),
-                                                    ),
-                                            ),
-                                            Positioned(
-                                              top: 4,
-                                              right: 4,
-                                              child: GestureDetector(
-                                                onTap: () => setState(
-                                                  () => _deletedMediaIds.add(
-                                                    m.id,
-                                                  ),
-                                                ),
-                                                child: Container(
-                                                  padding: const EdgeInsets.all(
-                                                    2,
-                                                  ),
-                                                  decoration:
-                                                      const BoxDecoration(
-                                                        color: Colors.black54,
-                                                        shape: BoxShape.circle,
-                                                      ),
-                                                  child: const Icon(
-                                                    Icons.delete,
-                                                    color: Colors.red,
-                                                    size: 16,
-                                                  ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      );
-                                    }),
-                                ..._selectedMedias.asMap().entries.map((e) {
-                                  final index = e.key;
-                                  final file = e.value;
-                                  final isVideo = _isVideo(file.path);
-                                  return Padding(
-                                    padding: const EdgeInsets.only(right: 8.0),
-                                    child: Stack(
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: isVideo
-                                              ? Container(
-                                                  width: 120,
-                                                  height: 120,
-                                                  color: AppColors.infoLight
-                                                      .withValues(alpha: 0.2),
-                                                  child: const Column(
-                                                    mainAxisAlignment:
-                                                        MainAxisAlignment
-                                                            .center,
-                                                    children: [
-                                                      Icon(
-                                                        Icons
-                                                            .play_circle_outline,
-                                                        size: 36,
-                                                        color:
-                                                            AppColors.primary,
-                                                      ),
-                                                      SizedBox(height: 4),
-                                                      Text(
-                                                        'Video mới',
-                                                        style: TextStyle(
-                                                          fontSize: 11,
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  ),
-                                                )
-                                              : Image.file(
-                                                  File(file.path),
-                                                  width: 120,
-                                                  height: 120,
-                                                  fit: BoxFit.cover,
-                                                ),
-                                        ),
-                                        Positioned(
-                                          top: 4,
-                                          right: 4,
-                                          child: GestureDetector(
-                                            onTap: () => setState(
-                                              () => _selectedMedias.removeAt(
-                                                index,
-                                              ),
-                                            ),
-                                            child: Container(
-                                              padding: const EdgeInsets.all(2),
-                                              decoration: const BoxDecoration(
-                                                color: Colors.black54,
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Icon(
-                                                Icons.close,
-                                                color: Colors.white,
-                                                size: 16,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                }),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
+                          title: '1. Thông tin khách hàng',
                           children: [
-                            OutlinedButton.icon(
-                              onPressed: () => _pickImage(ImageSource.camera),
-                              icon: const Icon(Icons.camera_alt, size: 18),
-                              label: const Text('Chụp ảnh'),
+                            _buildTextField(
+                              context,
+                              controller: _customerNameController,
+                              label: 'Tên khách hàng',
+                              hint: 'Nhập tên khách hàng',
+                              icon: Icons.person_outline,
                             ),
-                            OutlinedButton.icon(
-                              onPressed: _pickMultiImages,
-                              icon: const Icon(Icons.photo_library, size: 18),
-                              label: const Text('Chọn nhiều ảnh'),
-                            ),
-                            OutlinedButton.icon(
-                              onPressed: _pickVideo,
-                              icon: const Icon(
-                                Icons.videocam_outlined,
-                                size: 18,
-                              ),
-                              label: const Text('Chọn video'),
+                            const SizedBox(height: 12),
+                            _buildTextField(
+                              context,
+                              controller: _customerPhoneController,
+                              label: 'Số điện thoại',
+                              hint: '0901 234 567',
+                              icon: Icons.phone_outlined,
+                              keyboardType: TextInputType.phone,
+                              required: false,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 20),
-                        const Text(
-                          'Cập nhật trạng thái',
-                          style: TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 8),
-                        DropdownButtonFormField<String>(
-                          initialValue: _nextStatus,
-                          items: statuses
-                              .map(
-                                (status) => DropdownMenuItem(
-                                  value: status.key,
-                                  child: Text(status.value),
+                        const SizedBox(height: 14),
+                        // ── Section 2: Thông tin thiết bị ──
+                        _FormSectionCard(
+                          isDark: isDark,
+                          icon: Icons.devices_outlined,
+                          title: '2. Thông tin thiết bị',
+                          children: List.generate(_deviceEntries.length, (
+                            index,
+                          ) {
+                            final entry = _deviceEntries[index];
+                            return Padding(
+                              padding: EdgeInsets.only(
+                                bottom: index < _deviceEntries.length - 1
+                                    ? 16
+                                    : 0,
+                              ),
+                              child: _DeviceFormCard(
+                                key: ValueKey(entry.id),
+                                index: index,
+                                entry: entry,
+                                isDark: isDark,
+                                canAssign: _canAssign,
+                                technicians: technicians,
+                                canRemove: _deviceEntries.length > 1,
+                                onRemove: () => setState(
+                                  () => _deviceEntries.removeAt(index),
                                 ),
-                              )
-                              .toList(),
-                          onChanged: (value) =>
-                              setState(() => _nextStatus = value),
-                          decoration: const InputDecoration(
-                            hintText: 'Chọn trạng thái',
-                            border: OutlineInputBorder(),
-                          ),
+                                onChanged: () => setState(() {}),
+                                orderCreatedAt: widget.order.createdAt,
+                              ),
+                            );
+                          }),
                         ),
-                        const SizedBox(height: 16),
-                        TextField(
-                          controller: _noteController,
-                          maxLines: 2,
-                          decoration: const InputDecoration(
-                            labelText: 'Ghi chú',
-                            border: OutlineInputBorder(),
-                          ),
-                        ),
-                        const SizedBox(height: 22),
-                        SizedBox(
-                          width: double.infinity,
-                          child: ElevatedButton(
-                            onPressed: _saving ? null : _save,
-                            child: _saving
-                                ? const SizedBox(
-                                    height: 20,
-                                    width: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Lưu thay đổi'),
-                          ),
+                        const SizedBox(height: 14),
+                        // ── Section 3: Xử lý & Phân công ──
+                        _FormSectionCard(
+                          isDark: isDark,
+                          icon: Icons.engineering_outlined,
+                          title: '3. Xử lý & Phân công',
+                          children: [
+                            _UnifiedTechnicianAssignmentField(
+                              isDark: isDark,
+                              canAssign: _canAssign,
+                              selectedIds: _technicianIds,
+                              resolveName: (id) =>
+                                  _resolveTechnicianName(id, backend),
+                              onTapPick: _canAssign
+                                  ? () async {
+                                      final selected =
+                                          await showModalBottomSheet<
+                                            Set<String>
+                                          >(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) =>
+                                                _TechnicianMultiSelectBottomSheet(
+                                                  technicians: technicians,
+                                                  initialSelected:
+                                                      _technicianIds,
+                                                  isDark: isDark,
+                                                ),
+                                          );
+                                      if (selected != null) {
+                                        setState(() {
+                                          _technicianIds
+                                            ..clear()
+                                            ..addAll(selected);
+                                        });
+                                      }
+                                    }
+                                  : null,
+                              onRemoveId: _canAssign
+                                  ? (id) => setState(
+                                      () => _technicianIds.remove(id),
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(height: 14),
+                            _OrderStatusSelectorField(
+                              isDark: isDark,
+                              selectedStatusCode:
+                                  _nextStatus ?? _currentStatusBackendCode,
+                              statuses: statuses,
+                              onStatusSelected: (value) =>
+                                  setState(() => _nextStatus = value),
+                            ),
+                            const SizedBox(height: 14),
+                            _UnifiedMediaPickerBox(
+                              isDark: isDark,
+                              existingMediaWidgets: existingMedias.map((m) {
+                                final url = backend.api.resolveUrl(m.url);
+                                return _MediaThumbItem(
+                                  isVideo: m.isVideo,
+                                  imageUrl: m.isVideo ? null : url,
+                                  label: 'Video',
+                                  onRemove: () => setState(
+                                    () => _deletedMediaIds.add(m.id),
+                                  ),
+                                );
+                              }).toList(),
+                              newMediaFiles: _selectedMedias,
+                              isVideoPath: _isVideo,
+                              onRemoveNewAt: (idx) =>
+                                  setState(() => _selectedMedias.removeAt(idx)),
+                              onCamera: () => _pickImage(ImageSource.camera),
+                              onGallery: _pickMultiImages,
+                              onVideo: _pickVideo,
+                            ),
+                            const SizedBox(height: 14),
+                            TextFormField(
+                              controller: _noteController,
+                              maxLines: 2,
+                              style: const TextStyle(fontSize: 14),
+                              decoration: _unifiedInputDecoration(
+                                context,
+                                label: 'Ghi chú xử lý',
+                                hint: 'Nhập ghi chú hoặc kết quả kiểm tra...',
+                                icon: Icons.notes_outlined,
+                                alignLabelWithHint: true,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
+                  ),
+                ),
+              ),
+              // ── Sticky Bottom Bar: Ghim cố định nút "Lưu thay đổi" ──
+              Container(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppColors.surfaceDark : Colors.white,
+                  border: Border(
+                    top: BorderSide(
+                      color: isDark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight,
+                    ),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(
+                        alpha: isDark ? 0.25 : 0.06,
+                      ),
+                      blurRadius: 12,
+                      offset: const Offset(0, -4),
+                    ),
+                  ],
+                ),
+                child: SizedBox(
+                  key: const ValueKey('edit-order-sticky-save-button'),
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: _saving ? null : _save,
+                    icon: _saving
+                        ? const SizedBox.shrink()
+                        : const Icon(Icons.check_circle_outline, size: 18),
+                    label: _saving
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text(
+                            'Lưu thay đổi',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
                   ),
                 ),
               ),
@@ -2831,71 +3078,1023 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   }
 }
 
-class _AssignedTechnicianCard extends StatelessWidget {
-  final String name;
-  final String? employeeId;
-  final String? department;
-  final String? phone;
-  final bool isAssigned;
+class _FormSectionCard extends StatelessWidget {
+  final bool isDark;
+  final IconData icon;
+  final String title;
+  final List<Widget> children;
+
+  const _FormSectionCard({
+    required this.isDark,
+    required this.icon,
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: isDark
+            ? const Color(0xFF0F172A).withValues(alpha: 0.5)
+            : const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+        ),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, size: 17, color: AppColors.primary),
+                const SizedBox(width: 7),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ─── Helper: Lấy ký tự đầu của tên chính (ví dụ: Nguyễn Tấn Phát -> P) ──────
+String _givenNameInitial(String fullName) {
+  final parts = fullName.trim().split(RegExp(r'\s+'));
+  if (parts.isEmpty || parts.first.isEmpty) return 'K';
+  return parts.last.substring(0, 1).toUpperCase();
+}
+
+class _UnifiedTechnicianAssignmentField extends StatelessWidget {
+  final bool isDark;
+  final bool canAssign;
+  final Set<String> selectedIds;
+  final String Function(String id) resolveName;
+  final VoidCallback? onTapPick;
+  final void Function(String id)? onRemoveId;
+
+  const _UnifiedTechnicianAssignmentField({
+    required this.isDark,
+    required this.canAssign,
+    required this.selectedIds,
+    required this.resolveName,
+    this.onTapPick,
+    this.onRemoveId,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+
+    return InkWell(
+      key: const ValueKey('order-technician-selector'),
+      onTap: onTapPick,
+      borderRadius: BorderRadius.circular(12),
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Kỹ thuật viên phụ trách',
+          prefixIcon: const Icon(Icons.engineering_outlined, size: 20),
+          suffixIcon: canAssign
+              ? Icon(Icons.keyboard_arrow_down_rounded, color: secondaryColor)
+              : null,
+          filled: true,
+          fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+        ),
+        child: selectedIds.isEmpty
+            ? Text(
+                canAssign ? 'Chưa phân công (Chạm để chọn)' : 'Chưa phân công',
+                style: TextStyle(fontSize: 13.5, color: secondaryColor),
+              )
+            : Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  ...selectedIds.map((id) {
+                    final name = resolveName(id);
+                    return InputChip(
+                      key: ValueKey('assigned-tech-chip-$id'),
+                      avatar: CircleAvatar(
+                        backgroundColor: AppColors.primary,
+                        child: Text(
+                          _givenNameInitial(name),
+                          style: const TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                      label: Text(
+                        name,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: isDark
+                              ? AppColors.textPrimaryDark
+                              : AppColors.textPrimaryLight,
+                        ),
+                      ),
+                      backgroundColor: AppColors.primary.withValues(
+                        alpha: isDark ? 0.18 : 0.08,
+                      ),
+                      side: BorderSide(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                      ),
+                      deleteIcon: const Icon(Icons.close_rounded, size: 15),
+                      deleteIconColor: AppColors.error,
+                      deleteButtonTooltipMessage: 'Bỏ chọn $name',
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      onPressed: onTapPick,
+                      onDeleted: onRemoveId != null
+                          ? () => onRemoveId!(id)
+                          : null,
+                    );
+                  }),
+                ],
+              ),
+      ),
+    );
+  }
+}
+
+// ─── Cấu hình màu sắc & Icon cho Trạng thái đơn hàng ─────────────────────────
+
+class _OrderStatusVisual {
+  final String code;
+  final String label;
+  final String subtitle;
+  final IconData icon;
+  final Color color;
+  final Color bgColor;
+  final Color borderColor;
+
+  const _OrderStatusVisual({
+    required this.code,
+    required this.label,
+    required this.subtitle,
+    required this.icon,
+    required this.color,
+    required this.bgColor,
+    required this.borderColor,
+  });
+}
+
+_OrderStatusVisual _statusVisualForCode(String code, {bool isDark = false}) {
+  switch (code) {
+    case 'PENDING':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Chưa kiểm tra',
+        subtitle: 'Đơn mới tiếp nhận, chưa kiểm tra',
+        icon: Icons.radio_button_unchecked_rounded,
+        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+        bgColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
+        borderColor: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+      );
+    case 'WAITING_FOR_CHECK':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Chờ kiểm tra',
+        subtitle: 'Đang xếp hàng chờ kỹ thuật kiểm tra',
+        icon: Icons.hourglass_top_rounded,
+        color: const Color(0xFF0284C7),
+        bgColor: isDark
+            ? const Color(0xFF0284C7).withValues(alpha: 0.16)
+            : const Color(0xFFE0F2FE),
+        borderColor: const Color(0xFF7DD3FC),
+      );
+    case 'CHECKING':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Đang kiểm tra',
+        subtitle: 'Kỹ thuật viên đang đo đạc, chẩn đoán lỗi',
+        icon: Icons.manage_search_rounded,
+        color: const Color(0xFF6366F1),
+        bgColor: isDark
+            ? const Color(0xFF6366F1).withValues(alpha: 0.16)
+            : const Color(0xFFEEF2FF),
+        borderColor: const Color(0xFFA5B4FC),
+      );
+    case 'CHECKED':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Đã kiểm tra',
+        subtitle: 'Đã xác định nguyên nhân lỗi & phương án',
+        icon: Icons.fact_check_outlined,
+        color: const Color(0xFF0D9488),
+        bgColor: isDark
+            ? const Color(0xFF0D9488).withValues(alpha: 0.16)
+            : const Color(0xFFCCFBF1),
+        borderColor: const Color(0xFF5EEAD4),
+      );
+    case 'IN_PROGRESS':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Đang sửa',
+        subtitle: 'Đang tiến hành sửa chữa, thay thế linh kiện',
+        icon: Icons.build_circle_outlined,
+        color: const Color(0xFFD97706),
+        bgColor: isDark
+            ? const Color(0xFFD97706).withValues(alpha: 0.16)
+            : const Color(0xFFFEF3C7),
+        borderColor: const Color(0xFFFCD34D),
+      );
+    case 'COMPLETED':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Hoàn thành',
+        subtitle: 'Đã sửa xong và kiểm tra vận hành ổn định',
+        icon: Icons.check_circle_rounded,
+        color: const Color(0xFF16A34A),
+        bgColor: isDark
+            ? const Color(0xFF16A34A).withValues(alpha: 0.16)
+            : const Color(0xFFDCFCE7),
+        borderColor: const Color(0xFF86EFAC),
+      );
+    case 'DELIVERED':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Đã giao',
+        subtitle: 'Đã bàn giao thiết bị cho khách hàng',
+        icon: Icons.local_shipping_outlined,
+        color: const Color(0xFF2563EB),
+        bgColor: isDark
+            ? const Color(0xFF2563EB).withValues(alpha: 0.16)
+            : const Color(0xFFDBEAFE),
+        borderColor: const Color(0xFF93C5FD),
+      );
+    case 'CANCELLED':
+      return _OrderStatusVisual(
+        code: code,
+        label: 'Đã trả',
+        subtitle: 'Hoàn trả thiết bị cho khách hàng',
+        icon: Icons.assignment_return_outlined,
+        color: const Color(0xFFDC2626),
+        bgColor: isDark
+            ? const Color(0xFFDC2626).withValues(alpha: 0.16)
+            : const Color(0xFFFEE2E2),
+        borderColor: const Color(0xFFFCA5A5),
+      );
+    default:
+      return _OrderStatusVisual(
+        code: code,
+        label: code,
+        subtitle: '',
+        icon: Icons.radio_button_unchecked_rounded,
+        color: const Color(0xFF64748B),
+        bgColor: const Color(0xFFF1F5F9),
+        borderColor: const Color(0xFFCBD5E1),
+      );
+  }
+}
+
+class _OrderStatusSelectorField extends StatelessWidget {
+  final bool isDark;
+  final String selectedStatusCode;
+  final List<MapEntry<String, String>> statuses;
+  final ValueChanged<String> onStatusSelected;
+
+  const _OrderStatusSelectorField({
+    required this.isDark,
+    required this.selectedStatusCode,
+    required this.statuses,
+    required this.onStatusSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final visual = _statusVisualForCode(selectedStatusCode, isDark: isDark);
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+
+    return InkWell(
+      key: const ValueKey('order-status-selector'),
+      borderRadius: BorderRadius.circular(12),
+      onTap: () async {
+        final picked = await showModalBottomSheet<String>(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _OrderStatusPickerSheet(
+            selectedStatusCode: selectedStatusCode,
+            statuses: statuses,
+            isDark: isDark,
+          ),
+        );
+        if (picked != null) {
+          onStatusSelected(picked);
+        }
+      },
+      child: InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Trạng thái đơn hàng',
+          prefixIcon: Icon(visual.icon, size: 20, color: visual.color),
+          suffixIcon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: secondaryColor,
+          ),
+          filled: true,
+          fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            ),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(
+              color: isDark ? AppColors.borderDark : AppColors.borderLight,
+            ),
+          ),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 10,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: visual.bgColor,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: visual.borderColor),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: visual.color,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    visual.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: visual.color,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _OrderStatusPickerSheet extends StatelessWidget {
+  final String selectedStatusCode;
+  final List<MapEntry<String, String>> statuses;
   final bool isDark;
 
-  const _AssignedTechnicianCard({
-    required this.name,
-    required this.employeeId,
-    required this.department,
-    required this.phone,
-    required this.isAssigned,
+  const _OrderStatusPickerSheet({
+    required this.selectedStatusCode,
+    required this.statuses,
     required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final details = <String>[
-      if (employeeId != null && employeeId!.isNotEmpty) employeeId!,
-      if (department != null && department!.isNotEmpty) department!,
-      if (phone != null && phone!.isNotEmpty) phone!,
-    ];
     return Container(
-      width: double.infinity,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+      ),
+      decoration: BoxDecoration(
+        color: isDark ? AppColors.surfaceDark : Colors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: Material(
+        type: MaterialType.transparency,
+        child: SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const ModalTopBar(title: 'Chọn trạng thái đơn hàng'),
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                  itemCount: statuses.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    final entry = statuses[index];
+                    final visual = _statusVisualForCode(
+                      entry.key,
+                      isDark: isDark,
+                    );
+                    final isSelected = entry.key == selectedStatusCode;
+
+                    return InkWell(
+                      key: ValueKey('status-option-${entry.key}'),
+                      borderRadius: BorderRadius.circular(14),
+                      onTap: () => Navigator.pop(context, entry.key),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 11,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? visual.bgColor
+                              : (isDark
+                                    ? const Color(0xFF1E293B)
+                                    : const Color(0xFFF8FAFC)),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isSelected
+                                ? visual.color
+                                : (isDark
+                                      ? AppColors.borderDark
+                                      : AppColors.borderLight),
+                            width: isSelected ? 1.5 : 1,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 38,
+                              height: 38,
+                              decoration: BoxDecoration(
+                                color: visual.bgColor,
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: visual.borderColor),
+                              ),
+                              child: Icon(
+                                visual.icon,
+                                color: visual.color,
+                                size: 20,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          visual.label,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w700,
+                                            color: isDark
+                                                ? AppColors.textPrimaryDark
+                                                : AppColors.textPrimaryLight,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 2,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: visual.bgColor,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                          border: Border.all(
+                                            color: visual.borderColor,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          visual.label,
+                                          style: TextStyle(
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                            color: visual.color,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (visual.subtitle.isNotEmpty) ...[
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      visual.subtitle,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: isDark
+                                            ? AppColors.textSecondaryDark
+                                            : AppColors.textSecondaryLight,
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Icon(
+                              isSelected
+                                  ? Icons.radio_button_checked_rounded
+                                  : Icons.radio_button_unchecked_rounded,
+                              color: isSelected
+                                  ? visual.color
+                                  : (isDark
+                                        ? AppColors.textSecondaryDark
+                                        : Colors.grey[400]),
+                              size: 22,
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MediaThumbItem extends StatelessWidget {
+  final bool isVideo;
+  final String? imageUrl;
+  final File? localFile;
+  final String label;
+  final VoidCallback onRemove;
+
+  const _MediaThumbItem({
+    required this.isVideo,
+    this.imageUrl,
+    this.localFile,
+    required this.label,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(right: 10),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: isVideo
+                ? Container(
+                    width: 84,
+                    height: 84,
+                    color: AppColors.infoLight.withValues(alpha: 0.25),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.play_circle_outline,
+                          size: 28,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          label,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                : localFile != null
+                ? Image.file(
+                    localFile!,
+                    width: 84,
+                    height: 84,
+                    fit: BoxFit.cover,
+                  )
+                : Image.network(
+                    imageUrl ?? '',
+                    width: 84,
+                    height: 84,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => Container(
+                      width: 84,
+                      height: 84,
+                      color: Colors.grey[300],
+                      child: const Icon(Icons.broken_image, size: 18),
+                    ),
+                  ),
+          ),
+          Positioned(
+            top: 4,
+            right: 4,
+            child: GestureDetector(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(3),
+                decoration: const BoxDecoration(
+                  color: AppColors.error,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 13),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashedRectPainter extends CustomPainter {
+  final Color color;
+  final double radius;
+  static const double _strokeWidth = 1.4;
+  static const double _dashWidth = 5.0;
+  static const double _dashGap = 3.5;
+
+  const _DashedRectPainter({required this.color, this.radius = 12.0});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = _strokeWidth
+      ..style = PaintingStyle.stroke;
+
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+
+    for (final metric in path.computeMetrics()) {
+      double distance = 0.0;
+      while (distance < metric.length) {
+        final next = (distance + _dashWidth).clamp(0.0, metric.length);
+        canvas.drawPath(metric.extractPath(distance, next), paint);
+        distance += _dashWidth + _dashGap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedRectPainter oldDelegate) {
+    return oldDelegate.color != color || oldDelegate.radius != radius;
+  }
+}
+
+class _UnifiedMediaPickerBox extends StatelessWidget {
+  final bool isDark;
+  final List<Widget> existingMediaWidgets;
+  final List<XFile> newMediaFiles;
+  final bool Function(String path) isVideoPath;
+  final void Function(int index) onRemoveNewAt;
+  final VoidCallback onCamera;
+  final VoidCallback onGallery;
+  final VoidCallback onVideo;
+
+  const _UnifiedMediaPickerBox({
+    required this.isDark,
+    this.existingMediaWidgets = const [],
+    required this.newMediaFiles,
+    required this.isVideoPath,
+    required this.onRemoveNewAt,
+    required this.onCamera,
+    required this.onGallery,
+    required this.onVideo,
+  });
+
+  Future<void> _showMediaActionSheet(BuildContext context) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetCtx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppColors.surfaceDark : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: Material(
+            type: MaterialType.transparency,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const ModalTopBar(title: 'Thêm ảnh / video đính kèm'),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          key: const ValueKey('media-action-camera'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt_outlined,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          title: const Text(
+                            'Chụp ảnh mới',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Mở máy ảnh chụp trực tiếp tình trạng thiết bị',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onTap: () {
+                            Navigator.pop(sheetCtx);
+                            onCamera();
+                          },
+                        ),
+                        const SizedBox(height: 6),
+                        ListTile(
+                          key: const ValueKey('media-action-gallery'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.success.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.photo_library_outlined,
+                              color: AppColors.success,
+                            ),
+                          ),
+                          title: const Text(
+                            'Chọn từ thư viện',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Chọn một hoặc nhiều ảnh có sẵn trong máy',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onTap: () {
+                            Navigator.pop(sheetCtx);
+                            onGallery();
+                          },
+                        ),
+                        const SizedBox(height: 6),
+                        ListTile(
+                          key: const ValueKey('media-action-video'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: AppColors.warning.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.videocam_outlined,
+                              color: AppColors.warning,
+                            ),
+                          ),
+                          title: const Text(
+                            'Quay/Chọn video',
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                            ),
+                          ),
+                          subtitle: const Text(
+                            'Đính kèm video ghi lại lỗi hoặc quá trình kiểm tra',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                          onTap: () {
+                            Navigator.pop(sheetCtx);
+                            onVideo();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final totalCount = existingMediaWidgets.length + newMediaFiles.length;
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+
+    return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: isDark ? AppColors.backgroundDark : const Color(0xFFF8FAFC),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: isDark ? AppColors.borderDark : AppColors.borderLight,
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            backgroundColor: isAssigned
-                ? AppColors.infoLight
-                : const Color(0xFFF1F5F9),
-            child: Icon(
-              isAssigned
-                  ? Icons.engineering_outlined
-                  : Icons.person_off_outlined,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                if (details.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    details.join(' - '),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark
-                          ? AppColors.textSecondaryDark
-                          : AppColors.textSecondaryLight,
+          Row(
+            children: [
+              Icon(Icons.attach_file, size: 16, color: secondaryColor),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  'Đính kèm ảnh / video',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
+                ),
+              ),
+              if (totalCount > 0)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$totalCount tệp',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
                     ),
                   ),
-                ],
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 84,
+            child: Row(
+              children: [
+                // Ô viền nét đứt "+ Thêm ảnh / video" ở góc trái
+                InkWell(
+                  key: const ValueKey('media-picker-add-tile'),
+                  onTap: () => _showMediaActionSheet(context),
+                  borderRadius: BorderRadius.circular(12),
+                  child: CustomPaint(
+                    painter: _DashedRectPainter(
+                      color: AppColors.primary.withValues(alpha: 0.65),
+                      radius: 12,
+                    ),
+                    child: Container(
+                      width: 84,
+                      height: 84,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(
+                          alpha: isDark ? 0.12 : 0.05,
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.add_circle_outline_rounded,
+                            size: 22,
+                            color: AppColors.primary,
+                          ),
+                          SizedBox(height: 4),
+                          Text(
+                            '+ Thêm\nảnh / video',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 10.5,
+                              height: 1.15,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Danh sách cuộn ngang hiển thị preview ảnh/video bên phải
+                Expanded(
+                  child: totalCount == 0
+                      ? Container(
+                          height: 84,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          decoration: BoxDecoration(
+                            color: isDark
+                                ? AppColors.surfaceDark.withValues(alpha: 0.4)
+                                : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: isDark
+                                  ? AppColors.borderDark.withValues(alpha: 0.6)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Chưa có ảnh/video đính kèm.\nBấm vào dấu + bên trái để tải lên.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              height: 1.35,
+                              color: secondaryColor,
+                            ),
+                          ),
+                        )
+                      : ListView(
+                          key: const ValueKey('media-picker-preview-list'),
+                          scrollDirection: Axis.horizontal,
+                          children: [
+                            ...existingMediaWidgets,
+                            ...newMediaFiles.asMap().entries.map((e) {
+                              final index = e.key;
+                              final file = e.value;
+                              final isVideo = isVideoPath(file.path);
+                              return _MediaThumbItem(
+                                isVideo: isVideo,
+                                localFile: isVideo ? null : File(file.path),
+                                label: 'Video mới',
+                                onRemove: () => onRemoveNewAt(index),
+                              );
+                            }),
+                          ],
+                        ),
+                ),
               ],
             ),
           ),
@@ -3075,7 +4274,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     return _KeyboardBottomPadding(
       child: Container(
         constraints: BoxConstraints(
-          maxHeight: MediaQuery.sizeOf(context).height * 0.9,
+          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
         ),
         decoration: BoxDecoration(
           color: isDark ? AppColors.surfaceDark : Colors.white,
@@ -3089,311 +4288,188 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const ModalTopBar(),
+                const ModalTopBar(title: 'Tạo đơn sửa chữa mới'),
                 Flexible(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                     child: Form(
                       key: _formKey,
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            'Tạo đơn sửa chữa mới',
-                            style: TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 24),
-                          _buildTextField(
-                            context,
-                            controller: _customerNameController,
-                            label: 'Tên khách hàng',
-                            hint: 'Nhập tên khách hàng',
+                          _FormSectionCard(
+                            isDark: isDark,
                             icon: Icons.person_outline,
-                          ),
-                          const SizedBox(height: 16),
-                          _buildTextField(
-                            context,
-                            controller: _customerPhoneController,
-                            label: 'Số điện thoại',
-                            hint: '0901 234 567',
-                            icon: Icons.phone_outlined,
-                            keyboardType: TextInputType.phone,
-                            required: false,
-                          ),
-                          const SizedBox(height: 16),
-                          // ── Danh sách thiết bị ─────────────────────
-                          ...List.generate(_deviceEntries.length, (index) {
-                            final entry = _deviceEntries[index];
-                            return _DeviceFormCard(
-                              key: ValueKey(entry.id),
-                              index: index,
-                              entry: entry,
-                              isDark: isDark,
-                              canAssign: canAssign,
-                              technicians: technicians,
-                              canRemove: _deviceEntries.length > 1,
-                              onRemove: () => setState(
-                                () => _deviceEntries.removeAt(index),
-                              ),
-                              onChanged: () => setState(() {}),
-                              orderCreatedAt: null,
-                            );
-                          }),
-                          if (canAssign) ...[
-                            const SizedBox(height: 16),
-                            Text(
-                              'Phân công người sửa (Có thể chọn nhiều)',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w600,
-                                color: isDark
-                                    ? AppColors.textPrimaryDark
-                                    : AppColors.textPrimaryLight,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            InkWell(
-                              onTap: () async {
-                                final selected = await showDialog<Set<String>>(
-                                  context: context,
-                                  builder: (context) {
-                                    return _TechnicianMultiSelectDialog(
-                                      technicians: technicians,
-                                      initialSelected: _technicianIds,
-                                      isDark: isDark,
-                                    );
-                                  },
-                                );
-                                if (selected != null) {
-                                  setState(() {
-                                    _technicianIds.clear();
-                                    _technicianIds.addAll(selected);
-                                  });
-                                }
-                              },
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 14,
-                                ),
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: isDark
-                                        ? Colors.grey[700]!
-                                        : Colors.grey[400]!,
-                                  ),
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Row(
-                                  children: [
-                                    Expanded(
-                                      child: _technicianIds.isEmpty
-                                          ? Text(
-                                              'Chọn nhân viên (không bắt buộc)',
-                                              style: TextStyle(
-                                                color: isDark
-                                                    ? Colors.grey[400]
-                                                    : Colors.grey[600],
-                                              ),
-                                            )
-                                          : Wrap(
-                                              spacing: 6,
-                                              runSpacing: 6,
-                                              children: _technicianIds.map((
-                                                id,
-                                              ) {
-                                                final name = technicians
-                                                    .firstWhere(
-                                                      (t) => t.id == id,
-                                                      orElse: () => User(
-                                                        id: id,
-                                                        name: 'Kỹ thuật viên',
-                                                        email: '',
-                                                        employeeId: '',
-                                                        role: UserRole.employee,
-                                                        status:
-                                                            UserStatus.active,
-                                                      ),
-                                                    )
-                                                    .name;
-                                                return Chip(
-                                                  label: Text(
-                                                    name,
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                    ),
-                                                  ),
-                                                  padding: EdgeInsets.zero,
-                                                  materialTapTargetSize:
-                                                      MaterialTapTargetSize
-                                                          .shrinkWrap,
-                                                  onDeleted: () {
-                                                    setState(() {
-                                                      _technicianIds.remove(id);
-                                                    });
-                                                  },
-                                                );
-                                              }).toList(),
-                                            ),
-                                    ),
-                                    Icon(
-                                      Icons.arrow_drop_down,
-                                      color: isDark
-                                          ? Colors.grey[400]
-                                          : Colors.grey[600],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: 16),
-
-                          Text(
-                            'Đính kèm hình ảnh hoặc video',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: isDark
-                                  ? AppColors.textPrimaryDark
-                                  : AppColors.textPrimaryLight,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (_selectedMedias.isNotEmpty) ...[
-                            SizedBox(
-                              height: 120,
-                              child: ListView.separated(
-                                scrollDirection: Axis.horizontal,
-                                itemCount: _selectedMedias.length,
-                                separatorBuilder: (context, index) =>
-                                    const SizedBox(width: 8),
-                                itemBuilder: (context, index) {
-                                  final file = _selectedMedias[index];
-                                  final isVideo = _isVideo(file.path);
-                                  return Stack(
-                                    children: [
-                                      ClipRRect(
-                                        borderRadius: BorderRadius.circular(8),
-                                        child: isVideo
-                                            ? Container(
-                                                width: 120,
-                                                height: 120,
-                                                color: AppColors.infoLight
-                                                    .withValues(alpha: 0.2),
-                                                child: const Column(
-                                                  mainAxisAlignment:
-                                                      MainAxisAlignment.center,
-                                                  children: [
-                                                    Icon(
-                                                      Icons.play_circle_outline,
-                                                      size: 36,
-                                                      color: AppColors.primary,
-                                                    ),
-                                                    SizedBox(height: 4),
-                                                    Text(
-                                                      'Video',
-                                                      style: TextStyle(
-                                                        fontSize: 12,
-                                                      ),
-                                                    ),
-                                                  ],
-                                                ),
-                                              )
-                                            : Image.file(
-                                                File(file.path),
-                                                width: 120,
-                                                height: 120,
-                                                fit: BoxFit.cover,
-                                              ),
-                                      ),
-                                      Positioned(
-                                        top: 4,
-                                        right: 4,
-                                        child: GestureDetector(
-                                          onTap: () => setState(
-                                            () =>
-                                                _selectedMedias.removeAt(index),
-                                          ),
-                                          child: Container(
-                                            padding: const EdgeInsets.all(2),
-                                            decoration: const BoxDecoration(
-                                              color: Colors.black54,
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                              size: 16,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
+                            title: '1. Thông tin khách hàng',
                             children: [
-                              OutlinedButton.icon(
-                                onPressed: () => _pickImage(ImageSource.camera),
-                                icon: const Icon(Icons.camera_alt, size: 18),
-                                label: const Text('Chụp ảnh'),
+                              _buildTextField(
+                                context,
+                                controller: _customerNameController,
+                                label: 'Tên khách hàng',
+                                hint: 'Nhập tên khách hàng',
+                                icon: Icons.person_outline,
                               ),
-                              OutlinedButton.icon(
-                                onPressed: _pickMultiImages,
-                                icon: const Icon(Icons.photo_library, size: 18),
-                                label: const Text('Chọn nhiều ảnh'),
-                              ),
-                              OutlinedButton.icon(
-                                onPressed: _pickVideo,
-                                icon: const Icon(
-                                  Icons.videocam_outlined,
-                                  size: 18,
-                                ),
-                                label: const Text('Chọn video'),
+                              const SizedBox(height: 12),
+                              _buildTextField(
+                                context,
+                                controller: _customerPhoneController,
+                                label: 'Số điện thoại',
+                                hint: '0901 234 567',
+                                icon: Icons.phone_outlined,
+                                keyboardType: TextInputType.phone,
+                                required: false,
                               ),
                             ],
                           ),
-                          const SizedBox(height: 32),
-                          SizedBox(
-                            width: double.infinity,
-                            child: ElevatedButton(
-                              onPressed: _isLoading ? null : _createOrder,
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
+                          const SizedBox(height: 14),
+                          _FormSectionCard(
+                            isDark: isDark,
+                            icon: Icons.devices_outlined,
+                            title: '2. Thông tin thiết bị',
+                            children: List.generate(_deviceEntries.length, (
+                              index,
+                            ) {
+                              final entry = _deviceEntries[index];
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: index < _deviceEntries.length - 1
+                                      ? 16
+                                      : 0,
                                 ),
+                                child: _DeviceFormCard(
+                                  key: ValueKey(entry.id),
+                                  index: index,
+                                  entry: entry,
+                                  isDark: isDark,
+                                  canAssign: canAssign,
+                                  technicians: technicians,
+                                  canRemove: _deviceEntries.length > 1,
+                                  onRemove: () => setState(
+                                    () => _deviceEntries.removeAt(index),
+                                  ),
+                                  onChanged: () => setState(() {}),
+                                  orderCreatedAt: null,
+                                ),
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 14),
+                          _FormSectionCard(
+                            isDark: isDark,
+                            icon: Icons.engineering_outlined,
+                            title: '3. Xử lý & Phân công',
+                            children: [
+                              if (canAssign) ...[
+                                _UnifiedTechnicianAssignmentField(
+                                  isDark: isDark,
+                                  canAssign: canAssign,
+                                  selectedIds: _technicianIds,
+                                  resolveName: (id) => technicians
+                                      .firstWhere(
+                                        (t) => t.id == id,
+                                        orElse: () => User(
+                                          id: id,
+                                          name: 'Kỹ thuật viên',
+                                          email: '',
+                                          employeeId: '',
+                                          role: UserRole.employee,
+                                          status: UserStatus.active,
+                                        ),
+                                      )
+                                      .name,
+                                  onTapPick: () async {
+                                    final selected =
+                                        await showModalBottomSheet<Set<String>>(
+                                          context: context,
+                                          isScrollControlled: true,
+                                          backgroundColor: Colors.transparent,
+                                          builder: (context) =>
+                                              _TechnicianMultiSelectBottomSheet(
+                                                technicians: technicians,
+                                                initialSelected: _technicianIds,
+                                                isDark: isDark,
+                                              ),
+                                        );
+                                    if (selected != null) {
+                                      setState(() {
+                                        _technicianIds
+                                          ..clear()
+                                          ..addAll(selected);
+                                      });
+                                    }
+                                  },
+                                  onRemoveId: (id) =>
+                                      setState(() => _technicianIds.remove(id)),
+                                ),
+                                const SizedBox(height: 14),
+                              ],
+                              _UnifiedMediaPickerBox(
+                                isDark: isDark,
+                                newMediaFiles: _selectedMedias,
+                                isVideoPath: _isVideo,
+                                onRemoveNewAt: (idx) => setState(
+                                  () => _selectedMedias.removeAt(idx),
+                                ),
+                                onCamera: () => _pickImage(ImageSource.camera),
+                                onGallery: _pickMultiImages,
+                                onVideo: _pickVideo,
                               ),
-                              child: _isLoading
-                                  ? const SizedBox(
-                                      height: 20,
-                                      width: 20,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        valueColor:
-                                            AlwaysStoppedAnimation<Color>(
-                                              Colors.white,
-                                            ),
-                                      ),
-                                    )
-                                  : const Text('Tạo đơn hàng'),
-                            ),
+                            ],
                           ),
                         ],
                       ),
+                    ),
+                  ),
+                ),
+                // ── Sticky Bottom Bar: Ghim cố định nút "Tạo đơn hàng" ──
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surfaceDark : Colors.white,
+                    border: Border(
+                      top: BorderSide(
+                        color: isDark
+                            ? AppColors.borderDark
+                            : AppColors.borderLight,
+                      ),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: isDark ? 0.25 : 0.06,
+                        ),
+                        blurRadius: 12,
+                        offset: const Offset(0, -4),
+                      ),
+                    ],
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: ElevatedButton.icon(
+                      onPressed: _isLoading ? null : _createOrder,
+                      icon: _isLoading
+                          ? const SizedBox.shrink()
+                          : const Icon(Icons.add_circle_outline, size: 18),
+                      label: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  Colors.white,
+                                ),
+                              ),
+                            )
+                          : const Text(
+                              'Tạo đơn hàng',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                     ),
                   ),
                 ),
@@ -3417,55 +4493,41 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-            color: isDark
-                ? AppColors.textPrimaryDark
-                : AppColors.textPrimaryLight,
+    return TextFormField(
+      controller: controller,
+      keyboardType: keyboardType,
+      maxLines: maxLines,
+      style: const TextStyle(fontSize: 14),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        alignLabelWithHint: maxLines > 1,
+        prefixIcon: Icon(icon, size: 20),
+        filled: true,
+        fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
         ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: controller,
-          keyboardType: keyboardType,
-          maxLines: maxLines,
-          style: const TextStyle(fontSize: 14),
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: Icon(icon, size: 20),
-            filled: true,
-            fillColor: isDark ? AppColors.surfaceDark : const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
-              ),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(
-                color: isDark ? AppColors.borderDark : AppColors.borderLight,
-              ),
-            ),
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 16,
-            ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(
+            color: isDark ? AppColors.borderDark : AppColors.borderLight,
           ),
-          validator: (value) {
-            if (required && (value == null || value.isEmpty)) {
-              return 'Trường này không được để trống';
-            }
-            return null;
-          },
         ),
-      ],
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 14,
+          vertical: 14,
+        ),
+      ),
+      validator: (value) {
+        if (required && (value == null || value.trim().isEmpty)) {
+          return 'Trường này không được để trống';
+        }
+        return null;
+      },
     );
   }
 }
@@ -3486,25 +4548,27 @@ class _KeyboardBottomPadding extends StatelessWidget {
   }
 }
 
-class _TechnicianMultiSelectDialog extends StatefulWidget {
+class _TechnicianMultiSelectBottomSheet extends StatefulWidget {
   final List<User> technicians;
   final Set<String> initialSelected;
   final bool isDark;
 
-  const _TechnicianMultiSelectDialog({
+  const _TechnicianMultiSelectBottomSheet({
     required this.technicians,
     required this.initialSelected,
     required this.isDark,
   });
 
   @override
-  State<_TechnicianMultiSelectDialog> createState() =>
-      _TechnicianMultiSelectDialogState();
+  State<_TechnicianMultiSelectBottomSheet> createState() =>
+      _TechnicianMultiSelectBottomSheetState();
 }
 
-class _TechnicianMultiSelectDialogState
-    extends State<_TechnicianMultiSelectDialog> {
+class _TechnicianMultiSelectBottomSheetState
+    extends State<_TechnicianMultiSelectBottomSheet> {
   final Set<String> _selected = <String>{};
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   @override
   void initState() {
@@ -3513,52 +4577,359 @@ class _TechnicianMultiSelectDialogState
   }
 
   @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  List<User> get _filteredTechnicians {
+    final q = _searchQuery.trim().toLowerCase();
+    if (q.isEmpty) return widget.technicians;
+    return widget.technicians.where((tech) {
+      return tech.name.toLowerCase().contains(q) ||
+          tech.employeeId.toLowerCase().contains(q) ||
+          tech.role.label.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  void _toggleTechnician(String id) {
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Chọn kỹ thuật viên'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: widget.technicians.isEmpty
-              ? [
-                  const Padding(
-                    padding: EdgeInsets.all(16),
-                    child: Text('Không có kỹ thuật viên khả dụng.'),
-                  ),
-                ]
-              : widget.technicians.map((tech) {
-                  final isChecked = _selected.contains(tech.id);
-                  return CheckboxListTile(
-                    title: Text(tech.name),
-                    subtitle: Text(
-                      tech.employeeId.isNotEmpty
-                          ? tech.employeeId
-                          : tech.role.label,
+    final isDark = widget.isDark;
+    final filtered = _filteredTechnicians;
+    final allFilteredSelected =
+        filtered.isNotEmpty &&
+        filtered.every((tech) => _selected.contains(tech.id));
+    final secondaryColor = isDark
+        ? AppColors.textSecondaryDark
+        : AppColors.textSecondaryLight;
+
+    return _KeyboardBottomPadding(
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                ModalTopBar(
+                  title: 'Chọn kỹ thuật viên',
+                  trailing: Container(
+                    key: const ValueKey('technician-picker-selected-count'),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
                     ),
-                    value: isChecked,
-                    onChanged: (bool? checked) {
-                      setState(() {
-                        if (checked == true) {
-                          _selected.add(tech.id);
-                        } else {
-                          _selected.remove(tech.id);
-                        }
-                      });
-                    },
-                  );
-                }).toList(),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Text(
+                      'Đã chọn (${_selected.length})',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ),
+                // ── Thanh tìm kiếm & Nút Chọn tất cả / Bỏ chọn tất cả ──
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+                  child: Column(
+                    children: [
+                      TextField(
+                        key: const ValueKey('technician-picker-search-field'),
+                        controller: _searchController,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value),
+                        style: const TextStyle(fontSize: 13.5),
+                        decoration: InputDecoration(
+                          hintText: 'Tìm theo tên hoặc mã nhân viên...',
+                          prefixIcon: const Icon(Icons.search, size: 19),
+                          suffixIcon: _searchQuery.isNotEmpty
+                              ? IconButton(
+                                  icon: const Icon(Icons.clear, size: 17),
+                                  onPressed: () {
+                                    _searchController.clear();
+                                    setState(() => _searchQuery = '');
+                                  },
+                                )
+                              : null,
+                          filled: true,
+                          fillColor: isDark
+                              ? const Color(0xFF1E293B)
+                              : const Color(0xFFF8FAFC),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDark
+                                  ? AppColors.borderDark
+                                  : AppColors.borderLight,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: isDark
+                                  ? AppColors.borderDark
+                                  : AppColors.borderLight,
+                            ),
+                          ),
+                        ),
+                      ),
+                      if (filtered.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                'Danh sách kỹ thuật viên (${filtered.length})',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: secondaryColor,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            TextButton.icon(
+                              key: const ValueKey(
+                                'technician-picker-toggle-all',
+                              ),
+                              style: TextButton.styleFrom(
+                                visualDensity: VisualDensity.compact,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  if (allFilteredSelected) {
+                                    for (final tech in filtered) {
+                                      _selected.remove(tech.id);
+                                    }
+                                  } else {
+                                    for (final tech in filtered) {
+                                      _selected.add(tech.id);
+                                    }
+                                  }
+                                });
+                              },
+                              icon: Icon(
+                                allFilteredSelected
+                                    ? Icons.deselect_outlined
+                                    : Icons.select_all_rounded,
+                                size: 16,
+                              ),
+                              label: Text(
+                                allFilteredSelected
+                                    ? 'Bỏ chọn tất cả'
+                                    : 'Chọn tất cả',
+                                style: const TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                // ── Danh sách nhân viên: Avatar chữ cái đầu + chạm toàn bộ hàng ──
+                Flexible(
+                  child: filtered.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(28),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.person_search_outlined,
+                                size: 36,
+                                color: secondaryColor,
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                widget.technicians.isEmpty
+                                    ? 'Không có kỹ thuật viên khả dụng.'
+                                    : 'Không tìm thấy nhân viên phù hợp.',
+                                style: TextStyle(
+                                  fontSize: 13.5,
+                                  color: secondaryColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, _) => const SizedBox(height: 8),
+                          itemBuilder: (context, index) {
+                            final tech = filtered[index];
+                            final isChecked = _selected.contains(tech.id);
+                            final subtitle = tech.employeeId.isNotEmpty
+                                ? '${tech.employeeId} • ${tech.role.label}'
+                                : tech.role.label;
+
+                            return InkWell(
+                              key: ValueKey('technician-picker-row-${tech.id}'),
+                              borderRadius: BorderRadius.circular(12),
+                              onTap: () => _toggleTechnician(tech.id),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 10,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: isChecked
+                                      ? AppColors.primary.withValues(
+                                          alpha: isDark ? 0.16 : 0.07,
+                                        )
+                                      : (isDark
+                                            ? const Color(0xFF1E293B)
+                                            : const Color(0xFFF8FAFC)),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isChecked
+                                        ? AppColors.primary
+                                        : (isDark
+                                              ? AppColors.borderDark
+                                              : AppColors.borderLight),
+                                    width: isChecked ? 1.4 : 1,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    CircleAvatar(
+                                      radius: 19,
+                                      backgroundColor: isChecked
+                                          ? AppColors.primary
+                                          : AppColors.primary.withValues(
+                                              alpha: 0.14,
+                                            ),
+                                      child: Text(
+                                        _givenNameInitial(tech.name),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w700,
+                                          color: isChecked
+                                              ? Colors.white
+                                              : AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            tech.name,
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.w700,
+                                              color: isDark
+                                                  ? AppColors.textPrimaryDark
+                                                  : AppColors.textPrimaryLight,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            subtitle,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: secondaryColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    Checkbox(
+                                      value: isChecked,
+                                      activeColor: AppColors.primary,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(5),
+                                      ),
+                                      onChanged: (_) =>
+                                          _toggleTechnician(tech.id),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                // ── Sticky Footer: Hủy & Xác nhận ──
+                Container(
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppColors.surfaceDark : Colors.white,
+                    border: Border(
+                      top: BorderSide(
+                        color: isDark
+                            ? AppColors.borderDark
+                            : AppColors.borderLight,
+                      ),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.pop(context),
+                          child: const Text('Hủy'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          key: const ValueKey(
+                            'technician-picker-confirm-button',
+                          ),
+                          onPressed: () => Navigator.pop(context, _selected),
+                          child: Text('Chọn (${_selected.length})'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('Hủy'),
-        ),
-        ElevatedButton(
-          onPressed: () => Navigator.pop(context, _selected),
-          child: const Text('Chọn'),
-        ),
-      ],
     );
   }
 }
@@ -3655,7 +5026,18 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
             labelText: 'Tên thiết bị *',
             hintText: 'Biến tần Yaskawa, Delta...',
             prefixIcon: const Icon(Icons.devices_outlined, size: 20),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
             filled: true,
             fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             contentPadding: const EdgeInsets.symmetric(
@@ -3674,7 +5056,18 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
             labelText: 'Số seri',
             hintText: 'Nhập số seri (nếu có)',
             prefixIcon: const Icon(Icons.tag, size: 20),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
             filled: true,
             fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
             contentPadding: const EdgeInsets.symmetric(
@@ -3685,6 +5078,37 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
           onChanged: (_) => widget.onChanged(),
         ),
         const SizedBox(height: 12),
+        // Tình trạng lỗi
+        TextFormField(
+          controller: entry.descController,
+          maxLines: 2,
+          decoration: InputDecoration(
+            labelText: 'Tình trạng lỗi',
+            hintText: 'Mô tả lỗi thiết bị',
+            alignLabelWithHint: true,
+            prefixIcon: const Icon(Icons.error_outline, size: 20),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(
+                color: isDark ? AppColors.borderDark : AppColors.borderLight,
+              ),
+            ),
+            filled: true,
+            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 14,
+            ),
+          ),
+          onChanged: (_) => widget.onChanged(),
+        ),
+        const SizedBox(height: 8),
         // Bảo hành switch
         SwitchListTile(
           title: const Text('Bảo hành', style: TextStyle(fontSize: 14)),
@@ -3736,9 +5160,9 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
               decoration: BoxDecoration(
                 border: Border.all(
-                  color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                  color: isDark ? AppColors.borderDark : AppColors.borderLight,
                 ),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
               ),
               child: Row(
@@ -3909,9 +5333,9 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
                 border: Border.all(
                   color: !_isWarrantyValid(entry.warrantyExpiry)
                       ? AppColors.error
-                      : (isDark ? Colors.grey[700]! : Colors.grey[300]!),
+                      : (isDark ? AppColors.borderDark : AppColors.borderLight),
                 ),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 color: isDark ? const Color(0xFF1E293B) : Colors.white,
               ),
               child: Row(
@@ -3970,27 +5394,7 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
               ),
             ),
           ],
-          const SizedBox(height: 12),
-        ] else
-          const SizedBox(height: 8),
-        // Tình trạng lỗi
-        TextFormField(
-          controller: entry.descController,
-          maxLines: 2,
-          decoration: InputDecoration(
-            labelText: 'Tình trạng lỗi',
-            hintText: 'Mô tả lỗi thiết bị',
-            prefixIcon: const Icon(Icons.error_outline, size: 20),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            filled: true,
-            fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 14,
-              vertical: 14,
-            ),
-          ),
-          onChanged: (_) => widget.onChanged(),
-        ),
+        ],
       ],
     );
   }

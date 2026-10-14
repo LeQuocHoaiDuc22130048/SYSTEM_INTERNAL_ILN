@@ -42,9 +42,15 @@ class _SmoothTabStackState extends State<SmoothTabStack>
   void didUpdateWidget(SmoothTabStack oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.index != oldWidget.index) {
-      _outgoing = oldWidget.index;
       _forward = widget.isForward ?? widget.index > oldWidget.index;
-      _controller.forward(from: 0);
+      if (_forward) {
+        _outgoing = oldWidget.index;
+        _controller.forward(from: 0);
+      } else {
+        _outgoing = null;
+        _controller.stop();
+        _controller.value = 1;
+      }
     }
   }
 
@@ -56,7 +62,7 @@ class _SmoothTabStackState extends State<SmoothTabStack>
 
   @override
   Widget build(BuildContext context) {
-    final reduced = MediaQuery.disableAnimationsOf(context);
+    final reduced = MediaQuery.disableAnimationsOf(context) || !_forward;
     final direction = _forward ? 1.0 : -1.0;
     // Stable keys let us put the incoming page on top without recreating tabs.
     final indices = [

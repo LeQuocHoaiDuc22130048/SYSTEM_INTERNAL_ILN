@@ -50,6 +50,42 @@ class NotificationProvider extends ChangeNotifier {
   Stream<Map<String, dynamic>> get messageStream =>
       _messageStreamController.stream;
 
+  final _conversationEvents =
+      StreamController<Map<String, dynamic>>.broadcast();
+  Stream<Map<String, dynamic>> get conversationEventStream =>
+      _conversationEvents.stream;
+  String? _watchedConversationId;
+  StompUnsubscribe? _unsubscribeConversation;
+
+  void watchConversationEvents(String? id) {
+    if (_watchedConversationId == id) return;
+    _unsubscribeConversation?.call();
+    _unsubscribeConversation = null;
+    _watchedConversationId = id;
+    _subscribeConversationEvents();
+  }
+
+  void _subscribeConversationEvents() {
+    final id = _watchedConversationId;
+    if (id == null || _stompClient?.connected != true) return;
+    _unsubscribeConversation = _stompClient!.subscribe(
+      destination: '/topic/conversation/$id/events',
+      callback: (frame) {
+        if (!apiHasToken ||
+            _suppressTokenUpload ||
+            _watchedConversationId != id) {
+          return;
+        }
+        try {
+          final decoded = jsonDecode(frame.body ?? '');
+          if (decoded is Map<String, dynamic>) _conversationEvents.add(decoded);
+        } catch (e) {
+          _log('Conversation event parse failed: $e');
+        }
+      },
+    );
+  }
+
   Stream<AppNotification> get notificationClickStream =>
       _clickStreamController.stream;
 
@@ -113,8 +149,8 @@ class NotificationProvider extends ChangeNotifier {
         clickNotification(notification);
       });
 
-      final initialMessage =
-          await FirebaseMessaging.instance.getInitialMessage();
+      final initialMessage = await FirebaseMessaging.instance
+          .getInitialMessage();
       if (initialMessage != null && apiHasToken) {
         _log('FCM getInitialMessage triggered');
         final notification = _parseNotificationFromPayload(
@@ -378,6 +414,8 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   void _onRealtimeConnected(StompFrame frame) {
+    _unsubscribeConversation = null;
+    _subscribeConversationEvents();
     _stompClient?.subscribe(
       destination: '/user/queue/notifications',
       callback: (frame) {
@@ -422,6 +460,7 @@ class NotificationProvider extends ChangeNotifier {
   }
 
   void _disconnectRealtime() {
+    _unsubscribeConversation = null;
     _stompClient?.deactivate();
     _stompClient = null;
   }
@@ -582,6 +621,7 @@ class NotificationProvider extends ChangeNotifier {
     _onMessageOpenedAppSub?.cancel();
     _tokenRefreshSub?.cancel();
     _messageStreamController.close();
+    _conversationEvents.close();
     _clickStreamController.close();
     super.dispose();
   }
