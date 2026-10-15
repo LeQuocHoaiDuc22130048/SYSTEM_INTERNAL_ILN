@@ -1,12 +1,15 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Wrench,
   Plus,
   X,
   Trash2,
+  Search,
+  RefreshCw,
 } from 'lucide-react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
-import { isManagerOrAbove as _isManagerOrAbove } from '../utils/permissions';
+import { isManagerOrAbove as _isManagerOrAbove, hasPermission } from '../utils/permissions';
 import { MediaPreviewModal } from './MediaPreviewModal';
 import type {
   RepairDevice,
@@ -15,13 +18,18 @@ import type {
   TimelineEvent,
   OrdersTabProps,
 } from '../types/orders';
+import type { Customer } from '../types/customer';
+import { getCustomers, createCustomer } from '../utils/customerApi';
 import { OrderListPanel } from './orders/OrderListPanel';
 import { OrderDetailPanel } from './orders/OrderDetailPanel';
 import './OrdersTab.css';
 
 
 export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) => {
+  const canAction = usePermissionCheck();
   const isManager = React.useMemo(() => _isManagerOrAbove(currentUser ?? null), [currentUser]);
+  const canManageCustomers = React.useMemo(() => hasPermission(currentUser ?? null, 'CUSTOMER_CREATE'), [currentUser]);
+
   // State
   const [orders, setOrders] = useState<RepairOrder[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -45,6 +53,18 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
   const [isStatusModalOpen, setIsStatusModalOpen] = useState<boolean>(false);
   const [isAssignModalOpen, setIsAssignModalOpen] = useState<boolean>(false);
+
+  // Customer Picker in Create Order
+  const [customerMode, setCustomerMode] = useState<'SELECT' | 'MANUAL'>('SELECT');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [customerSearch, setCustomerSearch] = useState<string>('');
+  const [customerOptions, setCustomerOptions] = useState<Customer[]>([]);
+  const [isSearchingCustomers, setIsSearchingCustomers] = useState<boolean>(false);
+  const [isQuickCreateOpen, setIsQuickCreateOpen] = useState<boolean>(false);
+  const [quickName, setQuickName] = useState<string>('');
+  const [quickPhone, setQuickPhone] = useState<string>('');
+  const [quickType, setQuickType] = useState<'INDIVIDUAL' | 'COMPANY'>('INDIVIDUAL');
+  const [quickCreating, setQuickCreating] = useState<boolean>(false);
 
   // Form states
   const [customerName, setCustomerName] = useState<string>('');
@@ -97,7 +117,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
   // Fetch employees (for assignment dropdown)
   const fetchEmployees = useCallback(async () => {
     try {
-      const response = await fetch('/api/v1/employees?size=200', {
+      const response = await fetch('/api/v1/employees/repair-assignees', {
         headers: getAuthHeaders(),
       });
       if (response.ok) {
@@ -143,6 +163,23 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
     setSelectedOrder(order);
     fetchTimeline(order.id);
   };
+
+  const refreshSelectedOrder = useCallback(async () => {
+    if (!selectedOrder) return;
+    try {
+      const res = await fetch(`/api/v1/repair-orders/${selectedOrder.id}`, {
+        headers: getAuthHeaders(),
+      });
+      if (res.ok) {
+        const result = await res.json();
+        if (result?.data) setSelectedOrder(result.data);
+      }
+      fetchTimeline(selectedOrder.id);
+      fetchOrders();
+    } catch (e) {
+      console.error(e);
+    }
+  }, [selectedOrder, fetchOrders]);
 
   // Status mapping to label and classes
   const getStatusMeta = (status: string) => {
@@ -227,8 +264,55 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
     setFormDevices(updated);
   };
 
+  // Debounce searching active customers for Create Order picker
+  useEffect(() => {
+    if (!isCreateModalOpen || customerMode !== 'SELECT') return;
+    const timer = setTimeout(async () => {
+      setIsSearchingCustomers(true);
+      const res = await getCustomers({
+        keyword: customerSearch,
+        active: true,
+        size: 10,
+      });
+      if (res.success && res.data) {
+        setCustomerOptions(res.data.content);
+      }
+      setIsSearchingCustomers(false);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [isCreateModalOpen, customerMode, customerSearch]);
+
+  // Quick create customer
+  const handleQuickCreateCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickName.trim()) {
+      showToast('Vui lòng nhập tên khách hàng');
+      return;
+    }
+    setQuickCreating(true);
+    const res = await createCustomer({
+      customerName: quickName.trim(),
+      type: quickType,
+      phone: quickPhone.trim() || null,
+    });
+    setQuickCreating(false);
+    if (res.success && res.data) {
+      showToast('Tạo khách hàng thành công!');
+      setSelectedCustomer(res.data);
+      setIsQuickCreateOpen(false);
+      setQuickName('');
+      setQuickPhone('');
+    } else {
+      showToast(res.message || 'Lỗi tạo khách hàng');
+    }
+  };
+
   // Open Create Modal
   const openCreateModal = () => {
+    setCustomerMode('SELECT');
+    setSelectedCustomer(null);
+    setCustomerSearch('');
+    setCustomerOptions([]);
     setCustomerName('');
     setCustomerPhone('');
     setFormDevices([
@@ -240,27 +324,43 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
   // Create Order API
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!customerName.trim()) {
-      showToast('Vui lòng nhập tên khách hàng');
-      return;
+    if (customerMode === 'SELECT') {
+      if (!selectedCustomer) {
+        showToast('Vui lòng chọn khách hàng');
+        return;
+      }
+    } else {
+      if (!customerName.trim()) {
+        showToast('Vui lòng nhập tên khách hàng');
+        return;
+      }
     }
     if (formDevices.some((d) => !d.deviceName.trim())) {
       showToast('Vui lòng điền tên thiết bị');
       return;
     }
 
+    const payload: any = {
+      devices: formDevices.map((d) => ({
+        ...d,
+        warrantyExpiry: d.underWarranty && d.warrantyExpiry ? d.warrantyExpiry : undefined,
+      })),
+    };
+
+    if (customerMode === 'SELECT' && selectedCustomer) {
+      payload.customerId = selectedCustomer.id;
+    } else {
+      payload.customerName = customerName.trim();
+      if (customerPhone.trim()) {
+        payload.customerPhone = customerPhone.trim();
+      }
+    }
+
     try {
       const response = await fetch('/api/v1/repair-orders', {
         method: 'POST',
         headers: getJsonAuthHeaders(),
-        body: JSON.stringify({
-          customerName: customerName.trim(),
-          customerPhone: customerPhone.trim() || undefined,
-          devices: formDevices.map((d) => ({
-            ...d,
-            warrantyExpiry: d.underWarranty && d.warrantyExpiry ? d.warrantyExpiry : undefined,
-          })),
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
@@ -617,6 +717,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
             <OrderDetailPanel
               selectedOrder={selectedOrder}
               isManager={isManager}
+              currentUser={currentUser}
               openEditModal={openEditModal}
               handleDeleteOrder={handleDeleteOrder}
               getStatusMeta={getStatusMeta}
@@ -631,6 +732,8 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
               timeline={timeline}
               handleCancelOrder={handleCancelOrder}
               onClose={() => setSelectedOrder(null)}
+              onRefreshOrder={refreshSelectedOrder}
+              showToast={showToast}
             />
           ) : (
             <div className="detail-empty-state">
@@ -652,28 +755,134 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCreateOrder} className="modal-form">
-              <div className="form-section-title">Thông tin khách hàng</div>
-              <div className="form-row-grid">
-                <div className="form-group">
-                  <label>Tên khách hàng *</label>
-                  <input
-                    type="text"
-                    required
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Nguyễn Văn A"
-                  />
+            {canAction('REPAIR_CREATE') && (<form onSubmit={handleCreateOrder} className="modal-form">
+              <div className="form-section-title flex-header">
+                <span>Thông tin khách hàng</span>
+                {canManageCustomers && customerMode === 'SELECT' && (
+                  (canAction('CUSTOMER_CREATE') && (<button
+                    type="button"
+                    className="btn-add-device-row"
+                    onClick={() => setIsQuickCreateOpen(true)}
+                  >
+                    <Plus size={13} />
+                    Tạo nhanh khách hàng
+                  </button>))
+                )}
+              </div>
+
+              <div className="customer-picker-container" style={{ marginBottom: '16px' }}>
+                <div className="customer-picker-mode-switch">
+                  <button
+                    type="button"
+                    className={`customer-picker-mode-btn ${customerMode === 'SELECT' ? 'active' : ''}`}
+                    onClick={() => setCustomerMode('SELECT')}
+                  >
+                    Chọn hồ sơ khách hàng (Khuyên dùng)
+                  </button>
+                  <button
+                    type="button"
+                    className={`customer-picker-mode-btn ${customerMode === 'MANUAL' ? 'active' : ''}`}
+                    onClick={() => setCustomerMode('MANUAL')}
+                  >
+                    Nhập thủ công (Không liên kết)
+                  </button>
                 </div>
-                <div className="form-group">
-                  <label>Số điện thoại</label>
-                  <input
-                    type="text"
-                    value={customerPhone}
-                    onChange={(e) => setCustomerPhone(e.target.value)}
-                    placeholder="0901234567"
-                  />
-                </div>
+
+                {customerMode === 'SELECT' ? (
+                  selectedCustomer ? (
+                    <div className="customer-selected-card">
+                      <div className="customer-selected-info">
+                        <div className="customer-selected-name">
+                          {selectedCustomer.customerName}
+                          <span style={{ marginLeft: '8px', fontSize: '0.72rem', background: '#dbeafe', color: '#1e40af', padding: '2px 6px', borderRadius: '4px' }}>
+                            {selectedCustomer.type === 'COMPANY' ? 'Doanh nghiệp' : 'Cá nhân'}
+                          </span>
+                        </div>
+                        <div className="customer-selected-meta">
+                          <span>Mã: {selectedCustomer.customerCode.slice(0, 16)}...</span>
+                          {selectedCustomer.phone && <span>• SĐT: {selectedCustomer.phone}</span>}
+                          {selectedCustomer.email && <span>• Email: {selectedCustomer.email}</span>}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn-icon-action"
+                        onClick={() => setSelectedCustomer(null)}
+                        title="Đổi khách hàng khác"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          placeholder="Gõ tên, mã khách, SĐT để tìm hồ sơ..."
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          style={{
+                            width: '100%',
+                            padding: '8px 12px 8px 32px',
+                            border: '1px solid #cbd5e1',
+                            borderRadius: '6px',
+                            fontSize: '0.85rem',
+                          }}
+                        />
+                        <Search size={15} style={{ position: 'absolute', left: 10, top: 10, color: '#94a3b8' }} />
+                        {isSearchingCustomers && (
+                          <RefreshCw size={14} className="animate-spin" style={{ position: 'absolute', right: 10, top: 10, color: '#94a3b8' }} />
+                        )}
+                      </div>
+
+                      <div className="customer-picker-results" style={{ marginTop: '6px' }}>
+                        {customerOptions.length === 0 ? (
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '0.82rem' }}>
+                            {isSearchingCustomers ? 'Đang tìm kiếm...' : 'Nhập từ khóa tìm kiếm hồ sơ khách hàng'}
+                          </div>
+                        ) : (
+                          customerOptions.map((c) => (
+                            <div
+                              key={c.id}
+                              className="customer-picker-item"
+                              onClick={() => setSelectedCustomer(c)}
+                            >
+                              <div>
+                                <div style={{ fontWeight: 600 }}>{c.customerName}</div>
+                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                                  {c.customerCode.slice(0, 15)}... {c.phone ? `• SĐT: ${c.phone}` : ''}
+                                </div>
+                              </div>
+                              <span style={{ fontSize: '0.75rem', color: '#2563eb', fontWeight: 600 }}>Chọn</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )
+                ) : (
+                  <div className="form-row-grid" style={{ marginTop: '4px' }}>
+                    <div className="form-group">
+                      <label>Tên khách hàng *</label>
+                      <input
+                        type="text"
+                        required
+                        value={customerName}
+                        onChange={(e) => setCustomerName(e.target.value)}
+                        placeholder="Nguyễn Văn A"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label>Số điện thoại</label>
+                      <input
+                        type="text"
+                        value={customerPhone}
+                        onChange={(e) => setCustomerPhone(e.target.value)}
+                        placeholder="0901234567"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="form-section-title flex-header">
@@ -767,7 +976,83 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                   Tạo đơn hàng
                 </button>
               </div>
-            </form>
+            </form>) }
+          </div>
+        </div>
+      )}
+
+      {/* QUICK CREATE CUSTOMER MODAL */}
+      {isQuickCreateOpen && (
+        <div className="orders-modal-overlay" style={{ zIndex: 1100 }}>
+          <div className="orders-modal-card" style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>
+                <Plus size={18} />
+                Tạo nhanh khách hàng
+              </h3>
+              <button
+                type="button"
+                className="close-modal-btn"
+                onClick={() => !quickCreating && setIsQuickCreateOpen(false)}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            {canAction('CUSTOMER_CREATE') && (<form onSubmit={handleQuickCreateCustomer} className="modal-form">
+              <div className="form-group">
+                <label>Tên khách hàng / Đơn vị *</label>
+                <input
+                  type="text"
+                  required
+                  maxLength={100}
+                  placeholder="VD: Công ty TNHH ABC hoặc Anh Tuấn"
+                  value={quickName}
+                  onChange={(e) => setQuickName(e.target.value)}
+                />
+              </div>
+
+              <div className="form-row-grid">
+                <div className="form-group">
+                  <label>Phân loại *</label>
+                  <select
+                    value={quickType}
+                    onChange={(e) => setQuickType(e.target.value as any)}
+                  >
+                    <option value="INDIVIDUAL">Cá nhân</option>
+                    <option value="COMPANY">Doanh nghiệp</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label>Số điện thoại</label>
+                  <input
+                    type="text"
+                    maxLength={20}
+                    placeholder="VD: 0901234567"
+                    value={quickPhone}
+                    onChange={(e) => setQuickPhone(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="modal-actions-footer" style={{ marginTop: '16px' }}>
+                <button
+                  type="button"
+                  className="btn-cancel"
+                  disabled={quickCreating}
+                  onClick={() => setIsQuickCreateOpen(false)}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  className="btn-submit"
+                  disabled={quickCreating || !quickName.trim()}
+                >
+                  {quickCreating && <RefreshCw size={14} className="animate-spin" />}
+                  Tạo và chọn ngay
+                </button>
+              </div>
+            </form>) }
           </div>
         </div>
       )}
@@ -782,7 +1067,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleUpdateOrder} className="modal-form">
+            {canAction('REPAIR_UPDATE') && (<form onSubmit={handleUpdateOrder} className="modal-form">
               <div className="form-section-title">Thông tin khách hàng</div>
               <div className="form-row-grid">
                 <div className="form-group">
@@ -897,7 +1182,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                   Lưu thay đổi
                 </button>
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -923,7 +1208,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                   <option value="IN_PROGRESS">Đang sửa</option>
                   <option value="COMPLETED">Hoàn thành (Chờ giao)</option>
                   <option value="DELIVERED">Đã bàn giao khách hàng</option>
-                  <option value="CANCELLED">Đã trả</option>
+                  {canAction('REPAIR_CANCEL') && <option value="CANCELLED">Đã trả</option>}
                 </select>
               </div>
               <div className="form-group">
@@ -958,7 +1243,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleAssignTechs} className="modal-form">
+            {canAction('REPAIR_ASSIGN') && (<form onSubmit={handleAssignTechs} className="modal-form">
               <div className="form-group">
                 <label>Chọn kỹ thuật viên (Chọn nhiều)</label>
                 <div className="tech-checkbox-list">
@@ -1005,7 +1290,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                   Lưu phân công
                 </button>
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}

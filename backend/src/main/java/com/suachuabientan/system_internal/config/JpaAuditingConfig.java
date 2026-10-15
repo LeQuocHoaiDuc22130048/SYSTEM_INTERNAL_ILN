@@ -1,6 +1,7 @@
 package com.suachuabientan.system_internal.config;
 
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
+import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.domain.AuditorAware;
@@ -23,6 +24,9 @@ public class JpaAuditingConfig {
             }
             // Lấy userId từ principal nếu có
             Object principal = auth.getPrincipal();
+            if (principal instanceof CustomUserDetails userDetails) {
+                return Optional.of(userDetails.getUserId());
+            }
             if (principal instanceof UserEntity user) {
                 return Optional.of(user.getId());
             }

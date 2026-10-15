@@ -1,3 +1,5 @@
+import '../widgets/permission_gate.dart';
+import '../models/app_permission.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
@@ -31,25 +33,28 @@ class AttendanceOnlyPage extends StatelessWidget {
               ),
             ),
             Center(
-              child: FilledButton.icon(
-                onPressed: onStartScan,
-                icon: const Icon(LucideIcons.scanFace, size: 24),
-                label: const Text(
-                  'Ch\u1EA5m c\u00F4ng / Qu\u00E9t khu\u00F4n m\u1EB7t',
-                ),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 18,
+              child: PermissionGate(
+                permission: AppPermission.useAttendanceKiosk,
+                child: FilledButton.icon(
+                  onPressed: onStartScan,
+                  icon: const Icon(LucideIcons.scanFace, size: 24),
+                  label: const Text(
+                    'Ch\u1EA5m c\u00F4ng / Qu\u00E9t khu\u00F4n m\u1EB7t',
                   ),
-                  textStyle: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 18,
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
               ),

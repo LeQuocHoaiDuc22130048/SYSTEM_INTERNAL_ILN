@@ -46,7 +46,7 @@ public class AttendanceQueryController {
     private static final int LATE_GRACE_MINUTES = 15;
 
     @GetMapping("/monthly")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_REPORT_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MonthlyAttendanceResponse>> getMonthly(
             @RequestParam(defaultValue = "2025") int year,
             @RequestParam(defaultValue = "6") int month) {
@@ -307,6 +307,7 @@ public class AttendanceQueryController {
     }
 
     @GetMapping("/me/logs")
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeHistoryResponse>> getMyLogs(
             @RequestParam(required = false) Integer year,
             @RequestParam(required = false) Integer month,
@@ -317,7 +318,7 @@ public class AttendanceQueryController {
     }
 
     @GetMapping("/{employeeId}/logs")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER') or principal.userId.toString() == #p0.toString()")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('ATTENDANCE_REPORT_VIEW') or (hasAuthority('ATTENDANCE_VIEW') and #employeeId == principal.userId)")
     public ResponseEntity<ApiResponse<EmployeeHistoryResponse>> getEmployeeLogs(
             @PathVariable UUID employeeId,
             @RequestParam(defaultValue = "2025") int year,

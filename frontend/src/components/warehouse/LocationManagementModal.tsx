@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useState, useMemo } from 'react';
 import {
   X,
@@ -45,6 +46,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
   onPrintAllLocationsQr,
   showToast,
 }) => {
+  const canAction = usePermissionCheck();
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [editingLocation, setEditingLocation] = useState<LocationItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
@@ -250,7 +252,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
 
           {/* Action Buttons */}
           <div style={{ display: 'flex', gap: '8px' }}>
-            <button
+            {canAction('WAREHOUSE_QR_PRINT') && (<button
               type="button"
               onClick={onPrintAllLocationsQr}
               className="btn-filter"
@@ -270,9 +272,9 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
             >
               <Printer size={15} color="#0284c7" />
               <span>In Tất Cả Tem QR</span>
-            </button>
+            </button>) }
 
-            <button
+            {canAction('LOCATION_CREATE') && (<button
               type="button"
               onClick={openCreateForm}
               style={{
@@ -291,7 +293,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
             >
               <Plus size={16} />
               <span>Thêm Vị Trí Mới</span>
-            </button>
+            </button>) }
           </div>
         </div>
 
@@ -403,7 +405,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
 
                     {/* Right: Actions */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <button
+                      {canAction('WAREHOUSE_QR_PRINT') && (<button
                         type="button"
                         title="In tem QR vị trí"
                         onClick={() => onPrintLocationQr(loc)}
@@ -423,9 +425,9 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
                       >
                         <Printer size={14} />
                         <span>In QR</span>
-                      </button>
+                      </button>) }
 
-                      <button
+                      {canAction('LOCATION_UPDATE') && (<button
                         type="button"
                         title="Chỉnh sửa vị trí"
                         onClick={() => openEditForm(loc)}
@@ -445,9 +447,9 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
                       >
                         <Edit2 size={14} />
                         <span>Sửa</span>
-                      </button>
+                      </button>) }
 
-                      <button
+                      {canAction('LOCATION_DELETE') && (<button
                         type="button"
                         title="Xóa vị trí này"
                         onClick={() => setDeletingLocation(loc)}
@@ -467,7 +469,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
                       >
                         <Trash2 size={14} />
                         <span>Xóa</span>
-                      </button>
+                      </button>) }
                     </div>
                   </div>
                 );
@@ -521,7 +523,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
               </button>
             </div>
 
-            <form onSubmit={handleSaveLocation} className="modal-form">
+            {(editingLocation ? canAction('LOCATION_UPDATE') : canAction('LOCATION_CREATE')) && (<form onSubmit={handleSaveLocation} className="modal-form">
               <div className="form-group">
                 <label>Mã vị trí (Code) *</label>
                 <input
@@ -574,11 +576,11 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
                 >
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit" disabled={isSaving}>
+                {(editingLocation ? canAction('LOCATION_UPDATE') : canAction('LOCATION_CREATE')) && (<button type="submit" className="btn-submit" disabled={isSaving}>
                   {isSaving ? 'Đang lưu...' : editingLocation ? 'Cập nhật' : 'Tạo mới'}
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -655,7 +657,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
                   >
                     Hủy bỏ
                   </button>
-                  <button
+                  {canAction('LOCATION_DELETE') && (<button
                     type="button"
                     onClick={handleDeleteLocation}
                     disabled={isDeleting}
@@ -670,7 +672,7 @@ export const LocationManagementModal: React.FC<LocationManagementModalProps> = (
                     }}
                   >
                     {isDeleting ? 'Đang xóa...' : 'Xác nhận xóa'}
-                  </button>
+                  </button>) }
                 </div>
               </>
             )}

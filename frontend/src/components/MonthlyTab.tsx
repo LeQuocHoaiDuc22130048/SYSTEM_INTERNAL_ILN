@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect } from 'react';
 import {
   Search, Download, ExternalLink, Edit3, ChevronRight, X, Calendar,
@@ -31,6 +32,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
   setHistoryEmployee,
   showToast,
 }) => {
+  const canAction = usePermissionCheck();
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
   const [expandedLogs, setExpandedLogs] = useState<Record<string, EmployeeHistoryResponse>>({});
   const [expandedLogsLoading, setExpandedLogsLoading] = useState<Record<string, boolean>>({});
@@ -475,10 +477,10 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
             />
           </div>
         </div>
-        <button id="btn-export-excel" className="export-btn" onClick={handleExportExcel}>
+        {canAction('ATTENDANCE_EXPORT') && (<button id="btn-export-excel" className="export-btn" onClick={handleExportExcel}>
           <Download size={18} />
           Xuất Excel
-        </button>
+        </button>) }
       </section>
 
       <main className="table-card">

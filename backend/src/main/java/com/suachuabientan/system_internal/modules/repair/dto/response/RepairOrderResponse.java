@@ -43,7 +43,8 @@ public record RepairOrderResponse(
 
         // Danh sách thiết bị trong đơn
         List<RepairDeviceResponse> devices,
-        String notes
+        String notes,
+        UUID customerId
 ) {
     public record UserSummary(
             UUID id,

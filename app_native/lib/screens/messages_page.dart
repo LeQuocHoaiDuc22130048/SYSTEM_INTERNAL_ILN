@@ -1,3 +1,5 @@
+import '../widgets/chat/conversation_actions_sheet.dart';
+import '../widgets/permission_gate.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -185,18 +187,21 @@ class _ConversationListPageState extends State<_ConversationListPage> {
                       ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => _showNewChatDialog(context),
-                    icon: Container(
-                      padding: const EdgeInsets.all(6),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        LucideIcons.messageSquarePlus,
-                        size: 18,
-                        color: AppColors.primary,
+                  PermissionGate(
+                    permission: AppPermission.createConversations,
+                    child: IconButton(
+                      onPressed: () => _showNewChatDialog(context),
+                      icon: Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          LucideIcons.messageSquarePlus,
+                          size: 18,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                   ),
@@ -347,6 +352,20 @@ class _ConversationListPageState extends State<_ConversationListPage> {
                     final conversation = filteredConversations[index];
                     return Dismissible(
                       key: ValueKey('conversation-row-${conversation.id}'),
+                      direction:
+                          context.watch<AuthProvider>().can(
+                            AppPermission.pinConversations,
+                          )
+                          ? (context.watch<AuthProvider>().can(
+                                  AppPermission.muteConversations,
+                                )
+                                ? DismissDirection.horizontal
+                                : DismissDirection.startToEnd)
+                          : (context.watch<AuthProvider>().can(
+                                  AppPermission.muteConversations,
+                                )
+                                ? DismissDirection.endToStart
+                                : DismissDirection.none),
                       background: _conversationSwipeBackground(
                         conversation.isPinned
                             ? Icons.push_pin
@@ -430,7 +449,6 @@ void _showConversationActions(
 ) {
   HapticFeedback.mediumImpact();
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final colors = Theme.of(context).colorScheme;
   final provider = context.read<ChatProvider>();
 
   void openPage(Widget page) {
@@ -471,140 +489,46 @@ void _showConversationActions(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (sheetContext) {
-      Widget action(
-        IconData icon,
-        String title,
-        Color color,
-        VoidCallback onTap,
-      ) => ListTile(
-        leading: CircleAvatar(
-          radius: 19,
-          backgroundColor: color.withValues(alpha: isDark ? 0.2 : 0.1),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        ),
-        onTap: () {
-          Navigator.pop(sheetContext);
-          onTap();
-        },
-      );
-      Widget group(List<Widget> children) => Material(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        clipBehavior: Clip.antiAlias,
-        child: Column(mainAxisSize: MainAxisSize.min, children: children),
-      );
-      final name = conversation.name.trim();
-      return SafeArea(
-        top: false,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                contentPadding: const EdgeInsets.only(bottom: 12),
-                leading: CircleAvatar(
-                  radius: 25,
-                  backgroundColor: colors.primaryContainer,
-                  foregroundColor: colors.onPrimaryContainer,
-                  foregroundImage: conversation.avatarUrl?.isNotEmpty == true
-                      ? NetworkImage(
-                          conversation.avatarUrl!,
-                          headers: mediaAuthHeaders(
-                            context,
-                            conversation.avatarUrl!,
-                          ),
-                        )
-                      : null,
-                  child: Text(
-                    name.isEmpty ? '?' : name.characters.first.toUpperCase(),
+      final auth = sheetContext.watch<AuthProvider>();
+      VoidCallback closeThen(VoidCallback action) => () {
+        Navigator.pop(sheetContext);
+        action();
+      };
+      return ConversationActionsSheet(
+        conversation: conversation,
+        onPin: auth.can(AppPermission.pinConversations)
+            ? closeThen(
+                () => _runChatAction(
+                  context,
+                  (provider) => provider.pinConversation(
+                    conversation.id,
+                    !conversation.isPinned,
                   ),
                 ),
-                title: Text(
-                  conversation.name,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w700,
-                  ),
+              )
+            : null,
+        onMute: auth.can(AppPermission.muteConversations)
+            ? closeThen(toggleMute)
+            : null,
+        onRead: auth.can(AppPermission.markConversationsRead)
+            ? closeThen(
+                () => _runChatAction(
+                  context,
+                  (provider) => provider.markAsRead(conversation.id),
                 ),
-                subtitle: Text(
-                  conversation.type == 'GROUP'
-                      ? '${conversation.members.length} thành viên'
-                      : 'Trò chuyện trực tiếp',
-                ),
-              ),
-              group([
-                action(
-                  Icons.push_pin_outlined,
-                  conversation.isPinned
-                      ? 'Bỏ ghim hội thoại'
-                      : 'Ghim hội thoại',
-                  AppColors.primary,
-                  () => _runChatAction(
-                    context,
-                    (provider) => provider.pinConversation(
-                      conversation.id,
-                      !conversation.isPinned,
-                    ),
-                  ),
-                ),
-                action(
-                  conversation.notificationsMuted
-                      ? Icons.notifications_active_outlined
-                      : Icons.notifications_off_outlined,
-                  conversation.notificationsMuted
-                      ? 'Bật thông báo'
-                      : 'Tắt thông báo',
-                  Colors.orange,
-                  toggleMute,
-                ),
-                if (conversation.unreadCount > 0)
-                  action(
-                    Icons.mark_email_read_outlined,
-                    'Đánh dấu đã đọc',
-                    Colors.green,
-                    () => _runChatAction(
-                      context,
-                      (provider) => provider.markAsRead(conversation.id),
-                    ),
-                  ),
-              ]),
-              const SizedBox(height: 12),
-              group([
-                action(
-                  Icons.photo_library_outlined,
-                  'Xem ảnh, file & liên kết',
-                  Colors.purple,
-                  openGallery,
-                ),
-                action(
-                  Icons.search,
-                  'Tìm kiếm tin nhắn',
-                  AppColors.primary,
-                  openSearch,
-                ),
-                action(
-                  Icons.info_outline,
-                  'Thông tin cuộc trò chuyện',
-                  Colors.teal,
-                  () => openPage(
-                    _ChatDetailInfoPage(
-                      conversation: conversation,
-                      isDark: isDark,
-                      onMuteToggle: toggleMute,
-                      onSearch: openSearch,
-                      onGallery: openGallery,
-                    ),
-                  ),
-                ),
-              ]),
-            ],
+              )
+            : null,
+        onGallery: closeThen(openGallery),
+        onSearch: closeThen(openSearch),
+        onInfo: closeThen(
+          () => openPage(
+            _ChatDetailInfoPage(
+              conversation: conversation,
+              isDark: isDark,
+              onMuteToggle: toggleMute,
+              onSearch: openSearch,
+              onGallery: openGallery,
+            ),
           ),
         ),
       );
@@ -1770,161 +1694,182 @@ class _ChatDetailPageState extends State<_ChatDetailPage> {
                     .toList(),
               ),
             _buildMentionSuggestions(),
-            Container(
-              padding: EdgeInsets.fromLTRB(
-                8,
-                8,
-                8,
-                8 + MediaQuery.paddingOf(context).bottom,
-              ),
-              decoration: BoxDecoration(
-                color: surface,
-                border: Border(
-                  top: BorderSide(
-                    color: widget.isDark
-                        ? AppColors.borderDark
-                        : AppColors.borderLight,
+            PermissionGate.any(
+              permissions: const [
+                AppPermission.sendMessages,
+                AppPermission.uploadMessages,
+              ],
+              child: Container(
+                padding: EdgeInsets.fromLTRB(
+                  8,
+                  8,
+                  8,
+                  8 + MediaQuery.paddingOf(context).bottom,
+                ),
+                decoration: BoxDecoration(
+                  color: surface,
+                  border: Border(
+                    top: BorderSide(
+                      color: widget.isDark
+                          ? AppColors.borderDark
+                          : AppColors.borderLight,
+                    ),
                   ),
                 ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_replyingToMessage != null) ...[
-                    _buildReplyPreviewBar(),
-                    const SizedBox(height: 8),
-                  ],
-                  Row(
-                    children: [
-                      Visibility(
-                        visible: !_isTyping,
-                        maintainSize: false,
-                        maintainAnimation: false,
-                        maintainState: false,
-                        child: IconButton(
-                          onPressed: _isUploading || _voiceBusy
-                              ? null
-                              : _showAttachments,
-                          tooltip: 'Thêm nội dung',
-                          icon: const Icon(Icons.add_circle_outline, size: 24),
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Visibility(
-                        visible: _isTyping,
-                        maintainSize: false,
-                        maintainAnimation: false,
-                        maintainState: false,
-                        child: IconButton(
-                          onPressed: () {
-                            FocusScope.of(context).unfocus();
-                            setState(() {
-                              _isTyping = false;
-                            });
-                          },
-                          icon: const Icon(Icons.chevron_right, size: 24),
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      Expanded(
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: widget.isDark
-                                ? AppColors.borderDark
-                                : const Color(0xFFF1F5F9),
-                            borderRadius: BorderRadius.circular(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_replyingToMessage != null) ...[
+                      _buildReplyPreviewBar(),
+                      const SizedBox(height: 8),
+                    ],
+                    Row(
+                      children: [
+                        Visibility(
+                          visible: !_isTyping,
+                          maintainSize: false,
+                          maintainAnimation: false,
+                          maintainState: false,
+                          child: PermissionGate(
+                            permission: AppPermission.uploadMessages,
+                            child: IconButton(
+                              onPressed: _isUploading || _voiceBusy
+                                  ? null
+                                  : _showAttachments,
+                              tooltip: 'Thêm nội dung',
+                              icon: const Icon(
+                                Icons.add_circle_outline,
+                                size: 24,
+                              ),
+                              color: AppColors.primary,
+                            ),
                           ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _controller,
-                                  enabled: !_voiceBusy,
-                                  focusNode: _inputFocus,
-                                  onSubmitted: (_) => _handleSend(),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: widget.isDark
-                                        ? AppColors.textPrimaryDark
-                                        : AppColors.textPrimaryLight,
-                                  ),
-                                  decoration: const InputDecoration(
-                                    hintText: 'Nhập tin nhắn...',
-                                    hintStyle: TextStyle(
+                        ),
+                        Visibility(
+                          visible: _isTyping,
+                          maintainSize: false,
+                          maintainAnimation: false,
+                          maintainState: false,
+                          child: IconButton(
+                            onPressed: () {
+                              FocusScope.of(context).unfocus();
+                              setState(() {
+                                _isTyping = false;
+                              });
+                            },
+                            icon: const Icon(Icons.chevron_right, size: 24),
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: widget.isDark
+                                  ? AppColors.borderDark
+                                  : const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _controller,
+                                    enabled: !_voiceBusy,
+                                    focusNode: _inputFocus,
+                                    onSubmitted: (_) => _handleSend(),
+                                    style: TextStyle(
                                       fontSize: 14,
-                                      color: AppColors.textSecondaryLight,
+                                      color: widget.isDark
+                                          ? AppColors.textPrimaryDark
+                                          : AppColors.textPrimaryLight,
                                     ),
-                                    contentPadding: EdgeInsets.symmetric(
-                                      horizontal: 16,
-                                      vertical: 8,
+                                    decoration: const InputDecoration(
+                                      hintText: 'Nhập tin nhắn...',
+                                      hintStyle: TextStyle(
+                                        fontSize: 14,
+                                        color: AppColors.textSecondaryLight,
+                                      ),
+                                      contentPadding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8,
+                                      ),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      isDense: true,
                                     ),
-                                    border: InputBorder.none,
-                                    enabledBorder: InputBorder.none,
-                                    focusedBorder: InputBorder.none,
-                                    errorBorder: InputBorder.none,
-                                    disabledBorder: InputBorder.none,
-                                    isDense: true,
                                   ),
                                 ),
+                                const SizedBox(width: 8),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        PermissionGate(
+                          permission: AppPermission.uploadMessages,
+                          child: VoiceRecordButton(
+                            onSend: _sendVoice,
+                            enabled: !_isUploading,
+                            onBusyChanged: (busy) {
+                              if (mounted) setState(() => _voiceBusy = busy);
+                            },
+                          ),
+                        ),
+                        Visibility(
+                          visible: _isTyping,
+                          maintainSize: false,
+                          maintainAnimation: false,
+                          maintainState: false,
+                          child: PermissionGate(
+                            permission: AppPermission.sendMessages,
+                            child: InkWell(
+                              onTap: _isUploading || _voiceBusy
+                                  ? null
+                                  : _handleSend,
+                              borderRadius: BorderRadius.circular(18),
+                              child: Container(
+                                width: 36,
+                                height: 36,
+                                alignment: Alignment.center,
+                                child: _isUploading
+                                    ? const SizedBox(
+                                        width: 20,
+                                        height: 20,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: AppColors.primary,
+                                        ),
+                                      )
+                                    : const Icon(
+                                        Icons.send,
+                                        size: 22,
+                                        color: AppColors.primary,
+                                      ),
                               ),
-                              const SizedBox(width: 8),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      VoiceRecordButton(
-                        onSend: _sendVoice,
-                        enabled: !_isUploading,
-                        onBusyChanged: (busy) {
-                          if (mounted) setState(() => _voiceBusy = busy);
-                        },
-                      ),
-                      Visibility(
-                        visible: _isTyping,
-                        maintainSize: false,
-                        maintainAnimation: false,
-                        maintainState: false,
-                        child: InkWell(
-                          onTap: _isUploading || _voiceBusy
-                              ? null
-                              : _handleSend,
-                          borderRadius: BorderRadius.circular(18),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            alignment: Alignment.center,
-                            child: _isUploading
-                                ? const SizedBox(
-                                    width: 20,
-                                    height: 20,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: AppColors.primary,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.send,
-                                    size: 22,
-                                    color: AppColors.primary,
-                                  ),
+                        Visibility(
+                          visible: !_isTyping,
+                          maintainSize: false,
+                          maintainAnimation: false,
+                          maintainState: false,
+                          child: PermissionGate(
+                            permission: AppPermission.sendMessages,
+                            child: IconButton(
+                              onPressed: _voiceBusy ? null : _sendLike,
+                              icon: const Icon(Icons.thumb_up, size: 22),
+                              color: AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
-                      Visibility(
-                        visible: !_isTyping,
-                        maintainSize: false,
-                        maintainAnimation: false,
-                        maintainState: false,
-                        child: IconButton(
-                          onPressed: _voiceBusy ? null : _sendLike,
-                          icon: const Icon(Icons.thumb_up, size: 22),
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
@@ -2554,9 +2499,15 @@ class _ConversationGalleryPageState extends State<_ConversationGalleryPage> {
         return InkWell(
           onTap: () => showDialog<void>(
             context: context,
-            barrierColor: item.messageType == 'VIDEO' ? Colors.transparent : Colors.black54,
+            barrierColor: item.messageType == 'VIDEO'
+                ? Colors.transparent
+                : Colors.black54,
             builder: (_) => item.messageType == 'VIDEO'
-                ? VideoPlayerDialog(videoUrl: mediaUrl, title: 'Video', senderName: item.sender.fullName)
+                ? VideoPlayerDialog(
+                    videoUrl: mediaUrl,
+                    title: 'Video',
+                    senderName: item.sender.fullName,
+                  )
                 : ImagePreviewDialog(imageUrl: mediaUrl),
           ),
           child: ClipRRect(
@@ -2798,12 +2749,17 @@ class _PinnedMessageBanner extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            tooltip: 'Bỏ ghim tin nhắn',
-            onPressed: () async {
-              await context.read<ChatProvider>().unpinMessage(conversation.id);
-            },
-            icon: const Icon(Icons.close, size: 16),
+          PermissionGate(
+            permission: AppPermission.pinMessages,
+            child: IconButton(
+              tooltip: 'Bỏ ghim tin nhắn',
+              onPressed: () async {
+                await context.read<ChatProvider>().unpinMessage(
+                  conversation.id,
+                );
+              },
+              icon: const Icon(Icons.close, size: 16),
+            ),
           ),
         ],
       ),
@@ -2847,13 +2803,21 @@ class _ChatMessageBubble extends StatelessWidget {
     final bubble = ChatMessageGestures(
       key: ValueKey('message-gestures-${message.id}'),
       enabled: !message.isRecalled,
-      onReply: onReply,
+      onReply: context.watch<AuthProvider>().can(AppPermission.sendMessages)
+          ? onReply
+          : null,
       onTap: message.messageType == 'TEXT' ? onTap : null,
-      onDoubleTap: () => _runChatAction(
-        context,
-        (provider) =>
-            provider.reactToMessage(message.conversationId, message.id, '❤️'),
-      ),
+      onDoubleTap:
+          context.watch<AuthProvider>().can(AppPermission.reactMessages)
+          ? () => _runChatAction(
+              context,
+              (provider) => provider.reactToMessage(
+                message.conversationId,
+                message.id,
+                '❤️',
+              ),
+            )
+          : null,
       onLongPress: () => _showMessageActionSheet(
         context,
         message: message,
@@ -2991,38 +2955,44 @@ void _showMessageActionSheet(
                 alignment: WrapAlignment.center,
                 children: _reactionEmojis
                     .map(
-                      (emoji) => TextButton(
-                        style: TextButton.styleFrom(
-                          minimumSize: const Size(44, 44),
-                          padding: const EdgeInsets.all(8),
-                        ),
-                        onPressed: () async {
-                          Navigator.pop(sheetContext);
-                          await _runChatAction(
-                            context,
-                            (provider) => provider.reactToMessage(
-                              message.conversationId,
-                              message.id,
-                              emoji,
-                            ),
-                          );
-                        },
-                        child: Text(
-                          emoji,
-                          style: const TextStyle(fontSize: 22),
+                      (emoji) => PermissionGate(
+                        permission: AppPermission.reactMessages,
+                        child: TextButton(
+                          style: TextButton.styleFrom(
+                            minimumSize: const Size(44, 44),
+                            padding: const EdgeInsets.all(8),
+                          ),
+                          onPressed: () async {
+                            Navigator.pop(sheetContext);
+                            await _runChatAction(
+                              context,
+                              (provider) => provider.reactToMessage(
+                                message.conversationId,
+                                message.id,
+                                emoji,
+                              ),
+                            );
+                          },
+                          child: Text(
+                            emoji,
+                            style: const TextStyle(fontSize: 22),
+                          ),
                         ),
                       ),
                     )
                     .toList(),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.reply_outlined),
-              title: const Text('Trả lời'),
-              onTap: () {
-                Navigator.pop(sheetContext);
-                onReply();
-              },
+            PermissionGate(
+              permission: AppPermission.sendMessages,
+              child: ListTile(
+                leading: const Icon(Icons.reply_outlined),
+                title: const Text('Trả lời'),
+                onTap: () {
+                  Navigator.pop(sheetContext);
+                  onReply();
+                },
+              ),
             ),
             if (!message.isRecalled && message.content.isNotEmpty)
               ListTile(
@@ -3034,46 +3004,40 @@ void _showMessageActionSheet(
                 },
               ),
             if (canEdit)
-              ListTile(
-                leading: const Icon(Icons.edit_outlined),
-                title: const Text('Sửa tin nhắn'),
-                onTap: () {
-                  Navigator.pop(sheetContext);
-                  _showEditMessageDialog(context, message);
-                },
+              PermissionGate(
+                permission: AppPermission.updateMessages,
+                child: ListTile(
+                  leading: const Icon(Icons.edit_outlined),
+                  title: const Text('Sửa tin nhắn'),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _showEditMessageDialog(context, message);
+                  },
+                ),
               ),
             if (!message.isRecalled)
-              ListTile(
-                leading: const Icon(Icons.push_pin_outlined),
-                title: const Text('Ghim tin nhắn'),
-                onTap: () async {
-                  Navigator.pop(sheetContext);
-                  await _runChatAction(
-                    context,
-                    (provider) =>
-                        provider.pinMessage(message.conversationId, message.id),
-                  );
-                },
+              PermissionGate(
+                permission: AppPermission.pinMessages,
+                child: ListTile(
+                  leading: const Icon(Icons.push_pin_outlined),
+                  title: const Text('Ghim tin nhắn'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await _runChatAction(
+                      context,
+                      (provider) => provider.pinMessage(
+                        message.conversationId,
+                        message.id,
+                      ),
+                    );
+                  },
+                ),
               ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('Xóa phía tôi'),
-              onTap: () async {
-                Navigator.pop(sheetContext);
-                await _runChatAction(
-                  context,
-                  (provider) => provider.deleteMessage(
-                    message.conversationId,
-                    message.id,
-                    forEveryone: false,
-                  ),
-                );
-              },
-            ),
-            if (canRecall)
-              ListTile(
-                leading: const Icon(Icons.undo_outlined),
-                title: const Text('Thu hồi mọi người'),
+            PermissionGate(
+              permission: AppPermission.deleteMessages,
+              child: ListTile(
+                leading: const Icon(Icons.delete_outline),
+                title: const Text('Xóa phía tôi'),
                 onTap: () async {
                   Navigator.pop(sheetContext);
                   await _runChatAction(
@@ -3081,10 +3045,30 @@ void _showMessageActionSheet(
                     (provider) => provider.deleteMessage(
                       message.conversationId,
                       message.id,
-                      forEveryone: true,
+                      forEveryone: false,
                     ),
                   );
                 },
+              ),
+            ),
+            if (canRecall)
+              PermissionGate(
+                permission: AppPermission.deleteMessages,
+                child: ListTile(
+                  leading: const Icon(Icons.undo_outlined),
+                  title: const Text('Thu hồi mọi người'),
+                  onTap: () async {
+                    Navigator.pop(sheetContext);
+                    await _runChatAction(
+                      context,
+                      (provider) => provider.deleteMessage(
+                        message.conversationId,
+                        message.id,
+                        forEveryone: true,
+                      ),
+                    );
+                  },
+                ),
               ),
           ],
         ),
@@ -3226,7 +3210,10 @@ class _MessageContent extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _VideoMessageWidget(videoUrl: mediaUrl, senderName: message.sender.fullName),
+          _VideoMessageWidget(
+            videoUrl: mediaUrl,
+            senderName: message.sender.fullName,
+          ),
           if (message.content.isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(message.content, style: textStyle),
@@ -3673,19 +3660,25 @@ class _ChatDetailInfoPageState extends State<_ChatDetailInfoPage> {
                 style: const TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.admin_panel_settings_outlined),
-              title: Text(
-                member.isAdmin
-                    ? 'Bỏ quyền quản trị viên'
-                    : 'Đặt làm quản trị viên',
+            PermissionGate(
+              permission: AppPermission.updateConversationMemberRole,
+              child: ListTile(
+                leading: const Icon(Icons.admin_panel_settings_outlined),
+                title: Text(
+                  member.isAdmin
+                      ? 'Bỏ quyền quản trị viên'
+                      : 'Đặt làm quản trị viên',
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'role'),
               ),
-              onTap: () => Navigator.pop(sheetContext, 'role'),
             ),
-            ListTile(
-              leading: const Icon(Icons.person_remove_outlined),
-              title: const Text('Xóa khỏi nhóm'),
-              onTap: () => Navigator.pop(sheetContext, 'remove'),
+            PermissionGate(
+              permission: AppPermission.removeConversationMembers,
+              child: ListTile(
+                leading: const Icon(Icons.person_remove_outlined),
+                title: const Text('Xóa khỏi nhóm'),
+                onTap: () => Navigator.pop(sheetContext, 'remove'),
+              ),
             ),
           ],
         ),
@@ -3848,26 +3841,32 @@ class _ChatDetailInfoPageState extends State<_ChatDetailInfoPage> {
               title: 'Tìm kiếm trong cuộc trò chuyện',
               onTap: onSearch,
             ),
-            _buildMenuItem(
-              icon: conversation.notificationsMuted
-                  ? Icons.notifications_off_outlined
-                  : Icons.notifications_none_outlined,
-              iconColor: Colors.orange,
-              title: conversation.notificationsMuted
-                  ? 'Bật thông báo'
-                  : 'Tắt thông báo',
-              onTap: () async {
-                await onMuteToggle();
-              },
+            PermissionGate(
+              permission: AppPermission.muteConversations,
+              child: _buildMenuItem(
+                icon: conversation.notificationsMuted
+                    ? Icons.notifications_off_outlined
+                    : Icons.notifications_none_outlined,
+                iconColor: Colors.orange,
+                title: conversation.notificationsMuted
+                    ? 'Bật thông báo'
+                    : 'Tắt thông báo',
+                onTap: () async {
+                  await onMuteToggle();
+                },
+              ),
             ),
             if (conversation.type == 'GROUP') ...[
               _buildSectionHeader('Thành viên nhóm'),
               if (canManage)
-                _buildMenuItem(
-                  icon: Icons.person_add_outlined,
-                  iconColor: AppColors.primary,
-                  title: 'Thêm thành viên',
-                  onTap: () => _addMembers(conversation),
+                PermissionGate(
+                  permission: AppPermission.addConversationMembers,
+                  child: _buildMenuItem(
+                    icon: Icons.person_add_outlined,
+                    iconColor: AppColors.primary,
+                    title: 'Thêm thành viên',
+                    onTap: () => _addMembers(conversation),
+                  ),
                 ),
               ListView.builder(
                 shrinkWrap: true,
@@ -3883,7 +3882,13 @@ class _ChatDetailInfoPageState extends State<_ChatDetailInfoPage> {
                       .primaries[memberHash.abs() % Colors.primaries.length];
 
                   return ListTile(
-                    trailing: canManage && member.userId != currentUserId
+                    trailing:
+                        canManage &&
+                            context.watch<AuthProvider>().canAny([
+                              AppPermission.updateConversationMemberRole,
+                              AppPermission.removeConversationMembers,
+                            ]) &&
+                            member.userId != currentUserId
                         ? IconButton(
                             icon: const Icon(Icons.manage_accounts_outlined),
                             tooltip: 'Quản lý ${member.fullName}',
@@ -3934,13 +3939,18 @@ class _ChatDetailInfoPageState extends State<_ChatDetailInfoPage> {
               onTap: () {},
             ),
             if (conversation.type == 'GROUP')
-              _buildMenuItem(
-                icon: conversation.type == 'GROUP' ? Icons.logout : Icons.block,
-                iconColor: Colors.red,
-                title: conversation.type == 'GROUP'
-                    ? 'Rời khỏi nhóm'
-                    : 'Chặn người dùng',
-                onTap: () => _leaveGroup(conversation),
+              PermissionGate(
+                permission: AppPermission.leaveConversations,
+                child: _buildMenuItem(
+                  icon: conversation.type == 'GROUP'
+                      ? Icons.logout
+                      : Icons.block,
+                  iconColor: Colors.red,
+                  title: conversation.type == 'GROUP'
+                      ? 'Rời khỏi nhóm'
+                      : 'Chặn người dùng',
+                  onTap: () => _leaveGroup(conversation),
+                ),
               ),
             const SizedBox(height: 32),
           ],
@@ -4113,8 +4123,11 @@ class _VideoMessageWidgetState extends State<_VideoMessageWidget> {
           showDialog(
             context: context,
             barrierColor: Colors.transparent,
-            builder: (context) =>
-                VideoPlayerDialog(videoUrl: widget.videoUrl, title: 'Video', senderName: widget.senderName),
+            builder: (context) => VideoPlayerDialog(
+              videoUrl: widget.videoUrl,
+              title: 'Video',
+              senderName: widget.senderName,
+            ),
           );
         },
         child: Container(

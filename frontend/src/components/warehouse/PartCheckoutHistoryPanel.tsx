@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useEffect, useState, useCallback } from 'react';
 import { Search, RefreshCw, ArrowUpRight, ArrowDownLeft, CheckCircle2, AlertTriangle, Clock, User, MapPin } from 'lucide-react';
 import { getAuthHeaders } from '../../utils/auth';
@@ -14,6 +15,7 @@ export const PartCheckoutHistoryPanel: React.FC<PartCheckoutHistoryPanelProps> =
   showToast,
   onReturnClick,
 }) => {
+  const canAction = usePermissionCheck();
   const [historyItems, setHistoryItems] = useState<PartCheckoutHistoryItem[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -218,7 +220,7 @@ export const PartCheckoutHistoryPanel: React.FC<PartCheckoutHistoryPanelProps> =
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     {item.checkoutStatus === 'OPEN' && onReturnClick && (
-                      <button
+                      (canAction('PART_RETURN') && (<button
                         onClick={() => onReturnClick(item)}
                         style={{
                           backgroundColor: '#2563eb',
@@ -232,7 +234,7 @@ export const PartCheckoutHistoryPanel: React.FC<PartCheckoutHistoryPanelProps> =
                         }}
                       >
                         Trả linh kiện
-                      </button>
+                      </button>))
                     )}
                   </td>
                 </tr>

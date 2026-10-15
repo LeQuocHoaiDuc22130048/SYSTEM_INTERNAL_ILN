@@ -44,7 +44,7 @@ class _HomeAttendanceState extends State<HomeAttendance> {
     });
     try {
       final backend = context.read<BackendDataProvider>();
-      if (auth.can(AppPermission.manageAttendance)) {
+      if (auth.can(AppPermission.viewAttendanceReports)) {
         await backend.loadAttendance();
       } else {
         await backend.loadMyTodayAttendance();
@@ -203,7 +203,7 @@ class _HomeAttendanceState extends State<HomeAttendance> {
     if (!auth.can(AppPermission.viewAttendance)) return const SizedBox.shrink();
     final backend = context.watch<BackendDataProvider>();
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final team = auth.can(AppPermission.manageAttendance);
+    final team = auth.can(AppPermission.viewAttendanceReports);
     final own = backend.myTodayAttendance;
     final records = team
         ? backend.attendanceRecords.where((r) => _today(r.date)).toList()

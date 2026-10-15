@@ -117,9 +117,11 @@ class User {
   }
 
   bool can(AppPermission permission) {
+    if (role == UserRole.superAdmin) return true;
     final serverPermissions = permissions;
     if (serverPermissions != null) {
-      return serverPermissions.contains(permission);
+      final aliases = legacyPermissionAliases[permission];
+      return aliases == null ? serverPermissions.contains(permission) : aliases.any(serverPermissions.contains);
     }
     return role.can(permission);
   }
@@ -227,7 +229,8 @@ extension UserRolePermissions on UserRole {
   bool can(AppPermission permission) => permissions.contains(permission);
 
   Set<AppPermission> get permissions {
-    const employeePermissions = {
+    const basePermissions = {
+      AppPermission.viewDevices,
       AppPermission.viewDashboard,
       AppPermission.viewRepairOrders,
       AppPermission.manageRepairOrders,
@@ -238,19 +241,35 @@ extension UserRolePermissions on UserRole {
       AppPermission.viewAttendance,
       AppPermission.viewProfile,
       AppPermission.updateOwnProfile,
+      AppPermission.viewCustomers,
+    };
+
+    const employeePermissions = {
+      ...basePermissions,
+      AppPermission.manageCustomers,
     };
 
     const technicianPermissions = {
+      AppPermission.viewDevices,
       AppPermission.viewDashboard,
       AppPermission.viewRepairOrders,
       AppPermission.manageRepairOrders,
       AppPermission.updateRepairOrderStatus,
       AppPermission.assignRepairOrders,
+      AppPermission.viewCustomers,
       AppPermission.viewProfile,
       AppPermission.updateOwnProfile,
     };
 
+    const warehousePermissions = {
+      ...basePermissions,
+      AppPermission.viewNotifications,
+    };
+
     const managerPermissions = {
+      AppPermission.manageDevices,
+      AppPermission.manageBanners,
+      AppPermission.deleteRepairOrders,
       ...employeePermissions,
       AppPermission.viewNotifications,
       AppPermission.assignRepairOrders,
@@ -260,6 +279,8 @@ extension UserRolePermissions on UserRole {
     };
 
     const adminPermissions = {
+      AppPermission.manageAppUpdates,
+      AppPermission.managePermissions,
       ...managerPermissions,
       AppPermission.deleteWarehouse,
       AppPermission.manageEmployeeSecurity,
@@ -270,18 +291,29 @@ extension UserRolePermissions on UserRole {
       case UserRole.superAdmin:
         return AppPermission.values.toSet();
       case UserRole.admin:
-        return adminPermissions;
+        return _expandRoleDefaults(adminPermissions);
       case UserRole.manager:
-        return managerPermissions;
+        return _expandRoleDefaults(managerPermissions);
       case UserRole.technician:
-        return technicianPermissions;
+        return _expandRoleDefaults(technicianPermissions);
       case UserRole.warehouse:
-        return {...employeePermissions, AppPermission.viewNotifications};
+        return _expandRoleDefaults(warehousePermissions);
       case UserRole.employee:
-        return employeePermissions;
+        return _expandRoleDefaults(employeePermissions);
       case UserRole.attendance:
-        return const {AppPermission.viewAttendance};
+        return const {AppPermission.viewAttendance, AppPermission.useAttendanceKiosk};
     }
     // {{END_ROLE_PERMISSIONS_SWITCH}}
   }
+}
+
+Set<AppPermission> _expandRoleDefaults(Set<AppPermission> initial) {
+  final result = {...initial};
+  for (final entry in rolePermissionExpansion.entries) {
+    if (initial.contains(entry.key)) result.addAll(entry.value);
+  }
+  if (initial.contains(AppPermission.assignRepairOrders) || initial.contains(AppPermission.manageAttendance)) {
+    result.add(AppPermission.useAttendanceKiosk);
+  }
+  return result;
 }

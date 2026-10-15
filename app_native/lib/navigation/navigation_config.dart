@@ -48,7 +48,8 @@ List<NavigationItem> buildMainNavigationItems(AuthProvider auth) {
         tabIndex: MainTabs.messages,
       ),
     if (auth.canAny({
-      AppPermission.manageEmployees,
+      AppPermission.viewEmployees,
+
       AppPermission.approveAccounts,
     }))
       const NavigationItem(
@@ -57,10 +58,17 @@ List<NavigationItem> buildMainNavigationItems(AuthProvider auth) {
         activeIcon: Icons.people,
         tabIndex: MainTabs.employeeManagement,
       ),
+    if (auth.can(AppPermission.viewCustomers))
+      const NavigationItem(
+        icon: Icons.people_alt_outlined,
+        label: 'Khách hàng',
+        activeIcon: Icons.people_alt,
+        tabIndex: MainTabs.customers,
+      ),
     if (auth.can(AppPermission.viewProfile))
       const NavigationItem(
         icon: Icons.person_outline,
-        label: 'C\u00E1 nh\u00E2n',
+        label: 'Cá nhân',
         activeIcon: Icons.person,
         tabIndex: MainTabs.profile,
       ),
@@ -81,6 +89,8 @@ bool canAccessMainTab(AuthProvider auth, int tabIndex) {
       return auth.can(AppPermission.viewRepairOrders);
     case MainTabs.warehouse:
       return auth.can(AppPermission.viewWarehouse);
+    case MainTabs.customers:
+      return auth.can(AppPermission.viewCustomers);
     case MainTabs.attendance:
       return !Platform.isIOS && auth.can(AppPermission.viewAttendance);
     case MainTabs.messages:
@@ -90,7 +100,8 @@ bool canAccessMainTab(AuthProvider auth, int tabIndex) {
     case MainTabs.employeeManagement:
     case MainTabs.accountApproval:
       return auth.canAny({
-        AppPermission.manageEmployees,
+        AppPermission.viewEmployees,
+
         AppPermission.approveAccounts,
       });
     case MainTabs.profile:

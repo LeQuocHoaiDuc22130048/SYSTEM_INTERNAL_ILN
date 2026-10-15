@@ -10,6 +10,7 @@ import '../models/part_checkout.dart';
 import '../models/part.dart';
 import '../models/store_location.dart';
 import '../models/app_banner.dart';
+import '../models/customer.dart';
 import 'api_client.dart';
 
 class BackendDataProvider extends ChangeNotifier {
@@ -21,6 +22,7 @@ class BackendDataProvider extends ChangeNotifier {
   List<User> pendingUsers = [];
   List<RepairOrder> repairOrders = [];
   List<Board> boards = [];
+  List<User> repairAssignees = [];
   List<Part> parts = [];
   List<StoreLocation> locations = [];
   List<AttendanceRecord> attendanceRecords = [];
@@ -35,6 +37,7 @@ class BackendDataProvider extends ChangeNotifier {
 
   void clear() {
     employees = [];
+    repairAssignees = [];
     pendingUsers = [];
     repairOrders = [];
     boards = [];
@@ -95,6 +98,12 @@ class BackendDataProvider extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
+  Future<void> loadRepairAssignees() async {
+    final data = await api.get('/api/v1/employees/repair-assignees');
+    repairAssignees = _content(data).map(User.fromJson).toList();
+    notifyListeners();
+  }
+
   Future<void> loadPendingUsers({bool notify = true}) async {
     final data = await api.get(
       '/api/v1/auth/pending',
@@ -127,18 +136,25 @@ class BackendDataProvider extends ChangeNotifier {
   }
 
   Future<RepairOrder> createRepairOrder({
-    required String customerName,
+    String? customerName,
     String? customerPhone,
+    String? customerId,
     required List<RepairDevice> devices,
   }) async {
+    final Map<String, dynamic> body = {
+      'devices': devices.map((d) => d.toRequestJson()).toList(),
+    };
+    if (customerId != null && customerId.isNotEmpty) {
+      body['customerId'] = customerId;
+    } else {
+      body['customerName'] = customerName ?? '';
+      if (customerPhone != null && customerPhone.isNotEmpty) {
+        body['customerPhone'] = customerPhone;
+      }
+    }
     final data = await api.post(
       '/api/v1/repair-orders',
-      body: {
-        'customerName': customerName,
-        if (customerPhone != null && customerPhone.isNotEmpty)
-          'customerPhone': customerPhone,
-        'devices': devices.map((d) => d.toRequestJson()).toList(),
-      },
+      body: body,
     );
     return RepairOrder.fromJson(data as Map<String, dynamic>);
   }
@@ -403,6 +419,131 @@ class BackendDataProvider extends ChangeNotifier {
   Future<void> deleteRepairOrder(String orderId) async {
     await api.delete('/api/v1/repair-orders/$orderId');
     await loadRepairOrders();
+  }
+
+  Future<RepairOrder> linkRepairOrderCustomer(
+    String orderId, {
+    required String customerId,
+    required String reason,
+    bool reload = true,
+  }) async {
+    final data = await api.put(
+      '/api/v1/repair-orders/$orderId/customer',
+      body: {
+        'customerId': customerId,
+        'reason': reason.trim(),
+      },
+    );
+    if (reload) await loadRepairOrders();
+    return RepairOrder.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<CustomerPage> searchCustomers({
+    String? search,
+    String? keyword,
+    bool? active,
+    CustomerType? type,
+    int page = 0,
+    int size = 20,
+  }) async {
+    final query = <String, dynamic>{
+      'page': page,
+      'size': size.clamp(1, 50),
+    };
+    final q = (search ?? keyword)?.trim();
+    if (q != null && q.isNotEmpty) {
+      query['keyword'] = q;
+    }
+    if (active != null) {
+      query['active'] = active;
+    }
+    if (type != null) {
+      query['type'] = type.backendValue;
+    }
+
+    final data = await api.get('/api/v1/customers', queryParameters: query);
+    if (data is Map<String, dynamic>) {
+      return CustomerPage.fromJson(data);
+    }
+    return const CustomerPage(
+      content: [],
+      number: 0,
+      size: 20,
+      totalElements: 0,
+      totalPages: 0,
+      last: true,
+    );
+  }
+
+  Future<Customer> getCustomer(String id) async {
+    final data = await api.get('/api/v1/customers/$id');
+    return Customer.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Customer> createCustomer({
+    required String name,
+    required CustomerType type,
+    String? phone,
+    String? email,
+    String? address,
+    String? taxCode,
+    String? notes,
+  }) async {
+    final body = {
+      'customerName': name.trim(),
+      'type': type.backendValue,
+      'phone': (phone != null && phone.trim().isNotEmpty) ? phone.trim() : null,
+      'email': (email != null && email.trim().isNotEmpty) ? email.trim() : null,
+      'address': (address != null && address.trim().isNotEmpty) ? address.trim() : null,
+      'taxCode': (taxCode != null && taxCode.trim().isNotEmpty) ? taxCode.trim() : null,
+      'notes': (notes != null && notes.trim().isNotEmpty) ? notes.trim() : null,
+    };
+    final data = await api.post('/api/v1/customers', body: body);
+    return Customer.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Customer> updateCustomer(
+    String id, {
+    required String name,
+    required CustomerType type,
+    String? phone,
+    String? email,
+    String? address,
+    String? taxCode,
+    String? notes,
+  }) async {
+    final body = {
+      'customerName': name.trim(),
+      'type': type.backendValue,
+      'phone': (phone != null && phone.trim().isNotEmpty) ? phone.trim() : null,
+      'email': (email != null && email.trim().isNotEmpty) ? email.trim() : null,
+      'address': (address != null && address.trim().isNotEmpty) ? address.trim() : null,
+      'taxCode': (taxCode != null && taxCode.trim().isNotEmpty) ? taxCode.trim() : null,
+      'notes': (notes != null && notes.trim().isNotEmpty) ? notes.trim() : null,
+    };
+    final data = await api.put('/api/v1/customers/$id', body: body);
+    return Customer.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<Customer> updateCustomerStatus(String id, bool active) async {
+    final data = await api.patch('/api/v1/customers/$id/status', body: {'active': active});
+    return Customer.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<List<RepairOrder>> getRepairOrdersByCustomer(
+    String customerId, {
+    int page = 0,
+    int size = 20,
+  }) async {
+    final data = await api.get(
+      '/api/v1/repair-orders',
+      queryParameters: {
+        'customerId': customerId,
+        'page': page,
+        'size': size.clamp(1, 50),
+      },
+    );
+    return _content(data).map(RepairOrder.fromJson).toList();
   }
 
   Future<void> checkoutBoard(

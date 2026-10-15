@@ -44,6 +44,9 @@ public class RepairOrder extends BaseEntity {
 
     // ── Thông tin khách hàng ──────────────────────────────────
 
+    @Column(name = "customer_id")
+    private UUID customerId;
+
     @Column(name = "customer_name", nullable = false, length = 100)
     private String customerName;
 

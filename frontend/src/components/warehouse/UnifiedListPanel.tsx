@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React from 'react';
 import {
   Search,
@@ -50,6 +51,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
   onQuickCheckoutBoard,
   onOpenLocationManagement,
 }) => {
+  const canAction = usePermissionCheck();
   // 1. Calculate Stats
   const totalBoards = boards.length;
   const totalParts = parts.length;
@@ -446,7 +448,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
               Quản Lý Vị Trí
             </button>
           )}
-          <button
+          {canAction('BOARD_CREATE') && (<button
             type="button"
             onClick={onAddBoard}
             style={{
@@ -465,8 +467,8 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
           >
             <Plus size={15} />
             Bo Mạch
-          </button>
-          <button
+          </button>) }
+          {canAction('PART_CREATE') && (<button
             type="button"
             onClick={onAddPart}
             style={{
@@ -485,7 +487,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
           >
             <Plus size={15} />
             Linh Kiện
-          </button>
+          </button>) }
         </div>
       </div>
 
@@ -627,7 +629,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
                       )}
                     </div>
 
-                    <button
+                    {canAction('BOARD_CHECKOUT') && (<button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -649,7 +651,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
                     >
                       <ArrowUpRight size={13} />
                       Lấy bo
-                    </button>
+                    </button>)}
                   </div>
                 </div>
               );
@@ -769,7 +771,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
                       )}
                     </div>
 
-                    <button
+                    {canAction('PART_CHECKOUT') && (<button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -791,7 +793,7 @@ export const UnifiedListPanel: React.FC<UnifiedListPanelProps> = ({
                     >
                       <ArrowUpRight size={13} />
                       Lấy linh kiện
-                    </button>
+                    </button>)}
                   </div>
                 </div>
               );

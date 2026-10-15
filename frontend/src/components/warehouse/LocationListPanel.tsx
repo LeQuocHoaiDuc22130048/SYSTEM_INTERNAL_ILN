@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useState, useMemo } from 'react';
 import {
   Search,
@@ -51,6 +52,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
   onViewLocationParts,
   showToast,
 }) => {
+  const canAction = usePermissionCheck();
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'OCCUPIED' | 'EMPTY'>('ALL');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
@@ -513,7 +515,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
             <span>Quét QR</span>
           </button>
 
-          <button
+          {canAction('WAREHOUSE_QR_PRINT') && (<button
             type="button"
             onClick={onPrintAllLocationsQr}
             style={{
@@ -532,9 +534,9 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
           >
             <Printer size={15} color="#0284c7" />
             <span>In Tem QR</span>
-          </button>
+          </button>) }
 
-          <button
+          {canAction('LOCATION_CREATE') && (<button
             type="button"
             onClick={openCreateForm}
             style={{
@@ -554,7 +556,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
           >
             <Plus size={16} />
             <span>+ Thêm Vị Trí Mới</span>
-          </button>
+          </button>) }
         </div>
       </div>
 
@@ -704,7 +706,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                                 <span>Xem LK</span>
                               </button>
                             )}
-                            <button
+                            {canAction('WAREHOUSE_QR_PRINT') && (<button
                               type="button"
                               title="In tem QR vị trí"
                               onClick={() => onPrintLocationQr(loc)}
@@ -724,8 +726,8 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                             >
                               <Printer size={13} />
                               <span>In QR</span>
-                            </button>
-                            <button
+                            </button>) }
+                            {canAction('LOCATION_UPDATE') && (<button
                               type="button"
                               title="Chỉnh sửa thông tin vị trí"
                               onClick={() => openEditForm(loc)}
@@ -745,8 +747,8 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                             >
                               <Edit2 size={13} />
                               <span>Sửa</span>
-                            </button>
-                            <button
+                            </button>) }
+                            {canAction('LOCATION_DELETE') && (<button
                               type="button"
                               title="Xóa vị trí này"
                               onClick={() => setDeletingLocation(loc)}
@@ -766,7 +768,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                             >
                               <Trash2 size={13} />
                               <span>Xóa</span>
-                            </button>
+                            </button>) }
                           </div>
                         </td>
                       </tr>
@@ -841,7 +843,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                       </div>
 
                       <div style={{ display: 'flex', gap: '5px' }}>
-                        <button
+                        {canAction('WAREHOUSE_QR_PRINT') && (<button
                           type="button"
                           title="In tem QR vị trí"
                           onClick={() => onPrintLocationQr(loc)}
@@ -861,8 +863,8 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                         >
                           <Printer size={13} />
                           <span>In QR</span>
-                        </button>
-                        <button
+                        </button>) }
+                        {canAction('LOCATION_UPDATE') && (<button
                           type="button"
                           title="Chỉnh sửa thông tin vị trí"
                           onClick={() => openEditForm(loc)}
@@ -882,8 +884,8 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                         >
                           <Edit2 size={13} />
                           <span>Sửa</span>
-                        </button>
-                        <button
+                        </button>) }
+                        {canAction('LOCATION_DELETE') && (<button
                           type="button"
                           title="Xóa vị trí này"
                           onClick={() => setDeletingLocation(loc)}
@@ -903,7 +905,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                         >
                           <Trash2 size={13} />
                           <span>Xóa</span>
-                        </button>
+                        </button>) }
                       </div>
                     </div>
 
@@ -1027,7 +1029,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
               </button>
             </div>
 
-            <form onSubmit={handleSaveLocation} className="modal-form">
+            {(editingLocation ? canAction('LOCATION_UPDATE') : canAction('LOCATION_CREATE')) && (<form onSubmit={handleSaveLocation} className="modal-form">
               <div className="form-group">
                 <label>Mã vị trí (Code) *</label>
                 <input
@@ -1080,11 +1082,11 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                 >
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit" disabled={isSaving}>
+                {(editingLocation ? canAction('LOCATION_UPDATE') : canAction('LOCATION_CREATE')) && (<button type="submit" className="btn-submit" disabled={isSaving}>
                   {isSaving ? 'Đang lưu...' : editingLocation ? 'Cập nhật' : 'Tạo mới'}
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -1184,7 +1186,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                   >
                     Hủy bỏ
                   </button>
-                  <button
+                  {canAction('LOCATION_DELETE') && (<button
                     type="button"
                     onClick={handleDeleteLocation}
                     disabled={isDeleting}
@@ -1199,7 +1201,7 @@ export const LocationListPanel: React.FC<LocationListPanelProps> = ({
                     }}
                   >
                     {isDeleting ? 'Đang xóa...' : 'Xác nhận xóa'}
-                  </button>
+                  </button>) }
                 </div>
               </>
             )}

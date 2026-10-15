@@ -13,7 +13,6 @@ import com.suachuabientan.system_internal.modules.messaging.dto.request.UpdateMe
 import com.suachuabientan.system_internal.modules.messaging.dto.response.ConversationResponse;
 import com.suachuabientan.system_internal.modules.messaging.dto.response.MessageResponse;
 import com.suachuabientan.system_internal.modules.messaging.service.MessagingService;
-import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,7 +45,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/conversations")
 @RequiredArgsConstructor
-@PreAuthorize(RoleExpressions.ANY_ACTIVE_USER)
+@PreAuthorize("hasAuthority('MESSAGING_USE') or hasRole('SUPER_ADMIN')")
 public class MessagingController {
     private final MessagingService messagingService;
 
@@ -60,6 +59,7 @@ public class MessagingController {
 
     @Operation(summary = "Create direct or group conversation")
     @PostMapping
+    @PreAuthorize("hasAuthority('CONVERSATION_CREATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> createConversation(
             @Valid @RequestBody CreateConversationRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -101,6 +101,7 @@ public class MessagingController {
 
     @Operation(summary = "Send message")
     @PostMapping("/{conversationId}/messages")
+    @PreAuthorize("hasAuthority('MESSAGE_SEND') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MessageResponse>> sendMessage(
             @PathVariable UUID conversationId,
             @Valid @RequestBody SendMessageRequest request,
@@ -111,6 +112,7 @@ public class MessagingController {
 
     @Operation(summary = "Send media message")
     @PostMapping(value = "/{conversationId}/messages/media", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('MESSAGE_UPLOAD') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MessageResponse>> sendMediaMessage(
             @PathVariable UUID conversationId,
             @RequestPart("file") MultipartFile file,
@@ -130,6 +132,7 @@ public class MessagingController {
 
     @Operation(summary = "Edit sent message")
     @PatchMapping("/{conversationId}/messages/{messageId}")
+    @PreAuthorize("hasAuthority('MESSAGE_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MessageResponse>> updateMessage(
             @PathVariable UUID conversationId,
             @PathVariable UUID messageId,
@@ -142,6 +145,7 @@ public class MessagingController {
 
     @Operation(summary = "Delete message for me or recall for everyone")
     @DeleteMapping("/{conversationId}/messages/{messageId}")
+    @PreAuthorize("hasAuthority('MESSAGE_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MessageResponse>> deleteMessage(
             @PathVariable UUID conversationId,
             @PathVariable UUID messageId,
@@ -158,6 +162,7 @@ public class MessagingController {
 
     @Operation(summary = "Add message reaction")
     @PutMapping("/{conversationId}/messages/{messageId}/reactions")
+    @PreAuthorize("hasAuthority('MESSAGE_REACT') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MessageResponse>> addReaction(
             @PathVariable UUID conversationId,
             @PathVariable UUID messageId,
@@ -174,6 +179,7 @@ public class MessagingController {
 
     @Operation(summary = "Remove message reaction")
     @DeleteMapping("/{conversationId}/messages/{messageId}/reactions")
+    @PreAuthorize("hasAuthority('MESSAGE_REACT') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<MessageResponse>> removeReaction(
             @PathVariable UUID conversationId,
             @PathVariable UUID messageId,
@@ -190,6 +196,7 @@ public class MessagingController {
 
     @Operation(summary = "Pin conversation for current user")
     @PutMapping("/{conversationId}/pin")
+    @PreAuthorize("hasAuthority('CONVERSATION_PIN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> pinConversation(
             @PathVariable UUID conversationId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -200,6 +207,7 @@ public class MessagingController {
 
     @Operation(summary = "Unpin conversation for current user")
     @DeleteMapping("/{conversationId}/pin")
+    @PreAuthorize("hasAuthority('CONVERSATION_PIN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> unpinConversation(
             @PathVariable UUID conversationId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -210,6 +218,7 @@ public class MessagingController {
 
     @Operation(summary = "Mute notifications for conversation")
     @PutMapping("/{conversationId}/mute")
+    @PreAuthorize("hasAuthority('CONVERSATION_MUTE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> muteConversation(
             @PathVariable UUID conversationId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -220,6 +229,7 @@ public class MessagingController {
 
     @Operation(summary = "Unmute notifications for conversation")
     @DeleteMapping("/{conversationId}/mute")
+    @PreAuthorize("hasAuthority('CONVERSATION_MUTE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> unmuteConversation(
             @PathVariable UUID conversationId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -230,6 +240,7 @@ public class MessagingController {
 
     @Operation(summary = "Pin message to conversation")
     @PutMapping("/{conversationId}/pinned-message/{messageId}")
+    @PreAuthorize("hasAuthority('MESSAGE_PIN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> pinMessage(
             @PathVariable UUID conversationId,
             @PathVariable UUID messageId,
@@ -241,6 +252,7 @@ public class MessagingController {
 
     @Operation(summary = "Unpin message from conversation")
     @DeleteMapping("/{conversationId}/pinned-message")
+    @PreAuthorize("hasAuthority('MESSAGE_PIN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> unpinMessage(
             @PathVariable UUID conversationId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -251,6 +263,7 @@ public class MessagingController {
 
     @Operation(summary = "Add members")
     @PostMapping("/{conversationId}/members")
+    @PreAuthorize("hasAuthority('CONVERSATION_MEMBER_ADD') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> addMembers(
             @PathVariable UUID conversationId,
             @Valid @RequestBody AddConversationMembersRequest request,
@@ -262,6 +275,7 @@ public class MessagingController {
 
     @Operation(summary = "Update conversation")
     @PatchMapping("/{conversationId}")
+    @PreAuthorize("hasAuthority('CONVERSATION_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> updateConversation(
             @PathVariable UUID conversationId,
             @Valid @RequestBody UpdateConversationRequest request,
@@ -273,6 +287,7 @@ public class MessagingController {
 
     @Operation(summary = "Update member role and chat permission")
     @PatchMapping("/{conversationId}/members/{memberId}/role")
+    @PreAuthorize("hasAuthority('CONVERSATION_MEMBER_ROLE_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> updateMemberRole(
             @PathVariable UUID conversationId,
             @PathVariable UUID memberId,
@@ -285,6 +300,7 @@ public class MessagingController {
 
     @Operation(summary = "Remove member")
     @DeleteMapping("/{conversationId}/members/{memberId}")
+    @PreAuthorize("hasAuthority('CONVERSATION_MEMBER_REMOVE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<ConversationResponse>> removeMember(
             @PathVariable UUID conversationId,
             @PathVariable UUID memberId,
@@ -296,6 +312,7 @@ public class MessagingController {
 
     @Operation(summary = "Publish typing state")
     @PostMapping("/{conversationId}/typing")
+    @PreAuthorize("hasAuthority('MESSAGE_SEND') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> typing(
             @PathVariable UUID conversationId,
             @RequestBody(required = false) TypingRequest request,
@@ -309,6 +326,7 @@ public class MessagingController {
 
     @Operation(summary = "Leave group conversation")
     @PostMapping("/{conversationId}/leave")
+    @PreAuthorize("hasAuthority('CONVERSATION_LEAVE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> leaveConversation(
             @PathVariable UUID conversationId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -318,6 +336,7 @@ public class MessagingController {
 
     @Operation(summary = "Mark conversation as read")
     @PutMapping("/{conversationId}/read")
+    @PreAuthorize("hasAuthority('CONVERSATION_READ_MARK') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> markAsRead(
             @PathVariable UUID conversationId,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React from 'react';
 import { Boxes, Edit2, Trash2, ArrowUpRight, MapPin } from 'lucide-react';
 import type { Part } from '../../types/warehouse';
@@ -19,6 +20,7 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
   openPartCheckoutModal,
   onOpenLocationScan,
 }) => {
+  const canAction = usePermissionCheck();
   const isZeroStock = selectedPart.totalQuantity === 0;
   const isLowStock = selectedPart.totalQuantity < selectedPart.minAmount;
 
@@ -46,20 +48,20 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
         </div>
 
         <div className="actions-wrapper">
-          <button className="btn-action-outline" onClick={() => openAddEditPartModal(selectedPart)}>
+          {canAction('PART_UPDATE') && (<button className="btn-action-outline" onClick={() => openAddEditPartModal(selectedPart)} >
             <Edit2 size={14} />
             Sửa
-          </button>
-          <button className="btn-action-outline danger" onClick={handleDeletePart}>
+          </button>) }
+          {canAction('PART_DELETE') && (<button className="btn-action-outline danger" onClick={handleDeletePart} >
             <Trash2 size={14} />
             Xóa
-          </button>
+          </button>) }
         </div>
       </div>
 
       {/* Main Action Buttons */}
       <div className="detail-main-actions-bar" style={{ display: 'flex', gap: '8px' }}>
-        <button
+        {canAction('PART_CHECKOUT') && (<button
           className="btn-checkout-board"
           onClick={openPartCheckoutModal}
           disabled={isZeroStock}
@@ -67,10 +69,10 @@ export const PartDetailPanel: React.FC<PartDetailPanelProps> = ({
         >
           <ArrowUpRight size={16} />
           Lấy linh kiện out kho
-        </button>
-        <button className="btn-action-outline" onClick={openAdjustStockModal} style={{ whiteSpace: 'nowrap' }}>
+        </button>) }
+        {canAction('PART_STOCK_ADJUST') && (<button className="btn-action-outline" onClick={openAdjustStockModal} style={{ whiteSpace: 'nowrap' }}>
           Điều chỉnh kho
-        </button>
+        </button>) }
       </div>
 
       {/* Specs Section */}

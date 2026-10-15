@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
@@ -35,6 +36,7 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
   onRefreshLocations,
   showToast,
 }) => {
+  const canAction = usePermissionCheck();
   const [codeOrQr, setCodeOrQr] = useState<string>(initialCode);
   const [loading, setLoading] = useState<boolean>(false);
   const [scanResult, setScanResult] = useState<LocationScanData | null>(null);
@@ -300,7 +302,7 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                   </span>
 
                   {onPrintLocationQr && (
-                    <button
+                    (canAction('WAREHOUSE_QR_PRINT') && (<button
                       type="button"
                       onClick={() => onPrintLocationQr(scanResult)}
                       style={{
@@ -320,10 +322,10 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                     >
                       <Printer size={14} />
                       In QR
-                    </button>
+                    </button>))
                   )}
 
-                  <button
+                  {canAction('LOCATION_UPDATE') && (<button
                     type="button"
                     onClick={openEditModal}
                     style={{
@@ -343,7 +345,7 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                   >
                     <Edit2 size={14} />
                     Sửa
-                  </button>
+                  </button>) }
 
                   <button
                     type="button"
@@ -499,12 +501,12 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
             <div className="w-modal-card" style={{ maxWidth: '480px', width: '90vw' }}>
               <div className="modal-header">
                 <h3>Chỉnh Sửa Vị Trí Kho</h3>
-                <button className="close-modal-btn" onClick={() => setIsEditOpen(false)}>
+                <button className="close-modal-btn" onClick={() => setIsEditOpen(false)} >
                   <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSaveEdit} className="modal-form">
+              {canAction('LOCATION_UPDATE') && (<form onSubmit={handleSaveEdit} className="modal-form">
                 <div className="form-group">
                   <label>Mã vị trí (Code) *</label>
                   <input
@@ -553,11 +555,11 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                   >
                     Hủy
                   </button>
-                  <button type="submit" className="btn-submit" disabled={isSaving}>
+                  {canAction('LOCATION_UPDATE') && (<button type="submit" className="btn-submit" disabled={isSaving}>
                     {isSaving ? 'Đang lưu...' : 'Lưu thay đổi'}
-                  </button>
+                  </button>) }
                 </div>
-              </form>
+              </form>) }
             </div>
           </div>
         )}
@@ -637,7 +639,7 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                     >
                       Hủy bỏ
                     </button>
-                    <button
+                    {canAction('LOCATION_DELETE') && (<button
                       type="button"
                       onClick={handleDeleteLocation}
                       disabled={isDeleting}
@@ -652,7 +654,7 @@ export const LocationQrScanModal: React.FC<LocationQrScanModalProps> = ({
                       }}
                     >
                       {isDeleting ? 'Đang xóa...' : 'Xác nhận xóa'}
-                    </button>
+                    </button>) }
                   </div>
                 </>
               )}

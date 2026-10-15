@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React from 'react';
 import { Cpu, Edit2, Trash2, MapPin } from 'lucide-react';
 import type { Board, BoardHistoryItem } from '../../types/warehouse';
@@ -27,6 +28,7 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
   boardHistory,
   onOpenLocationScan,
 }) => {
+  const canAction = usePermissionCheck();
   return (
     <div className="detail-scroller">
       <div className="detail-header-row">
@@ -43,27 +45,27 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
         </div>
 
         <div className="actions-wrapper">
-          <button className="btn-action-outline" onClick={() => openAddEditModal(selectedBoard)}>
+          {canAction('BOARD_UPDATE') && (<button className="btn-action-outline" onClick={() => openAddEditModal(selectedBoard)} >
             <Edit2 size={14} />
             Sửa
-          </button>
-          <button className="btn-action-outline danger" onClick={handleDeleteBoard}>
+          </button>) }
+          {canAction('BOARD_DELETE') && (<button className="btn-action-outline danger" onClick={handleDeleteBoard} >
             <Trash2 size={14} />
             Xóa
-          </button>
+          </button>) }
         </div>
       </div>
 
       {/* Status Action Buttons */}
       <div className="detail-main-actions-bar">
         {selectedBoard.status === 'AVAILABLE' ? (
-          <button className="btn-checkout-board" onClick={openCheckoutModal}>
+          (canAction('BOARD_CHECKOUT') && (<button className="btn-checkout-board" onClick={openCheckoutModal} >
             Mượn board / Checkout
-          </button>
+          </button>))
         ) : (selectedBoard.status === 'CHECKED_OUT' || selectedBoard.status === 'IN_USE') ? (
-          <button className="btn-return-board" onClick={openReturnModal}>
+          (canAction('BOARD_RETURN') && (<button className="btn-return-board" onClick={openReturnModal} >
             Trả board về kho
-          </button>
+          </button>))
         ) : null}
       </div>
 
@@ -204,7 +206,7 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
       )}
 
       {/* History Section */}
-      <div className="detail-content-section">
+      {canAction('BOARD_HISTORY_VIEW') && (<div className="detail-content-section">
         <h4 className="section-title">Lịch sử di chuyển & mượn trả</h4>
         <div className="history-flow-card">
           {loadingHistory ? (
@@ -235,7 +237,7 @@ export const BoardDetailPanel: React.FC<BoardDetailPanelProps> = ({
             <p className="no-data-text">Chưa có lịch sử mượn trả nào cho bo mạch này.</p>
           )}
         </div>
-      </div>
+      </div>) }
     </div>
   );
 };

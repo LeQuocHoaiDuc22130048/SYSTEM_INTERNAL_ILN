@@ -5,7 +5,6 @@ import com.suachuabientan.system_internal.modules.update.dto.AppUpdateInfo;
 import com.suachuabientan.system_internal.modules.update.dto.CreateUpdateDto;
 import com.suachuabientan.system_internal.modules.update.entity.AppUpdate;
 import com.suachuabientan.system_internal.modules.update.service.AppUpdateService;
-import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -187,7 +186,7 @@ public class AppUpdateController {
 
     @Operation(summary = "Lấy danh sách các bản cập nhật")
     @GetMapping
-    @PreAuthorize(RoleExpressions.ADMIN_OR_ABOVE)
+    @PreAuthorize("hasAuthority('APP_UPDATE_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<AppUpdate>>> getAllUpdates(
             @RequestParam(value = "platform", required = false) String platform
     ) {
@@ -196,7 +195,7 @@ public class AppUpdateController {
 
     @Operation(summary = "Tạo mới bản cập nhật")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize(RoleExpressions.ADMIN_OR_ABOVE)
+    @PreAuthorize("hasAuthority('APP_UPDATE_UPLOAD') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AppUpdate>> createUpdate(
             @RequestParam(value = "platform", defaultValue = "ANDROID") String platform,
             @RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file,
@@ -220,7 +219,7 @@ public class AppUpdateController {
 
     @Operation(summary = "Phát hành bản cập nhật")
     @PostMapping("/{id}/release")
-    @PreAuthorize(RoleExpressions.ADMIN_OR_ABOVE)
+    @PreAuthorize("hasAuthority('APP_UPDATE_RELEASE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AppUpdate>> releaseUpdate(@PathVariable UUID id) {
         AppUpdate released = appUpdateService.releaseUpdate(id);
         return ResponseEntity.ok(ApiResponse.success(released));
@@ -228,7 +227,7 @@ public class AppUpdateController {
 
     @Operation(summary = "Xóa bản cập nhật")
     @DeleteMapping("/{id}")
-    @PreAuthorize(RoleExpressions.ADMIN_OR_ABOVE)
+    @PreAuthorize("hasAuthority('APP_UPDATE_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteUpdate(@PathVariable UUID id) {
         appUpdateService.deleteUpdate(id);
         return ResponseEntity.ok(ApiResponse.success(null));

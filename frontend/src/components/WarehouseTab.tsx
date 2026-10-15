@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   X,
@@ -26,6 +27,7 @@ import './WarehouseTab.css';
 
 
 export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMode }) => {
+  const canAction = usePermissionCheck();
   const [boards, setBoards] = useState<Board[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -946,13 +948,13 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
           >
             📍 Vị Trí Kho ({locations.length})
           </button>
-          <button
+          {canAction('PART_HISTORY_VIEW') && (<button
             type="button"
             className={`warehouse-mode-btn ${warehouseMode === 'PART_LOGS' ? 'active' : ''}`}
             onClick={() => setWarehouseMode('PART_LOGS')}
           >
             📜 Nhật Ký Lấy/Trả
-          </button>
+          </button>) }
         </div>
 
         {warehouseMode !== 'LOCATIONS' && (
@@ -969,13 +971,13 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
               Quét QR Vị Trí
             </button>
 
-            <button
+            {canAction('WAREHOUSE_QR_PRINT') && (<button
               type="button"
               onClick={() => handleOpenLocationQrPrint()}
               style={{ backgroundColor: '#ffffff', color: '#2563eb', border: '1.5px solid #bfdbfe', padding: '8px 14px', borderRadius: '8px', fontWeight: 600, fontSize: '0.88rem', cursor: 'pointer' }}
             >
               🏷️ In Tem QR
-            </button>
+            </button>) }
           </div>
         )}
       </div>
@@ -1186,7 +1188,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSaveBoard} className="modal-form">
+            {(editingBoard ? canAction('BOARD_UPDATE') : canAction('BOARD_CREATE')) && (<form onSubmit={handleSaveBoard} className="modal-form">
               <div className="form-group">
                 <label>Tên bo mạch *</label>
                 <input
@@ -1202,7 +1204,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <div className="form-group">
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                     <label style={{ margin: 0 }}>Vị trí lưu kho có sẵn</label>
-                    <button
+                    {canAction('LOCATION_CREATE') && (<button
                       type="button"
                       onClick={() => {
                         setNewLocationCode('');
@@ -1214,7 +1216,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                       style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
                     >
                       + Thêm vị trí mới
-                    </button>
+                    </button>) }
                   </div>
                   <select
                     value={boardLocation}
@@ -1296,11 +1298,11 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <button type="button" className="btn-cancel" onClick={() => setIsAddEditModalOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit">
+                {(editingBoard ? canAction('BOARD_UPDATE') : canAction('BOARD_CREATE')) && (<button type="submit" className="btn-submit">
                   {editingBoard ? 'Lưu thay đổi' : 'Thêm bo mạch'}
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -1315,7 +1317,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleCheckoutBoard} className="modal-form">
+            {canAction('BOARD_CHECKOUT') && (<form onSubmit={handleCheckoutBoard} className="modal-form">
 
               {/* Stock info banner */}
               <div className="checkout-stock-banner">
@@ -1356,15 +1358,15 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <button type="button" className="btn-cancel" onClick={() => setIsCheckoutModalOpen(false)}>
                   Hủy
                 </button>
-                <button
+                {canAction('BOARD_CHECKOUT') && (<button
                   type="submit"
                   className="btn-submit"
                   disabled={checkoutQuantity > (selectedBoard?.quantity || 0)}
                 >
                   Xác nhận mượn
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -1379,7 +1381,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleReturnBoard} className="modal-form">
+            {canAction('BOARD_RETURN') && (<form onSubmit={handleReturnBoard} className="modal-form">
 
               {/* Return type selection */}
               <div className="form-group">
@@ -1454,11 +1456,11 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <button type="button" className="btn-cancel" onClick={() => setIsReturnModalOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit">
+                {canAction('BOARD_RETURN') && (<button type="submit" className="btn-submit">
                   {returnType === 'FULL' ? 'Xác nhận trả hết' : 'Xác nhận trả một phần'}
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -1473,7 +1475,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSavePart} className="modal-form">
+            {(editingPart ? canAction('PART_UPDATE') : canAction('PART_CREATE')) && (<form onSubmit={handleSavePart} className="modal-form">
               <div className="form-row-grid">
                 <div className="form-group">
                   <label>Mã IPN *</label>
@@ -1536,12 +1538,12 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 />
               </div>
 
-              {!editingPart && (
+              {!editingPart && canAction('PART_STOCK_ADJUST') && (
                 <div className="form-row-grid" style={{ backgroundColor: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '14px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                       <label style={{ margin: 0, fontWeight: 600, color: '#334155' }}>Vị trí lưu kho có sẵn</label>
-                      <button
+                      {canAction('LOCATION_CREATE') && (<button
                         type="button"
                         onClick={() => {
                           setNewLocationCode('');
@@ -1553,7 +1555,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                         style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
                       >
                         + Thêm vị trí mới
-                      </button>
+                      </button>) }
                     </div>
                     <select
                       value={partInitialLocationCode}
@@ -1587,11 +1589,11 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <button type="button" className="btn-cancel" onClick={() => setIsPartAddEditModalOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit">
+                {(editingPart ? canAction('PART_UPDATE') : canAction('PART_CREATE')) && (<button type="submit" className="btn-submit">
                   {editingPart ? 'Lưu thay đổi' : 'Thêm linh kiện'}
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -1606,11 +1608,11 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleAdjustStock} className="modal-form">
+            {canAction('PART_STOCK_ADJUST') && (<form onSubmit={handleAdjustStock} className="modal-form">
               <div className="form-group">
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
                   <label style={{ margin: 0 }}>Vị trí lưu kho có sẵn *</label>
-                  <button
+                  {canAction('LOCATION_CREATE') && (<button
                     type="button"
                     onClick={() => {
                       setNewLocationCode('');
@@ -1622,7 +1624,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                     style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.8rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
                   >
                     + Thêm vị trí mới
-                  </button>
+                  </button>) }
                 </div>
                 <select
                   required
@@ -1667,11 +1669,11 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <button type="button" className="btn-cancel" onClick={() => setIsAdjustStockModalOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit">
+                {canAction('PART_STOCK_ADJUST') && (<button type="submit" className="btn-submit">
                   Xác nhận điều chỉnh
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}
@@ -1689,7 +1691,7 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <X size={20} />
               </button>
             </div>
-            <form onSubmit={handleSaveLocation} className="modal-form">
+            {canAction('LOCATION_CREATE') && (<form onSubmit={handleSaveLocation} className="modal-form">
               <div className="form-group">
                 <label>Mã vị trí kho (Kệ / Ngăn) *</label>
                 <input
@@ -1757,11 +1759,11 @@ export const WarehouseTab: React.FC<WarehouseTabProps> = ({ showToast, initialMo
                 <button type="button" className="btn-cancel" onClick={() => setIsAddLocationModalOpen(false)}>
                   Hủy
                 </button>
-                <button type="submit" className="btn-submit">
+                {canAction('LOCATION_CREATE') && (<button type="submit" className="btn-submit">
                   Tạo Vị Trí & Cấp QR
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}

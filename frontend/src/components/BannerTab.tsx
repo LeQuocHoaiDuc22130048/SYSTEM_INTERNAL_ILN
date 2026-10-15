@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import { useBannerHistory } from './useBannerHistory';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
@@ -182,6 +183,7 @@ function BannerActionFields({ actionType, actionValue, onTypeChange, onValueChan
 }
 
 export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
+  const canAction = usePermissionCheck();
   const [banners, setBanners] = useState<AppBanner[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
@@ -1126,7 +1128,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
             <span>Làm mới</span>
           </button>
 
-          <button
+          {canAction('BANNER_CREATE') && (<button
             type="button"
             className="btn-upload-crop-banner"
             onClick={() => quickUploadInputRef.current?.click()}
@@ -1134,12 +1136,12 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
           >
             <Crop size={16} />
             <span>Tải & Cắt Banner từ Máy</span>
-          </button>
+          </button>) }
 
-          <button type="button" className="btn-create" onClick={handleOpenCreateModal}>
+          {canAction('BANNER_CREATE') && (<button type="button" className="btn-create" onClick={handleOpenCreateModal}>
             <Plus size={16} />
             <span>Thêm Banner Mới</span>
-          </button>
+          </button>) }
         </div>
       </div>
 
@@ -1156,7 +1158,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
           </div>
           <h3>Không tìm thấy banner nào</h3>
           <p>Chưa có banner nào khớp với điều kiện tìm kiếm hoặc chưa được tạo.</p>
-          <button
+          {canAction('BANNER_CREATE') && (<button
             type="button"
             className="btn-create"
             onClick={handleOpenCreateModal}
@@ -1164,7 +1166,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
           >
             <Plus size={15} />
             <span>Thêm Banner Mới</span>
-          </button>
+          </button>) }
         </div>
       ) : (
         <div className="banner-cards-grid">
@@ -1262,7 +1264,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                 {/* 3. Right: Action Bar */}
                 <div className="banner-card-action-bar" onClick={e => e.stopPropagation()}>
                   {/* Switch Toggle (Bật / Tắt nhanh) */}
-                  <div
+                  {canAction('BANNER_STATUS_UPDATE') && (<div
                     className="banner-switch-container"
                     title={banner.isActive ? 'Đang hiển thị trên App (Bấm để ẩn)' : 'Đang tạm ẩn (Bấm để hiển thị)'}
                     onClick={() => handleToggleActive(banner)}
@@ -1273,10 +1275,10 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                     <span className={`banner-switch-text ${banner.isActive ? 'active' : ''}`}>
                       {banner.isActive ? 'Bật' : 'Tắt'}
                     </span>
-                  </div>
+                  </div>) }
 
                   <div className="banner-action-buttons">
-                    <button
+                    {canAction('BANNER_REORDER') && (<button
                       type="button"
                       className="btn-card-action"
                       disabled={index === 0}
@@ -1284,8 +1286,8 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                       title="Chuyển lên trước"
                     >
                       <ArrowUp size={13} />
-                    </button>
-                    <button
+                    </button>) }
+                    {canAction('BANNER_REORDER') && (<button
                       type="button"
                       className="btn-card-action"
                       disabled={index === banners.length - 1}
@@ -1293,27 +1295,27 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                       title="Chuyển xuống sau"
                     >
                       <ArrowDown size={13} />
-                    </button>
+                    </button>) }
 
                     {/* Icon bút chì (Chỉnh sửa) */}
-                    <button
+                    {canAction('BANNER_UPDATE') && (<button
                       type="button"
                       className="btn-card-action edit-btn"
                       onClick={() => handleOpenEditModal(banner)}
                       title="Chỉnh sửa banner"
                     >
                       <Edit size={14} />
-                    </button>
+                    </button>) }
 
                     {/* Icon thùng rác đỏ (Xóa) */}
-                    <button
+                    {canAction('BANNER_DELETE') && (<button
                       type="button"
                       className="btn-card-action delete-btn"
                       onClick={() => handleDelete(banner)}
                       title="Xóa banner"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </button>) }
                   </div>
                 </div>
               </div>
@@ -1357,7 +1359,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit}>
+              {(editingBanner ? canAction('BANNER_UPDATE') : canAction('BANNER_CREATE')) && (<form onSubmit={handleSubmit}>
               <div className="banner-modal-body">
                 <details className="banner-editor-group" open><summary>Mẫu banner & công cụ thiết kế</summary><div className="banner-editor-fields">
                   <div className="banner-template-picker">
@@ -2109,7 +2111,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                 >
                   Hủy
                 </button>
-                <button type="submit" className="btn-primary" disabled={submitting}>
+                {(editingBanner ? canAction('BANNER_UPDATE') : canAction('BANNER_CREATE')) && (<button type="submit" className="btn-primary" disabled={submitting}>
                   {submitting ? (
                     <>
                       <RefreshCw size={15} className="animate-spin" />
@@ -2121,9 +2123,9 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                       <span>{editingBanner ? 'Lưu thay đổi' : 'Tạo banner'}</span>
                     </>
                   )}
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
             </div>
           )}
         </div>
@@ -2276,14 +2278,14 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                     <p style={{ fontSize: '12px', color: '#dbeafe', margin: '8px 0 16px' }}>
                       Bật trạng thái hiển thị cho ít nhất 1 banner để xem trước trên app.
                     </p>
-                    <button
+                    {canAction('BANNER_CREATE') && (<button
                       type="button"
                       className="stitch-banner-cta-btn"
                       onClick={handleOpenCreateModal}
                     >
                       <Plus size={13} />
                       <span>Tạo banner ngay</span>
-                    </button>
+                    </button>) }
                   </div>
                 </div>
               )}

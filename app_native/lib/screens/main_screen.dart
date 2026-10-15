@@ -22,6 +22,7 @@ import '../widgets/navigation/side_navigation.dart';
 import '../widgets/app_quick_actions.dart';
 import 'attendance_only_page.dart';
 import 'attendance_screen.dart';
+import 'customers_page.dart';
 import 'dashboard_page.dart';
 import 'home_page.dart';
 import 'employee_management_page.dart';
@@ -39,7 +40,7 @@ class MainScreen extends StatefulWidget {
   State<MainScreen> createState() => _MainScreenState();
 }
 
-class _MainScreenState extends State<MainScreen> {
+class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
   int _currentIndex = MainTabs.dashboard;
   int _previousIndex = MainTabs.dashboard;
   bool _isSidebarExpanded = true;
@@ -49,6 +50,7 @@ class _MainScreenState extends State<MainScreen> {
 
   late final List<Widget?> _pages;
   StreamSubscription<AppNotification>? _notificationSub;
+  Timer? _permissionRefresh;
   bool _navigatingToLogin = false;
 
   bool _initializedArgs = false;
@@ -69,6 +71,17 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _permissionRefresh = Timer.periodic(const Duration(minutes: 1), (_) {
+      if (!mounted ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      final auth = context.read<AuthProvider>();
+      if (auth.isAuthenticated && !auth.isLoadingProfile) {
+        unawaited(auth.loadMe());
+      }
+    });
     final auth = context.read<AuthProvider>();
     _currentIndex =
         widget.initialIndex != null &&
@@ -82,6 +95,7 @@ class _MainScreenState extends State<MainScreen> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
+        unawaited(context.read<AuthProvider>().loadMe());
         final args = ModalRoute.of(context)?.settings.arguments;
         if (args is int &&
             canAccessMainTab(context.read<AuthProvider>(), args)) {
@@ -132,8 +146,17 @@ class _MainScreenState extends State<MainScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _permissionRefresh?.cancel();
     _notificationSub?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      unawaited(context.read<AuthProvider>().loadMe());
+    }
   }
 
   Widget _buildPage(int index) {
@@ -168,6 +191,8 @@ class _MainScreenState extends State<MainScreen> {
         );
       case MainTabs.accountApproval:
         return const SizedBox.shrink();
+      case MainTabs.customers:
+        return const CustomersPage();
       case MainTabs.profile:
         return ProfilePage(
           hideTopBar: true,

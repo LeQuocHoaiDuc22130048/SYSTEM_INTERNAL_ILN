@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { EmployeeMonthlyStats, UserInfo } from './mockData';
+import { canAccessTab } from './utils/tabPermissions';
+import { PermissionUserContext } from './utils/permissionContext';
 import './App.css';
 import { normalizeMonthlyResponse } from './utils/employee';
 
@@ -17,6 +19,7 @@ import { UpdateTab } from './components/UpdateTab';
 import { BannerTab } from './components/BannerTab';
 import { Sidebar } from './components/Sidebar';
 import { OrdersTab } from './components/OrdersTab';
+import { CustomersTab } from './components/CustomersTab';
 import { WarehouseTab } from './components/WarehouseTab';
 import { AccountsTab } from './components/AccountsTab';
 import { DashboardTab } from './components/DashboardTab';
@@ -30,7 +33,7 @@ import { exportAttendanceExcel } from './utils/excel';
 type DataSource = 'api' | 'error' | 'loading';
 
 /** Tab đang hiển thị */
-type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'warehouse' | 'locations' | 'accounts';
+type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts';
 
 /** Dữ liệu target để mở EditModal */
 interface EditModalTarget {
@@ -52,6 +55,38 @@ function App() {
     }
   });
 
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    let disposed = false;
+    let loadingUser = false;
+    const refreshPermissions = async () => {
+      if (document.visibilityState === 'hidden' || loadingUser) return;
+      loadingUser = true;
+      try {
+        const response = await fetch('/api/v1/auth/me', { headers: getAuthHeaders() });
+        const result = await response.json();
+        if (!disposed && response.ok && result.data) {
+          localStorage.setItem('currentUser', JSON.stringify(result.data));
+          setCurrentUser(result.data);
+        }
+      } catch {
+        // Keep the last authenticated snapshot while offline; API checks remain authoritative.
+      } finally { loadingUser = false; }
+    };
+    void refreshPermissions();
+    const timer = window.setInterval(() => void refreshPermissions(), 60000);
+    window.addEventListener('focus', refreshPermissions);
+    window.addEventListener('permissions-updated', refreshPermissions);
+    document.addEventListener('visibilitychange', refreshPermissions);
+    return () => {
+      disposed = true;
+      clearInterval(timer);
+      window.removeEventListener('focus', refreshPermissions);
+      window.removeEventListener('permissions-updated', refreshPermissions);
+      document.removeEventListener('visibilitychange', refreshPermissions);
+    };
+  }, [isAuthenticated]);
+
   const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth() + 1);
 
@@ -65,7 +100,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'warehouse', 'locations', 'accounts'];
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'customers', 'warehouse', 'locations', 'accounts'];
     const hash = window.location.hash.replace('#', '') as ActiveTab;
     if (validTabs.includes(hash)) return hash;
 
@@ -85,7 +120,7 @@ function App() {
 
   // Lắng nghe sự kiện hashchange khi người dùng bấm nút Back/Forward trên trình duyệt
   useEffect(() => {
-    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'warehouse', 'locations', 'accounts'];
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'customers', 'warehouse', 'locations', 'accounts'];
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') as ActiveTab;
       if (validTabs.includes(hash)) {
@@ -481,6 +516,7 @@ function App() {
   }
 
   return (
+    <PermissionUserContext.Provider value={currentUser}>
     <div className="app-layout">
       {toastMessage && <div className="toast-msg">{toastMessage}</div>}
 
@@ -522,7 +558,9 @@ function App() {
         />
 
         <div className="main-content-inner">
-          {activeTab === 'dashboard' ? (
+          {!canAccessTab(currentUser, activeTab) ? (
+            <div role="alert">Bạn chưa được cấp quyền sử dụng chức năng này. Chọn một mục được cấp quyền trong menu.</div>
+          ) : activeTab === 'dashboard' ? (
             <DashboardTab
               setActiveTab={setActiveTab}
               showToast={showToast}
@@ -592,6 +630,11 @@ function App() {
               showToast={showToast}
               currentUser={currentUser}
             />
+          ) : activeTab === 'customers' ? (
+            <CustomersTab
+              showToast={showToast}
+              currentUser={currentUser}
+            />
           ) : activeTab === 'accounts' ? (
             <AccountsTab
               showToast={showToast}
@@ -653,6 +696,7 @@ function App() {
         />
       )}
     </div>
+    </PermissionUserContext.Provider>
   );
 }
 

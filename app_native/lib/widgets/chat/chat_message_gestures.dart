@@ -15,9 +15,9 @@ class ChatMessageGestures extends StatefulWidget {
     this.enabled = true,
   });
   final Widget child;
-  final VoidCallback onReply;
+  final VoidCallback? onReply;
   final VoidCallback onLongPress;
-  final VoidCallback onDoubleTap;
+  final VoidCallback? onDoubleTap;
   final VoidCallback? onTap;
   final bool enabled;
   @override
@@ -95,20 +95,24 @@ class _ChatMessageGesturesState extends State<ChatMessageGestures>
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
         dragStartBehavior: DragStartBehavior.down,
-        onHorizontalDragStart: _startDrag,
-        onHorizontalDragUpdate: _updateDrag,
-        onHorizontalDragEnd: (_) {
-          final reply = !_pointerCancelled && _dragOffset.abs() >= 50;
-          _returnToRest();
-          if (reply) widget.onReply();
-        },
+        onHorizontalDragStart: widget.onReply == null ? null : _startDrag,
+        onHorizontalDragUpdate: widget.onReply == null ? null : _updateDrag,
+        onHorizontalDragEnd: widget.onReply == null
+            ? null
+            : (_) {
+                final reply = !_pointerCancelled && _dragOffset.abs() >= 50;
+                _returnToRest();
+                if (reply) widget.onReply?.call();
+              },
         onHorizontalDragCancel: _returnToRest,
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
-        onDoubleTap: () {
-          _pulseController.forward(from: 0);
-          widget.onDoubleTap();
-        },
+        onDoubleTap: widget.onDoubleTap == null
+            ? null
+            : () {
+                _pulseController.forward(from: 0);
+                widget.onDoubleTap?.call();
+              },
         child: Transform.translate(
           offset: Offset(_visualOffset, 0),
           child: Transform.scale(

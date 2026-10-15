@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import { getAvatarLetters } from '../utils/employee';
@@ -22,6 +23,7 @@ export const EditModal: React.FC<EditModalProps> = ({
   showToast,
   onSaveSuccess,
 }) => {
+  const canAction = usePermissionCheck();
   const [hasEditCheckIn, setHasEditCheckIn] = useState<boolean>(false);
   const [editCheckInTime, setEditCheckInTime] = useState<string>('08:30');
   const [editCheckInRecordId, setEditCheckInRecordId] = useState<string | null>(null);
@@ -111,7 +113,7 @@ export const EditModal: React.FC<EditModalProps> = ({
             <X size={20} />
           </button>
         </div>
-        <form onSubmit={handleSaveEdit}>
+        {canAction('ATTENDANCE_RECORD_UPDATE') && (<form onSubmit={handleSaveEdit}>
           <div className="modal-body modal-body--gap">
             <div className="edit-employee-card">
               <div className="avatar-badge">{getAvatarLetters(employee.name)}</div>
@@ -179,11 +181,11 @@ export const EditModal: React.FC<EditModalProps> = ({
             <button type="button" className="action-btn-outline" onClick={onClose} disabled={editSubmitting}>
               Hủy
             </button>
-            <button type="submit" className="action-btn-primary" disabled={editSubmitting}>
+            {canAction('ATTENDANCE_RECORD_UPDATE') && (<button type="submit" className="action-btn-primary" disabled={editSubmitting}>
               {editSubmitting ? 'Đang lưu...' : 'Lưu thay đổi'}
-            </button>
+            </button>) }
           </div>
-        </form>
+        </form>) }
       </div>
     </div>
   );

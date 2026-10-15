@@ -4,7 +4,6 @@ import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.notification.dto.request.UpdateDeviceTokenRequest;
 import com.suachuabientan.system_internal.modules.notification.dto.response.NotificationResponse;
 import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
-import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -25,7 +24,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/v1/notifications")
 @RequiredArgsConstructor
-@PreAuthorize(RoleExpressions.ANY_ACTIVE_USER)
+@PreAuthorize("hasAuthority('NOTIFICATION_VIEW') or hasRole('SUPER_ADMIN')")
 public class NotificationController {
     private final NotificationService notificationService;
 
@@ -48,6 +47,7 @@ public class NotificationController {
 
     @Operation(summary = "Đánh dấu một thông báo đã đọc")
     @PutMapping("/{id}/read")
+    @PreAuthorize("hasAuthority('NOTIFICATION_MARK_READ') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<NotificationResponse>> markAsRead(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -58,6 +58,7 @@ public class NotificationController {
 
     @Operation(summary = "Đánh dấu tất cả thông báo đã đọc")
     @PutMapping("/read-all")
+    @PreAuthorize("hasAuthority('NOTIFICATION_MARK_READ') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Map<String, Long>>> markAllAsRead(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         long updated = notificationService.markAllAsRead(userDetails.getUserId());
@@ -68,6 +69,7 @@ public class NotificationController {
 
     @Operation(summary = "Cập nhật Firebase device token của người đang đăng nhập")
     @PutMapping("/device-token")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> updateDeviceToken(
             @Valid @RequestBody UpdateDeviceTokenRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -77,6 +79,7 @@ public class NotificationController {
 
     @Operation(summary = "Hủy Firebase device token khi đăng xuất thiết bị hiện tại")
     @DeleteMapping("/device-token")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ApiResponse<Void>> clearDeviceToken(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         notificationService.clearDeviceToken(userDetails.getUserId());

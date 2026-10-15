@@ -47,6 +47,16 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class EmployeeService implements InitializingBean {
 
+    @Transactional(readOnly = true)
+    public List<com.suachuabientan.system_internal.modules.employee.dto.response.RepairAssigneeResponse> getRepairAssignees() {
+        return userRepository.findByRoleInAndStatusAndIsDeletedFalse(
+                List.of(UserRole.TECHNICIAN, UserRole.ADMIN, UserRole.SUPER_ADMIN), UserStatus.ACTIVE).stream()
+                .map(user -> new com.suachuabientan.system_internal.modules.employee.dto.response.RepairAssigneeResponse(
+                        user.getId(), user.getUsername(), user.getFullName(), user.getEmployeeCode(),
+                        user.getRole().name(), user.getStatus().name(), user.getAvatarUrl()))
+                .toList();
+    }
+
     private final UserRepository userRepository;
     private final AttendanceRecordRepository attendanceRepository;
     private final RepairOrderRepository repairOrderRepository;
@@ -175,7 +185,11 @@ public class EmployeeService implements InitializingBean {
         if (StringUtils.hasText(request.phone())) user.setPhone(request.phone());
         if (StringUtils.hasText(request.address())) user.setAddress(request.address());
         if (StringUtils.hasText(request.avatarUrl())) user.setAvatarUrl(request.avatarUrl());
-        if (StringUtils.hasText(request.role()) && isManager) {
+        if (StringUtils.hasText(request.role()) && !request.role().equalsIgnoreCase(user.getRole().name())) {
+            UserEntity requester = findUserById(requesterId);
+            if (requester.getRole() != UserRole.SUPER_ADMIN || targetId.equals(requesterId)) {
+                throw new BusinessException("Chỉ SUPER_ADMIN được thay đổi vai trò của tài khoản khác", 403);
+            }
             try {
                 UserRole newRole = UserRole.valueOf(request.role().toUpperCase());
                 user.setRole(newRole);

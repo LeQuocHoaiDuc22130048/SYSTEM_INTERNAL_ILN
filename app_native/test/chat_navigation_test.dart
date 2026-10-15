@@ -24,7 +24,11 @@ class _Auth extends AuthProvider {
   @override
   bool get isAuthenticated => true;
   @override
-  bool can(AppPermission permission) => permission == AppPermission.useMessages;
+  bool can(AppPermission permission) => const {
+    AppPermission.useMessages,
+    AppPermission.sendMessages,
+    AppPermission.uploadMessages,
+  }.contains(permission);
 }
 
 class _Updates extends UpdateProvider {

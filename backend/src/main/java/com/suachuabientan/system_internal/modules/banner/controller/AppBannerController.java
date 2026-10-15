@@ -6,7 +6,6 @@ import com.suachuabientan.system_internal.modules.banner.dto.CreateAppBannerDto;
 import com.suachuabientan.system_internal.modules.banner.dto.ReorderBannersDto;
 import com.suachuabientan.system_internal.modules.banner.dto.UpdateAppBannerDto;
 import com.suachuabientan.system_internal.modules.banner.service.AppBannerService;
-import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -52,7 +51,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Lấy tất cả banner cho trang quản trị website")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_VIEW') or hasRole('SUPER_ADMIN')")
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<AppBannerDto>>> getAllBanners() {
         return ResponseEntity.ok(ApiResponse.success(bannerService.getAllBanners()));
@@ -65,7 +64,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Tạo mới banner (JSON)")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_CREATE') or hasRole('SUPER_ADMIN')")
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<AppBannerDto>> createBannerJson(
             @RequestBody @Valid CreateAppBannerDto dto,
@@ -76,7 +75,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Tạo mới banner kèm file ảnh (Multipart)")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_CREATE') or hasRole('SUPER_ADMIN')")
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<AppBannerDto>> createBannerMultipart(
             @RequestParam("title") String title,
@@ -141,7 +140,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Cập nhật banner (JSON)")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_UPDATE') or hasRole('SUPER_ADMIN')")
     @PutMapping(value = "/{id}", consumes = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<ApiResponse<AppBannerDto>> updateBannerJson(
             @PathVariable UUID id,
@@ -153,7 +152,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Cập nhật banner kèm file ảnh (Multipart)")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_UPDATE') or hasRole('SUPER_ADMIN')")
     @PutMapping(value = "/{id}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<AppBannerDto>> updateBannerMultipart(
             @PathVariable UUID id,
@@ -219,7 +218,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Bật/tắt trạng thái hiển thị của banner")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_STATUS_UPDATE') or hasRole('SUPER_ADMIN')")
     @PatchMapping("/{id}/toggle-active")
     public ResponseEntity<ApiResponse<AppBannerDto>> toggleActive(
             @PathVariable UUID id,
@@ -230,7 +229,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Sắp xếp lại thứ tự banner")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_REORDER') or hasRole('SUPER_ADMIN')")
     @PatchMapping("/reorder")
     public ResponseEntity<ApiResponse<Void>> reorderBanners(
             @RequestBody @Valid ReorderBannersDto dto,
@@ -241,7 +240,7 @@ public class AppBannerController {
     }
 
     @Operation(summary = "Xóa banner")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('BANNER_DELETE') or hasRole('SUPER_ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> deleteBanner(
             @PathVariable UUID id,

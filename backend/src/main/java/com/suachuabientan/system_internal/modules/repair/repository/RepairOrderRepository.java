@@ -41,6 +41,8 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
             LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
             LEFT JOIN repair_devices rd ON rd.order_id = r.id
             WHERE r.is_deleted = false
+              AND (:unlinkedOnly = false OR r.customer_id IS NULL)
+              AND (CAST(:customerId AS TEXT) IS NULL OR r.customer_id = CAST(:customerId AS uuid))
               AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
               AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid) OR r.assigned_to = CAST(:assignedTo AS uuid))
               AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.assigned_to = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
@@ -53,13 +55,15 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
                   OR LOWER(r.serial_number)  LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
                   OR LOWER(rd.serial_number) LIKE LOWER(CONCAT('%', CAST(:keyword AS TEXT), '%'))
               )
-            ORDER BY r.priority ASC, r.received_at DESC
+            ORDER BY r.priority ASC, r.received_at DESC, r.id DESC
             """,
             countQuery = """
                     SELECT COUNT(DISTINCT r.id) FROM repair_orders r
                     LEFT JOIN repair_order_assignees roa ON roa.order_id = r.id
                     LEFT JOIN repair_devices rd ON rd.order_id = r.id
                     WHERE r.is_deleted = false
+                      AND (:unlinkedOnly = false OR r.customer_id IS NULL)
+                      AND (CAST(:customerId AS TEXT) IS NULL OR r.customer_id = CAST(:customerId AS uuid))
                       AND (CAST(:status AS TEXT) IS NULL OR r.status = CAST(:status AS TEXT))
                       AND (CAST(:assignedTo AS TEXT) IS NULL OR roa.technician_id = CAST(:assignedTo AS uuid) OR r.assigned_to = CAST(:assignedTo AS uuid))
                       AND (CAST(:staffId AS TEXT) IS NULL OR roa.technician_id = CAST(:staffId AS uuid) OR r.assigned_to = CAST(:staffId AS uuid) OR r.received_by = CAST(:staffId AS uuid))
@@ -79,6 +83,8 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
             @Param("status") String status,
             @Param("assignedTo") String assignedTo,
             @Param("staffId") String staffId,
+            @Param("customerId") String customerId,
+            @Param("unlinkedOnly") boolean unlinkedOnly,
             Pageable pageable);
 
 

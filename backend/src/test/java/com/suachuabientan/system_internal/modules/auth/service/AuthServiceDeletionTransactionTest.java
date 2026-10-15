@@ -104,7 +104,7 @@ class AuthServiceDeletionTransactionTest {
     private AuthService serviceWith(RefreshTokenRepository tokenRepository) {
         NotificationService notifications = new NotificationService(mock(NotificationRepository.class), users,
                 mock(FcmService.class), mock(SimpMessagingTemplate.class));
-        AuthService target = new AuthService(users, passwordEncoder, mock(UserMapper.class),
+        AuthService target = new AuthService(users, passwordEncoder, org.mapstruct.factory.Mappers.getMapper(UserMapper.class),
                 mock(EmployeeCodeGenerator.class), mock(AuthenticationManager.class), mock(JwtUtil.class),
                 tokenRepository, mock(UserRegistrationRequestRepository.class), notifications,
                 mock(PasswordResetOtpRepository.class), mock(PasswordResetOtpService.class), mock(RbacService.class));
@@ -112,6 +112,35 @@ class AuthServiceDeletionTransactionTest {
         proxy.setProxyTargetClass(true);
         proxy.addAdvice(new TransactionInterceptor(transactionManager, new AnnotationTransactionAttributeSource()));
         return (AuthService) proxy.getProxy();
+    }
+
+    @Test
+    void accountSearchIncludesAdministratorsWhileEmployeeSearchKeepsThemHidden() {
+        String keyword = "account-search-" + UUID.randomUUID();
+        transaction.executeWithoutResult(status -> {
+            for (UserRole role : java.util.List.of(UserRole.ADMIN, UserRole.SUPER_ADMIN, UserRole.MANAGER)) {
+                UserEntity account = new UserEntity();
+                account.setUsername(UUID.randomUUID().toString());
+                account.setPasswordHash("test-hash");
+                account.setFullName(keyword);
+                account.setRole(role);
+                account.setStatus(UserStatus.ACTIVE);
+                account.setCreatedAt(Instant.now());
+                account.setUpdatedAt(Instant.now());
+                users.save(account);
+            }
+        });
+
+        var page = org.springframework.data.domain.PageRequest.of(0, 20);
+        var accounts = authService.getUsers(keyword, page);
+        assertEquals(3, accounts.getTotalElements());
+        assertEquals(java.util.Set.of("ADMIN", "SUPER_ADMIN", "MANAGER"),
+                accounts.getContent().stream().map(response -> response.role()).collect(java.util.stream.Collectors.toSet()));
+        transaction.executeWithoutResult(status -> {
+            var employees = users.searchUsers(keyword, page);
+            assertEquals(1, employees.getTotalElements());
+            assertEquals(UserRole.MANAGER, employees.getContent().getFirst().getRole());
+        });
     }
 
     @ParameterizedTest(name = "deletion commits and revokes sessions: selfDelete={0}")

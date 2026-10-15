@@ -26,6 +26,7 @@ export interface RepairOrder {
   id: string;
   orderCode: string;
   deviceName: string;
+  customerId?: string | null;
   customerName: string;
   customerPhone?: string;
   serialNumber?: string;

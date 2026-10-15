@@ -61,6 +61,18 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
             """)
     Page<UserEntity> searchUsers(@Param("keyword") String keyword, Pageable pageable);
 
+    /** Account management includes administrators; employee lists use searchUsers. */
+    @Query("""
+            SELECT u FROM UserEntity u
+               WHERE u.isDeleted = false
+                 AND (
+                   COALESCE(TRIM(:keyword), '') = ''
+                   OR LOWER(u.fullName) LIKE LOWER(CONCAT('%', TRIM(:keyword), '%'))
+                   OR LOWER(u.employeeCode) LIKE LOWER(CONCAT('%', TRIM(:keyword), '%'))
+                 )
+            """)
+    Page<UserEntity> searchAccounts(@Param("keyword") String keyword, Pageable pageable);
+
 
     @Query("""
             SELECT MAX(CAST(SUBSTRING(u.employeeCode, LENGTH(:prefix) + 1) AS integer))

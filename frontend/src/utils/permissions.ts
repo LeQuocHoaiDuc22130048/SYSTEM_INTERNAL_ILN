@@ -1,4 +1,5 @@
 import type { UserInfo } from '../mockData';
+import { ACTION_PERMISSION_LABELS, LEGACY_PERMISSION_ALIASES, ROLE_PERMISSION_EXPANSION } from './actionPermissions';
 
 // ── Role Labels (tiếng Việt) ──────────────────────────────────────────────
 
@@ -25,21 +26,19 @@ export const ROLE_COLORS: Record<string, string> = {
 // ── Permission Labels ─────────────────────────────────────────────────────
 
 export const PERMISSION_LABELS: Record<string, string> = {
+  ...ACTION_PERMISSION_LABELS,
+  DEVICE_VIEW: 'Xem thiết bị',
+  REPAIR_DELETE: 'Xóa đơn sửa chữa',
   DASHBOARD_VIEW: 'Xem dashboard',
   REPAIR_VIEW: 'Xem đơn sửa chữa',
-  REPAIR_MANAGE: 'Quản lý đơn sửa chữa',
   REPAIR_STATUS_UPDATE: 'Cập nhật trạng thái đơn',
   REPAIR_ASSIGN: 'Phân công kỹ thuật viên',
+  CUSTOMER_VIEW: 'Xem khách hàng',
   WAREHOUSE_VIEW: 'Xem kho bo mạch',
-  WAREHOUSE_MANAGE: 'Quản lý kho bo mạch',
-  WAREHOUSE_DELETE: 'Xóa vật tư kho',
   MESSAGING_USE: 'Nhắn tin nội bộ',
   NOTIFICATION_VIEW: 'Xem thông báo',
   ATTENDANCE_VIEW: 'Xem chấm công',
-  ATTENDANCE_MANAGE: 'Quản lý chấm công',
-  EMPLOYEE_MANAGE: 'Quản lý nhân viên',
   ACCOUNT_APPROVE: 'Duyệt tài khoản',
-  EMPLOYEE_SECURITY_MANAGE: 'Quản lý bảo mật nhân viên',
   PROFILE_VIEW: 'Xem hồ sơ',
   PROFILE_UPDATE_SELF: 'Cập nhật hồ sơ cá nhân',
 };
@@ -49,7 +48,9 @@ export const PERMISSION_LABELS: Record<string, string> = {
 export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   SUPER_ADMIN: Object.keys(PERMISSION_LABELS),
   ADMIN: [
+    'DEVICE_VIEW', 'DEVICE_MANAGE', 'BANNER_MANAGE', 'APP_UPDATE_MANAGE', 'PERMISSION_MANAGE', 'REPAIR_DELETE',
     'DASHBOARD_VIEW', 'REPAIR_VIEW', 'REPAIR_MANAGE', 'REPAIR_STATUS_UPDATE', 'REPAIR_ASSIGN',
+    'CUSTOMER_VIEW', 'CUSTOMER_MANAGE',
     'WAREHOUSE_VIEW', 'WAREHOUSE_MANAGE', 'WAREHOUSE_DELETE',
     'MESSAGING_USE', 'NOTIFICATION_VIEW',
     'ATTENDANCE_VIEW', 'ATTENDANCE_MANAGE',
@@ -57,7 +58,9 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'PROFILE_VIEW', 'PROFILE_UPDATE_SELF',
   ],
   MANAGER: [
+    'DEVICE_VIEW', 'DEVICE_MANAGE', 'BANNER_MANAGE', 'REPAIR_DELETE',
     'DASHBOARD_VIEW', 'REPAIR_VIEW', 'REPAIR_MANAGE', 'REPAIR_STATUS_UPDATE', 'REPAIR_ASSIGN',
+    'CUSTOMER_VIEW', 'CUSTOMER_MANAGE',
     'WAREHOUSE_VIEW', 'WAREHOUSE_MANAGE',
     'MESSAGING_USE', 'NOTIFICATION_VIEW',
     'ATTENDANCE_VIEW', 'ATTENDANCE_MANAGE',
@@ -65,18 +68,24 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'PROFILE_VIEW', 'PROFILE_UPDATE_SELF',
   ],
   TECHNICIAN: [
+    'DEVICE_VIEW',
     'DASHBOARD_VIEW', 'REPAIR_VIEW', 'REPAIR_MANAGE', 'REPAIR_STATUS_UPDATE', 'REPAIR_ASSIGN',
+    'CUSTOMER_VIEW',
     'PROFILE_VIEW', 'PROFILE_UPDATE_SELF',
   ],
   WAREHOUSE: [
+    'DEVICE_VIEW',
     'DASHBOARD_VIEW', 'REPAIR_VIEW', 'REPAIR_MANAGE', 'REPAIR_STATUS_UPDATE',
+    'CUSTOMER_VIEW',
     'WAREHOUSE_VIEW', 'WAREHOUSE_MANAGE',
     'MESSAGING_USE', 'NOTIFICATION_VIEW',
     'ATTENDANCE_VIEW',
     'PROFILE_VIEW', 'PROFILE_UPDATE_SELF',
   ],
   EMPLOYEE: [
+    'DEVICE_VIEW',
     'DASHBOARD_VIEW', 'REPAIR_VIEW', 'REPAIR_MANAGE', 'REPAIR_STATUS_UPDATE',
+    'CUSTOMER_VIEW', 'CUSTOMER_MANAGE',
     'WAREHOUSE_VIEW', 'WAREHOUSE_MANAGE',
     'MESSAGING_USE', 'NOTIFICATION_VIEW',
     'ATTENDANCE_VIEW',
@@ -85,12 +94,24 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
   ATTENDANCE: ['ATTENDANCE_VIEW'],
 };
 
+for (const [role, codes] of Object.entries(ROLE_DEFAULT_PERMISSIONS)) {
+  const expanded = new Set(codes);
+  for (const [parent, children] of Object.entries(ROLE_PERMISSION_EXPANSION)) {
+    if (expanded.has(parent)) children.forEach(code => expanded.add(code));
+  }
+  if (['SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN', 'ATTENDANCE'].includes(role)) expanded.add('ATTENDANCE_KIOSK_USE');
+  ROLE_DEFAULT_PERMISSIONS[role] = [...expanded].filter(code => code in PERMISSION_LABELS);
+}
+
 // ── Helper Functions ──────────────────────────────────────────────────────
 
 /** Kiểm tra user có permission cụ thể không */
 export function hasPermission(user: UserInfo | null, permission: string): boolean {
   if (!user) return false;
-  if (user.permissions && user.permissions.length > 0) {
+  if (user.role?.toUpperCase() === 'SUPER_ADMIN') return true;
+  const children = LEGACY_PERMISSION_ALIASES[permission];
+  if (children) return children.some(code => hasPermission(user, code));
+  if (Array.isArray(user.permissions)) {
     return user.permissions.includes(permission);
   }
   // Fallback: dùng ma trận mặc định nếu API chưa trả về permissions

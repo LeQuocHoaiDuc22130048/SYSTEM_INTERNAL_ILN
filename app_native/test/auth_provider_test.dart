@@ -74,7 +74,7 @@ void main() {
             200,
           );
         }
-        if (request.url.path == '/api/v1/employees/me') {
+        if ((request.url.path == '/api/v1/employees/me' || request.url.path == '/api/v1/auth/me')) {
           return http.Response(
             jsonEncode({
               'data': {
@@ -260,9 +260,23 @@ void main() {
       );
     });
 
+    test('fresh empty permissions replace cached role access', () async {
+      setupMockClient((request) async {
+        return http.Response(jsonEncode({'data': {
+          'id': 'permission-user', 'username': 'permission-user', 'fullName': 'Permission User',
+          'role': 'ADMIN', 'permissions': <String>[],
+        }}), 200);
+      });
+      apiClient.accessToken = 'valid_token';
+      await authProvider.loadMe();
+      expect(authProvider.currentUser?.permissions, isEmpty);
+      expect(authProvider.can(AppPermission.manageCustomers), false);
+      expect(authProvider.can(AppPermission.managePermissions), false);
+    });
+
     test('TC7: loadMe success', () async {
       setupMockClient((request) async {
-        if (request.url.path == '/api/v1/employees/me') {
+        if ((request.url.path == '/api/v1/employees/me' || request.url.path == '/api/v1/auth/me')) {
           return http.Response(
             jsonEncode({
               'data': {
@@ -352,13 +366,13 @@ void main() {
     test('TC10: loadMe exposes error and can retry profile sync', () async {
       var failProfile = true;
       setupMockClient((request) async {
-        if (request.url.path == '/api/v1/employees/me' && failProfile) {
+        if ((request.url.path == '/api/v1/employees/me' || request.url.path == '/api/v1/auth/me') && failProfile) {
           return http.Response(
             jsonEncode({'message': 'Server unavailable'}),
             500,
           );
         }
-        if (request.url.path == '/api/v1/employees/me') {
+        if ((request.url.path == '/api/v1/employees/me' || request.url.path == '/api/v1/auth/me')) {
           return http.Response(
             jsonEncode({
               'data': {
@@ -397,7 +411,7 @@ void main() {
       'TC13: tryAutoLogin succeeds when valid token is in storage',
       () async {
         setupMockClient((request) async {
-          if (request.url.path == '/api/v1/employees/me') {
+          if ((request.url.path == '/api/v1/employees/me' || request.url.path == '/api/v1/auth/me')) {
             return http.Response(
               jsonEncode({
                 'data': {

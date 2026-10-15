@@ -40,6 +40,7 @@ class RepairOrder {
   final String id;
   final String orderNumber;
   final String deviceName;
+  final String? customerId;
   final String customerName;
   final String? customerPhone;
   final RepairOrderStatus status;
@@ -60,6 +61,7 @@ class RepairOrder {
     required this.id,
     required this.orderNumber,
     required this.deviceName,
+    this.customerId,
     required this.customerName,
     this.customerPhone,
     required this.status,
@@ -141,6 +143,7 @@ class RepairOrder {
       id: json['id']?.toString() ?? '',
       orderNumber: json['orderCode']?.toString() ?? '',
       deviceName: json['deviceName']?.toString() ?? '',
+      customerId: json['customerId']?.toString(),
       customerName: json['customerName']?.toString() ?? '',
       customerPhone: json['customerPhone']?.toString(),
       status: _statusFromBackend(json['status']?.toString()),

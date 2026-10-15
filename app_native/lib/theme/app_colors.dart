@@ -18,6 +18,8 @@ class AppColors {
   static const Color textPrimaryDark = Color(0xFFF8FAFC); // slate-50
   static const Color textSecondaryLight = Color(0xFF64748B); // slate-500
   static const Color textSecondaryDark = Color(0xFF94A3B8); // slate-400
+  static const Color textTertiaryLight = Color(0xFF94A3B8); // slate-400
+  static const Color textTertiaryDark = Color(0xFF64748B); // slate-500
 
   // Border colors
   static const Color borderLight = Color(0xFFE2E8F0); // slate-200

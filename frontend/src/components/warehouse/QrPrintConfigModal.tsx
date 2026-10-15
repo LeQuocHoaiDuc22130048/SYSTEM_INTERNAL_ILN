@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   X,
@@ -64,6 +65,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
   onClose,
   onConfirmPrint,
 }) => {
+  const canAction = usePermissionCheck();
   const [config, setConfig] = useState<QrPrintConfig>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -386,14 +388,14 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
               </div>
 
               <div style={{ marginTop: '8px', display: 'flex', gap: '8px' }}>
-                <button
+                {canAction('WAREHOUSE_QR_PRINT') && (<button
                   type="button"
                   className="btn-test-driver"
                   onClick={handleTestPrinterDriver}
                 >
                   <Zap size={14} />
                   <span>Kiểm tra cổng giao tiếp Driver TNS_LABEL</span>
-                </button>
+                </button>) }
               </div>
 
               {testDriverStatus && (
@@ -646,7 +648,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                   </select>
                 )}
 
-                <button
+                {canAction('WAREHOUSE_QR_PRINT') && (<button
                   type="button"
                   onClick={() => onConfirmPrint(config, [activeItem])}
                   style={{
@@ -666,7 +668,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
                 >
                   <Printer size={13} />
                   <span>In tem này</span>
-                </button>
+                </button>) }
               </div>
             </div>
 
@@ -825,7 +827,7 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
               Hủy bỏ
             </button>
             {printItems.length > 1 && (
-              <button
+              (canAction('WAREHOUSE_QR_PRINT') && (<button
                 className="btn-secondary"
                 onClick={() => onConfirmPrint(config, [activeItem])}
                 style={{ fontWeight: 600, color: '#0369a1', borderColor: '#bae6fd', backgroundColor: '#f0f9ff' }}
@@ -833,14 +835,14 @@ export const QrPrintConfigModal: React.FC<QrPrintConfigModalProps> = ({
               >
                 <Printer size={15} />
                 <span>In riêng tem #{activeIndex + 1} ({activeItem.code})</span>
-              </button>
+              </button>))
             )}
-            <button className="btn-primary-print" onClick={handlePrintClick} style={{ backgroundColor: '#0284c7', fontSize: '14px', padding: '10px 22px' }}>
+            {canAction('WAREHOUSE_QR_PRINT') && (<button className="btn-primary-print" onClick={handlePrintClick} style={{ backgroundColor: '#0284c7', fontSize: '14px', padding: '10px 22px' }}>
               <Printer size={18} />
               <span>
                 {printItems.length > 1 ? `🖨️ In Tem Ngay (Tất cả ${printItems.length} tem)` : '🖨️ In Tem Ngay (TNS_LABEL)'}
               </span>
-            </button>
+            </button>) }
           </div>
         </div>
       </div>

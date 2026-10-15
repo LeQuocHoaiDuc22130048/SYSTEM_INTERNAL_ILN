@@ -36,7 +36,7 @@ public class WarehouseController {
 
     @Operation(summary = "Tạo bo mạch mới")
     @PostMapping
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('BOARD_CREATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<BoardItemResponse>> create(
             @Valid @RequestBody CreateBoardItemRequest request,
             @AuthenticationPrincipal UserDetails userDetails
@@ -66,7 +66,7 @@ public class WarehouseController {
 
     @Operation(summary = "Cập nhật thông tin bo mạch")
     @PatchMapping("/{id}")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('BOARD_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<BoardItemResponse>> update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateBoardItemRequest request,
@@ -77,7 +77,7 @@ public class WarehouseController {
 
     @Operation(summary = "Xoá bo mạch (soft delete)")
     @DeleteMapping("/{id}")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_DELETE)
+    @PreAuthorize("hasAuthority('BOARD_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -96,7 +96,7 @@ public class WarehouseController {
     // ── Checkout / Return ─────────────────────────────────────
     @Operation(summary = "Lấy bo mạch để sửa chữa")
     @PostMapping("/{id}/checkout")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('BOARD_CHECKOUT') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CheckoutResponse>> checkout(
             @PathVariable UUID id,
             @RequestBody(required = false) CheckoutRequest request,
@@ -110,7 +110,7 @@ public class WarehouseController {
 
     @Operation(summary = "Trả bo mạch về kho")
     @PatchMapping("/{id}/return")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('BOARD_RETURN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<CheckoutResponse>> returnBoard(
             @PathVariable UUID id,
             @RequestBody(required = false) ReturnBoardRequest request,
@@ -126,7 +126,7 @@ public class WarehouseController {
     // ── History ───────────────────────────────────────────────
     @Operation(summary = "Lịch sử lấy/trả của bo mạch")
     @GetMapping("/{id}/history")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
+    @PreAuthorize("hasAuthority('BOARD_HISTORY_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<CheckoutResponse>>> getHistory(
             @PathVariable UUID id,
             @PageableDefault(size = 20) Pageable pageable) {

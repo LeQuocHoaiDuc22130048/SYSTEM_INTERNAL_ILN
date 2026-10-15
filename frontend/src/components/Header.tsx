@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'warehouse' | 'locations' | 'accounts';
+  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts';
   currentMonth: number;
   currentYear: number;
   prevMonth: () => void;
@@ -107,6 +107,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Banner ứng dụng'
                 : activeTab === 'orders'
                 ? 'Quản lý đơn sửa chữa'
+                : activeTab === 'customers'
+                ? 'Hồ sơ khách hàng'
                 : activeTab === 'locations'
                 ? 'Vị trí & Kệ kho'
                 : activeTab === 'accounts'

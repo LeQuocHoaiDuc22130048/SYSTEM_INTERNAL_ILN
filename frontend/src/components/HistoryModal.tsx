@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect } from 'react';
 import { X, LogIn, LogOut, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import type { EmployeeHistoryResponse } from '../mockData';
@@ -34,6 +35,7 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   onOpenEditModal,
   showToast,
 }) => {
+  const canAction = usePermissionCheck();
   const [historyData, setHistoryData] = useState<EmployeeHistoryResponse | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('ALL');
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
@@ -182,13 +184,13 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
           </div>
           <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             {historyData && (
-              <button
+              (canAction('ATTENDANCE_EXPORT') && (<button
                 className="action-btn-outline"
                 onClick={() => exportEmployeeHistoryExcel(historyData, currentMonth, currentYear)}
                 style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 12px', fontSize: '13px' }}
               >
                 <Download size={14} /> Xuất Excel
-              </button>
+              </button>))
             )}
             <button className="modal-close" onClick={onClose}>
               <X size={20} />
@@ -353,12 +355,12 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
                             >
                               Xem log chi tiết
                             </button>
-                            <button
+                            {canAction('ATTENDANCE_RECORD_UPDATE') && (<button
                               className="mini-action-btn primary"
                               onClick={() => onOpenEditModal(dayLog, employee)}
                             >
                               Chỉnh sửa
-                            </button>
+                            </button>) }
                           </div>
                         </div>
                       )}

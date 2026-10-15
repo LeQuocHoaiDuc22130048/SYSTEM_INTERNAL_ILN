@@ -1,3 +1,4 @@
+import '../widgets/permission_gate.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -7,6 +8,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../models/customer.dart';
 import '../models/repair_device.dart';
 import '../models/repair_order.dart';
 import '../models/user.dart';
@@ -14,6 +16,7 @@ import '../models/app_permission.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
+import 'customer_picker_sheet.dart';
 import '../utils/media_auth_headers.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/video_player_dialog.dart';
@@ -73,7 +76,7 @@ Future<void> _callCustomerPhone(BuildContext context, String? rawPhone) async {
 Future<void> showCreateRepairOrderSheet(BuildContext context) async {
   final auth = context.read<AuthProvider>();
   if (!auth.can(AppPermission.viewRepairOrders) ||
-      !auth.can(AppPermission.manageRepairOrders)) {
+      !auth.can(AppPermission.createRepairOrders)) {
     return;
   }
   await showModalBottomSheet<void>(
@@ -318,9 +321,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backend = context.watch<BackendDataProvider>();
-    final auth = context.watch<AuthProvider>();
     final orders = backend.repairOrders;
-    final isEmployee = auth.role == UserRole.employee;
 
     final screenSize = MediaQuery.sizeOf(context);
     final wide = screenSize.width >= 760;
@@ -373,11 +374,14 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                               ],
                             ),
                           ),
-                          if (screenSize.width > 900 && !isEmployee)
-                            ElevatedButton.icon(
-                              onPressed: () => _showCreateOrderSheet(context),
-                              icon: const Icon(Icons.add, size: 18),
-                              label: const Text('Tạo đơn'),
+                          if (screenSize.width > 900)
+                            PermissionGate(
+                              permission: AppPermission.createRepairOrders,
+                              child: ElevatedButton.icon(
+                                onPressed: () => _showCreateOrderSheet(context),
+                                icon: const Icon(Icons.add, size: 18),
+                                label: const Text('Tạo đơn'),
+                              ),
                             ),
                         ],
                       ),
@@ -1286,6 +1290,122 @@ class _OrderDetailSheet extends StatelessWidget {
     );
   }
 
+  Future<void> _showLinkCustomerDialog(
+    BuildContext context,
+    RepairOrder order,
+  ) async {
+    final picked = await showCustomerPickerSheet(context);
+    if (picked == null || !context.mounted) return;
+
+    if (picked.id == order.customerId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đơn hàng đã liên kết với khách hàng này rồi.'),
+        ),
+      );
+      return;
+    }
+
+    final reasonCtrl = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final isChanging = order.customerId != null;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dlgCtx) => AlertDialog(
+        title: Text(
+          isChanging ? 'Chuyển hồ sơ khách hàng' : 'Liên kết hồ sơ khách hàng',
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Khách hàng: ${picked.name}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14,
+                ),
+              ),
+              Text(
+                'Mã KH: ${picked.customerCode} (${picked.typeLabel})',
+                style: const TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: reasonCtrl,
+                maxLines: 3,
+                decoration: const InputDecoration(
+                  labelText: 'Lý do thay đổi hồ sơ *',
+                  hintText: 'Nhập lý do chuyển/liên kết hồ sơ...',
+                  border: OutlineInputBorder(),
+                ),
+                validator: (v) {
+                  if (v == null || v.trim().isEmpty) {
+                    return 'Vui lòng nhập lý do';
+                  }
+                  if (v.trim().length < 3) {
+                    return 'Lý do phải có ít nhất 3 ký tự';
+                  }
+                  return null;
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dlgCtx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(dlgCtx, true);
+              }
+            },
+            child: const Text('Xác nhận'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      try {
+        final backend = context.read<BackendDataProvider>();
+        await backend.linkRepairOrderCustomer(
+          order.id,
+          customerId: picked.id,
+          reason: reasonCtrl.text.trim(),
+        );
+        await backend.loadRepairOrders();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cập nhật liên kết hồ sơ khách hàng thành công!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      } catch (e) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi liên kết hồ sơ: $e'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    }
+  }
+
   Widget _buildClusterCard({
     required bool isDark,
     required IconData icon,
@@ -1341,7 +1461,9 @@ class _OrderDetailSheet extends StatelessWidget {
             .where((item) => item.id == this.order.id)
             .firstOrNull ??
         this.order;
-    final canDelete = context.watch<AuthProvider>().isManagerOrAbove;
+    final canDelete = context.watch<AuthProvider>().can(
+      AppPermission.deleteRepairOrders,
+    );
     final hasPhone =
         order.customerPhone != null && order.customerPhone!.trim().isNotEmpty;
 
@@ -1488,6 +1610,97 @@ class _OrderDetailSheet extends StatelessWidget {
                                     ),
                                   ),
                                 ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: order.customerId != null
+                                    ? AppColors.success.withValues(alpha: 0.12)
+                                    : (isDark
+                                          ? Colors.white12
+                                          : Colors.black.withValues(
+                                              alpha: 0.05,
+                                            )),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: order.customerId != null
+                                      ? AppColors.success.withValues(alpha: 0.3)
+                                      : (isDark
+                                            ? Colors.white24
+                                            : Colors.black12),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    order.customerId != null
+                                        ? LucideIcons.userCheck
+                                        : LucideIcons.userX,
+                                    size: 12,
+                                    color: order.customerId != null
+                                        ? AppColors.success
+                                        : (isDark
+                                              ? Colors.white60
+                                              : Colors.black54),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    order.customerId != null
+                                        ? 'Đã liên kết hồ sơ'
+                                        : 'Chưa liên kết hồ sơ',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: order.customerId != null
+                                          ? AppColors.success
+                                          : (isDark
+                                                ? Colors.white60
+                                                : Colors.black54),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (context.watch<AuthProvider>().can(
+                              order.customerId == null
+                                  ? AppPermission.assignOrderCustomer
+                                  : AppPermission.transferOrderCustomer,
+                            ))
+                              TextButton.icon(
+                                style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  minimumSize: Size.zero,
+                                  tapTargetSize:
+                                      MaterialTapTargetSize.shrinkWrap,
+                                  foregroundColor: AppColors.primary,
+                                ),
+                                icon: const Icon(LucideIcons.link, size: 13),
+                                label: Text(
+                                  order.customerId != null
+                                      ? 'Chuyển hồ sơ'
+                                      : 'Liên kết hồ sơ',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                onPressed: () =>
+                                    _showLinkCustomerDialog(context, order),
                               ),
                           ],
                         ),
@@ -1737,73 +1950,109 @@ class _OrderDetailSheet extends StatelessWidget {
               child: Row(
                 children: [
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: () async {
-                        final updated = await showModalBottomSheet<bool>(
-                          context: context,
-                          isScrollControlled: true,
-                          isDismissible: false,
-                          enableDrag: false,
-                          useSafeArea: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (_) => _OrderStatusSheet(order: order),
-                        );
-                        if (updated == true && context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Cập nhật trạng thái thành công!'),
-                              backgroundColor: AppColors.success,
+                    child: PermissionGate.any(
+                      permissions: const [
+                        AppPermission.updateRepairOrderStatus,
+                        AppPermission.cancelRepairOrders,
+                      ],
+                      child: OutlinedButton(
+                        onPressed:
+                            context.watch<AuthProvider>().canAny(const [
+                              AppPermission.updateRepairOrderStatus,
+                              AppPermission.cancelRepairOrders,
+                            ])
+                            ? () async {
+                                final updated =
+                                    await showModalBottomSheet<bool>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      isDismissible: false,
+                                      enableDrag: false,
+                                      useSafeArea: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (_) =>
+                                          _OrderStatusSheet(order: order),
+                                    );
+                                if (updated == true && context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Cập nhật trạng thái thành công!',
+                                      ),
+                                      backgroundColor: AppColors.success,
+                                    ),
+                                  );
+                                }
+                              }
+                            : null,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.sync, size: 17),
+                            SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Cập nhật trạng thái',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          );
-                        }
-                      },
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.sync, size: 17),
-                          SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'Cập nhật trạng thái',
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final updated = await showModalBottomSheet<bool>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => _EditOrderSheet(order: order),
-                        );
-                        if (updated == true && context.mounted) {
-                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                            if (context.mounted) {
-                              Navigator.pop(context);
-                            }
-                          });
-                        }
-                      },
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.edit_outlined, size: 17),
-                          SizedBox(width: 6),
-                          Flexible(
-                            child: Text(
-                              'Chỉnh sửa',
-                              overflow: TextOverflow.ellipsis,
+                    child: PermissionGate.any(
+                      permissions: const [
+                        AppPermission.updateRepairOrders,
+                        AppPermission.assignRepairOrders,
+                        AppPermission.uploadRepairMedia,
+                        AppPermission.deleteRepairMedia,
+                      ],
+                      child: ElevatedButton(
+                        onPressed:
+                            context.watch<AuthProvider>().canAny(const [
+                              AppPermission.updateRepairOrders,
+                              AppPermission.assignRepairOrders,
+                              AppPermission.uploadRepairMedia,
+                              AppPermission.deleteRepairMedia,
+                            ])
+                            ? () async {
+                                final updated =
+                                    await showModalBottomSheet<bool>(
+                                      context: context,
+                                      isScrollControlled: true,
+                                      backgroundColor: Colors.transparent,
+                                      builder: (context) =>
+                                          _EditOrderSheet(order: order),
+                                    );
+                                if (updated == true && context.mounted) {
+                                  WidgetsBinding.instance.addPostFrameCallback((
+                                    _,
+                                  ) {
+                                    if (context.mounted) {
+                                      Navigator.pop(context);
+                                    }
+                                  });
+                                }
+                              }
+                            : null,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.edit_outlined, size: 17),
+                            SizedBox(width: 6),
+                            Flexible(
+                              child: Text(
+                                'Chỉnh sửa',
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -1931,7 +2180,13 @@ class _OrderStatusSheetState extends State<_OrderStatusSheet> {
                               spacing: 8,
                               runSpacing: 8,
                               children: [
-                                for (final entry in _orderStatuses)
+                                for (final entry in _orderStatuses.where(
+                                  (entry) => context.watch<AuthProvider>().can(
+                                    entry.key == 'CANCELLED'
+                                        ? AppPermission.cancelRepairOrders
+                                        : AppPermission.updateRepairOrderStatus,
+                                  ),
+                                ))
                                   SizedBox(
                                     width: (constraints.maxWidth - 8) / 2,
                                     child: Builder(
@@ -2574,8 +2829,8 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _canAssign) {
         final backend = context.read<BackendDataProvider>();
-        if (backend.employees.isEmpty) {
-          backend.loadEmployees();
+        if (backend.repairAssignees.isEmpty) {
+          backend.loadRepairAssignees();
         }
       }
     });
@@ -2661,7 +2916,8 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     setState(() => _saving = true);
     final backend = context.read<BackendDataProvider>();
     try {
-      if (infoChanged || noteChanged) {
+      if ((infoChanged || noteChanged) &&
+          context.read<AuthProvider>().can(AppPermission.updateRepairOrders)) {
         await backend.updateRepairOrder(
           widget.order.id,
           customerName: _customerNameController.text.trim(),
@@ -2813,7 +3069,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     if (id.startsWith('name:')) {
       return id.substring(5);
     }
-    for (final emp in backend.employees) {
+    for (final emp in backend.repairAssignees) {
       if (emp.id == id) return emp.name;
     }
     final idx = widget.order.assigneeIds.indexOf(id);
@@ -2831,7 +3087,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backend = context.watch<BackendDataProvider>();
-    final technicians = backend.employees
+    final technicians = backend.repairAssignees
         .where(
           (user) =>
               (user.role == UserRole.employee ||
@@ -2839,7 +3095,15 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
               user.status == UserStatus.active,
         )
         .toList();
-    final statuses = _availableStatuses();
+    final statuses = _availableStatuses()
+        .where(
+          (entry) => context.watch<AuthProvider>().can(
+            entry.key == 'CANCELLED'
+                ? AppPermission.cancelRepairOrders
+                : AppPermission.updateRepairOrderStatus,
+          ),
+        )
+        .toList();
     final existingMedias = widget.order.media
         .where((m) => !_deletedMediaIds.contains(m.id))
         .toList();
@@ -2870,63 +3134,69 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         // ── Section 1: Thông tin khách hàng ──
-                        _FormSectionCard(
-                          isDark: isDark,
-                          icon: Icons.person_outline,
-                          title: '1. Thông tin khách hàng',
-                          children: [
-                            _buildTextField(
-                              context,
-                              controller: _customerNameController,
-                              label: 'Tên khách hàng',
-                              hint: 'Nhập tên khách hàng',
-                              icon: Icons.person_outline,
-                            ),
-                            const SizedBox(height: 12),
-                            _buildTextField(
-                              context,
-                              controller: _customerPhoneController,
-                              label: 'Số điện thoại',
-                              hint: '0901 234 567',
-                              icon: Icons.phone_outlined,
-                              keyboardType: TextInputType.phone,
-                              required: false,
-                            ),
-                          ],
-                        ),
+                        if (context.watch<AuthProvider>().can(
+                          AppPermission.updateRepairOrders,
+                        ))
+                          _FormSectionCard(
+                            isDark: isDark,
+                            icon: Icons.person_outline,
+                            title: '1. Thông tin khách hàng',
+                            children: [
+                              _buildTextField(
+                                context,
+                                controller: _customerNameController,
+                                label: 'Tên khách hàng',
+                                hint: 'Nhập tên khách hàng',
+                                icon: Icons.person_outline,
+                              ),
+                              const SizedBox(height: 12),
+                              _buildTextField(
+                                context,
+                                controller: _customerPhoneController,
+                                label: 'Số điện thoại',
+                                hint: '0901 234 567',
+                                icon: Icons.phone_outlined,
+                                keyboardType: TextInputType.phone,
+                                required: false,
+                              ),
+                            ],
+                          ),
                         const SizedBox(height: 14),
                         // ── Section 2: Thông tin thiết bị ──
-                        _FormSectionCard(
-                          isDark: isDark,
-                          icon: Icons.devices_outlined,
-                          title: '2. Thông tin thiết bị',
-                          children: List.generate(_deviceEntries.length, (
-                            index,
-                          ) {
-                            final entry = _deviceEntries[index];
-                            return Padding(
-                              padding: EdgeInsets.only(
-                                bottom: index < _deviceEntries.length - 1
-                                    ? 16
-                                    : 0,
-                              ),
-                              child: _DeviceFormCard(
-                                key: ValueKey(entry.id),
-                                index: index,
-                                entry: entry,
-                                isDark: isDark,
-                                canAssign: _canAssign,
-                                technicians: technicians,
-                                canRemove: _deviceEntries.length > 1,
-                                onRemove: () => setState(
-                                  () => _deviceEntries.removeAt(index),
+                        if (context.watch<AuthProvider>().can(
+                          AppPermission.updateRepairOrders,
+                        ))
+                          _FormSectionCard(
+                            isDark: isDark,
+                            icon: Icons.devices_outlined,
+                            title: '2. Thông tin thiết bị',
+                            children: List.generate(_deviceEntries.length, (
+                              index,
+                            ) {
+                              final entry = _deviceEntries[index];
+                              return Padding(
+                                padding: EdgeInsets.only(
+                                  bottom: index < _deviceEntries.length - 1
+                                      ? 16
+                                      : 0,
                                 ),
-                                onChanged: () => setState(() {}),
-                                orderCreatedAt: widget.order.createdAt,
-                              ),
-                            );
-                          }),
-                        ),
+                                child: _DeviceFormCard(
+                                  key: ValueKey(entry.id),
+                                  index: index,
+                                  entry: entry,
+                                  isDark: isDark,
+                                  canAssign: _canAssign,
+                                  technicians: technicians,
+                                  canRemove: _deviceEntries.length > 1,
+                                  onRemove: () => setState(
+                                    () => _deviceEntries.removeAt(index),
+                                  ),
+                                  onChanged: () => setState(() {}),
+                                  orderCreatedAt: widget.order.createdAt,
+                                ),
+                              );
+                            }),
+                          ),
                         const SizedBox(height: 14),
                         // ── Section 3: Xử lý & Phân công ──
                         _FormSectionCard(
@@ -2934,74 +3204,93 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
                           icon: Icons.engineering_outlined,
                           title: '3. Xử lý & Phân công',
                           children: [
-                            _UnifiedTechnicianAssignmentField(
-                              isDark: isDark,
-                              canAssign: _canAssign,
-                              selectedIds: _technicianIds,
-                              resolveName: (id) =>
-                                  _resolveTechnicianName(id, backend),
-                              onTapPick: _canAssign
-                                  ? () async {
-                                      final selected =
-                                          await showModalBottomSheet<
-                                            Set<String>
-                                          >(
-                                            context: context,
-                                            isScrollControlled: true,
-                                            backgroundColor: Colors.transparent,
-                                            builder: (context) =>
-                                                _TechnicianMultiSelectBottomSheet(
-                                                  technicians: technicians,
-                                                  initialSelected:
-                                                      _technicianIds,
-                                                  isDark: isDark,
-                                                ),
-                                          );
-                                      if (selected != null) {
-                                        setState(() {
-                                          _technicianIds
-                                            ..clear()
-                                            ..addAll(selected);
-                                        });
+                            PermissionGate(
+                              permission: AppPermission.assignRepairOrders,
+                              child: _UnifiedTechnicianAssignmentField(
+                                isDark: isDark,
+                                canAssign: _canAssign,
+                                selectedIds: _technicianIds,
+                                resolveName: (id) =>
+                                    _resolveTechnicianName(id, backend),
+                                onTapPick: _canAssign
+                                    ? () async {
+                                        final selected =
+                                            await showModalBottomSheet<
+                                              Set<String>
+                                            >(
+                                              context: context,
+                                              isScrollControlled: true,
+                                              backgroundColor:
+                                                  Colors.transparent,
+                                              builder: (context) =>
+                                                  _TechnicianMultiSelectBottomSheet(
+                                                    technicians: technicians,
+                                                    initialSelected:
+                                                        _technicianIds,
+                                                    isDark: isDark,
+                                                  ),
+                                            );
+                                        if (selected != null) {
+                                          setState(() {
+                                            _technicianIds
+                                              ..clear()
+                                              ..addAll(selected);
+                                          });
+                                        }
                                       }
-                                    }
-                                  : null,
-                              onRemoveId: _canAssign
-                                  ? (id) => setState(
-                                      () => _technicianIds.remove(id),
-                                    )
-                                  : null,
+                                    : null,
+                                onRemoveId: _canAssign
+                                    ? (id) => setState(
+                                        () => _technicianIds.remove(id),
+                                      )
+                                    : null,
+                              ),
                             ),
                             const SizedBox(height: 14),
-                            _OrderStatusSelectorField(
-                              isDark: isDark,
-                              selectedStatusCode:
-                                  _nextStatus ?? _currentStatusBackendCode,
-                              statuses: statuses,
-                              onStatusSelected: (value) =>
-                                  setState(() => _nextStatus = value),
+                            PermissionGate(
+                              permission: AppPermission.updateRepairOrderStatus,
+                              child: _OrderStatusSelectorField(
+                                isDark: isDark,
+                                selectedStatusCode:
+                                    _nextStatus ?? _currentStatusBackendCode,
+                                statuses: statuses,
+                                onStatusSelected: (value) =>
+                                    setState(() => _nextStatus = value),
+                              ),
                             ),
                             const SizedBox(height: 14),
-                            _UnifiedMediaPickerBox(
-                              isDark: isDark,
-                              existingMediaWidgets: existingMedias.map((m) {
-                                final url = backend.api.resolveUrl(m.url);
-                                return _MediaThumbItem(
-                                  isVideo: m.isVideo,
-                                  imageUrl: m.isVideo ? null : url,
-                                  label: 'Video',
-                                  onRemove: () => setState(
-                                    () => _deletedMediaIds.add(m.id),
-                                  ),
-                                );
-                              }).toList(),
-                              newMediaFiles: _selectedMedias,
-                              isVideoPath: _isVideo,
-                              onRemoveNewAt: (idx) =>
-                                  setState(() => _selectedMedias.removeAt(idx)),
-                              onCamera: () => _pickImage(ImageSource.camera),
-                              onGallery: _pickMultiImages,
-                              onVideo: _pickVideo,
+                            PermissionGate.any(
+                              permissions: const [
+                                AppPermission.uploadRepairMedia,
+                                AppPermission.deleteRepairMedia,
+                              ],
+                              child: _UnifiedMediaPickerBox(
+                                isDark: isDark,
+                                existingMediaWidgets: existingMedias.map((m) {
+                                  final url = backend.api.resolveUrl(m.url);
+                                  return _MediaThumbItem(
+                                    isVideo: m.isVideo,
+                                    imageUrl: m.isVideo ? null : url,
+                                    label: 'Video',
+                                    onRemove:
+                                        context.watch<AuthProvider>().can(
+                                          AppPermission.deleteRepairMedia,
+                                        )
+                                        ? () => setState(
+                                            () => _deletedMediaIds.add(m.id),
+                                          )
+                                        : null,
+                                  );
+                                }).toList(),
+                                newMediaFiles: _selectedMedias,
+                                isVideoPath: _isVideo,
+                                onRemoveNewAt: (idx) => setState(
+                                  () => _selectedMedias.removeAt(idx),
+                                ),
+                                onCamera: () => _pickImage(ImageSource.camera),
+                                onGallery: _pickMultiImages,
+                                onVideo: _pickVideo,
+                              ),
                             ),
                             const SizedBox(height: 14),
                             TextFormField(
@@ -3665,7 +3954,7 @@ class _MediaThumbItem extends StatelessWidget {
   final String? imageUrl;
   final File? localFile;
   final String label;
-  final VoidCallback onRemove;
+  final VoidCallback? onRemove;
 
   const _MediaThumbItem({
     required this.isVideo,
@@ -3728,21 +4017,22 @@ class _MediaThumbItem extends StatelessWidget {
                     ),
                   ),
           ),
-          Positioned(
-            top: 4,
-            right: 4,
-            child: GestureDetector(
-              onTap: onRemove,
-              child: Container(
-                padding: const EdgeInsets.all(3),
-                decoration: const BoxDecoration(
-                  color: AppColors.error,
-                  shape: BoxShape.circle,
+          if (onRemove != null)
+            Positioned(
+              top: 4,
+              right: 4,
+              child: GestureDetector(
+                onTap: onRemove,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: const BoxDecoration(
+                    color: AppColors.error,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 13),
                 ),
-                child: const Icon(Icons.close, color: Colors.white, size: 13),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -4006,48 +4296,51 @@ class _UnifiedMediaPickerBox extends StatelessWidget {
             child: Row(
               children: [
                 // Ô viền nét đứt "+ Thêm ảnh / video" ở góc trái
-                InkWell(
-                  key: const ValueKey('media-picker-add-tile'),
-                  onTap: () => _showMediaActionSheet(context),
-                  borderRadius: BorderRadius.circular(12),
-                  child: CustomPaint(
-                    painter: _DashedRectPainter(
-                      color: AppColors.primary.withValues(alpha: 0.65),
-                      radius: 12,
-                    ),
-                    child: Container(
-                      width: 84,
-                      height: 84,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(
-                          alpha: isDark ? 0.12 : 0.05,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
+                if (context.watch<AuthProvider>().can(
+                  AppPermission.uploadRepairMedia,
+                ))
+                  InkWell(
+                    key: const ValueKey('media-picker-add-tile'),
+                    onTap: () => _showMediaActionSheet(context),
+                    borderRadius: BorderRadius.circular(12),
+                    child: CustomPaint(
+                      painter: _DashedRectPainter(
+                        color: AppColors.primary.withValues(alpha: 0.65),
+                        radius: 12,
                       ),
-                      child: const Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.add_circle_outline_rounded,
-                            size: 22,
-                            color: AppColors.primary,
+                      child: Container(
+                        width: 84,
+                        height: 84,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(
+                            alpha: isDark ? 0.12 : 0.05,
                           ),
-                          SizedBox(height: 4),
-                          Text(
-                            '+ Thêm\nảnh / video',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              fontSize: 10.5,
-                              height: 1.15,
-                              fontWeight: FontWeight.w700,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.add_circle_outline_rounded,
+                              size: 22,
                               color: AppColors.primary,
                             ),
-                          ),
-                        ],
+                            SizedBox(height: 4),
+                            Text(
+                              '+ Thêm\nảnh / video',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10.5,
+                                height: 1.15,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
-                ),
                 const SizedBox(width: 10),
                 // Danh sách cuộn ngang hiển thị preview ảnh/video bên phải
                 Expanded(
@@ -4115,6 +4408,8 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
   final _formKey = GlobalKey<FormState>();
   final _customerNameController = TextEditingController();
   final _customerPhoneController = TextEditingController();
+  Customer? _selectedCustomer;
+  bool _isManualCustomer = false;
   bool _isLoading = false;
   final Set<String> _technicianIds = <String>{};
   final List<XFile> _selectedMedias = [];
@@ -4134,8 +4429,8 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
         );
         if (canAssign) {
           final backend = context.read<BackendDataProvider>();
-          if (backend.employees.isEmpty) {
-            backend.loadEmployees();
+          if (backend.repairAssignees.isEmpty) {
+            backend.loadRepairAssignees();
           }
         }
       }
@@ -4183,13 +4478,23 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     setState(() => _isLoading = true);
     final backend = context.read<BackendDataProvider>();
 
+    final String? customerId = (_selectedCustomer != null && !_isManualCustomer)
+        ? _selectedCustomer!.id
+        : null;
+    final String? customerName = customerId != null
+        ? null
+        : _customerNameController.text.trim();
+    final String? customerPhone = customerId != null
+        ? null
+        : (_customerPhoneController.text.replaceAll(RegExp(r'\D'), '').isEmpty
+              ? null
+              : _customerPhoneController.text.replaceAll(RegExp(r'\D'), ''));
+
     try {
       final order = await backend.createRepairOrder(
-        customerName: _customerNameController.text.trim(),
-        customerPhone: _customerPhoneController.text.replaceAll(
-          RegExp(r'\D'),
-          '',
-        ),
+        customerId: customerId,
+        customerName: customerName,
+        customerPhone: customerPhone,
         devices: _deviceEntries
             .map(
               (e) => RepairDevice(
@@ -4262,7 +4567,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     );
     final technicians = context
         .watch<BackendDataProvider>()
-        .employees
+        .repairAssignees
         .where(
           (user) =>
               (user.role == UserRole.employee ||
@@ -4303,23 +4608,198 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                             icon: Icons.person_outline,
                             title: '1. Thông tin khách hàng',
                             children: [
-                              _buildTextField(
-                                context,
-                                controller: _customerNameController,
-                                label: 'Tên khách hàng',
-                                hint: 'Nhập tên khách hàng',
-                                icon: Icons.person_outline,
-                              ),
-                              const SizedBox(height: 12),
-                              _buildTextField(
-                                context,
-                                controller: _customerPhoneController,
-                                label: 'Số điện thoại',
-                                hint: '0901 234 567',
-                                icon: Icons.phone_outlined,
-                                keyboardType: TextInputType.phone,
-                                required: false,
-                              ),
+                              if (_selectedCustomer != null &&
+                                  !_isManualCustomer) ...[
+                                Container(
+                                  padding: const EdgeInsets.all(12),
+                                  decoration: BoxDecoration(
+                                    color: isDark
+                                        ? const Color(0xFF1E293B)
+                                        : const Color(0xFFF1F5F9),
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(
+                                      color: AppColors.primary.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 16,
+                                            backgroundColor:
+                                                _selectedCustomer!.isCompany
+                                                ? const Color(
+                                                    0xFF8B5CF6,
+                                                  ).withValues(alpha: 0.15)
+                                                : AppColors.primary.withValues(
+                                                    alpha: 0.15,
+                                                  ),
+                                            foregroundColor:
+                                                _selectedCustomer!.isCompany
+                                                ? const Color(0xFF8B5CF6)
+                                                : AppColors.primary,
+                                            child: Icon(
+                                              _selectedCustomer!.isCompany
+                                                  ? LucideIcons.building2
+                                                  : LucideIcons.user,
+                                              size: 16,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
+                                              children: [
+                                                Text(
+                                                  _selectedCustomer!.name,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 14,
+                                                  ),
+                                                ),
+                                                Text(
+                                                  '${_selectedCustomer!.typeLabel} • ${_selectedCustomer!.customerCode}',
+                                                  style: TextStyle(
+                                                    fontSize: 11,
+                                                    color: isDark
+                                                        ? Colors.white54
+                                                        : AppColors
+                                                              .textSecondaryLight,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                          TextButton(
+                                            onPressed: () async {
+                                              final picked =
+                                                  await showCustomerPickerSheet(
+                                                    context,
+                                                  );
+                                              if (picked != null) {
+                                                setState(
+                                                  () => _selectedCustomer =
+                                                      picked,
+                                                );
+                                              }
+                                            },
+                                            child: const Text('Đổi'),
+                                          ),
+                                          IconButton(
+                                            icon: const Icon(
+                                              Icons.close,
+                                              size: 18,
+                                            ),
+                                            tooltip: 'Bỏ chọn',
+                                            onPressed: () {
+                                              setState(() {
+                                                _selectedCustomer = null;
+                                                _isManualCustomer = true;
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                      if (_selectedCustomer!.phone != null &&
+                                          _selectedCustomer!
+                                              .phone!
+                                              .isNotEmpty) ...[
+                                        const SizedBox(height: 6),
+                                        Row(
+                                          children: [
+                                            const Icon(
+                                              LucideIcons.phone,
+                                              size: 12,
+                                              color: Colors.grey,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              _selectedCustomer!.phone!,
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.grey,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                              ] else ...[
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: AppColors.primary,
+                                          side: const BorderSide(
+                                            color: AppColors.primary,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                          padding: const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
+                                        ),
+                                        icon: const Icon(
+                                          LucideIcons.userCheck,
+                                          size: 16,
+                                        ),
+                                        label: const Text(
+                                          'Chọn từ danh bạ khách hàng',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        onPressed: () async {
+                                          final picked =
+                                              await showCustomerPickerSheet(
+                                                context,
+                                              );
+                                          if (picked != null) {
+                                            setState(() {
+                                              _selectedCustomer = picked;
+                                              _isManualCustomer = false;
+                                            });
+                                          }
+                                        },
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 12),
+                                _buildTextField(
+                                  context,
+                                  controller: _customerNameController,
+                                  label: 'Tên khách hàng lẻ',
+                                  hint: 'Nhập tên khách hàng',
+                                  icon: Icons.person_outline,
+                                  required:
+                                      _selectedCustomer == null ||
+                                      _isManualCustomer,
+                                ),
+                                const SizedBox(height: 12),
+                                _buildTextField(
+                                  context,
+                                  controller: _customerPhoneController,
+                                  label: 'Số điện thoại',
+                                  hint: '0901 234 567',
+                                  icon: Icons.phone_outlined,
+                                  keyboardType: TextInputType.phone,
+                                  required: false,
+                                ),
+                              ],
                             ],
                           ),
                           const SizedBox(height: 14),
@@ -4361,59 +4841,70 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                             title: '3. Xử lý & Phân công',
                             children: [
                               if (canAssign) ...[
-                                _UnifiedTechnicianAssignmentField(
-                                  isDark: isDark,
-                                  canAssign: canAssign,
-                                  selectedIds: _technicianIds,
-                                  resolveName: (id) => technicians
-                                      .firstWhere(
-                                        (t) => t.id == id,
-                                        orElse: () => User(
-                                          id: id,
-                                          name: 'Kỹ thuật viên',
-                                          email: '',
-                                          employeeId: '',
-                                          role: UserRole.employee,
-                                          status: UserStatus.active,
-                                        ),
-                                      )
-                                      .name,
-                                  onTapPick: () async {
-                                    final selected =
-                                        await showModalBottomSheet<Set<String>>(
-                                          context: context,
-                                          isScrollControlled: true,
-                                          backgroundColor: Colors.transparent,
-                                          builder: (context) =>
-                                              _TechnicianMultiSelectBottomSheet(
-                                                technicians: technicians,
-                                                initialSelected: _technicianIds,
-                                                isDark: isDark,
-                                              ),
-                                        );
-                                    if (selected != null) {
-                                      setState(() {
-                                        _technicianIds
-                                          ..clear()
-                                          ..addAll(selected);
-                                      });
-                                    }
-                                  },
-                                  onRemoveId: (id) =>
-                                      setState(() => _technicianIds.remove(id)),
+                                PermissionGate(
+                                  permission: AppPermission.assignRepairOrders,
+                                  child: _UnifiedTechnicianAssignmentField(
+                                    isDark: isDark,
+                                    canAssign: canAssign,
+                                    selectedIds: _technicianIds,
+                                    resolveName: (id) => technicians
+                                        .firstWhere(
+                                          (t) => t.id == id,
+                                          orElse: () => User(
+                                            id: id,
+                                            name: 'Kỹ thuật viên',
+                                            email: '',
+                                            employeeId: '',
+                                            role: UserRole.employee,
+                                            status: UserStatus.active,
+                                          ),
+                                        )
+                                        .name,
+                                    onTapPick: () async {
+                                      final selected =
+                                          await showModalBottomSheet<
+                                            Set<String>
+                                          >(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (context) =>
+                                                _TechnicianMultiSelectBottomSheet(
+                                                  technicians: technicians,
+                                                  initialSelected:
+                                                      _technicianIds,
+                                                  isDark: isDark,
+                                                ),
+                                          );
+                                      if (selected != null) {
+                                        setState(() {
+                                          _technicianIds
+                                            ..clear()
+                                            ..addAll(selected);
+                                        });
+                                      }
+                                    },
+                                    onRemoveId: (id) => setState(
+                                      () => _technicianIds.remove(id),
+                                    ),
+                                  ),
                                 ),
                                 const SizedBox(height: 14),
                               ],
-                              _UnifiedMediaPickerBox(
-                                isDark: isDark,
-                                newMediaFiles: _selectedMedias,
-                                isVideoPath: _isVideo,
-                                onRemoveNewAt: (idx) => setState(
-                                  () => _selectedMedias.removeAt(idx),
+                              PermissionGate(
+                                permission: AppPermission.uploadRepairMedia,
+                                child: _UnifiedMediaPickerBox(
+                                  isDark: isDark,
+                                  newMediaFiles: _selectedMedias,
+                                  isVideoPath: _isVideo,
+                                  onRemoveNewAt: (idx) => setState(
+                                    () => _selectedMedias.removeAt(idx),
+                                  ),
+                                  onCamera: () =>
+                                      _pickImage(ImageSource.camera),
+                                  onGallery: _pickMultiImages,
+                                  onVideo: _pickVideo,
                                 ),
-                                onCamera: () => _pickImage(ImageSource.camera),
-                                onGallery: _pickMultiImages,
-                                onVideo: _pickVideo,
                               ),
                             ],
                           ),

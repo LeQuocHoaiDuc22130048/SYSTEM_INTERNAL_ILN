@@ -10,6 +10,7 @@ enum QuickAction {
   createRepair,
   repairOrders,
   warehouse,
+  customers,
   messages,
   employees,
   notifications,
@@ -21,12 +22,13 @@ bool canUseQuickAction(AuthProvider auth, QuickAction action) {
   return switch (action) {
     QuickAction.createRepair =>
       auth.can(AppPermission.viewRepairOrders) &&
-          auth.can(AppPermission.manageRepairOrders),
+          auth.can(AppPermission.createRepairOrders),
     QuickAction.repairOrders => auth.can(AppPermission.viewRepairOrders),
     QuickAction.warehouse => auth.can(AppPermission.viewWarehouse),
+    QuickAction.customers => auth.can(AppPermission.viewCustomers),
     QuickAction.messages => auth.can(AppPermission.useMessages),
     QuickAction.employees => auth.canAny({
-      AppPermission.manageEmployees,
+      AppPermission.viewEmployees,
       AppPermission.approveAccounts,
     }),
     QuickAction.notifications => auth.can(AppPermission.viewNotifications),
@@ -56,6 +58,7 @@ Future<void> showAppQuickActions(
   final tab = switch (action) {
     QuickAction.repairOrders => MainTabs.repairOrders,
     QuickAction.warehouse => MainTabs.warehouse,
+    QuickAction.customers => MainTabs.customers,
     QuickAction.messages => MainTabs.messages,
     QuickAction.employees => MainTabs.employeeManagement,
     QuickAction.notifications => MainTabs.notifications,
@@ -78,6 +81,7 @@ class _QuickActionsSheet extends StatelessWidget {
       QuickAction.createRepair: 'Tạo đơn sửa chữa',
       QuickAction.repairOrders: 'Đơn sửa chữa',
       QuickAction.warehouse: 'Kho linh kiện',
+      QuickAction.customers: 'Khách hàng',
       QuickAction.messages: 'Nhắn tin',
       QuickAction.employees: 'Quản lý nhân viên',
       QuickAction.notifications: 'Thông báo',
@@ -87,6 +91,7 @@ class _QuickActionsSheet extends StatelessWidget {
       QuickAction.createRepair: Icons.add_circle_outline,
       QuickAction.repairOrders: Icons.build_outlined,
       QuickAction.warehouse: Icons.inventory_2_outlined,
+      QuickAction.customers: Icons.people_alt_outlined,
       QuickAction.messages: Icons.chat_bubble_outline,
       QuickAction.employees: Icons.people_outline,
       QuickAction.notifications: Icons.notifications_outlined,

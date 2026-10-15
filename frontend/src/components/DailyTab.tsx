@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React from 'react';
 import { Search, Plus } from 'lucide-react';
 import type { EmployeeMonthlyStats } from '../mockData';
@@ -37,6 +38,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
   setManualEmployee,
   setShowManualModal,
 }) => {
+  const canAction = usePermissionCheck();
   const getTodayStr = () => {
     const d = new Date();
     const y = d.getFullYear();
@@ -242,7 +244,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                         <td className="number-cell">{workingHours}</td>
                         <td>{getStatusPill(report, statusChar)}</td>
                         <td>
-                          <button
+                          {canAction('ATTENDANCE_RECORD_CREATE') && (<button
                             className="action-btn-outline action-btn-sm"
                             onClick={(e) => {
                               e.stopPropagation();
@@ -252,7 +254,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                           >
                             <Plus size={12} />
                             Ghi công tay
-                          </button>
+                          </button>) }
                         </td>
                       </tr>
                     );
@@ -329,7 +331,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
 
                     {/* Footer thẻ: Nút bấm [Ghi công tay] trải dài toàn bộ bề ngang dưới cùng */}
                     <div className="daily-card-footer">
-                      <button
+                      {canAction('ATTENDANCE_RECORD_CREATE') && (<button
                         type="button"
                         className="daily-card-manual-btn"
                         onClick={(e) => {
@@ -340,7 +342,7 @@ export const DailyTab: React.FC<DailyTabProps> = ({
                       >
                         <Plus size={16} />
                         Ghi công tay
-                      </button>
+                      </button>) }
                     </div>
                   </div>
                 );

@@ -1,15 +1,14 @@
 package com.suachuabientan.system_internal.modules.repair.dto.request;
 
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 
 import java.util.List;
+import java.util.UUID;
 
 public record CreateRepairOrderRequest(
 
-        @NotBlank(message = "Tên khách hàng không được để trống")
         @Size(max = 100)
         String customerName,
 
@@ -19,6 +18,8 @@ public record CreateRepairOrderRequest(
         /** Danh sách thiết bị (ít nhất 1) */
         @NotEmpty(message = "Phải có ít nhất một thiết bị")
         @Valid
-        List<CreateRepairDeviceRequest> devices
+        List<CreateRepairDeviceRequest> devices,
+
+        UUID customerId
 ) {
 }

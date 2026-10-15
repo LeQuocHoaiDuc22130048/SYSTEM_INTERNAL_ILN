@@ -28,6 +28,18 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class EmployeeServiceTest {
+    @Test
+    void employeeManagementDoesNotAllowChangingRolesThroughProfileUpdate() {
+        UUID actorId = UUID.randomUUID();
+        UserEntity actor = new UserEntity();
+        actor.setId(actorId);
+        actor.setRole(UserRole.EMPLOYEE);
+        when(userRepository.findByIdAndIsDeletedFalse(employeeId)).thenReturn(Optional.of(activeEmployee));
+        org.mockito.Mockito.lenient().when(userRepository.findByIdAndIsDeletedFalse(actorId)).thenReturn(Optional.of(actor));
+        var request = new com.suachuabientan.system_internal.modules.employee.dto.request.UpdateEmployeeRequest(null, null, null, null, null, "SUPER_ADMIN");
+        assertThrows(BusinessException.class, () -> employeeService.update(employeeId, request, actorId, true));
+        verify(rbacService, never()).updateRole(any(), any());
+    }
     @Mock
     private UserRepository userRepository;
     @Mock

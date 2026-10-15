@@ -4,7 +4,6 @@ import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.device.dto.DeviceRequest;
 import com.suachuabientan.system_internal.modules.device.dto.DeviceResponse;
 import com.suachuabientan.system_internal.modules.device.service.DeviceService;
-import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -29,14 +28,14 @@ public class DeviceController {
 
     @Operation(summary = "Lấy danh sách thiết bị và trạng thái hoạt động")
     @GetMapping
-    @PreAuthorize(RoleExpressions.ANY_ACTIVE_USER)
+    @PreAuthorize("hasAuthority('DEVICE_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<DeviceResponse>>> getDevices() {
         return ResponseEntity.ok(ApiResponse.success(deviceService.getDevices()));
     }
 
     @Operation(summary = "Thêm thiết bị mới")
     @PostMapping
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('DEVICE_CREATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<DeviceResponse>> createDevice(
             @Valid @RequestBody DeviceRequest request,
             @AuthenticationPrincipal UserDetails userDetails
@@ -48,7 +47,7 @@ public class DeviceController {
 
     @Operation(summary = "Cập nhật thông tin thiết bị")
     @PutMapping("/{id}")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('DEVICE_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<DeviceResponse>> updateDevice(
             @PathVariable UUID id,
             @Valid @RequestBody DeviceRequest request,
@@ -60,7 +59,7 @@ public class DeviceController {
 
     @Operation(summary = "Xoá thiết bị")
     @DeleteMapping("/{id}")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('DEVICE_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteDevice(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails
@@ -72,7 +71,7 @@ public class DeviceController {
 
     @Operation(summary = "Toggle trạng thái Online/Offline (Simulate)")
     @PostMapping("/{id}/toggle")
-    @PreAuthorize(RoleExpressions.MANAGER_OR_ABOVE)
+    @PreAuthorize("hasAuthority('DEVICE_STATUS_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<DeviceResponse>> toggleDeviceStatus(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails
@@ -83,7 +82,7 @@ public class DeviceController {
 
     @Operation(summary = "Gửi lệnh ping tới thiết bị")
     @PostMapping("/{id}/ping")
-    @PreAuthorize(RoleExpressions.ANY_ACTIVE_USER)
+    @PreAuthorize("hasAuthority('DEVICE_PING') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<DeviceResponse>> pingDevice(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails

@@ -1,3 +1,5 @@
+import '../widgets/permission_gate.dart';
+import '../models/app_permission.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -157,29 +159,32 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
 
           // Settings Action Button
-          InkWell(
-            onTap: user == null ? null : () => _showAccountSettings(user),
-            borderRadius: BorderRadius.circular(20),
-            child: Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: isDark
-                    ? const Color(0xFF1E293B)
-                    : const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
+          PermissionGate(
+            permission: AppPermission.updateOwnProfile,
+            child: InkWell(
+              onTap: user == null ? null : () => _showAccountSettings(user),
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
                   color: isDark
-                      ? AppColors.borderDark
-                      : const Color(0xFFE2E8F0),
+                      ? const Color(0xFF1E293B)
+                      : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.borderDark
+                        : const Color(0xFFE2E8F0),
+                  ),
                 ),
-              ),
-              child: Icon(
-                LucideIcons.settings,
-                size: 18,
-                color: isDark
-                    ? AppColors.textPrimaryDark
-                    : const Color(0xFF334155),
+                child: Icon(
+                  LucideIcons.settings,
+                  size: 18,
+                  color: isDark
+                      ? AppColors.textPrimaryDark
+                      : const Color(0xFF334155),
+                ),
               ),
             ),
           ),
@@ -240,35 +245,40 @@ class _ProfilePageState extends State<ProfilePage> {
               Positioned(
                 bottom: 0,
                 right: 0,
-                child: InkWell(
-                  onTap: user == null ? null : () => _showAccountSettings(user),
-                  borderRadius: BorderRadius.circular(20),
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: isDark ? const Color(0xFF1E293B) : Colors.white,
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: isDark
-                            ? AppColors.borderDark
-                            : const Color(0xFFCBD5E1),
-                        width: 1.5,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.10),
-                          blurRadius: 6,
-                          offset: const Offset(0, 2),
+                child: PermissionGate(
+                  permission: AppPermission.updateOwnProfile,
+                  child: InkWell(
+                    onTap: user == null
+                        ? null
+                        : () => _showAccountSettings(user),
+                    borderRadius: BorderRadius.circular(20),
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: isDark
+                              ? AppColors.borderDark
+                              : const Color(0xFFCBD5E1),
+                          width: 1.5,
                         ),
-                      ],
-                    ),
-                    child: Icon(
-                      LucideIcons.camera,
-                      size: 15,
-                      color: isDark
-                          ? AppColors.textPrimaryDark
-                          : const Color(0xFF475569),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.10),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        LucideIcons.camera,
+                        size: 15,
+                        color: isDark
+                            ? AppColors.textPrimaryDark
+                            : const Color(0xFF475569),
+                      ),
                     ),
                   ),
                 ),
@@ -328,28 +338,31 @@ class _ProfilePageState extends State<ProfilePage> {
         const SizedBox(height: 16),
 
         // Edit Profile Pill Button (Matching Stitch)
-        ElevatedButton(
-          onPressed: user == null ? null : () => _showAccountSettings(user),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: const Color(0xFF2563EB),
-            foregroundColor: Colors.white,
-            elevation: 3,
-            shadowColor: const Color(0xFF2563EB).withValues(alpha: 0.35),
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(24),
-            ),
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(LucideIcons.pencil, size: 14),
-              SizedBox(width: 6),
-              Text(
-                'Chỉnh sửa hồ sơ',
-                style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+        PermissionGate(
+          permission: AppPermission.updateOwnProfile,
+          child: ElevatedButton(
+            onPressed: user == null ? null : () => _showAccountSettings(user),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              elevation: 3,
+              shadowColor: const Color(0xFF2563EB).withValues(alpha: 0.35),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
               ),
-            ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(LucideIcons.pencil, size: 14),
+                SizedBox(width: 6),
+                Text(
+                  'Chỉnh sửa hồ sơ',
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
           ),
         ),
       ],

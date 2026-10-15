@@ -8,7 +8,7 @@ import {
 import type { UserInfo } from '../mockData';
 import { getAuthHeaders } from '../utils/auth';
 import { getAvatarLetters } from '../utils/employee';
-import { isAdminOrAbove } from '../utils/permissions';
+import { hasPermission } from '../utils/permissions';
 import { FieldWorkModal } from './FieldWorkModal';
 import './DashboardTab.css';
 
@@ -172,7 +172,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     setShowFieldWorkModal(true);
   };
 
-  const isAdmin = useMemo(() => isAdminOrAbove(currentUser), [currentUser]);
+  const canViewTeamAttendance = useMemo(() => hasPermission(currentUser, 'ATTENDANCE_REPORT_VIEW'), [currentUser]);
 
   const fetchDashboardData = useCallback(async () => {
     try {
@@ -199,7 +199,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       let fetchedPersonalDays: PersonalHistoryDay[] = [];
       let fetchedPersonalSummary: PersonalSummary | null = null;
 
-      if (isAdmin) {
+      if (canViewTeamAttendance) {
         // 3. Fetch Employees (Manager/Admin)
         const employeesRes = await fetch('/api/v1/employees?size=200', { headers });
         if (employeesRes.ok) {
@@ -264,7 +264,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [showToast, isAdmin, currentUser?.id, currentYear, currentMonth]);
+  }, [showToast, canViewTeamAttendance, currentUser?.id, currentYear, currentMonth]);
 
   useEffect(() => {
     fetchDashboardData();
@@ -975,7 +975,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         {/* Card 5: Nhân viên có mặt (Admin) HOẶC Ngày công của tôi (Non-admin) */}
-        {isAdmin ? (
+        {canViewTeamAttendance ? (
           <div className="stat-card border-teal">
             <div className="stat-info">
               <span className="stat-label">Nhân viên có mặt</span>
@@ -1026,7 +1026,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         {/* Card 8: Tài khoản chờ duyệt (Admin) HOẶC Đi muộn / Tăng ca (Non-admin) */}
-        {isAdmin ? (
+        {canViewTeamAttendance ? (
           <div className="stat-card border-amber">
             <div className="stat-info">
               <span className="stat-label">Tài khoản chờ duyệt</span>
@@ -1412,7 +1412,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         {/* Right Side: Data Lists */}
         <div className="dashboard-lists-column">
           {/* Attendance Panel: Admin sees company-wide today check-ins; Non-admin sees personal attendance days */}
-          {isAdmin ? (
+          {canViewTeamAttendance ? (
             <div className="dashboard-panel flex-column">
               <div className="panel-header">
                 <h3 className="panel-title">Chấm công hôm nay</h3>

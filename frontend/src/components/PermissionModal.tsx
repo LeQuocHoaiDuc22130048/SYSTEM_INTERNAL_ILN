@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import { X, Shield, RotateCcw, Save, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
 import { PERMISSION_LABELS } from '../utils/permissions';
@@ -27,6 +28,10 @@ interface PermissionModalProps {
 // ── Module display names ───────────────────────────────────────────────────
 
 const MODULE_LABELS: Record<string, string> = {
+  CUSTOMER: '👥 Khách hàng',
+  DEVICE: '📱 Thiết bị',
+  BANNER: '🖼️ Banner',
+  UPDATE: '📦 Phát hành ứng dụng',
   DASHBOARD:    '📊 Dashboard',
   REPAIR:       '🔧 Sửa chữa',
   INVENTORY:    '📦 Kho hàng',
@@ -58,6 +63,8 @@ function stateToOverride(state: OverrideState): boolean | null {
 export const PermissionModal: React.FC<PermissionModalProps> = ({
   userId, userName, userRole, onClose, showToast,
 }) => {
+  const canAction = usePermissionCheck();
+  const protectedRole = userRole.toUpperCase() === 'SUPER_ADMIN';
   const [permissions, setPermissions] = useState<PermissionDetail[]>([]);
   const [overrides, setOverrides] = useState<Record<string, OverrideState>>({});
   const [loading, setLoading] = useState(true);
@@ -286,37 +293,37 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
                       {/* Toggle buttons */}
                       <div className="perm-toggle-group">
                         {/* Kế thừa từ role */}
-                        <button
+                        {(canAction('PERMISSION_UPDATE') && !protectedRole) && (<button
                           className={`perm-toggle-btn inherited ${currentState === 'inherited' ? 'active' : ''}`}
                           onClick={() => handleToggle(perm.code, 'inherited')}
                           title={`Kế thừa từ role (${perm.fromRole ? 'có quyền' : 'không có'})`}
                           id={`perm-inherit-${perm.code}`}
-                          disabled={saving}
+                          disabled={saving || protectedRole}
                         >
                           <MinusCircle size={14} />
-                        </button>
+                        </button>) }
 
                         {/* Grant */}
-                        <button
+                        {(canAction('PERMISSION_UPDATE') && !protectedRole) && (<button
                           className={`perm-toggle-btn grant ${currentState === 'grant' ? 'active' : ''}`}
                           onClick={() => handleToggle(perm.code, 'grant')}
                           title="Cấp thêm quyền này"
                           id={`perm-grant-${perm.code}`}
-                          disabled={saving}
+                          disabled={saving || protectedRole}
                         >
                           <CheckCircle2 size={14} />
-                        </button>
+                        </button>) }
 
                         {/* Deny */}
-                        <button
+                        {(canAction('PERMISSION_UPDATE') && !protectedRole) && (<button
                           className={`perm-toggle-btn deny ${currentState === 'deny' ? 'active' : ''}`}
                           onClick={() => handleToggle(perm.code, 'deny')}
                           title="Thu hồi quyền này"
                           id={`perm-deny-${perm.code}`}
-                          disabled={saving}
+                          disabled={saving || protectedRole}
                         >
                           <XCircle size={14} />
-                        </button>
+                        </button>) }
                       </div>
                     </div>
                   );
@@ -331,29 +338,29 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
           <div className="perm-modal-footer-info">
             {hasChanges
               ? <span className="perm-changed-badge">⚠ {changedCount} thay đổi chưa lưu</span>
-              : <span>Không có thay đổi</span>
+              : <span>{protectedRole ? 'SUPER_ADMIN luôn có toàn bộ quyền hệ thống' : 'Không có thay đổi'}</span>
             }
           </div>
           <div className="perm-footer-btns">
-            <button
+            {(canAction('PERMISSION_RESET') && !protectedRole) && (<button
               className="btn-perm-reset"
               onClick={handleResetAll}
-              disabled={saving || loading}
+              disabled={saving || loading || protectedRole}
               title="Reset tất cả về mặc định role"
               id="perm-reset-all-btn"
             >
               <RotateCcw size={13} style={{ marginRight: 4 }} />
               Reset tất cả
-            </button>
-            <button
+            </button>) }
+            {(canAction('PERMISSION_UPDATE') && !protectedRole) && (<button
               className="btn-perm-save"
               onClick={handleSave}
-              disabled={saving || loading || !hasChanges}
+              disabled={saving || loading || !hasChanges || protectedRole}
               id="perm-save-btn"
             >
               <Save size={14} />
               {saving ? 'Đang lưu...' : 'Lưu quyền'}
-            </button>
+            </button>) }
           </div>
         </div>
       </div>

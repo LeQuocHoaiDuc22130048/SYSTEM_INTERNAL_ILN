@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React from 'react';
 import { Search, Filter, Calendar, Plus, X, User, Phone } from 'lucide-react';
 import type { RepairOrder } from '../../types/orders';
@@ -45,6 +46,7 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
   getStatusMeta,
   visibleCount,
 }) => {
+  const canAction = usePermissionCheck();
   return (
     <>
       {/* Top Filter Card */}
@@ -64,10 +66,10 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
             />
           </div>
 
-          <button className="btn-create-order" onClick={openCreateModal}>
+          {canAction('REPAIR_CREATE') && (<button  className="btn-create-order" onClick={openCreateModal}>
             <Plus size={16} />
             <span>Tạo đơn mới</span>
-          </button>
+          </button>) }
         </div>
 
         <div className="filters-row">

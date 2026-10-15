@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React from 'react';
 import { Search, Plus, Boxes, CheckCircle, Cpu, History, MapPin, Tag } from 'lucide-react';
 import type { Board } from '../../types/warehouse';
@@ -33,6 +34,7 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
   getStatusLabel,
   getStatusColorClass,
 }) => {
+  const canAction = usePermissionCheck();
   return (
     <>
       {/* Stats Bar */}
@@ -104,7 +106,7 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
             </select>
 
             {openAddLocationModal && (
-              <button
+              (canAction('LOCATION_CREATE') && (<button
                 type="button"
                 className="btn-action-outline"
                 onClick={openAddLocationModal}
@@ -113,13 +115,13 @@ export const BoardListPanel: React.FC<BoardListPanelProps> = ({
               >
                 <MapPin size={16} className="text-primary" />
                 <span>Thêm vị trí (QR)</span>
-              </button>
+              </button>))
             )}
 
-            <button className="btn-add-board" onClick={() => openAddEditModal(null)}>
+            {canAction('BOARD_CREATE') && (<button className="btn-add-board" onClick={() => openAddEditModal(null)} >
               <Plus size={16} />
               <span>Thêm bo mạch</span>
-            </button>
+            </button>) }
           </div>
         </div>
       </div>

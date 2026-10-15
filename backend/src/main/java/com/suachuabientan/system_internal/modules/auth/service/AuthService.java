@@ -394,7 +394,7 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public Page<UserResponse> getUsers(String keyword, Pageable pageable) {
-        return userRepository.searchUsers(keyword, pageable).map(userMapper::toResponse);
+        return userRepository.searchAccounts(keyword, pageable).map(userMapper::toResponse);
     }
 
     /**
@@ -434,6 +434,9 @@ public class AuthService {
         if (targetUserId.equals(performedByUserId)) {
             throw new BusinessException("Không thể tự thay đổi trạng thái tài khoản của bản thân", 400);
         }
+        if (user.getRole() == UserRole.SUPER_ADMIN) {
+            throw new BusinessException("Không thể thay đổi trạng thái SUPER_ADMIN", 403);
+        }
 
         switch (action.toUpperCase()) {
             case "SUSPEND" -> {
@@ -455,7 +458,7 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public List<UserPermissionDetailResponse> getUserPermissions(UUID targetUserId) {
-        userRepository.findByIdAndIsDeletedFalse(targetUserId)
+        UserEntity target = userRepository.findByIdAndIsDeletedFalse(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + targetUserId));
 
         return rbacService.getUserPermissionDetails(targetUserId).stream()
@@ -464,7 +467,11 @@ public class AuthService {
                     Boolean overrideGranted = (Boolean) row.get("override_granted");
 
                     boolean effective;
-                    if (overrideGranted != null) {
+                    if (target.getRole() == UserRole.SUPER_ADMIN) {
+                        effective = true;
+                        fromRole = true;
+                        overrideGranted = null;
+                    } else if (overrideGranted != null) {
                         effective = overrideGranted;
                     } else {
                         effective = fromRole;
@@ -492,20 +499,56 @@ public class AuthService {
             Map<String, Boolean> overrides,
             UUID performedByUserId) {
 
-        userRepository.findByIdAndIsDeletedFalse(targetUserId)
+        UserEntity target = userRepository.findByIdAndIsDeletedFalse(targetUserId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + targetUserId));
 
         if (targetUserId.equals(performedByUserId)) {
             throw new BusinessException("Không thể tự thay đổi quyền của bản thân", 400);
         }
 
+        if (target.getRole() == UserRole.SUPER_ADMIN) {
+            throw new BusinessException("Không thể thay đổi quyền của SUPER_ADMIN", 403);
+        }
+        UserEntity actor = userRepository.findByIdAndIsDeletedFalse(performedByUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người thực hiện"));
+        if (actor.getRole() != UserRole.SUPER_ADMIN) {
+            var actorPermissions = rbacService.getPermissionCodes(performedByUserId);
+            if (!actorPermissions.contains(overrides.isEmpty() ? "PERMISSION_RESET" : "PERMISSION_UPDATE")) {
+                throw new BusinessException("Bạn không có quyền quản trị phân quyền", 403);
+            }
+            for (var entry : overrides.entrySet()) {
+                if (Boolean.TRUE.equals(entry.getValue()) &&
+                        (!actorPermissions.contains(entry.getKey()) || java.util.Set.of("PERMISSION_UPDATE", "PERMISSION_RESET").contains(entry.getKey()))) {
+                    throw new BusinessException("Không thể cấp quyền vượt quá quyền của người thực hiện", 403);
+                }
+            }
+        }
+
+        var previousPermissions = new java.util.HashSet<>(rbacService.getPermissionCodes(targetUserId));
         rbacService.setUserPermissionOverrides(targetUserId, overrides, performedByUserId);
-        log.info("Cập nhật permissions: userId={}, overrides={}, by={}", targetUserId, overrides.keySet(), performedByUserId);
+        var effectivePermissions = rbacService.getPermissionCodes(targetUserId);
+        if (actor.getRole() != UserRole.SUPER_ADMIN) {
+            var gained = new java.util.HashSet<>(effectivePermissions);
+            gained.removeAll(previousPermissions);
+            if ((gained.contains("PERMISSION_UPDATE") || gained.contains("PERMISSION_RESET")) || !rbacService.getPermissionCodes(performedByUserId).containsAll(gained)) {
+                throw new BusinessException("Không thể khôi phục quyền vượt quá quyền của người thực hiện", 403);
+            }
+        }
+        log.info("Cập nhật permissions: userId={}, overrides={}, before={}, after={}, by={}",
+                targetUserId, overrides, previousPermissions, effectivePermissions, performedByUserId);
 
         return getUserPermissions(targetUserId);
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
+    @Transactional(readOnly = true)
+    public LoginResponse.UserInfo getCurrentUser(UUID userId) {
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));
+        return new LoginResponse.UserInfo(user.getId(), user.getUsername(), user.getFullName(),
+                user.getRole().name(), user.getStatus().name(), user.getAvatarUrl(), user.getDepartment(), permissionCodes(user));
+    }
+
     private String buildLoginBlockMessage(UserStatus status) {
         return switch (status) {
             case PENDING_APPROVAL -> "Tài khoản chưa được duyệt. Vui lòng liên hệ quản lý.";

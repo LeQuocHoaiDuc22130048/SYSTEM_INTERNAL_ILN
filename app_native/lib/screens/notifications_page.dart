@@ -1,3 +1,6 @@
+import '../utils/auth_provider.dart';
+import '../widgets/permission_gate.dart';
+import '../models/app_permission.dart';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
@@ -100,7 +103,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                         notifications: provider.notifications,
                         isDark: isDark,
                         onTap: (item) {
-                          provider.markAsRead(item);
+                          if (context.read<AuthProvider>().can(
+                            AppPermission.markNotificationsRead,
+                          )) {
+                            provider.markAsRead(item);
+                          }
                           _handleNotificationTap(item);
                         },
                       ),
@@ -162,10 +169,13 @@ class _Header extends StatelessWidget {
           ),
         ),
         if (onMarkAllAsRead != null)
-          TextButton.icon(
-            onPressed: onMarkAllAsRead,
-            icon: const Icon(LucideIcons.checkCheck, size: 14),
-            label: const Text('Đọc tất cả'),
+          PermissionGate(
+            permission: AppPermission.markNotificationsRead,
+            child: TextButton.icon(
+              onPressed: onMarkAllAsRead,
+              icon: const Icon(LucideIcons.checkCheck, size: 14),
+              label: const Text('Đọc tất cả'),
+            ),
           ),
       ],
     );

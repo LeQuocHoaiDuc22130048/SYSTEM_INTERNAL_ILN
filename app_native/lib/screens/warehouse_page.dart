@@ -1,3 +1,4 @@
+import '../widgets/permission_gate.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -7,6 +8,7 @@ import '../utils/backend_data_provider.dart';
 import '../utils/network_provider.dart';
 import '../widgets/status_badge.dart';
 import '../models/board.dart';
+import '../models/app_permission.dart';
 import '../models/board_history_item.dart';
 import '../models/part.dart';
 import '../models/store_location.dart';
@@ -210,19 +212,31 @@ class _WarehousePageState extends State<WarehousePage> {
                       ),
                       Row(
                         children: [
-                          ElevatedButton.icon(
-                            onPressed: () {
-                              _showAddSelectionSheet();
-                            },
-                            icon: const Icon(Icons.add, size: 16),
-                            label: const Text(
-                              'Thêm',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 10,
+                          PermissionGate.any(
+                            permissions: const [
+                              AppPermission.createBoards,
+                              AppPermission.createParts,
+                              AppPermission.createLocations,
+                            ],
+                            child: ElevatedButton.icon(
+                              onPressed:
+                                  context.watch<AuthProvider>().can(
+                                    AppPermission.manageWarehouse,
+                                  )
+                                  ? () {
+                                      _showAddSelectionSheet();
+                                    }
+                                  : null,
+                              icon: const Icon(Icons.add, size: 16),
+                              label: const Text(
+                                'Thêm',
+                                style: TextStyle(fontSize: 12),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 10,
+                                ),
                               ),
                             ),
                           ),
@@ -599,6 +613,9 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   void _showAddSelectionSheet() {
+    if (!context.read<AuthProvider>().can(AppPermission.manageWarehouse)) {
+      return;
+    }
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
@@ -627,118 +644,127 @@ class _WarehousePageState extends State<WarehousePage> {
               ),
             ),
             const SizedBox(height: 16),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.info.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+            PermissionGate(
+              permission: AppPermission.createBoards,
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.info.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    LucideIcons.cpu,
+                    color: AppColors.info,
+                    size: 22,
+                  ),
                 ),
-                child: const Icon(
-                  LucideIcons.cpu,
-                  color: AppColors.info,
-                  size: 22,
+                title: Text(
+                  'Bo mạch mới',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
                 ),
+                subtitle: Text(
+                  'Tạo hồ sơ theo dõi bo mạch / thiết bị sửa chữa',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showAddEditBoardDialog();
+                },
               ),
-              title: Text(
-                'Bo mạch mới',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                ),
-              ),
-              subtitle: Text(
-                'Tạo hồ sơ theo dõi bo mạch / thiết bị sửa chữa',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showAddEditBoardDialog();
-              },
             ),
             const Divider(height: 12),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+            PermissionGate(
+              permission: AppPermission.createParts,
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.success.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.precision_manufacturing,
+                    color: AppColors.success,
+                    size: 22,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.precision_manufacturing,
-                  color: AppColors.success,
-                  size: 22,
+                title: Text(
+                  'Linh kiện mới',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
                 ),
+                subtitle: Text(
+                  'Thêm linh kiện điện tử, số lượng tồn kho và vị trí lưu trữ',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _showAddEditPartDialog();
+                },
               ),
-              title: Text(
-                'Linh kiện mới',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                ),
-              ),
-              subtitle: Text(
-                'Thêm linh kiện điện tử, số lượng tồn kho và vị trí lưu trữ',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () {
-                Navigator.pop(ctx);
-                _showAddEditPartDialog();
-              },
             ),
             const Divider(height: 12),
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
+            PermissionGate(
+              permission: AppPermission.createLocations,
+              child: ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.add_location_alt_rounded,
+                    color: AppColors.primary,
+                    size: 22,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.add_location_alt_rounded,
-                  color: AppColors.primary,
-                  size: 22,
+                title: Text(
+                  'Vị trí lưu kho mới',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: isDark
+                        ? AppColors.textPrimaryDark
+                        : AppColors.textPrimaryLight,
+                  ),
                 ),
+                subtitle: Text(
+                  'Tạo mã kệ / ngăn lưu trữ mới cho bo mạch và linh kiện',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark
+                        ? AppColors.textSecondaryDark
+                        : AppColors.textSecondaryLight,
+                  ),
+                ),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  showCreateStoreLocationDialog(context);
+                },
               ),
-              title: Text(
-                'Vị trí lưu kho mới',
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isDark
-                      ? AppColors.textPrimaryDark
-                      : AppColors.textPrimaryLight,
-                ),
-              ),
-              subtitle: Text(
-                'Tạo mã kệ / ngăn lưu trữ mới cho bo mạch và linh kiện',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppColors.textSecondaryDark
-                      : AppColors.textSecondaryLight,
-                ),
-              ),
-              trailing: const Icon(Icons.chevron_right, size: 20),
-              onTap: () {
-                Navigator.pop(ctx);
-                showCreateStoreLocationDialog(context);
-              },
             ),
             const Divider(height: 12),
             ListTile(
@@ -1165,6 +1191,9 @@ class _WarehousePageState extends State<WarehousePage> {
     required Part part,
     PartLot? initialLot,
   }) {
+    if (!context.read<AuthProvider>().can(AppPermission.checkoutParts)) {
+      return;
+    }
     final availableLots = part.lots.where((l) => l.amount > 0).toList();
     if (availableLots.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1851,7 +1880,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  ElevatedButton.icon(
+                                  PermissionGate(permission: AppPermission.checkoutParts, child: ElevatedButton.icon(
                                     onPressed: amount <= 0
                                         ? null
                                         : () {
@@ -1884,7 +1913,7 @@ class _WarehousePageState extends State<WarehousePage> {
                                         borderRadius: BorderRadius.circular(6),
                                       ),
                                     ),
-                                  ),
+                                  )),
                                 ],
                               ),
                             );
@@ -1964,6 +1993,9 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   void _showPartDeleteConfirmDialog(Part part) {
+    if (!context.read<AuthProvider>().can(AppPermission.deleteParts)) {
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -1991,7 +2023,15 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   void _showAddEditPartDialog({Part? part}) {
+    if (!context.read<AuthProvider>().can(
+      part == null ? AppPermission.createParts : AppPermission.updateParts,
+    )) {
+      return;
+    }
     final isEditing = part != null;
+    final canAdjustStock = context.read<AuthProvider>().can(
+      AppPermission.adjustPartStock,
+    );
     final ipnCtrl = TextEditingController(text: part?.ipn ?? '');
     final nameCtrl = TextEditingController(text: part?.name ?? '');
     final minAmountCtrl = TextEditingController(
@@ -2056,7 +2096,10 @@ class _WarehousePageState extends State<WarehousePage> {
                               hintText: 'VD: Tụ điện, Điện trở...',
                             ),
                           ),
-                          if (!isEditing) ...[
+                          if (!isEditing &&
+                              context.watch<AuthProvider>().can(
+                                AppPermission.adjustPartStock,
+                              )) ...[
                             const SizedBox(height: 12),
                             LocationPickerField(
                               selectedLocation: initialLocation,
@@ -2137,7 +2180,8 @@ class _WarehousePageState extends State<WarehousePage> {
                             final initQty =
                                 double.tryParse(initialQtyCtrl.text.trim()) ??
                                 0.0;
-                            if (createdPartId != null &&
+                            if (canAdjustStock &&
+                                createdPartId != null &&
                                 initialLocation != null &&
                                 initQty > 0) {
                               await backend.adjustPartStock(
@@ -2198,6 +2242,9 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   void _showDeleteConfirmDialog(Board board) {
+    if (!context.read<AuthProvider>().can(AppPermission.deleteBoards)) {
+      return;
+    }
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -2240,6 +2287,11 @@ class _WarehousePageState extends State<WarehousePage> {
   }
 
   void _showAddEditBoardDialog({Board? board}) {
+    if (!context.read<AuthProvider>().can(
+      board == null ? AppPermission.createBoards : AppPermission.updateBoards,
+    )) {
+      return;
+    }
     final isEditing = board != null;
     final nameCtrl = TextEditingController(text: board?.name ?? '');
     final modelCtrl = TextEditingController(text: board?.model ?? '');
@@ -2544,6 +2596,9 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
   }
 
   Future<void> _loadHistory() async {
+    if (!context.read<AuthProvider>().can(AppPermission.viewBoardHistory)) {
+      return;
+    }
     setState(() {
       _isLoadingHistory = true;
     });
@@ -3041,6 +3096,9 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
   }
 
   Future<void> _handleAction({Map<String, dynamic>? returnData}) async {
+    if (!context.read<AuthProvider>().can(AppPermission.manageWarehouse)) {
+      return;
+    }
     setState(() {
       _isLoading = true;
     });
@@ -3123,10 +3181,9 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isEmployee = Provider.of<AuthProvider>(
-      context,
-      listen: false,
-    ).isEmployee;
+    final canDelete = context.watch<AuthProvider>().can(
+      AppPermission.deleteBoards,
+    );
 
     return Container(
       constraints: BoxConstraints(
@@ -3196,24 +3253,40 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                           onPressed: () => Navigator.pop(context),
                           icon: const Icon(Icons.close),
                         ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.edit,
-                            size: 20,
-                            color: AppColors.primary,
-                          ),
-                          onPressed: widget.onEdit,
-                          tooltip: 'Chỉnh sửa',
-                        ),
-                        if (!isEmployee)
-                          IconButton(
+                        PermissionGate(
+                          permission: AppPermission.updateBoards,
+                          child: IconButton(
                             icon: const Icon(
-                              Icons.delete,
+                              Icons.edit,
                               size: 20,
-                              color: AppColors.error,
+                              color: AppColors.primary,
                             ),
-                            onPressed: widget.onDelete,
-                            tooltip: 'Xóa',
+                            onPressed:
+                                context.watch<AuthProvider>().can(
+                                  AppPermission.updateBoards,
+                                )
+                                ? widget.onEdit
+                                : null,
+                            tooltip: 'Chỉnh sửa',
+                          ),
+                        ),
+                        if (canDelete)
+                          PermissionGate(
+                            permission: AppPermission.deleteBoards,
+                            child: IconButton(
+                              icon: const Icon(
+                                Icons.delete,
+                                size: 20,
+                                color: AppColors.error,
+                              ),
+                              onPressed:
+                                  context.watch<AuthProvider>().can(
+                                    AppPermission.deleteBoards,
+                                  )
+                                  ? widget.onDelete
+                                  : null,
+                              tooltip: 'Xóa',
+                            ),
                           ),
                       ],
                     ),
@@ -3329,7 +3402,7 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                     const SizedBox(height: 16),
                     const Divider(),
                     const SizedBox(height: 8),
-                    Row(
+                    PermissionGate(permission: AppPermission.viewBoardHistory, child: Row(
                       children: [
                         const Icon(Icons.history, size: 18),
                         const SizedBox(width: 8),
@@ -3344,16 +3417,16 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                           ),
                         ),
                       ],
-                    ),
+                    )),
                     const SizedBox(height: 12),
-                    if (_isLoadingHistory)
+                    if (context.watch<AuthProvider>().can(AppPermission.viewBoardHistory) && _isLoadingHistory)
                       const Center(
                         child: Padding(
                           padding: EdgeInsets.all(16.0),
                           child: CircularProgressIndicator(),
                         ),
                       )
-                    else if (_history == null || _history!.isEmpty)
+                    else if (context.watch<AuthProvider>().can(AppPermission.viewBoardHistory) && (_history == null || _history!.isEmpty))
                       Padding(
                         padding: const EdgeInsets.symmetric(vertical: 8),
                         child: Text(
@@ -3367,7 +3440,7 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                           ),
                         ),
                       )
-                    else
+                    else if (context.watch<AuthProvider>().can(AppPermission.viewBoardHistory))
                       ..._history!.map((item) {
                         final takenAtStr = item.takenAt != null
                             ? "${item.takenAt!.day}/${item.takenAt!.month}/${item.takenAt!.year} ${item.takenAt!.hour.toString().padLeft(2, '0')}:${item.takenAt!.minute.toString().padLeft(2, '0')}"
@@ -3562,34 +3635,49 @@ class _BoardDetailSheetState extends State<_BoardDetailSheet> {
                   return Row(
                     children: [
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed:
-                              widget.board.status == BoardStatus.available &&
-                                  widget.board.quantity > 0
-                              ? _handleAction
-                              : null,
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: PermissionGate(
+                          permission: AppPermission.checkoutBoards,
+                          child: ElevatedButton(
+                            onPressed:
+                                context.watch<AuthProvider>().can(
+                                      AppPermission.checkoutBoards,
+                                    ) &&
+                                    widget.board.status ==
+                                        BoardStatus.available &&
+                                    widget.board.quantity > 0
+                                ? _handleAction
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text('Lấy bo mạch'),
                           ),
-                          child: const Text('Lấy bo mạch'),
                         ),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: OutlinedButton(
-                          onPressed:
-                              widget.board.status == BoardStatus.checkedOut
-                              ? () async {
-                                  final returnData = await _showReturnDialog();
-                                  if (returnData == null) return;
-                                  await _handleAction(returnData: returnData);
-                                }
-                              : null,
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.success,
-                            padding: const EdgeInsets.symmetric(vertical: 16),
+                        child: PermissionGate(
+                          permission: AppPermission.returnBoards,
+                          child: OutlinedButton(
+                            onPressed:
+                                context.watch<AuthProvider>().can(
+                                      AppPermission.returnBoards,
+                                    ) &&
+                                    widget.board.status ==
+                                        BoardStatus.checkedOut
+                                ? () async {
+                                    final returnData =
+                                        await _showReturnDialog();
+                                    if (returnData == null) return;
+                                    await _handleAction(returnData: returnData);
+                                  }
+                                : null,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: AppColors.success,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                            ),
+                            child: const Text('Trả bo mạch'),
                           ),
-                          child: const Text('Trả bo mạch'),
                         ),
                       ),
                     ],
@@ -3669,6 +3757,9 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
   bool _isLoading = false;
 
   Future<void> _showReturnSheet() async {
+    if (!context.read<AuthProvider>().can(AppPermission.returnParts)) {
+      return;
+    }
     final returned = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -3685,6 +3776,9 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
   }
 
   void _showAdjustStockDialog() {
+    if (!context.read<AuthProvider>().can(AppPermission.adjustPartStock)) {
+      return;
+    }
     final allLocations = context.read<BackendDataProvider>().locations;
     StoreLocation? selectedLocation;
     if (widget.part.lots.isNotEmpty) {
@@ -3921,16 +4015,32 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          icon: const Icon(Icons.edit_outlined),
-                          onPressed: widget.onEdit,
-                        ),
-                        IconButton(
-                          icon: const Icon(
-                            Icons.delete_outline,
-                            color: AppColors.error,
+                        PermissionGate(
+                          permission: AppPermission.updateParts,
+                          child: IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            onPressed:
+                                context.watch<AuthProvider>().can(
+                                  AppPermission.updateParts,
+                                )
+                                ? widget.onEdit
+                                : null,
                           ),
-                          onPressed: widget.onDelete,
+                        ),
+                        PermissionGate(
+                          permission: AppPermission.deleteParts,
+                          child: IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline,
+                              color: AppColors.error,
+                            ),
+                            onPressed:
+                                context.watch<AuthProvider>().can(
+                                  AppPermission.deleteParts,
+                                )
+                                ? widget.onDelete
+                                : null,
+                          ),
                         ),
                       ],
                     ),
@@ -4081,31 +4191,54 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
                         Row(
                           children: [
                             Expanded(
-                              child: ElevatedButton.icon(
-                                onPressed: part.totalQuantity > 0
-                                    ? widget.onCheckout
-                                    : null,
-                                icon: const Icon(Icons.outbox, size: 18),
-                                label: const Text('Lấy linh kiện'),
+                              child: PermissionGate(
+                                permission: AppPermission.checkoutParts,
+                                child: ElevatedButton.icon(
+                                  onPressed:
+                                      context.watch<AuthProvider>().can(
+                                            AppPermission.checkoutParts,
+                                          ) &&
+                                          part.totalQuantity > 0
+                                      ? widget.onCheckout
+                                      : null,
+                                  icon: const Icon(Icons.outbox, size: 18),
+                                  label: const Text('Lấy linh kiện'),
+                                ),
                               ),
                             ),
                             const SizedBox(width: 8),
                             Expanded(
-                              child: OutlinedButton.icon(
-                                onPressed: _showReturnSheet,
-                                icon: const Icon(
-                                  Icons.inventory_2_outlined,
-                                  size: 18,
+                              child: PermissionGate(
+                                permission: AppPermission.returnParts,
+                                child: OutlinedButton.icon(
+                                  onPressed:
+                                      context.watch<AuthProvider>().can(
+                                        AppPermission.returnParts,
+                                      )
+                                      ? _showReturnSheet
+                                      : null,
+                                  icon: const Icon(
+                                    Icons.inventory_2_outlined,
+                                    size: 18,
+                                  ),
+                                  label: const Text('Trả linh kiện'),
                                 ),
-                                label: const Text('Trả linh kiện'),
                               ),
                             ),
                           ],
                         ),
-                        TextButton.icon(
-                          onPressed: _showAdjustStockDialog,
-                          icon: const Icon(Icons.tune, size: 18),
-                          label: const Text('Điều chỉnh kho'),
+                        PermissionGate(
+                          permission: AppPermission.adjustPartStock,
+                          child: TextButton.icon(
+                            onPressed:
+                                context.watch<AuthProvider>().can(
+                                  AppPermission.adjustPartStock,
+                                )
+                                ? _showAdjustStockDialog
+                                : null,
+                            icon: const Icon(Icons.tune, size: 18),
+                            label: const Text('Điều chỉnh kho'),
+                          ),
                         ),
                       ],
                     ),

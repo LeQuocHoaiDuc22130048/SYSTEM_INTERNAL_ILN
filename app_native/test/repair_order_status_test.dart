@@ -192,7 +192,7 @@ void main() {
       final api = ApiClient(
         baseUrl: 'https://test.local',
         client: MockClient((request) async {
-          if (request.url.path == '/api/v1/employees') {
+          if (request.url.path == '/api/v1/employees/repair-assignees') {
             return http.Response.bytes(
               utf8.encode(
                 jsonEncode({

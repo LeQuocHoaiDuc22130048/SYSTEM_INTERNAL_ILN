@@ -46,6 +46,28 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
+    @Test
+    void superAdminPermissionsCannotBeOverridden() {
+        UserEntity root = new UserEntity();
+        root.setId(UUID.randomUUID());
+        root.setRole(com.suachuabientan.system_internal.modules.auth.enums.UserRole.SUPER_ADMIN);
+        when(userRepository.findByIdAndIsDeletedFalse(root.getId())).thenReturn(Optional.of(root));
+        assertThrows(BusinessException.class, () -> authService.updateUserPermissions(root.getId(), java.util.Map.of("REPAIR_VIEW", false), UUID.randomUUID()));
+        verify(rbacService, never()).setUserPermissionOverrides(any(), any(), any());
+    }
+
+    @Test
+    void permissionManagerCannotDelegateRightsTheyDoNotHave() {
+        UserEntity actor = new UserEntity();
+        actor.setId(UUID.randomUUID());
+        actor.setRole(com.suachuabientan.system_internal.modules.auth.enums.UserRole.EMPLOYEE);
+        user.setRole(com.suachuabientan.system_internal.modules.auth.enums.UserRole.EMPLOYEE);
+        when(userRepository.findByIdAndIsDeletedFalse(user.getId())).thenReturn(Optional.of(user));
+        when(userRepository.findByIdAndIsDeletedFalse(actor.getId())).thenReturn(Optional.of(actor));
+        when(rbacService.getPermissionCodes(actor.getId())).thenReturn(java.util.List.of("PERMISSION_UPDATE"));
+        assertThrows(BusinessException.class, () -> authService.updateUserPermissions(user.getId(), java.util.Map.of("EMPLOYEE_SECURITY_MANAGE", true), actor.getId()));
+        verify(rbacService, never()).setUserPermissionOverrides(any(), any(), any());
+    }
     @Mock private UserRepository userRepository;
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private UserMapper userMapper;

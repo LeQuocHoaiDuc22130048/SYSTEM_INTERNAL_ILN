@@ -84,6 +84,10 @@ async function doRefreshToken(): Promise<string | null> {
         const { accessToken, refreshToken: newRefreshToken } = result.data;
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', newRefreshToken);
+        if (result.data.userInfo) {
+          localStorage.setItem('currentUser', JSON.stringify(result.data.userInfo));
+          window.dispatchEvent(new Event('permissions-updated'));
+        }
         return accessToken;
       }
     } else {

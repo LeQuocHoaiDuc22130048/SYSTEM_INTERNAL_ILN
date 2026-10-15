@@ -60,7 +60,7 @@ public class PartController {
 
     @Operation(summary = "Tạo linh kiện mới")
     @PostMapping
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('PART_CREATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PartResponse>> create(
             @Valid @RequestBody CreatePartRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -71,7 +71,7 @@ public class PartController {
 
     @Operation(summary = "Cập nhật linh kiện")
     @PatchMapping("/{id}")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('PART_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PartResponse>> update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdatePartRequest request,
@@ -82,7 +82,7 @@ public class PartController {
 
     @Operation(summary = "Xoá linh kiện")
     @DeleteMapping("/{id}")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_DELETE)
+    @PreAuthorize("hasAuthority('PART_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> delete(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -92,7 +92,7 @@ public class PartController {
 
     @Operation(summary = "Điều chỉnh số lượng tồn kho của linh kiện")
     @PostMapping("/{id}/adjust-stock")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('PART_STOCK_ADJUST') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PartResponse>> adjustStock(
             @PathVariable UUID id,
             @Valid @RequestBody AdjustStockRequest request,
@@ -106,7 +106,7 @@ public class PartController {
 
     @Operation(summary = "Nhập danh sách linh kiện hàng loạt từ Excel/CSV")
     @PostMapping("/bulk-import")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('PART_IMPORT') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<BulkImportPartResponse>> bulkImport(
             @Valid @RequestBody BulkImportPartRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -126,7 +126,7 @@ public class PartController {
 
     @Operation(summary = "Lấy linh kiện ra khỏi vị trí kho (Checkout)")
     @PostMapping("/{id}/checkout")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('PART_CHECKOUT') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PartCheckoutHistoryResponse>> checkoutPart(
             @PathVariable UUID id,
             @Valid @RequestBody PartCheckoutRequest request,
@@ -140,7 +140,7 @@ public class PartController {
 
     @Operation(summary = "Trả linh kiện về vị trí kho (Return)")
     @PostMapping("/checkouts/{checkoutId}/return")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('PART_RETURN') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<PartCheckoutHistoryResponse>> returnPart(
             @PathVariable UUID checkoutId,
             @Valid @RequestBody PartReturnRequest request,
@@ -154,7 +154,7 @@ public class PartController {
 
     @Operation(summary = "Xem nhật ký lấy và trả linh kiện (Part Activity Log)")
     @GetMapping("/checkouts/history")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_VIEW)
+    @PreAuthorize("hasAuthority('PART_HISTORY_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<PartCheckoutHistoryResponse>>> getCheckoutHistory(
             @RequestParam(required = false) UUID partId,
             @RequestParam(required = false) UUID locationId,
@@ -182,7 +182,7 @@ public class PartController {
 
     @Operation(summary = "Thêm vị trí kho mới kèm mã QR")
     @PostMapping("/locations")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('LOCATION_CREATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<LocationInfo>> createLocation(
             @Valid @RequestBody CreateStoreLocationRequest request,
             @AuthenticationPrincipal UserDetails userDetails) {
@@ -193,7 +193,7 @@ public class PartController {
 
     @Operation(summary = "Cập nhật thông tin vị trí kho")
     @PatchMapping("/locations/{id}")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasAuthority('LOCATION_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<LocationInfo>> updateLocation(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateStoreLocationRequest request,
@@ -207,7 +207,7 @@ public class PartController {
 
     @Operation(summary = "Xóa vị trí kho")
     @DeleteMapping("/locations/{id}")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_DELETE)
+    @PreAuthorize("hasAuthority('LOCATION_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteLocation(
             @PathVariable UUID id,
             @AuthenticationPrincipal UserDetails userDetails) {

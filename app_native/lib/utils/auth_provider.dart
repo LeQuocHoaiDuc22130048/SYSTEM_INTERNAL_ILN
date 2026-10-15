@@ -223,6 +223,11 @@ class AuthProvider extends ChangeNotifier {
     try {
       _log('Loading current user profile');
       final data = await api.get('/api/v1/employees/me');
+      final authData = await api.get('/api/v1/auth/me');
+      if (data is Map<String, dynamic> && authData is Map<String, dynamic>) {
+        data['permissions'] = authData['permissions'];
+        data['role'] = authData['role'];
+      }
       if (data is Map<String, dynamic>) {
         final loadedUser = User.fromJson(data);
         _currentUser = loadedUser.permissions == null && _currentUser != null

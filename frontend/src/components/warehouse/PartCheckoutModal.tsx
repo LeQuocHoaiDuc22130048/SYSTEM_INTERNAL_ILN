@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useState } from 'react';
 import { X, ArrowUpRight } from 'lucide-react';
 
@@ -21,6 +22,7 @@ export const PartCheckoutModal: React.FC<PartCheckoutModalProps> = ({
   onSuccess,
   showToast,
 }) => {
+  const canAction = usePermissionCheck();
   const [selectedLotId, setSelectedLotId] = useState<string>(initialLot?.id || '');
   const [quantity, setQuantity] = useState<number>(1);
   const [purpose, setPurpose] = useState<string>('Sửa chữa thiết bị');
@@ -101,7 +103,7 @@ export const PartCheckoutModal: React.FC<PartCheckoutModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
+        {canAction('PART_CHECKOUT') && (<form onSubmit={handleSubmit} className="modal-form">
           <div style={{ backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#0f172a' }}>{part.name}</div>
             <div style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>IPN: {part.ipn}</div>
@@ -172,11 +174,11 @@ export const PartCheckoutModal: React.FC<PartCheckoutModalProps> = ({
             <button type="button" className="btn-cancel" onClick={onClose}>
               Hủy
             </button>
-            <button type="submit" className="btn-submit btn-primary" disabled={submitting}>
+            {canAction('PART_CHECKOUT') && (<button type="submit" className="btn-submit btn-primary" disabled={submitting}>
               {submitting ? 'Đang xử lý...' : 'Xác Nhận Lấy Out Kho'}
-            </button>
+            </button>) }
           </div>
-        </form>
+        </form>) }
       </div>
     </div>
   );

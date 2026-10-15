@@ -1,8 +1,10 @@
+import '../widgets/permission_gate.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../theme/app_colors.dart';
 import '../models/user.dart';
+import '../models/app_permission.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/modal_top_bar.dart';
@@ -431,8 +433,9 @@ class _EmployeeDetailSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final avatarColor = _getAvatarColor(user.role);
-    final currentRole = context.watch<AuthProvider>().role;
-    final canEnrollFace = !Platform.isIOS && currentRole.isManagerOrAbove;
+    final canEnrollFace =
+        !Platform.isIOS &&
+        context.watch<AuthProvider>().can(AppPermission.enrollEmployeeFace);
 
     return Container(
       constraints: BoxConstraints(
@@ -619,21 +622,26 @@ class _EmployeeDetailSheet extends StatelessWidget {
                         ),
                         const SizedBox(width: 12),
                         Expanded(
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                              showModalBottomSheet(
-                                context: context,
-                                isScrollControlled: true,
-                                backgroundColor: Colors.transparent,
-                                builder: (context) =>
-                                    _EditEmployeeSheet(user: user),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: PermissionGate(
+                            permission: AppPermission.updateEmployees,
+                            child: ElevatedButton(
+                              onPressed: () {
+                                Navigator.pop(context);
+                                showModalBottomSheet(
+                                  context: context,
+                                  isScrollControlled: true,
+                                  backgroundColor: Colors.transparent,
+                                  builder: (context) =>
+                                      _EditEmployeeSheet(user: user),
+                                );
+                              },
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
+                              ),
+                              child: const Text('Chỉnh sửa'),
                             ),
-                            child: const Text('Chỉnh sửa'),
                           ),
                         ),
                       ],

@@ -12,9 +12,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Duration;
 
 @RestController
+@org.springframework.security.access.prepost.PreAuthorize("hasAuthority('MESSAGING_USE') or hasRole('SUPER_ADMIN')")
 @RequestMapping("/api/v1/message-media")
 @RequiredArgsConstructor
 public class MessageMediaController {
@@ -24,7 +24,7 @@ public class MessageMediaController {
     public ResponseEntity<Resource> getMedia(@PathVariable String storedName) {
         MessageMediaStorageService.DownloadedMedia media = messageMediaStorageService.load(storedName);
         return ResponseEntity.ok()
-                .cacheControl(CacheControl.maxAge(Duration.ofDays(7)).cachePublic())
+                .cacheControl(CacheControl.noStore())
                 .contentLength(media.size())
                 .contentType(media.contentType() != null && !media.contentType().isBlank()
                         ? MediaType.parseMediaType(media.contentType())

@@ -65,7 +65,7 @@ public class UnifiedWarehouseController {
 
     @Operation(summary = "Xuất kho mặt hàng (Bo mạch hoặc Linh kiện)")
     @PostMapping("/items/{id}/checkout")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasRole('SUPER_ADMIN') or (#itemType.equalsIgnoreCase('BOARD') ? hasAuthority('BOARD_CHECKOUT') : hasAuthority('PART_CHECKOUT'))")
     public ResponseEntity<ApiResponse<Object>> checkoutItem(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "PART") String itemType,
@@ -79,7 +79,7 @@ public class UnifiedWarehouseController {
 
     @Operation(summary = "Điều chỉnh tồn kho mặt hàng")
     @PostMapping("/items/{id}/adjust")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_MANAGE)
+    @PreAuthorize("hasRole('SUPER_ADMIN') or (#itemType.equalsIgnoreCase('BOARD') ? hasAuthority('BOARD_UPDATE') : hasAuthority('PART_STOCK_ADJUST'))")
     public ResponseEntity<ApiResponse<Void>> adjustStock(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "PART") String itemType,
@@ -93,7 +93,7 @@ public class UnifiedWarehouseController {
 
     @Operation(summary = "Xóa mặt hàng khỏi kho")
     @DeleteMapping("/items/{id}")
-    @PreAuthorize(RoleExpressions.WAREHOUSE_DELETE)
+    @PreAuthorize("hasRole('SUPER_ADMIN') or (#itemType.equalsIgnoreCase('BOARD') ? hasAuthority('BOARD_DELETE') : hasAuthority('PART_DELETE'))")
     public ResponseEntity<ApiResponse<Void>> deleteItem(
             @PathVariable UUID id,
             @RequestParam(defaultValue = "PART") String itemType,

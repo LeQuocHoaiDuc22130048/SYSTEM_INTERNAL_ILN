@@ -41,6 +41,13 @@ import java.util.UUID;
 public class AuthController {
     private final AuthService authService;
 
+    @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ApiResponse<LoginResponse.UserInfo>> getMe(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(authService.getCurrentUser(userDetails.getUserId())));
+    }
+
     // ── Public endpoints ──────────────────────────────────────────────────
 
     @Operation(summary = "Đăng ký tài khoản mới — status: PENDING_APPROVAL")
@@ -132,7 +139,7 @@ public class AuthController {
 
     @Operation(summary = "Danh sách tài khoản chờ duyệt")
     @GetMapping("/pending")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ACCOUNT_APPROVE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<UserResponse>>> getPendingUsers(
             @PageableDefault(size = 20) Pageable pageable) {
         return ResponseEntity.ok(ApiResponse.success(authService.getPendingUsers(pageable)));
@@ -140,7 +147,7 @@ public class AuthController {
 
     @Operation(summary = "Duyệt hoặc từ chối tài khoản")
     @PutMapping("/pending/{userId}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ACCOUNT_APPROVE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> processApproval(
             @PathVariable UUID userId,
             @Valid @RequestBody ApproveUserRequest request,
@@ -163,7 +170,7 @@ public class AuthController {
 
     @Operation(summary = "Danh sách tất cả user (có filter) — chỉ ADMIN+")
     @GetMapping("/users")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PERMISSION_VIEW', 'EMPLOYEE_STATUS_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<UserResponse>>> getUsers(
             @RequestParam(required = false, defaultValue = "") String keyword,
             @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -183,7 +190,7 @@ public class AuthController {
 
     @Operation(summary = "Suspend hoặc Activate tài khoản — chỉ ADMIN+")
     @PatchMapping("/users/{userId}/status")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAuthority('EMPLOYEE_STATUS_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<UserResponse>> updateUserStatus(
             @PathVariable UUID userId,
             @Valid @RequestBody UpdateUserStatusRequest request,
@@ -194,7 +201,7 @@ public class AuthController {
 
     @Operation(summary = "Xem permissions chi tiết của user — chỉ ADMIN+")
     @GetMapping("/users/{userId}/permissions")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAuthority('PERMISSION_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionDetailResponse>>> getUserPermissions(
             @PathVariable UUID userId) {
         return ResponseEntity.ok(ApiResponse.success(authService.getUserPermissions(userId)));
@@ -202,7 +209,7 @@ public class AuthController {
 
     @Operation(summary = "Cập nhật permission overrides của user — chỉ ADMIN+")
     @PutMapping("/users/{userId}/permissions")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAnyAuthority('PERMISSION_UPDATE','PERMISSION_RESET') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<UserPermissionDetailResponse>>> updateUserPermissions(
             @PathVariable UUID userId,
             @Valid @RequestBody UpdateUserPermissionsRequest request,

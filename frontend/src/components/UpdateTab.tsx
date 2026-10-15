@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   Plus,
@@ -49,6 +50,7 @@ const AppleIcon: React.FC<{ size?: number; className?: string }> = ({ size = 16,
 );
 
 export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger }) => {
+  const canAction = usePermissionCheck();
   const [updates, setUpdates] = useState<AppUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -474,10 +476,10 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
           <p>Phân tách và phát hành các phiên bản độc lập cho Android (.apk) và iOS (.ipa / App Store).</p>
         </div>
         <div className="update-search-actions">
-          <button className="update-add-btn" onClick={() => openCreateModal()}>
+          {canAction('APP_UPDATE_UPLOAD') && (<button className="update-add-btn" onClick={() => openCreateModal()}>
             <Plus size={18} />
             Tạo bản cập nhật
-          </button>
+          </button>) }
         </div>
       </div>
 
@@ -521,12 +523,12 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
           <FileText size={48} className="empty-icon" />
           <h3>Chưa có bản cập nhật nào {selectedPlatformFilter !== 'ALL' ? `cho ${selectedPlatformFilter === 'IOS' ? 'iOS' : 'Android'}` : ''}</h3>
           <p>Hãy tạo bản cập nhật đầu tiên để quản lý phiên bản cho hệ điều hành này.</p>
-          <button
+          {canAction('APP_UPDATE_UPLOAD') && (<button
             className="update-add-btn inline-btn"
             onClick={() => openCreateModal(selectedPlatformFilter !== 'ALL' ? selectedPlatformFilter : undefined)}
           >
             <Plus size={16} /> Tạo bản cập nhật mới
-          </button>
+          </button>) }
         </div>
       ) : (
         <div className="update-list-wrapper">
@@ -636,7 +638,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                       <td className="col-actions">
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           {update.status === 'DRAFT' ? (
-                            <button
+                            (canAction('APP_UPDATE_RELEASE') && (<button
                               className="action-btn release-btn"
                               onClick={() => handleRelease(update.id, update.version, itemPlatform)}
                               disabled={releasingId === update.id || deletingId === update.id}
@@ -647,7 +649,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                                 <Rocket size={14} />
                               )}
                               <span>Phát hành</span>
-                            </button>
+                            </button>))
                           ) : (
                             <span className="action-done" title="Bản cập nhật đã được phát hành hàng loạt">
                               <CheckCircle2 size={16} className="text-success" />
@@ -655,7 +657,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                             </span>
                           )}
 
-                          <button
+                          {canAction('APP_UPDATE_DELETE') && (<button
                             className="icon-action-btn delete-action-btn"
                             onClick={() => handleDelete(update.id, update.version, itemPlatform)}
                             disabled={deletingId === update.id || releasingId === update.id}
@@ -667,7 +669,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                             ) : (
                               <Trash2 size={14} />
                             )}
-                          </button>
+                          </button>) }
                         </div>
                       </td>
                     </tr>
@@ -779,7 +781,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                         )}
 
                         {update.status === 'DRAFT' && (
-                          <button
+                          (canAction('APP_UPDATE_RELEASE') && (<button
                             type="button"
                             className="card-action-btn release-btn"
                             onClick={() => handleRelease(update.id, update.version, itemPlatform)}
@@ -791,10 +793,10 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                               <Rocket size={13} />
                             )}
                             <span>Phát hành</span>
-                          </button>
+                          </button>))
                         )}
 
-                        <button
+                        {canAction('APP_UPDATE_DELETE') && (<button
                           type="button"
                           className="card-action-btn delete-btn"
                           onClick={() => handleDelete(update.id, update.version, itemPlatform)}
@@ -806,7 +808,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                           ) : (
                             <Trash2 size={13} />
                           )}
-                        </button>
+                        </button>) }
                       </div>
                     </div>
                   </div>
@@ -918,7 +920,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                 &times;
               </button>
             </div>
-            <form onSubmit={handleSubmit} className="update-modal-form">
+            {canAction('APP_UPDATE_UPLOAD') && (<form onSubmit={handleSubmit} className="update-modal-form">
               {/* Target Platform Selector */}
               <div className="form-group">
                 <label>Hệ điều hành mục tiêu (OS)*</label>
@@ -1104,7 +1106,7 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                 >
                   Hủy bỏ
                 </button>
-                <button type="submit" className="btn-submit" disabled={submitting}>
+                {canAction('APP_UPDATE_UPLOAD') && (<button type="submit" className="btn-submit" disabled={submitting}>
                   {submitting ? (
                     <>
                       <Loader2 size={16} className="spin" />
@@ -1113,9 +1115,9 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                   ) : (
                     <span>Xác nhận</span>
                   )}
-                </button>
+                </button>) }
               </div>
-            </form>
+            </form>) }
           </div>
         </div>
       )}

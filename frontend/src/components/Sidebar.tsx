@@ -21,7 +21,8 @@ import {
   MapPin,
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
-import { isAdminOrAbove, isManagerOrAbove as _isManagerOrAbove, getRoleLabel } from '../utils/permissions';
+import { hasPermission, getRoleLabel } from '../utils/permissions';
+import { canAccessTab } from '../utils/tabPermissions';
 
 export type SidebarTab =
   | 'dashboard'
@@ -31,6 +32,7 @@ export type SidebarTab =
   | 'updates'
   | 'banners'
   | 'orders'
+  | 'customers'
   | 'warehouse'
   | 'locations'
   | 'accounts';
@@ -60,14 +62,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   dataSource = 'api',
 }) => {
-  const isManagerOrAbove = useMemo(() => _isManagerOrAbove(currentUser), [currentUser]);
-  const showAccountsTab = useMemo(() => isAdminOrAbove(currentUser), [currentUser]);
+  const showAccountsTab = useMemo(() => canAccessTab(currentUser, 'accounts'), [currentUser]);
+  const canViewCustomers = useMemo(() => hasPermission(currentUser, 'CUSTOMER_VIEW'), [currentUser]);
 
   // Xác định nhóm cha tương ứng với tab
   const getGroupByTab = (tab: SidebarTab): GroupKey | null => {
     if (tab === 'monthly' || tab === 'daily') return 'attendance';
     if (tab === 'devices' || tab === 'updates' || tab === 'banners') return 'device';
-    if (tab === 'orders' || tab === 'warehouse' || tab === 'locations') return 'business';
+    if (tab === 'orders' || tab === 'customers' || tab === 'warehouse' || tab === 'locations') return 'business';
     if (tab === 'accounts') return 'accounts';
     return null;
   };
@@ -106,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Kiểm tra nhóm nào có chứa tab đang active
   const isAttendanceActive = activeTab === 'monthly' || activeTab === 'daily';
   const isDeviceActive = activeTab === 'devices' || activeTab === 'updates' || activeTab === 'banners';
-  const isBusinessActive = activeTab === 'orders' || activeTab === 'warehouse' || activeTab === 'locations';
+  const isBusinessActive = activeTab === 'orders' || activeTab === 'customers' || activeTab === 'warehouse' || activeTab === 'locations';
   const isAccountsActive = activeTab === 'accounts';
 
   return (
@@ -161,6 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <button
             className={`menu-item-direct ${activeTab === 'dashboard' ? 'active' : ''}`}
             onClick={() => handleTabClick('dashboard')}
+                style={{ display: canAccessTab(currentUser, 'dashboard') ? undefined : 'none' }}
             id="sidebar-dashboard-btn"
             title={isCollapsed ? 'Dashboard tổng hợp' : undefined}
           >
@@ -203,6 +206,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 className={`menu-item ${activeTab === 'monthly' ? 'active' : ''}`}
                 onClick={() => handleTabClick('monthly')}
+                style={{ display: canAccessTab(currentUser, 'monthly') ? undefined : 'none' }}
               >
                 <Calendar size={16} className="item-icon" />
                 <span>Xem theo tháng</span>
@@ -210,6 +214,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 className={`menu-item ${activeTab === 'daily' ? 'active' : ''}`}
                 onClick={() => handleTabClick('daily')}
+                style={{ display: canAccessTab(currentUser, 'daily') ? undefined : 'none' }}
               >
                 <Clock size={16} className="item-icon" />
                 <span>Xem theo ngày</span>
@@ -228,6 +233,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   className={`flyout-item ${activeTab === 'monthly' ? 'active' : ''}`}
                   onClick={() => handleTabClick('monthly')}
+                style={{ display: canAccessTab(currentUser, 'monthly') ? undefined : 'none' }}
                 >
                   <Calendar size={15} />
                   <span>Xem theo tháng</span>
@@ -235,6 +241,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   className={`flyout-item ${activeTab === 'daily' ? 'active' : ''}`}
                   onClick={() => handleTabClick('daily')}
+                style={{ display: canAccessTab(currentUser, 'daily') ? undefined : 'none' }}
                 >
                   <Clock size={15} />
                   <span>Xem theo ngày</span>
@@ -277,23 +284,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 className={`menu-item ${activeTab === 'devices' ? 'active' : ''}`}
                 onClick={() => handleTabClick('devices')}
+                style={{ display: canAccessTab(currentUser, 'devices') ? undefined : 'none' }}
               >
                 <Smartphone size={16} className="item-icon" />
                 <span>Trạng thái thiết bị</span>
               </button>
-              {isManagerOrAbove && (
+              {canAccessTab(currentUser, 'updates') && (
                 <button
                   className={`menu-item ${activeTab === 'updates' ? 'active' : ''}`}
                   onClick={() => handleTabClick('updates')}
+                style={{ display: canAccessTab(currentUser, 'updates') ? undefined : 'none' }}
                 >
                   <RefreshCw size={16} className="item-icon" />
                   <span>Cập nhật ứng dụng</span>
                 </button>
               )}
-              {isManagerOrAbove && (
+              {canAccessTab(currentUser, 'banners') && (
                 <button
                   className={`menu-item ${activeTab === 'banners' ? 'active' : ''}`}
                   onClick={() => handleTabClick('banners')}
+                style={{ display: canAccessTab(currentUser, 'banners') ? undefined : 'none' }}
                 >
                   <ImageIcon size={16} className="item-icon" />
                   <span>Banner ứng dụng</span>
@@ -313,23 +323,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   className={`flyout-item ${activeTab === 'devices' ? 'active' : ''}`}
                   onClick={() => handleTabClick('devices')}
+                style={{ display: canAccessTab(currentUser, 'devices') ? undefined : 'none' }}
                 >
                   <Smartphone size={15} />
                   <span>Trạng thái thiết bị</span>
                 </button>
-                {isManagerOrAbove && (
-                  <button
+                {canAccessTab(currentUser, 'updates') && (
+                <button
                     className={`flyout-item ${activeTab === 'updates' ? 'active' : ''}`}
                     onClick={() => handleTabClick('updates')}
+                style={{ display: canAccessTab(currentUser, 'updates') ? undefined : 'none' }}
                   >
                     <RefreshCw size={15} />
                     <span>Cập nhật ứng dụng</span>
                   </button>
                 )}
-                {isManagerOrAbove && (
-                  <button
+                {canAccessTab(currentUser, 'banners') && (
+                <button
                     className={`flyout-item ${activeTab === 'banners' ? 'active' : ''}`}
                     onClick={() => handleTabClick('banners')}
+                style={{ display: canAccessTab(currentUser, 'banners') ? undefined : 'none' }}
                   >
                     <ImageIcon size={15} />
                     <span>Banner ứng dụng</span>
@@ -373,13 +386,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 className={`menu-item ${activeTab === 'orders' ? 'active' : ''}`}
                 onClick={() => handleTabClick('orders')}
+                style={{ display: canAccessTab(currentUser, 'orders') ? undefined : 'none' }}
               >
                 <ClipboardList size={16} className="item-icon" />
                 <span>Đơn sửa chữa</span>
               </button>
+              {canViewCustomers && (
+                <button
+                  className={`menu-item ${activeTab === 'customers' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('customers')}
+                style={{ display: canAccessTab(currentUser, 'customers') ? undefined : 'none' }}
+                >
+                  <Users size={16} className="item-icon" />
+                  <span>Khách hàng</span>
+                </button>
+              )}
               <button
                 className={`menu-item ${activeTab === 'warehouse' ? 'active' : ''}`}
                 onClick={() => handleTabClick('warehouse')}
+                style={{ display: canAccessTab(currentUser, 'warehouse') ? undefined : 'none' }}
               >
                 <Boxes size={16} className="item-icon" />
                 <span>Kho bo mạch & Linh kiện</span>
@@ -387,6 +412,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 className={`menu-item ${activeTab === 'locations' ? 'active' : ''}`}
                 onClick={() => handleTabClick('locations')}
+                style={{ display: canAccessTab(currentUser, 'locations') ? undefined : 'none' }}
               >
                 <MapPin size={16} className="item-icon" />
                 <span>Vị trí & Kệ kho</span>
@@ -405,13 +431,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   className={`flyout-item ${activeTab === 'orders' ? 'active' : ''}`}
                   onClick={() => handleTabClick('orders')}
+                style={{ display: canAccessTab(currentUser, 'orders') ? undefined : 'none' }}
                 >
                   <ClipboardList size={15} />
                   <span>Đơn sửa chữa</span>
                 </button>
+                {canViewCustomers && (
+                  <button
+                    className={`flyout-item ${activeTab === 'customers' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('customers')}
+                style={{ display: canAccessTab(currentUser, 'customers') ? undefined : 'none' }}
+                  >
+                    <Users size={15} />
+                    <span>Khách hàng</span>
+                  </button>
+                )}
                 <button
                   className={`flyout-item ${activeTab === 'warehouse' ? 'active' : ''}`}
                   onClick={() => handleTabClick('warehouse')}
+                style={{ display: canAccessTab(currentUser, 'warehouse') ? undefined : 'none' }}
                 >
                   <Boxes size={15} />
                   <span>Kho bo mạch & Linh kiện</span>
@@ -419,6 +457,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   className={`flyout-item ${activeTab === 'locations' ? 'active' : ''}`}
                   onClick={() => handleTabClick('locations')}
+                style={{ display: canAccessTab(currentUser, 'locations') ? undefined : 'none' }}
                 >
                   <MapPin size={15} />
                   <span>Vị trí & Kệ kho</span>
@@ -462,6 +501,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   className={`menu-item ${activeTab === 'accounts' ? 'active' : ''}`}
                   onClick={() => handleTabClick('accounts')}
+                style={{ display: canAccessTab(currentUser, 'accounts') ? undefined : 'none' }}
                 >
                   <Users size={16} className="item-icon" />
                   <span>Quản lý tài khoản</span>
@@ -480,6 +520,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <button
                     className={`flyout-item ${activeTab === 'accounts' ? 'active' : ''}`}
                     onClick={() => handleTabClick('accounts')}
+                style={{ display: canAccessTab(currentUser, 'accounts') ? undefined : 'none' }}
                   >
                     <Users size={15} />
                     <span>Quản lý tài khoản</span>

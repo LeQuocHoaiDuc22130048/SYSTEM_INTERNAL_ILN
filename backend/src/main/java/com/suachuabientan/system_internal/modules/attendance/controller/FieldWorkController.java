@@ -7,6 +7,7 @@ import com.suachuabientan.system_internal.modules.attendance.service.FieldWorkSe
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -14,6 +15,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
+    @PreAuthorize("hasAuthority('FIELD_WORK_SAVE') or hasRole('SUPER_ADMIN')")
 @RequestMapping("/api/attendance/me/field-work")
 @RequiredArgsConstructor
 public class FieldWorkController {
@@ -28,6 +30,7 @@ public class FieldWorkController {
     }
 
     @DeleteMapping("/{date}")
+    @PreAuthorize("hasAuthority('FIELD_WORK_DELETE') or hasRole('SUPER_ADMIN')")
     public ApiResponse<Void> remove(
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             @AuthenticationPrincipal CustomUserDetails user) {

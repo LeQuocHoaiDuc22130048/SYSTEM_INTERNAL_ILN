@@ -42,7 +42,7 @@ public class AttendanceController {
 
     @Operation(summary = "Cham cong noi bo khong doi chieu khuon mat cho quan ly")
     @PostMapping("/check")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_CHECK_SELF') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> check(
             @RequestBody(required = false) CheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -54,7 +54,7 @@ public class AttendanceController {
 
     @Operation(summary = "Cham cong sau khi AI doi chieu anh khuon mat")
     @PostMapping("/face-check")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_CHECK_SELF') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> faceCheck(
             @Valid @RequestBody FaceCheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -65,7 +65,7 @@ public class AttendanceController {
 
     @Operation(summary = "Tablet kiosk nhan dien nhan vien bang khuon mat va cham cong")
     @PostMapping("/face-identify")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN', 'ATTENDANCE') or authentication.name.equalsIgnoreCase('attendance')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_KIOSK_USE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> faceIdentify(
             @Valid @RequestBody FaceCheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -76,6 +76,7 @@ public class AttendanceController {
 
     @Operation(summary = "Tong hop cham cong hom nay cua nguoi dang dang nhap")
     @GetMapping("/me/today")
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<DailyAttendanceResponse>> getMyToday(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(attendanceService.getMyToday(userDetails.getUserId())));
@@ -83,6 +84,7 @@ public class AttendanceController {
 
     @Operation(summary = "Lich su cham cong cua nguoi dang dang nhap")
     @GetMapping("/me/history")
+    @PreAuthorize("hasAuthority('ATTENDANCE_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<AttendanceResponse>>> getMyHistory(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
@@ -94,7 +96,7 @@ public class AttendanceController {
 
     @Operation(summary = "Cham cong tay cho nhan vien")
     @PostMapping("/manual")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_RECORD_CREATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> manualCheck(
             @Valid @RequestBody ManualCheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -104,7 +106,7 @@ public class AttendanceController {
 
     @Operation(summary = "Dong bo batch log cham cong offline tu mobile")
     @PostMapping("/sync")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN', 'ATTENDANCE') or authentication.name.equalsIgnoreCase('attendance')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_KIOSK_USE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceSyncResponse>> syncOfflineLogs(
             @Valid @RequestBody AttendanceSyncRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -115,7 +117,7 @@ public class AttendanceController {
 
     @Operation(summary = "Dong bo log ket qua nhan dien khuon mat de monitor false reject rate")
     @PostMapping("/recognition-logs/batch")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN', 'ATTENDANCE') or authentication.name.equalsIgnoreCase('attendance')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_KIOSK_USE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Integer>> syncRecognitionLogs(
             @Valid @RequestBody FaceRecognitionLogBatchRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -126,7 +128,7 @@ public class AttendanceController {
 
     @Operation(summary = "Xem cham cong theo ngay cua mot nhan vien")
     @GetMapping("/employees/{employeeId}/daily")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_REPORT_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<DailyAttendanceResponse>> getDaily(
             @PathVariable UUID employeeId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
@@ -135,7 +137,7 @@ public class AttendanceController {
 
     @Operation(summary = "Lich su cham cong cua mot nhan vien")
     @GetMapping("/employees/{employeeId}/history")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_REPORT_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<AttendanceResponse>>> getEmployeeHistory(
             @PathVariable UUID employeeId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -147,7 +149,7 @@ public class AttendanceController {
 
     @Operation(summary = "Bao cao cham cong toan bo nhan vien theo ngay")
     @GetMapping("/report")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_REPORT_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<DailyAttendanceResponse>>> getReport(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
         return ResponseEntity.ok(ApiResponse.success(attendanceService.getReport(date)));
@@ -155,7 +157,7 @@ public class AttendanceController {
 
     @Operation(summary = "Tao hoac cap nhat lich lam viec cho nhan vien")
     @PostMapping("/schedules")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('SCHEDULE_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<WorkScheduleResponse>> createOrUpdateSchedule(
             @Valid @RequestBody CreateScheduleRequest request) {
         return ResponseEntity.status(201)
@@ -164,7 +166,7 @@ public class AttendanceController {
 
     @Operation(summary = "Xem lich lam viec cua mot nhan vien")
     @GetMapping("/employees/{employeeId}/schedules")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('SCHEDULE_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<WorkScheduleResponse>>> getSchedules(
             @PathVariable UUID employeeId,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
@@ -174,7 +176,7 @@ public class AttendanceController {
 
     @Operation(summary = "Cap nhat ban ghi cham cong")
     @PutMapping("/records/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_RECORD_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<AttendanceResponse>> updateRecord(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateAttendanceRecordRequest request,
@@ -186,7 +188,7 @@ public class AttendanceController {
 
     @Operation(summary = "Xoa ban ghi cham cong (soft delete)")
     @DeleteMapping("/records/{id}")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_RECORD_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteRecord(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

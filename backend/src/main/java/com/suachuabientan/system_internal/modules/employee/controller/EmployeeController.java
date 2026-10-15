@@ -32,11 +32,17 @@ import java.util.UUID;
 public class EmployeeController {
     private final EmployeeService employeeService;
 
+    @GetMapping("/repair-assignees")
+    @PreAuthorize("hasAuthority('REPAIR_ASSIGN') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<List<com.suachuabientan.system_internal.modules.employee.dto.response.RepairAssigneeResponse>>> getRepairAssignees() {
+        return ResponseEntity.ok(ApiResponse.success(employeeService.getRepairAssignees()));
+    }
+
     // ── Danh sách & Chi tiết ──────────────────────────────────
 
     @Operation(summary = "Tìm kiếm danh sách nhân viên")
     @GetMapping
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE', 'TECHNICIAN', 'WAREHOUSE')")
+    @PreAuthorize("hasAnyAuthority('EMPLOYEE_VIEW','EMPLOYEE_STATUS_UPDATE','EMPLOYEE_FACE_ENROLL','EMPLOYEE_FACE_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<Page<EmployeeDetailResponse>>> search(
             @RequestParam(required = false) String keyword,
             @PageableDefault(size = 20) Pageable pageable) {
@@ -46,11 +52,12 @@ public class EmployeeController {
 
     @Operation(summary = "Chi tiết nhân viên")
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('EMPLOYEE_VIEW') or (hasAuthority('PROFILE_VIEW') and #id == principal.userId)")
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> getById(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         // Nhân viên chỉ xem được thông tin của mình, Manager+ xem được tất cả
-        if (!id.equals(userDetails.getUserId()) && !userDetails.isManagerOrAbove()) {
+        if (!id.equals(userDetails.getUserId()) && !userDetails.hasPermission("EMPLOYEE_VIEW")) {
             return ResponseEntity.status(403)
                     .body(ApiResponse.error(403, "Bạn không có quyền xem thông tin nhân viên này"));
         }
@@ -67,21 +74,21 @@ public class EmployeeController {
 
     @Operation(summary = "Danh sach embedding khuon mat de mobile sync offline")
     @GetMapping("/embeddings")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_KIOSK_USE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<EmployeeFaceEmbeddingResponse>>> getFaceEmbeddings() {
         return ResponseEntity.ok(ApiResponse.success(employeeService.getFaceEmbeddings()));
     }
 
     @Operation(summary = "Metadata version/checksum embedding khuon mat")
     @GetMapping("/embeddings/meta")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_KIOSK_USE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeEmbeddingMetadataResponse>> getFaceEmbeddingMetadata() {
         return ResponseEntity.ok(ApiResponse.success(employeeService.getFaceEmbeddingMetadata()));
     }
 
     @Operation(summary = "Delta embedding khuon mat thay doi tu moc since")
     @GetMapping("/embeddings/changes")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('ATTENDANCE_KIOSK_USE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeEmbeddingDeltaResponse>> getFaceEmbeddingChanges(
             @RequestParam(required = false) Instant since) {
         return ResponseEntity.ok(ApiResponse.success(employeeService.getFaceEmbeddingChanges(since)));
@@ -91,20 +98,21 @@ public class EmployeeController {
 
     @Operation(summary = "Cập nhật thông tin nhân viên")
     @PatchMapping("/{id}")
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('EMPLOYEE_UPDATE') or (hasAuthority('PROFILE_UPDATE_SELF') and #id == principal.userId)")
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> update(
             @PathVariable UUID id,
             @Valid @RequestBody UpdateEmployeeRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
                 employeeService.update(id, request,
-                        userDetails.getUserId(), userDetails.isManagerOrAbove())));
+                        userDetails.getUserId(), userDetails.hasPermission("EMPLOYEE_UPDATE"))));
     }
 
     // ── Khoá / Mở khoá ───────────────────────────────────────
 
     @Operation(summary = "Khoá tài khoản nhân viên")
     @PatchMapping("/{id}/suspend")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAuthority('EMPLOYEE_STATUS_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> suspend(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -114,7 +122,7 @@ public class EmployeeController {
 
     @Operation(summary = "Mở khoá tài khoản nhân viên")
     @PatchMapping("/{id}/activate")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAuthority('EMPLOYEE_STATUS_UPDATE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> activate(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -126,7 +134,7 @@ public class EmployeeController {
 
     @Operation(summary = "Đăng ký khuôn mặt nhân viên — chỉ Admin")
     @PostMapping("/{id}/face")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAuthority('EMPLOYEE_FACE_ENROLL') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> enrollFace(
             @PathVariable UUID id,
             @Valid @RequestBody EnrollFaceRequest request,
@@ -141,7 +149,7 @@ public class EmployeeController {
 
     @Operation(summary = "Xoa khuon mat da dang ky cua nhan vien")
     @DeleteMapping("/{id}/face")
-    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN')")
+    @PreAuthorize("hasAuthority('EMPLOYEE_FACE_DELETE') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<EmployeeDetailResponse>> deleteFace(
             @PathVariable UUID id,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

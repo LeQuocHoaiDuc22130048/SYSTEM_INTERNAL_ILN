@@ -1,3 +1,6 @@
+import '../utils/auth_provider.dart';
+import '../widgets/permission_gate.dart';
+import '../models/app_permission.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -266,9 +269,7 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
         leadingWidth: 58,
         leading: const Padding(
           padding: EdgeInsets.only(left: 16),
-          child: Center(
-            child: AppBackButton(),
-          ),
+          child: Center(child: AppBackButton()),
         ),
         title: const Text(
           'Quản Lý Vị Trí Kho / Kệ',
@@ -482,38 +483,51 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
                                               }
                                             },
                                             itemBuilder: (context) => [
-                                              const PopupMenuItem(
-                                                value: 'edit',
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.edit_outlined,
-                                                      size: 18,
-                                                    ),
-                                                    SizedBox(width: 8),
-                                                    Text('Sửa vị trí'),
-                                                  ],
+                                              if (context
+                                                  .watch<AuthProvider>()
+                                                  .can(
+                                                    AppPermission
+                                                        .updateLocations,
+                                                  ))
+                                                const PopupMenuItem(
+                                                  value: 'edit',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.edit_outlined,
+                                                        size: 18,
+                                                      ),
+                                                      SizedBox(width: 8),
+                                                      Text('Sửa vị trí'),
+                                                    ],
+                                                  ),
                                                 ),
-                                              ),
-                                              const PopupMenuItem(
-                                                value: 'delete',
-                                                child: Row(
-                                                  children: [
-                                                    Icon(
-                                                      Icons.delete_outline,
-                                                      size: 18,
-                                                      color: AppColors.error,
-                                                    ),
-                                                    SizedBox(width: 8),
-                                                    Text(
-                                                      'Xóa vị trí',
-                                                      style: TextStyle(
+                                              if (context
+                                                  .watch<AuthProvider>()
+                                                  .can(
+                                                    AppPermission
+                                                        .deleteLocations,
+                                                  ))
+                                                const PopupMenuItem(
+                                                  value: 'delete',
+                                                  child: Row(
+                                                    children: [
+                                                      Icon(
+                                                        Icons.delete_outline,
+                                                        size: 18,
                                                         color: AppColors.error,
                                                       ),
-                                                    ),
-                                                  ],
+                                                      SizedBox(width: 8),
+                                                      Text(
+                                                        'Xóa vị trí',
+                                                        style: TextStyle(
+                                                          color:
+                                                              AppColors.error,
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
                                                 ),
-                                              ),
                                             ],
                                           ),
                                         ],
@@ -563,10 +577,13 @@ class _LocationManagementPageState extends State<LocationManagementPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _showAddEditDialog(),
-        icon: const Icon(Icons.add),
-        label: const Text('Thêm vị trí mới'),
+      floatingActionButton: PermissionGate(
+        permission: AppPermission.createLocations,
+        child: FloatingActionButton.extended(
+          onPressed: () => _showAddEditDialog(),
+          icon: const Icon(Icons.add),
+          label: const Text('Thêm vị trí mới'),
+        ),
       ),
     );
   }

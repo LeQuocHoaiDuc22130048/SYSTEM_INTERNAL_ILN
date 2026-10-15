@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import type { AttendanceCheckType } from '../mockData';
@@ -21,6 +22,7 @@ export const ManualModal: React.FC<ManualModalProps> = ({
   showToast,
   onSaveSuccess,
 }) => {
+  const canAction = usePermissionCheck();
   const [manualType, setManualType] = useState<AttendanceCheckType>('IN');
   const [manualTime, setManualTime] = useState<string>('08:30');
   const [manualNote, setManualNote] = useState<string>('');
@@ -71,7 +73,7 @@ export const ManualModal: React.FC<ManualModalProps> = ({
             <X size={20} />
           </button>
         </div>
-        <form onSubmit={handleManualSubmit}>
+        {canAction('ATTENDANCE_RECORD_CREATE') && (<form onSubmit={handleManualSubmit}>
           <div className="modal-body modal-body--gap">
             <div className="edit-employee-card">
               <div className="avatar-badge">{getAvatarLetters(employee.name)}</div>
@@ -133,11 +135,11 @@ export const ManualModal: React.FC<ManualModalProps> = ({
             <button type="button" className="action-btn-outline" onClick={onClose} disabled={manualSubmitting}>
               Hủy
             </button>
-            <button type="submit" className="action-btn-primary" disabled={manualSubmitting}>
+            {canAction('ATTENDANCE_RECORD_CREATE') && (<button type="submit" className="action-btn-primary" disabled={manualSubmitting}>
               {manualSubmitting ? 'Đang lưu...' : 'Xác nhận'}
-            </button>
+            </button>) }
           </div>
-        </form>
+        </form>) }
       </div>
     </div>
   );

@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useState } from 'react';
 import { X, ArrowDownLeft } from 'lucide-react';
 import { getJsonAuthHeaders } from '../../utils/auth';
@@ -18,6 +19,7 @@ export const PartReturnModal: React.FC<PartReturnModalProps> = ({
   onSuccess,
   showToast,
 }) => {
+  const canAction = usePermissionCheck();
   const [returnedQty, setReturnedQty] = useState<number>(1);
   const [conditionStatus, setConditionStatus] = useState<'GOOD' | 'DAMAGED' | 'REPLACED'>('GOOD');
   const [notes, setNotes] = useState<string>('');
@@ -89,7 +91,7 @@ export const PartReturnModal: React.FC<PartReturnModalProps> = ({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="modal-form">
+        {canAction('PART_RETURN') && (<form onSubmit={handleSubmit} className="modal-form">
           <div style={{ backgroundColor: '#f8fafc', padding: '12px 16px', borderRadius: '8px', border: '1px solid #e2e8f0', marginBottom: '16px' }}>
             <div style={{ fontWeight: 600, fontSize: '0.95rem', color: '#0f172a' }}>{checkoutItem.partName || 'Linh kiện'}</div>
             <div style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>
@@ -143,11 +145,11 @@ export const PartReturnModal: React.FC<PartReturnModalProps> = ({
             <button type="button" className="btn-cancel" onClick={onClose}>
               Hủy
             </button>
-            <button type="submit" className="btn-submit btn-primary" disabled={submitting}>
+            {canAction('PART_RETURN') && (<button type="submit" className="btn-submit btn-primary" disabled={submitting}>
               {submitting ? 'Đang xử lý...' : 'Xác Nhận Trả Về Kho'}
-            </button>
+            </button>) }
           </div>
-        </form>
+        </form>) }
       </div>
     </div>
   );

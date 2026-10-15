@@ -220,6 +220,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'textColor': Color(0xFF4F46E5),
       'borderColor': Color(0xFFC7D2FE),
     },
+    {
+      'id': 'customers',
+      'label': 'Khách hàng',
+      'tooltip': 'Hồ sơ & danh bạ khách hàng',
+      'tabIndex': MainTabs.customers,
+      'icon': LucideIcons.contact,
+      'bgColor': Color(0xFFEFF6FF),
+      'textColor': Color(0xFF2563EB),
+      'borderColor': Color(0xFFBFDBFE),
+    },
   ];
 
   void _navigateToTab(int tabIndex) {
@@ -1147,6 +1157,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         'account_approval': MainTabs.accountApproval,
         'messages': MainTabs.messages,
         'employee_management': MainTabs.employeeManagement,
+        'customers': MainTabs.customers,
+        'customer': MainTabs.customers,
         'profile': MainTabs.profile,
       };
       final tabIndex = routes[value];
@@ -1154,6 +1166,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         _openBannerTab(tabIndex);
       } else if (value.contains('warehouse') || value.contains('kho')) {
         _openBannerTab(MainTabs.warehouse);
+      } else if (value.contains('customer') || value.contains('khách')) {
+        _openBannerTab(MainTabs.customers);
       } else if (value.contains('message') ||
           value.contains('chat') ||
           value.contains('nhắn')) {

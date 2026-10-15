@@ -3,7 +3,6 @@ package com.suachuabientan.system_internal.modules.messaging.controller;
 import com.suachuabientan.system_internal.modules.messaging.dto.request.SendMessageWSRequest;
 import com.suachuabientan.system_internal.modules.messaging.dto.response.MessageResponse;
 import com.suachuabientan.system_internal.modules.messaging.service.MessagingService;
-import com.suachuabientan.system_internal.security.authorization.RoleExpressions;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +19,7 @@ public class ChatWebSocketController {
 
     @MessageMapping("/messages.send")
     @SendToUser("/queue/messages")
-    @PreAuthorize(RoleExpressions.ANY_ACTIVE_USER)
+    @PreAuthorize("hasAuthority('MESSAGE_SEND') or hasRole('SUPER_ADMIN')")
     public MessageResponse send(
             @Valid SendMessageWSRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {

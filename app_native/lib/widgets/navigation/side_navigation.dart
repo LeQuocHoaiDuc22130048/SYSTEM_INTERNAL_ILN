@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../../models/app_permission.dart';
+import '../../navigation/main_tabs.dart';
 import '../../theme/app_colors.dart';
 import '../../utils/auth_provider.dart';
 import '../../utils/chat_provider.dart';
@@ -116,9 +117,17 @@ class SideNavigation extends StatelessWidget {
                 if (auth.can(AppPermission.viewWarehouse))
                   _SideNavItem(
                     icon: LucideIcons.cpu,
-                    label: 'Kho bo m\u1EA1ch',
-                    isSelected: currentIndex == 2,
-                    onTap: () => onIndexChanged(2),
+                    label: 'Kho bo mạch',
+                    isSelected: currentIndex == MainTabs.warehouse,
+                    onTap: () => onIndexChanged(MainTabs.warehouse),
+                    isExpanded: isExpanded,
+                  ),
+                if (auth.can(AppPermission.viewCustomers))
+                  _SideNavItem(
+                    icon: LucideIcons.contact,
+                    label: 'Khách hàng',
+                    isSelected: currentIndex == MainTabs.customers,
+                    onTap: () => onIndexChanged(MainTabs.customers),
                     isExpanded: isExpanded,
                   ),
                 if (auth.can(AppPermission.useMessages))
@@ -142,12 +151,12 @@ class SideNavigation extends StatelessWidget {
                 const SizedBox(height: 16),
                 if (isExpanded &&
                     auth.canAny({
-                      AppPermission.manageEmployees,
+                      AppPermission.viewEmployees,
                       AppPermission.approveAccounts,
                     }))
                   const _CategoryLabel('QU\u1EA2N L\u00DD'),
                 if (auth.canAny({
-                  AppPermission.manageEmployees,
+                  AppPermission.viewEmployees,
                   AppPermission.approveAccounts,
                 }))
                   _SideNavItem(

@@ -1,4 +1,6 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { hasPermission } from '../utils/permissions';
 import {
   Search,
   Plus,
@@ -42,6 +44,7 @@ interface DeviceTabProps {
 }
 
 export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) => {
+  const canAction = usePermissionCheck();
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -62,9 +65,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
 
   // Check if current user is manager/admin
   const isManagerOrAbove = useMemo(() => {
-    if (!currentUser || !currentUser.role) return false;
-    const role = currentUser.role.toUpperCase();
-    return role === 'SUPER_ADMIN' || role === 'ADMIN' || role === 'MANAGER';
+    return hasPermission(currentUser ?? null, 'DEVICE_MANAGE');
   }, [currentUser]);
 
   // Fetch devices list
@@ -429,10 +430,10 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
           </button>
 
           {isManagerOrAbove && (
-            <button className="device-add-btn" onClick={handleOpenCreateModal}>
+            (canAction('DEVICE_CREATE') && (<button className="device-add-btn" onClick={handleOpenCreateModal}>
               <Plus size={16} />
               Thêm thiết bị
-            </button>
+            </button>))
           )}
         </div>
       </div>
@@ -507,37 +508,37 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                 </div>
 
                 {/* Simulate heartbeat/ping (Any active user can call) */}
-                <button
+                {canAction('DEVICE_PING') && (<button
                   className="action-btn ping"
                   onClick={(e) => handlePing(device.id, e)}
                   title="Gửi tín hiệu Ping"
                 >
                   <Wifi size={20} />
-                </button>
+                </button>) }
 
                 {/* Toggle simulated status (Only managers/admins) */}
                 {isManagerOrAbove && (
-                  <button
+                  (canAction('DEVICE_STATUS_UPDATE') && (<button
                     className="action-btn toggle-sim"
                     onClick={(e) => handleToggleStatus(device.id, e)}
                     title="Bật/Tắt Giả lập"
                   >
                     <Settings size={18} />
                     <span>{device.status === 'ONLINE' ? 'Tắt' : 'Bật'}</span>
-                  </button>
+                  </button>))
                 )}
 
                 {/* Edit & Delete Actions (Only managers/admins) */}
                 {isManagerOrAbove && (
                   <>
-                    <button
+                    {canAction('DEVICE_UPDATE') && (<button
                       className="action-btn edit"
                       onClick={(e) => handleOpenEditModal(device, e)}
                       title="Chỉnh sửa"
                     >
                       <Edit size={20} />
-                    </button>
-                    <button
+                    </button>) }
+                    {canAction('DEVICE_DELETE') && (<button
                       className="action-btn delete"
                       onClick={(e) => {
                         e.stopPropagation();
@@ -546,7 +547,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                       title="Xóa thiết bị"
                     >
                       <Trash2 size={20} />
-                    </button>
+                    </button>) }
                   </>
                 )}
               </div>
@@ -566,7 +567,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
               </button>
             </div>
             <div className="modal-body">
-              <form className="device-form" onSubmit={handleFormSubmit}>
+              {(editingDevice ? canAction('DEVICE_UPDATE') : canAction('DEVICE_CREATE')) && (<form className="device-form" onSubmit={handleFormSubmit}>
                 <div className="form-group">
                   <label htmlFor="deviceId">Mã thiết bị (Device ID) *</label>
                   <input
@@ -637,11 +638,11 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                   <button type="button" className="form-cancel-btn" onClick={() => setIsFormOpen(false)}>
                     Hủy bỏ
                   </button>
-                  <button type="submit" className="form-submit-btn">
+                  {(editingDevice ? canAction('DEVICE_UPDATE') : canAction('DEVICE_CREATE')) && (<button type="submit" className="form-submit-btn">
                     {editingDevice ? 'Lưu thay đổi' : 'Đăng ký'}
-                  </button>
+                  </button>) }
                 </div>
-              </form>
+              </form>) }
             </div>
           </div>
         </div>
@@ -663,14 +664,14 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                 <button type="button" className="form-cancel-btn" onClick={() => setConfirmDeleteId(null)}>
                   Hủy bỏ
                 </button>
-                <button
+                {canAction('DEVICE_DELETE') && (<button
                   type="button"
                   className="form-submit-btn"
                   style={{ background: 'var(--color-absent)' }}
                   onClick={() => handleDeleteDevice(confirmDeleteId)}
                 >
                   Xóa bỏ
-                </button>
+                </button>) }
               </div>
             </div>
           </div>

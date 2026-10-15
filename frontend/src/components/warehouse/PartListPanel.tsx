@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../../utils/permissionContext';
 import React, { useState } from 'react';
 import {
   Search,
@@ -69,6 +70,7 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
   openLocationQrPrintModal,
   onQuickCheckoutPart,
 }) => {
+  const canAction = usePermissionCheck();
   const [partSearchMethod, setPartSearchMethod] = useState<'general' | 'locationQr'>('general');
 
   // Compute location-grouped parts
@@ -256,7 +258,7 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
             </select>
 
             {openAddLocationModal && (
-              <button
+              (canAction('LOCATION_CREATE') && (<button
                 type="button"
                 className="btn-action-outline"
                 onClick={openAddLocationModal}
@@ -265,11 +267,11 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
               >
                 <MapPin size={16} className="text-primary" />
                 <span>Thêm vị trí (QR)</span>
-              </button>
+              </button>))
             )}
 
             {openBulkImportModal && (
-              <button
+              (canAction('PART_IMPORT') && (<button
                 type="button"
                 className="btn-action-outline"
                 onClick={openBulkImportModal}
@@ -278,13 +280,13 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
               >
                 <FileSpreadsheet size={16} className="text-emerald-600 dark:text-emerald-400" />
                 <span>Nhập Excel / CSV</span>
-              </button>
+              </button>))
             )}
 
-            <button className="btn-add-board" onClick={() => openAddEditPartModal(null)}>
+            {canAction('PART_CREATE') && (<button className="btn-add-board" onClick={() => openAddEditPartModal(null)} >
               <Plus size={16} />
               <span>Thêm linh kiện</span>
-            </button>
+            </button>) }
           </div>
         </div>
 
@@ -325,7 +327,7 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
             </button>
 
             {openLocationQrPrintModal && (
-              <button
+              (canAction('WAREHOUSE_QR_PRINT') && (<button
                 type="button"
                 className="btn-export-pdf-all"
                 onClick={handlePrintAllLocations}
@@ -333,7 +335,7 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
               >
                 <Printer size={15} />
                 <span>In Tem QR Vị Trí</span>
-              </button>
+              </button>))
             )}
           </div>
         </div>
@@ -414,7 +416,7 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
                           </button>
 
                           {openLocationQrPrintModal && (
-                            <button
+                            (canAction('WAREHOUSE_QR_PRINT') && (<button
                               type="button"
                               onClick={() => handlePrintSingleLocation(group)}
                               style={{
@@ -433,7 +435,7 @@ export const PartListPanel: React.FC<PartListPanelProps> = ({
                             >
                               <Printer size={12} />
                               In Tem Kệ
-                            </button>
+                            </button>))
                           )}
                         </>
                       )}

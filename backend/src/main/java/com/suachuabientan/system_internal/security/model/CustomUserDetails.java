@@ -91,6 +91,6 @@ public class CustomUserDetails implements UserDetails {
     }
 
     public boolean hasPermission(String permissionCode) {
-        return this.permissions.contains(permissionCode);
+        return hasRole("SUPER_ADMIN") || this.permissions.contains(permissionCode);
     }
 }

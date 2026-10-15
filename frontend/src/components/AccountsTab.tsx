@@ -1,3 +1,4 @@
+import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search, Shield, UserCheck, RefreshCw, ChevronLeft, ChevronRight,
@@ -7,7 +8,7 @@ import { PermissionModal } from './PermissionModal';
 import type { UserInfo } from '../mockData';
 import {
   ROLE_LABELS, ROLE_COLORS, PERMISSION_LABELS, ROLE_DEFAULT_PERMISSIONS,
-  getRoleLabel,
+  getRoleLabel, hasPermission,
 } from '../utils/permissions';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import './AccountsTab.css';
@@ -60,6 +61,7 @@ function avatarColor(role: string): string {
 const PAGE_SIZE = 15;
 
 export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser }) => {
+  const canAction = usePermissionCheck();
   const [keyword, setKeyword] = useState('');
   const [roleFilter, setRoleFilter] = useState('');
   const [page, setPage] = useState(0);
@@ -68,7 +70,8 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   const isSuperAdmin = currentUser?.role?.toUpperCase() === 'SUPER_ADMIN';
-  const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN' || isSuperAdmin;
+  const canManagePermissions = hasPermission(currentUser, 'PERMISSION_VIEW');
+  const canManageSecurity = hasPermission(currentUser, 'EMPLOYEE_STATUS_UPDATE');
 
   // Modal state
   const [permModalUser, setPermModalUser] = useState<{ id: string; fullName: string; role: string } | null>(null);
@@ -310,7 +313,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
 
                     {/* Permissions */}
                     <td>
-                      <div className="permissions-mini">
+                      <div className="permissions-mini" title="Quyền mặc định theo vai trò; xem quyền hiệu lực trong Phân quyền chi tiết">
                         {showPerms.map(p => (
                           <span key={p} className="perm-chip" title={PERMISSION_LABELS[p] ?? p}>
                             {PERMISSION_LABELS[p]?.replace('Quản lý ', '').replace('Xem ', '') ?? p}
@@ -342,23 +345,23 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
                         )}
 
                         {/* Phân quyền chi tiết — ADMIN+ */}
-                        {isAdmin && !isMe && (
-                          <button
+                        {canManagePermissions && !isMe && (
+                          (canAction('PERMISSION_VIEW') && (<button
                             className="btn-icon-sm"
-                            onClick={() => setPermModalUser({ id: user.id, fullName: user.fullName || user.username, role: getRoleLabel(user.role) })}
+                            onClick={() => setPermModalUser({ id: user.id, fullName: user.fullName || user.username, role: user.role })}
                             disabled={isBusy}
                             title="Phân quyền chi tiết"
                             id={`btn-perms-${user.id}`}
                             style={{ color: 'var(--color-primary, #25437a)' }}
                           >
                             <KeyRound size={14} />
-                          </button>
+                          </button>))
                         )}
 
                         {/* Suspend / Activate — ADMIN+ */}
-                        {!isMe && user.status !== 'PENDING_APPROVAL' && (
+                        {canManageSecurity && !isMe && user.role !== 'SUPER_ADMIN' && user.status !== 'PENDING_APPROVAL' && (
                           user.status === 'ACTIVE' ? (
-                            <button
+                            (canAction('EMPLOYEE_STATUS_UPDATE') && (<button
                               className="btn-icon-sm danger"
                               onClick={() => handleToggleStatus(user)}
                               disabled={isBusy}
@@ -366,9 +369,9 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
                               id={`btn-suspend-${user.id}`}
                             >
                               <Lock size={14} />
-                            </button>
+                            </button>))
                           ) : user.status === 'SUSPENDED' ? (
-                            <button
+                            (canAction('EMPLOYEE_STATUS_UPDATE') && (<button
                               className="btn-icon-sm success"
                               onClick={() => handleToggleStatus(user)}
                               disabled={isBusy}
@@ -376,7 +379,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
                               id={`btn-activate-${user.id}`}
                             >
                               <UserCheck size={14} />
-                            </button>
+                            </button>))
                           ) : null
                         )}
 
@@ -439,7 +442,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
       <div className="accounts-matrix-card">
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1rem' }}>
           <ShieldAlert size={18} style={{ color: 'var(--color-primary, #25437a)' }} />
-          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-dark, #0f172a)' }}>Tổng hợp quyền theo Role</span>
+          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--color-text-dark, #0f172a)' }}>Quyền mặc định theo vai trò (tham khảo)</span>
         </div>
         <div style={{ overflowX: 'auto' }}>
           <table className="accounts-matrix-table">

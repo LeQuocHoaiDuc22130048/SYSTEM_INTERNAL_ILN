@@ -1,6 +1,8 @@
 package com.suachuabientan.system_internal.modules.repair.service;
 
 import com.suachuabientan.system_internal.modules.auth.enums.UserRole;
+import com.suachuabientan.system_internal.modules.customer.dto.CustomerResponse;
+import com.suachuabientan.system_internal.modules.customer.service.CustomerService;
 import com.suachuabientan.system_internal.modules.auth.enums.UserStatus;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.exception.ResourceNotFoundException;
@@ -58,11 +60,16 @@ public class RepairService {
     private final OrderCodeGenerator orderCodeGenerator;
     private final NotificationService notificationService;
     private final RepairMediaStorageService repairMediaStorageService;
+    private final CustomerService customerService;
 
     // ── Tạo đơn ──────────────────────────────────────────────
 
     @Transactional
     public RepairOrderResponse create(CreateRepairOrderRequest request, UUID receivedByUserId) {
+        CustomerResponse customer = request.customerId() == null ? null : customerService.requireActive(request.customerId());
+        if (customer == null && (request.customerName() == null || request.customerName().isBlank())) {
+            throw new BusinessException("Tên khách hàng không được để trống khi chưa chọn hồ sơ khách hàng");
+        }
         String orderCode = orderCodeGenerator.generate();
 
         // Lấy thông tin thiết bị đầu tiên để điền vào các field backward-compat
@@ -73,8 +80,9 @@ public class RepairService {
                 .deviceName(firstDevice.deviceName())
                 .deviceType(firstDevice.deviceType())
                 .serialNumber(firstDevice.serialNumber())
-                .customerName(request.customerName())
-                .customerPhone(request.customerPhone())
+                .customerId(request.customerId())
+                .customerName(customer == null ? request.customerName().strip() : customer.customerName())
+                .customerPhone(customer == null ? request.customerPhone() : customer.phone())
                 .description(firstDevice.description())
                 .underWarranty(Boolean.TRUE.equals(firstDevice.underWarranty()))
                 .status(RepairStatus.PENDING)
@@ -105,7 +113,14 @@ public class RepairService {
 
     @Transactional(readOnly = true)
     public Page<RepairOrderResponse> getAll(
-            String keyword, RepairStatus status, UUID assignedTo, Pageable pageable, CustomUserDetails userDetails) {
+            String keyword, RepairStatus status, UUID assignedTo, UUID customerId, Pageable pageable, CustomUserDetails userDetails) {
+        return getAll(keyword, status, assignedTo, customerId, false, pageable, userDetails);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<RepairOrderResponse> getAll(
+            String keyword, RepairStatus status, UUID assignedTo, UUID customerId, boolean unlinkedOnly,
+            Pageable pageable, CustomUserDetails userDetails) {
         String staffIdStr = null;
         if (userDetails != null && !userDetails.isManagerOrAbove()) {
             staffIdStr = userDetails.getUserId().toString();
@@ -113,7 +128,8 @@ public class RepairService {
         String statusStr = status != null ? status.name() : null;
         String assignedToStr = assignedTo != null ? assignedTo.toString() : null;
         return repairOrderRepository
-                .searchOrders(keyword, statusStr, assignedToStr, staffIdStr, pageable)
+                .searchOrders(keyword, statusStr, assignedToStr, staffIdStr,
+                        customerId == null ? null : customerId.toString(), unlinkedOnly, pageable)
                 .map(this::toResponse);
     }
 
@@ -279,7 +295,7 @@ public class RepairService {
 
         // Kiểm tra quyền hủy: ADMIN, SUPER_ADMIN, user có quyền REPAIR_MANAGE / REPAIR_STATUS_UPDATE, hoặc người/máy nhận đơn
         if (request.status() == RepairStatus.CANCELLED) {
-            boolean canCancel = isManager || isReceiver || (userDetails != null && (userDetails.hasRole("SUPER_ADMIN") || userDetails.hasRole("ADMIN") || userDetails.hasPermission("REPAIR_MANAGE") || userDetails.hasPermission("REPAIR_STATUS_UPDATE")));
+            boolean canCancel = userDetails != null && userDetails.hasPermission("REPAIR_CANCEL");
             if (!canCancel) {
                 throw new BusinessException("Chỉ quản trị viên, người có quyền quản lý đơn hoặc người/máy nhận đơn mới có quyền hủy đơn hàng", 403);
             }
@@ -334,6 +350,12 @@ public class RepairService {
                 "Thay đổi ưu tiên",
                 STR."Manager sắp xếp lại thứ tự \{request.items().size()} đơn",
                 managerId);
+    }
+
+    @Transactional
+    public void reorder(ReorderRequest request, CustomUserDetails userDetails) {
+        request.items().forEach(item -> getById(item.orderId(), userDetails));
+        reorder(request, userDetails.getUserId());
     }
 
     // ── Timeline ──────────────────────────────────────────────
@@ -584,7 +606,8 @@ public class RepairService {
                 images,
                 order.getCreatedAt(),
                 deviceResponses,
-                latestNote
+                latestNote,
+                order.getCustomerId()
         );
     }
 
@@ -675,6 +698,21 @@ public class RepairService {
     public RepairOrderResponse update(UUID id, UpdateRepairOrderRequest request, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(id);
 
+        if (userDetails != null && !userDetails.hasPermission("REPAIR_ASSIGN")
+                && request.devices() != null && request.devices().size() > 1) {
+            var existingDevices = repairDeviceRepository.findByOrderIdOrderByCreatedAtAsc(id);
+            // The first device inherits the order assignee below; subsequent devices
+            // must not change assignment through the general edit endpoint.
+            for (int index = 1; index < request.devices().size(); index++) {
+                String requested = request.devices().get(index).assignedToId();
+                requested = requested == null || requested.isBlank() ? null : requested.strip();
+                UUID existing = index < existingDevices.size() ? existingDevices.get(index).getAssignedTo() : null;
+                if (!java.util.Objects.equals(requested, existing == null ? null : existing.toString())) {
+                    throw new BusinessException("REPAIR_ASSIGN required", 403);
+                }
+            }
+        }
+
         if (userDetails != null && !userDetails.isManagerOrAbove()) {
             UUID userId = userDetails.getUserId();
             if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo()) && 
@@ -684,8 +722,10 @@ public class RepairService {
         }
 
         // Cập nhật thông tin khách hàng
-        order.setCustomerName(request.customerName());
-        order.setCustomerPhone(request.customerPhone());
+        if (order.getCustomerId() == null) {
+            order.setCustomerName(request.customerName());
+            order.setCustomerPhone(request.customerPhone());
+        }
 
         // Cập nhật backward-compat fields từ thiết bị đầu tiên
         if (request.devices() != null && !request.devices().isEmpty()) {
@@ -723,11 +763,51 @@ public class RepairService {
     }
 
     @Transactional
+    public RepairOrderResponse linkCustomer(UUID id, UUID customerId, String reason, CustomUserDetails userDetails) {
+        if (userDetails == null || (!userDetails.hasPermission("CUSTOMER_ASSIGN") && !userDetails.hasPermission("CUSTOMER_TRANSFER"))) {
+            throw new BusinessException("Bạn không có quyền gán khách hàng cho đơn", 403);
+        }
+        if (customerId == null || reason == null || reason.isBlank()) {
+            throw new BusinessException("Phải chọn khách hàng và nhập lý do gán hồ sơ");
+        }
+        RepairOrder order = findOrderById(id);
+        if (!userDetails.hasPermission(order.getCustomerId() == null ? "CUSTOMER_ASSIGN" : "CUSTOMER_TRANSFER")) {
+            throw new BusinessException("Bạn không có quyền thực hiện thao tác gán/chuyển khách hàng này", 403);
+        }
+        if (!userDetails.isManagerOrAbove()) {
+            UUID userId = userDetails.getUserId();
+            if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo())
+                    && (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
+                throw new BusinessException("Bạn không có quyền chỉnh sửa đơn hàng này", 403);
+            }
+        }
+        CustomerResponse customer = customerService.requireActive(customerId);
+        UUID previousCustomerId = order.getCustomerId();
+        String previousCustomerName = order.getCustomerName();
+        if (Objects.equals(previousCustomerId, customerId)) return toResponse(order);
+        order.setCustomerId(customerId);
+        order.setCustomerName(customer.customerName());
+        order.setCustomerPhone(customer.phone());
+        repairOrderRepository.save(order);
+        addTimeline(id, "Gán khách hàng", "Khách hàng: " + previousCustomerName + " (" + previousCustomerId
+                + ") -> " + customer.customerName() + " (" + customerId + ")"
+                + ". Lý do: " + reason.strip(), userDetails.getUserId());
+        return toResponse(order);
+    }
+
+    @Transactional
     public void delete(UUID id, CustomUserDetails userDetails) {
         RepairOrder order = findOrderById(id);
 
-        if (userDetails != null && !userDetails.isManagerOrAbove()) {
+        if (userDetails == null || !userDetails.hasPermission("REPAIR_DELETE")) {
             throw new BusinessException("Chỉ quản lý mới có quyền xóa đơn hàng", 403);
+        }
+        if (!userDetails.isManagerOrAbove()) {
+            UUID userId = userDetails.getUserId();
+            if (!userId.equals(order.getReceivedBy()) && !userId.equals(order.getAssignedTo())
+                    && (order.getAssignees() == null || !order.getAssignees().contains(userId))) {
+                throw new BusinessException("Bạn không có quyền xóa đơn hàng này", 403);
+            }
         }
 
         UUID performerId = userDetails != null ? userDetails.getUserId() : null;

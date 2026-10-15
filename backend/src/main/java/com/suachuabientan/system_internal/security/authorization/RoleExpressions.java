@@ -10,11 +10,11 @@ public final class RoleExpressions {
             "hasAnyRole('SUPER_ADMIN', 'ADMIN')";
     public static final String SUPER_ADMIN = "hasRole('SUPER_ADMIN')";
     public static final String WAREHOUSE_VIEW =
-            "hasAuthority('WAREHOUSE_VIEW') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN', 'WAREHOUSE', 'EMPLOYEE')";
+            "hasAuthority('WAREHOUSE_VIEW') or hasRole('SUPER_ADMIN')";
     public static final String WAREHOUSE_MANAGE =
-            "hasAuthority('WAREHOUSE_MANAGE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'TECHNICIAN', 'WAREHOUSE', 'EMPLOYEE')";
+            "hasAuthority('WAREHOUSE_MANAGE') or hasRole('SUPER_ADMIN')";
     public static final String WAREHOUSE_DELETE =
-            "hasAnyAuthority('WAREHOUSE_DELETE', 'WAREHOUSE_MANAGE') or hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MANAGER')";
+            "hasAuthority('WAREHOUSE_DELETE') or hasRole('SUPER_ADMIN')";
 
     private RoleExpressions() {
     }
