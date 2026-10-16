@@ -45,7 +45,7 @@ class AttendanceQueryControllerTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void fieldWorkCountsExactlyOneDayAndIncludesExcelNote(boolean withAttendance) throws Exception {
         UserEntity employee = new UserEntity();
         employee.setId(employeeId);
@@ -55,6 +55,7 @@ class AttendanceQueryControllerTest {
         var date = java.time.LocalDate.of(2026, 6, 7); // Sunday must still be exactly 1 day
         var field = new com.suachuabientan.system_internal.modules.attendance.entity.FieldWorkDay();
         field.setEmployeeId(employeeId);
+        field.setStatus("APPROVED");
         field.setWorkDate(date);
         field.setNote("Nhà máy ABC");
         when(fieldWorkDayRepository.findByWorkDateBetweenAndIsDeletedFalse(any(), any()))
@@ -84,7 +85,7 @@ class AttendanceQueryControllerTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({"13, 54, 17, 49", "8, 54, 12, 0"})
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void lateHalfDayKeepsHalfWorkDayForExcel(int inHour, int inMinute, int outHour, int outMinute) throws Exception {
         UserEntity employee = new UserEntity();
         employee.setId(employeeId);
@@ -121,7 +122,7 @@ class AttendanceQueryControllerTest {
             "8, 8, 30, 21, 0, o, OVERTIME, 1.5, 11.0",
             "8, 8, 30, 20, 59, p, PRESENT, 1.0, 11.0"
     })
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void attendanceCreditsMatchShiftsAndSundayInMonthlyAndHistory(
             int day, int inHour, int inMinute, int outHour, int outMinute,
             String pattern, String dayStatus, double workDays, double hours) throws Exception {
@@ -216,7 +217,7 @@ class AttendanceQueryControllerTest {
         employee.setRole(UserRole.EMPLOYEE);
         employee.setStatus(UserStatus.ACTIVE);
 
-        CustomUserDetails userDetails = new CustomUserDetails(employee);
+        CustomUserDetails userDetails = new CustomUserDetails(employee, java.util.Set.of(), java.util.Set.of("ATTENDANCE_VIEW"));
         when(userDetailsService.loadUserByUsername("testemployee")).thenReturn(userDetails);
 
         // MockUserRepository mặc định cho self test
@@ -241,7 +242,7 @@ class AttendanceQueryControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void getMonthlyWithManagerRoleSucceeds() throws Exception {
         UserEntity mockEmployee = new UserEntity();
         mockEmployee.setId(UUID.randomUUID());
@@ -324,7 +325,7 @@ class AttendanceQueryControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void getEmployeeLogsForOtherAsManagerSucceeds() throws Exception {
         UserEntity employee = new UserEntity();
         employee.setId(employeeId);
@@ -345,7 +346,7 @@ class AttendanceQueryControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void getMonthlyCalculatesLateAndOvertimeCorrectly() throws Exception {
         UUID empId = UUID.randomUUID();
         UserEntity employee = new UserEntity();
@@ -475,7 +476,7 @@ class AttendanceQueryControllerTest {
     }
 
     @Test
-    @WithMockUser(roles = "MANAGER")
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void getMonthlyReturnsUpdateNotesAndReasons() throws Exception {
         UUID empId = UUID.randomUUID();
         UserEntity employee = new UserEntity();

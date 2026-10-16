@@ -54,7 +54,7 @@ export const FieldWorkModal: React.FC<FieldWorkModalProps> = ({
         throw new Error(err.message || 'Lỗi khi ghi nhận ngày đi công trình');
       }
 
-      showToast(`Đã ghi nhận đi công trình ngày ${workDate.split('-').reverse().join('/')} thành công!`);
+      showToast(`Đã gửi yêu cầu đi công trình, chờ duyệt — ngày ${workDate.split('-').reverse().join('/')} thành công!`);
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -189,7 +189,7 @@ export const FieldWorkModal: React.FC<FieldWorkModalProps> = ({
               color: '#92400e',
               lineHeight: 1.5
             }}>
-              💡 <strong>Lưu ý:</strong> Ngày công trình được tính <strong>1.0 công chuẩn</strong> (kể cả Chủ nhật). Giờ quét thực tế (nếu có) vẫn được giữ nguyên.
+              💡 <strong>Lưu ý:</strong> Chỉ sau khi quản trị viên chấp nhận mới tính <strong>1.0 công chuẩn</strong> (kể cả Chủ nhật). Giờ quét thực tế (nếu có) vẫn được giữ nguyên.
             </div>
           </div>
 

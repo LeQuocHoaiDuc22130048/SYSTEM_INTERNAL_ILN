@@ -15,6 +15,7 @@ import 'api_client.dart';
 
 class BackendDataProvider extends ChangeNotifier {
   final ApiClient api;
+  int fieldWorkRevision = 0;
 
   BackendDataProvider({required this.api});
 
@@ -401,10 +402,12 @@ class BackendDataProvider extends ChangeNotifier {
       '/api/attendance/me/field-work/$dateStr',
       body: {'note': note.trim()},
     );
-    final data = res is Map<String, dynamic> && res['data'] is Map<String, dynamic>
+    final data =
+        res is Map<String, dynamic> && res['data'] is Map<String, dynamic>
         ? res['data'] as Map<String, dynamic>
         : (res is Map<String, dynamic> ? res : <String, dynamic>{});
     final saved = FieldWorkDay.fromJson(data);
+    fieldWorkRevision++;
     await loadMyTodayAttendance(notify: false);
     await loadMyAttendance(year: date.year, month: date.month, notify: true);
     return saved;
@@ -414,6 +417,7 @@ class BackendDataProvider extends ChangeNotifier {
     final dateStr =
         '${date.year.toString().padLeft(4, '0')}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     await api.delete('/api/attendance/me/field-work/$dateStr');
+    fieldWorkRevision++;
     await loadMyTodayAttendance(notify: false);
     await loadMyAttendance(year: date.year, month: date.month, notify: true);
   }
@@ -441,6 +445,23 @@ class BackendDataProvider extends ChangeNotifier {
     return list
         .map((e) => FieldWorkDay.fromJson(e as Map<String, dynamic>))
         .toList();
+  }
+
+  Future<List<FieldWorkDay>> getPendingFieldWork() async {
+    final res = await api.get('/api/attendance/field-work/pending');
+    final list = res is Map<String, dynamic>
+        ? res['data'] as List
+        : res as List;
+    return list
+        .map((e) => FieldWorkDay.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> reviewFieldWork(String id, bool approve, int version) async {
+    await api.put(
+      '/api/attendance/field-work/$id/review',
+      body: {'approve': approve, 'version': version},
+    );
   }
 
   Future<void> approveUser(User user) async {

@@ -1,17 +1,17 @@
 # Ghi nhận ngày đi công trình
 
 Nhân viên tự ghi nhận ngày hôm nay hoặc ngày trước đó. Ghi chú địa điểm/nội dung bắt buộc,
-không quá 2000 ký tự. Không có bước duyệt. Nhân viên chỉ sửa dữ liệu của tài khoản đăng nhập.
+không quá 2000 ký tự. Yêu cầu mới và mọi chỉnh sửa đều chuyển sang `PENDING`, chỉ ghi nhận công trình sau khi quản trị viên chấp nhận. Nhân viên chỉ sửa dữ liệu của tài khoản đăng nhập.
 
 ## API (cần JWT)
 
 - `PUT /api/attendance/me/field-work/{date}`: tích đi công trình hoặc sửa ghi chú.
   Ví dụ ngày: `2026-10-08`; body: `{"note":"Lắp đặt tại nhà máy ABC, Bình Dương"}`.
 - `DELETE /api/attendance/me/field-work/{date}`: bỏ tích, xóa mềm; gọi lặp lại vẫn thành công.
-- `GET /api/attendance/me/field-work?from=2026-10-01&to=2026-10-08`: danh sách ngày đã tích.
+- `GET /api/attendance/me/field-work?from=2026-10-01&to=2026-10-08`: danh sách yêu cầu của bản thân, gồm cả chờ duyệt và bị từ chối.
   Mặc định lấy từ đầu tháng đến hôm nay theo Asia/Ho_Chi_Minh.
 
-PUT trả dữ liệu trong `data`: id, employeeId, workDate, note, createdAt, updatedAt.
+PUT trả dữ liệu trong `data`: id, employeeId, workDate, note, createdAt, updatedAt, status, reviewedBy, reviewedAt, employeeName, version.
 Không nhận employeeId trong request. Ngày tương lai, note rỗng hoặc quá dài bị từ chối.
 
 ## Tổng hợp và Excel
@@ -40,3 +40,13 @@ Flyway V67 tạo `field_work_days`. Một hàng duy nhất cho mỗi nhân viên
 kể cả đã xóa mềm; tích lại khôi phục hàng cũ. Mutation khóa hàng nhân viên trong transaction
 để tránh tạo trùng khi gửi đồng thời. BaseEntity lưu người/thời điểm tạo, sửa và hủy.
 Không có cơ chế khóa kỳ công trong chức năng này; cho phép bổ sung mọi ngày quá khứ.
+
+## Xét duyệt đi công trình
+
+- `GET /api/attendance/field-work/pending`: ADMIN/SUPER_ADMIN xem tối đa 100 yêu cầu chờ duyệt cũ nhất, gồm tên nhân viên. Sau khi xử lý, tải lại để lấy các yêu cầu tiếp theo.
+- `PUT /api/attendance/field-work/{id}/review`: ADMIN/SUPER_ADMIN gửi `{"approve":true,"version":0}` để chấp nhận, hoặc `approve:false` để từ chối. `version` lấy từ danh sách mới nhất.
+- Không cho tự duyệt, duyệt lại yêu cầu đã xử lý/hủy, hoặc duyệt phiên bản cũ. Lưu người duyệt và thời điểm duyệt.
+- Chỉ `APPROVED` được dùng trong mọi truy vấn chấm công, tổng hợp tháng, lịch sử và Excel. `PENDING`/`REJECTED` không thay đổi công chấm công thực tế từ IN/OUT.
+- Gửi thông báo trong ứng dụng và push qua hệ thống hiện có đến ADMIN/SUPER_ADMIN khi gửi yêu cầu; thông báo kết quả đến nhân viên. Chạm thông báo trên di động mở Tổng quan.
+- Sửa ghi chú đã duyệt sẽ bỏ hiệu lực duyệt cũ, gửi lại chờ duyệt. Hủy yêu cầu là xóa mềm.
+- Migration `V72` giữ bản ghi cũ ở `APPROVED`; mặc định cho bản ghi mới là `PENDING`.

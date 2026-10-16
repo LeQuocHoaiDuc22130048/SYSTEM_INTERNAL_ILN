@@ -9,6 +9,7 @@ import type { UserInfo } from '../mockData';
 import { getAuthHeaders } from '../utils/auth';
 import { getAvatarLetters } from '../utils/employee';
 import { hasPermission } from '../utils/permissions';
+import { FieldWorkRequests } from './FieldWorkRequests';
 import { FieldWorkModal } from './FieldWorkModal';
 import './DashboardTab.css';
 
@@ -139,6 +140,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   currentYear,
   refreshTrigger,
 }) => {
+  const [fieldWorkRefresh, setFieldWorkRefresh] = useState(0);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
   const [boards, setBoards] = useState<BoardRecord[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
@@ -845,6 +847,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   return (
     <div className="dashboard-tab">
+      {(hasPermission(currentUser, 'FIELD_WORK_SAVE') || ['ADMIN', 'SUPER_ADMIN'].includes(currentUser?.role || '')) && <FieldWorkRequests admin={['ADMIN', 'SUPER_ADMIN'].includes(currentUser?.role || '')} refresh={fieldWorkRefresh} onChanged={() => { setFieldWorkRefresh(v => v + 1); void fetchDashboardData(); }} />}
       {/* ── Bộ lọc linh hoạt (Filters) ── */}
       <div className="dashboard-filter-bar">
         <div className="filter-left-section">
@@ -1671,6 +1674,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           onClose={() => setShowFieldWorkModal(false)}
           showToast={showToast}
           onSuccess={() => {
+            setFieldWorkRefresh(v => v + 1);
             fetchDashboardData();
           }}
         />

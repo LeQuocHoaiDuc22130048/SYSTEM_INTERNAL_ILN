@@ -25,6 +25,11 @@ NotificationNavigationTarget? resolveNotificationNavigation(
   final refType = item.refType;
   final refId = item.refId;
 
+  if (refType == 'FIELD_WORK') {
+    const target = NotificationNavigationTarget(tabIndex: MainTabs.dashboard);
+    return canAccessMainTab(auth, target.tabIndex) ? target : null;
+  }
+
   if (type == 'NEW_MESSAGE' || refType == 'CONVERSATION') {
     final target = NotificationNavigationTarget(
       tabIndex: MainTabs.messages,

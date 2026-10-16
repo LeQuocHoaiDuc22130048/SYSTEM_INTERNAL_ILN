@@ -39,7 +39,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
     final refType = item.refType;
     final refId = item.refId;
 
-    if (type == 'NEW_MESSAGE' || refType == 'CONVERSATION') {
+    if (refType == 'FIELD_WORK') {
+      widget.onNavigateToTab!(0);
+    } else if (type == 'NEW_MESSAGE' || refType == 'CONVERSATION') {
       widget.onNavigateToTab!(4, refId: refId);
     } else if (type.startsWith('ORDER_') ||
         type.startsWith('NEW_REPAIR_') ||

@@ -11,6 +11,7 @@ import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import '../widgets/status_badge.dart';
+import '../widgets/field_work_requests.dart';
 import '../widgets/modal_top_bar.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -72,6 +73,7 @@ class _DashboardPageState extends State<DashboardPage> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           _DashboardHeader(isDark: isDark, wide: wide),
+                          const FieldWorkRequests(),
                           const SizedBox(height: 24),
                           Builder(
                             builder: (context) {
@@ -134,6 +136,7 @@ class _DashboardPageState extends State<DashboardPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _DashboardHeader(isDark: isDark, wide: wide),
+                          const FieldWorkRequests(),
         const SizedBox(height: 24),
         GridView.builder(
           itemCount: 4,
@@ -1905,7 +1908,7 @@ class _FieldWorkBottomSheetState extends State<_FieldWorkBottomSheet> {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Đã ghi nhận ngày đi công trình thành công'),
+            content: Text('Đã gửi yêu cầu đi công trình, chờ quản trị viên duyệt'),
             backgroundColor: Color(0xFF10B981),
           ),
         );
@@ -2020,7 +2023,7 @@ class _FieldWorkBottomSheetState extends State<_FieldWorkBottomSheet> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          'Hệ thống tự động tính 1.0 công chuẩn cho ngày này',
+                          'Chỉ tính 1.0 công sau khi quản trị viên chấp nhận',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark

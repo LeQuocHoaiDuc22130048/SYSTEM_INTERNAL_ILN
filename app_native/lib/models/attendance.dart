@@ -358,6 +358,9 @@ class FieldWorkDay {
   final String employeeId;
   final DateTime workDate;
   final String note;
+  final String status;
+  final int version;
+  final String? employeeName;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -366,6 +369,9 @@ class FieldWorkDay {
     required this.employeeId,
     required this.workDate,
     required this.note,
+    this.status = 'APPROVED',
+    this.version = 0,
+    this.employeeName,
     this.createdAt,
     this.updatedAt,
   });
@@ -378,14 +384,15 @@ class FieldWorkDay {
           DateTime.tryParse(json['workDate']?.toString() ?? '') ??
           DateTime.now(),
       note: json['note']?.toString() ?? '',
-      createdAt:
-          json['createdAt'] != null
-              ? DateTime.tryParse(json['createdAt'].toString())
-              : null,
-      updatedAt:
-          json['updatedAt'] != null
-              ? DateTime.tryParse(json['updatedAt'].toString())
-              : null,
+      status: json['status']?.toString() ?? 'APPROVED',
+      version: (json['version'] as num?)?.toInt() ?? 0,
+      employeeName: json['employeeName']?.toString(),
+      createdAt: json['createdAt'] != null
+          ? DateTime.tryParse(json['createdAt'].toString())
+          : null,
+      updatedAt: json['updatedAt'] != null
+          ? DateTime.tryParse(json['updatedAt'].toString())
+          : null,
     );
   }
 }

@@ -1,6 +1,8 @@
 package com.suachuabientan.system_internal.modules.notification.enums;
 
 public enum NotificationType {
+    FIELD_WORK_PENDING,
+    FIELD_WORK_REVIEWED,
     NEW_REPAIR_ORDER,
     ORDER_ASSIGNED,
     ORDER_COMPLETED,
