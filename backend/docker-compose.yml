@@ -18,11 +18,13 @@ services:
       REDIS_PORT: 6379
       MINIO_ENDPOINT: http://minio:9000
       FACE_RECOGNITION_BASE_URL: http://face-ai:5000
+      APP_BANNER_UPLOAD_DIR: /app/uploads/banners
     ports:
       - "8080:8080"
     volumes:
       - ./firebase-service-account.json:/app/firebase-service-account.json:ro
       - ./releases:/app/releases
+      - uploads_data:/app/uploads
     depends_on:
       - postgres
       - redis
@@ -95,6 +97,9 @@ services:
     restart: unless-stopped
 
 volumes:
+  uploads_data:
+    external: true
+    name: backend_uploads_data
   postgres_data:
     external: true
     name: backend_postgres_data

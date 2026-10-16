@@ -52,3 +52,7 @@ build/
 *.apk
 
 .agents/
+
+# Runtime uploads and backups contain user data, not source code.
+backend/uploads/
+backend/backups/
