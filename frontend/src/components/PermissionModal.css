@@ -160,6 +160,7 @@
 
 .perm-module-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0;
@@ -256,6 +257,21 @@
 .perm-toggle-btn:hover {
   background: #f1f5f9;
   color: #1e293b;
+}
+
+.perm-module-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-left: auto;
+}
+
+.perm-module-actions .perm-toggle-btn {
+  width: auto;
+  gap: 0.3rem;
+  padding: 0 0.5rem;
+  font-size: 0.7rem;
+  white-space: nowrap;
 }
 
 /* Active states */

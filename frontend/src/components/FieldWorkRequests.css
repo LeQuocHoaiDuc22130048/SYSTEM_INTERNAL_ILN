@@ -1,0 +1,118 @@
+.field-work-requests {
+  min-width: 0;
+}
+
+.field-work-requests-header,
+.field-work-requests-tools,
+.field-work-request-heading,
+.field-work-request-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.field-work-requests-header,
+.field-work-request-heading {
+  justify-content: space-between;
+}
+
+.field-work-requests-header .panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.field-work-requests-tools {
+  margin-left: auto;
+}
+
+.field-work-requests-tools label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.field-work-requests-tools input,
+.field-work-request-button {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--color-card, #fff);
+  color: var(--color-text, #334155);
+  font: inherit;
+  font-size: 13px;
+}
+
+.field-work-requests-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+  color: var(--color-text-light, #64748b);
+  font-size: 13px;
+}
+
+.field-work-requests-empty svg {
+  color: #10b981;
+  flex-shrink: 0;
+}
+
+.field-work-requests-error {
+  color: #b91c1c;
+  margin: 14px 0 0;
+  font-size: 13px;
+}
+
+.field-work-request {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.field-work-request-note {
+  margin: 10px 0;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.field-work-request-status {
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.field-work-request-status.approved,
+.field-work-request-button.approve {
+  background: #ecfdf5;
+  color: #047857;
+  border-color: #a7f3d0;
+}
+
+.field-work-request-status.rejected,
+.field-work-request-button.reject {
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.field-work-request-button {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.field-work-request-button:hover:not(:disabled) {
+  filter: brightness(0.97);
+}
+
+.field-work-request-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

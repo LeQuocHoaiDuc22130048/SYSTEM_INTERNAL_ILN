@@ -13,7 +13,7 @@ interface PermissionDetail {
   module: string;
   description: string;
   fromRole: boolean;
-  overrideGranted: boolean | null;  // null = kế thừa, true = grant, false = deny
+  overrideGranted?: boolean | null;  // thiếu/null = kế thừa, true = grant, false = deny
   effectiveGranted: boolean;
 }
 
@@ -46,10 +46,16 @@ const MODULE_LABELS: Record<string, string> = {
 // Trạng thái override: 'inherited' | 'grant' | 'deny'
 type OverrideState = 'inherited' | 'grant' | 'deny';
 
+const MODULE_ACTIONS = [
+  { state: 'inherited', label: 'Kế thừa tất cả', Icon: MinusCircle },
+  { state: 'grant', label: 'Cấp tất cả', Icon: CheckCircle2 },
+  { state: 'deny', label: 'Thu hồi tất cả', Icon: XCircle },
+] as const;
+
 // ── Helpers ───────────────────────────────────────────────────────────────
 
-function overrideToState(overrideGranted: boolean | null): OverrideState {
-  if (overrideGranted === null) return 'inherited';
+function overrideToState(overrideGranted: boolean | null | undefined): OverrideState {
+  if (overrideGranted == null) return 'inherited';
   return overrideGranted ? 'grant' : 'deny';
 }
 
@@ -103,9 +109,10 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
 
   // ── Handle toggle ─────────────────────────────────────────────────────
 
-  const handleToggle = (code: string, newState: OverrideState) => {
+  const handleToggle = (codes: string[], newState: OverrideState) => {
     setOverrides(prev => {
-      const updated = { ...prev, [code]: newState };
+      const updated = { ...prev };
+      codes.forEach(code => { updated[code] = newState; });
       setHasChanges(Object.entries(updated).some(([c, s]) => {
         const orig = overrideToState(permissions.find(p => p.code === c)?.overrideGranted ?? null);
         return s !== orig;
@@ -256,6 +263,27 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
                     {MODULE_LABELS[module] ?? module}
                   </span>
                   <span className="perm-module-count">{perms.length} quyền</span>
+                  {canAction('PERMISSION_UPDATE') && !protectedRole && (
+                    <div className="perm-module-actions" role="group" aria-label={`Áp dụng cho nhóm ${MODULE_LABELS[module] ?? module}`}>
+                      {MODULE_ACTIONS.map(({ state, label, Icon }) => {
+                        const active = perms.every(perm => (overrides[perm.code] ?? 'inherited') === state);
+                        return (
+                          <button
+                            key={state}
+                            type="button"
+                            className={`perm-toggle-btn ${state} ${active ? 'active' : ''}`}
+                            id={`perm-module-${state}-${module}`}
+                            aria-pressed={active}
+                            onClick={() => handleToggle(perms.map(perm => perm.code), state)}
+                            disabled={saving || loading}
+                          >
+                            <Icon size={14} />
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {perms.map(perm => {
@@ -295,7 +323,7 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
                         {/* Kế thừa từ role */}
                         {(canAction('PERMISSION_UPDATE') && !protectedRole) && (<button
                           className={`perm-toggle-btn inherited ${currentState === 'inherited' ? 'active' : ''}`}
-                          onClick={() => handleToggle(perm.code, 'inherited')}
+                          onClick={() => handleToggle([perm.code], 'inherited')}
                           title={`Kế thừa từ role (${perm.fromRole ? 'có quyền' : 'không có'})`}
                           id={`perm-inherit-${perm.code}`}
                           disabled={saving || protectedRole}
@@ -306,7 +334,7 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
                         {/* Grant */}
                         {(canAction('PERMISSION_UPDATE') && !protectedRole) && (<button
                           className={`perm-toggle-btn grant ${currentState === 'grant' ? 'active' : ''}`}
-                          onClick={() => handleToggle(perm.code, 'grant')}
+                          onClick={() => handleToggle([perm.code], 'grant')}
                           title="Cấp thêm quyền này"
                           id={`perm-grant-${perm.code}`}
                           disabled={saving || protectedRole}
@@ -317,7 +345,7 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
                         {/* Deny */}
                         {(canAction('PERMISSION_UPDATE') && !protectedRole) && (<button
                           className={`perm-toggle-btn deny ${currentState === 'deny' ? 'active' : ''}`}
-                          onClick={() => handleToggle(perm.code, 'deny')}
+                          onClick={() => handleToggle([perm.code], 'deny')}
                           title="Thu hồi quyền này"
                           id={`perm-deny-${perm.code}`}
                           disabled={saving || protectedRole}

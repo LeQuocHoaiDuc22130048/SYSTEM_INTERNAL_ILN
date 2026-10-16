@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import { FieldWorkModal } from './FieldWorkModal';
+import { Briefcase, RefreshCw, CheckCircle2 } from 'lucide-react';
+import './FieldWorkRequests.css';
 
 type Request = { id: string; employeeId: string; employeeName?: string; workDate: string; note: string; status: string; version: number };
 const labels: Record<string, string> = { PENDING: 'Chờ duyệt', APPROVED: 'Đã chấp nhận', REJECTED: 'Đã từ chối' };
@@ -29,18 +31,26 @@ export function FieldWorkRequests({ admin, refresh, onChanged }: { admin: boolea
     } catch (e) { setError(e instanceof Error ? e.message : 'Có lỗi xảy ra'); }
     finally { setBusy(false); }
   };
-  return <section className="dashboard-card" style={{ padding: 16, marginBottom: 16 }}>
-    <h3>{admin ? 'Duyệt đi công trình' : 'Yêu cầu đi công trình'}</h3>
-    {!admin && <label>Tháng <input aria-label="Tháng yêu cầu" type="month" value={month} onChange={e => { if (e.target.value) setMonth(e.target.value); }} /></label>}
-    <button type="button" disabled={busy} onClick={() => void load()}>Làm mới</button>
-    {error && <p role="alert">{error}</p>}
-    {!requests.length && <p>Không có yêu cầu{admin ? ' chờ duyệt' : ''}.</p>}
-    {requests.map(r => <article key={r.id} style={{ borderTop: '1px solid #94a3b8', padding: '12px 0' }}>
-      <strong>{r.workDate}{admin ? ` — ${r.employeeName || r.employeeId}` : ''}</strong>
-      <p style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{r.note}</p>
-      <p>{labels[r.status] || r.status}</p>
-      {admin ? <><button disabled={busy} onClick={() => void review(r, true)}>Chấp nhận</button>{' '}<button disabled={busy} onClick={() => void review(r, false)}>Từ chối</button></>
-        : <button onClick={() => setEditing(r)}>Sửa / Hủy yêu cầu</button>}
+  return <section className="dashboard-panel field-work-requests">
+    <div className="field-work-requests-header">
+      <h3 className="panel-title"><Briefcase size={18} aria-hidden="true" />{admin ? 'Duyệt đi công trình' : 'Yêu cầu đi công trình'}</h3>
+      <div className="field-work-requests-tools">
+        {!admin && <label>Tháng <input aria-label="Tháng yêu cầu" type="month" value={month} onChange={e => { if (e.target.value) setMonth(e.target.value); }} /></label>}
+        <button className="btn-refresh-dashboard" type="button" disabled={busy} onClick={() => void load()}><RefreshCw size={14} aria-hidden="true" />Làm mới</button>
+      </div>
+    </div>
+    {error && <p className="field-work-requests-error" role="alert">{error}</p>}
+    {!requests.length && !error && <div className="field-work-requests-empty"><CheckCircle2 size={18} aria-hidden="true" /><span>Không có yêu cầu{admin ? ' chờ duyệt' : ''}.</span></div>}
+    {requests.map(r => <article key={r.id} className="field-work-request">
+      <div className="field-work-request-heading">
+        <strong>{r.workDate}{admin ? ` — ${r.employeeName || r.employeeId}` : ''}</strong>
+        <span className={`field-work-request-status ${r.status.toLowerCase()}`}>{labels[r.status] || r.status}</span>
+      </div>
+      <p className="field-work-request-note">{r.note}</p>
+      <div className="field-work-request-actions">
+        {admin ? <><button type="button" className="field-work-request-button approve" disabled={busy} onClick={() => void review(r, true)}>Chấp nhận</button><button type="button" className="field-work-request-button reject" disabled={busy} onClick={() => void review(r, false)}>Từ chối</button></>
+          : <button type="button" className="field-work-request-button" onClick={() => setEditing(r)}>Sửa / Hủy yêu cầu</button>}
+      </div>
     </article>)}
     {editing && <FieldWorkModal initialDate={editing.workDate} initialNote={editing.note} isExisting onClose={() => setEditing(null)} showToast={setError} onSuccess={() => { void load(); onChanged(); }} />}
   </section>;
