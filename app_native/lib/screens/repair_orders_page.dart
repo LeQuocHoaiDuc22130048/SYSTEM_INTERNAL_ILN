@@ -102,18 +102,63 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   final ValueNotifier<bool?> _warrantyFilter = ValueNotifier(null);
   final ValueNotifier<int> _visibleCount = ValueNotifier(20);
   final ScrollController _scrollController = ScrollController();
+  bool _fillingPage = false;
+  int _fillGeneration = 0;
 
   void _resetPage() {
     _visibleCount.value = 20;
+    _fillVisibleOrders();
+  }
+
+  Future<void> _fillVisibleOrders() async {
+    if (_fillingPage || !mounted) return;
+    final backend = context.read<BackendDataProvider>();
+    final generation = _fillGeneration;
+    _fillingPage = true;
+    try {
+      while (mounted &&
+          generation == _fillGeneration &&
+          _filteredOrders.length < _visibleCount.value &&
+          backend.hasMoreRepairOrders &&
+          !backend.isLoading &&
+          !backend.isLoadingMoreRepairOrders) {
+        await backend.loadMoreRepairOrders();
+        if (backend.repairOrdersPageError != null) break;
+      }
+    } finally {
+      if (generation == _fillGeneration) _fillingPage = false;
+    }
+  }
+
+  Future<void> _refreshOrders() async {
+    _fillGeneration++;
+    _fillingPage = false;
+    _visibleCount.value = 20;
+    await context.read<BackendDataProvider>().loadRepairOrders(pageSize: 20);
+    if (mounted) await _fillVisibleOrders();
+  }
+
+  Future<void> _loadNextPage() async {
+    final backend = context.read<BackendDataProvider>();
+    if (_fillingPage || backend.isLoadingMoreRepairOrders) return;
+    _visibleCount.value += 20;
+    await _fillVisibleOrders();
+  }
+
+  Future<void> _retryPage() async {
+    await context.read<BackendDataProvider>().loadMoreRepairOrders();
+    if (mounted) await _fillVisibleOrders();
   }
 
   void _onScroll() {
     if (_scrollController.hasClients) {
       if (_scrollController.position.pixels >=
           _scrollController.position.maxScrollExtent - 200) {
-        final totalItems = _filteredOrders.length;
-        if (_visibleCount.value < totalItems) {
-          _visibleCount.value = (_visibleCount.value + 20).clamp(0, totalItems);
+        final backend = context.read<BackendDataProvider>();
+        if (backend.repairOrdersPageError == null &&
+            (_visibleCount.value < _filteredOrders.length ||
+                backend.hasMoreRepairOrders)) {
+          _loadNextPage();
         }
       }
     }
@@ -130,7 +175,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     _scrollController.addListener(_onScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await context.read<BackendDataProvider>().loadRepairOrders();
+      await _refreshOrders();
+      if (!mounted) return;
       if (widget.targetOrderId != null) {
         _showOrderById(widget.targetOrderId!);
       }
@@ -156,6 +202,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
         backgroundColor: Colors.transparent,
         builder: (context) => _OrderDetailSheet(order: orders[matchIndex]),
       );
+    } else {
+      showRepairOrderDetails(context, id);
     }
   }
 
@@ -321,7 +369,15 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final backend = context.watch<BackendDataProvider>();
-    final orders = backend.repairOrders;
+    if (!backend.isLoading &&
+        !backend.isLoadingMoreRepairOrders &&
+        backend.repairOrdersPageError == null &&
+        backend.hasMoreRepairOrders &&
+        _filteredOrders.length < _visibleCount.value) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _fillVisibleOrders();
+      });
+    }
 
     final screenSize = MediaQuery.sizeOf(context);
     final wide = screenSize.width >= 760;
@@ -363,7 +419,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${orders.length} đơn tổng cộng',
+                                  '${backend.repairOrdersTotal} đơn tổng cộng',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: isDark
@@ -581,9 +637,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                   : backend.error != null
                   ? _ErrorState(
                       message: backend.error!,
-                      onRetry: () => context
-                          .read<BackendDataProvider>()
-                          .loadRepairOrders(),
+                      onRetry: _refreshOrders,
                       isDark: isDark,
                     )
                   : AnimatedBuilder(
@@ -611,9 +665,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
 
                         if (filtered.isEmpty) {
                           return RefreshIndicator(
-                            onRefresh: () => context
-                                .read<BackendDataProvider>()
-                                .loadRepairOrders(),
+                            onRefresh: _refreshOrders,
                             child: ListView(
                               physics: const AlwaysScrollableScrollPhysics(),
                               children: [
@@ -624,14 +676,13 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
                                   ),
                                   child: _EmptyOrders(isDark: isDark),
                                 ),
+                                _buildInfiniteScrollFooter(0, 0, isDark, wide),
                               ],
                             ),
                           );
                         }
                         return RefreshIndicator(
-                          onRefresh: () => context
-                              .read<BackendDataProvider>()
-                              .loadRepairOrders(),
+                          onRefresh: _refreshOrders,
                           child: ListView.builder(
                             controller: _scrollController,
                             physics: const AlwaysScrollableScrollPhysics(),
@@ -679,7 +730,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
 
   Widget _buildWarrantyFilterChip(String label, bool? value) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final orders = context.watch<BackendDataProvider>().repairOrders;
+    final backend = context.watch<BackendDataProvider>();
+    final orders = backend.repairOrders;
 
     return ValueListenableBuilder<RepairOrderStatus?>(
       valueListenable: _filter,
@@ -706,7 +758,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
           builder: (context, currentFilter, _) {
             final isSelected = currentFilter == value;
             return FilterChip(
-              label: Text('$label  $count'),
+              label: Text(
+                '$label  $count${backend.hasMoreRepairOrders ? '+' : ''}',
+              ),
               selected: isSelected,
               onSelected: (selected) {
                 _warrantyFilter.value = selected ? value : null;
@@ -742,7 +796,8 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
 
   Widget _buildFilterChip(String label, RepairOrderStatus? status) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final orders = context.watch<BackendDataProvider>().repairOrders;
+    final backend = context.watch<BackendDataProvider>();
+    final orders = backend.repairOrders;
 
     return ValueListenableBuilder<bool?>(
       valueListenable: _warrantyFilter,
@@ -768,8 +823,11 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
           valueListenable: _filter,
           builder: (context, currentFilter, _) {
             final isSelected = currentFilter == status;
+            final countLabel = status == null && currentWarrantyFilter == null
+                ? '${backend.repairOrdersTotal}'
+                : '$count${backend.hasMoreRepairOrders ? '+' : ''}';
             return FilterChip(
-              label: Text('$label  $count'),
+              label: Text('$label  $countLabel'),
               selected: isSelected,
               onSelected: (selected) {
                 _filter.value = selected ? status : null;
@@ -812,6 +870,13 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     bool isDark,
     bool wide,
   ) {
+    final backend = context.watch<BackendDataProvider>();
+    final hasMore = loadedCount < totalCount || backend.hasMoreRepairOrders;
+    final filtering =
+        _filter.value != null ||
+        _searchQuery.value.trim().isNotEmpty ||
+        _dateFilter.value != null ||
+        _warrantyFilter.value != null;
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 980),
@@ -828,18 +893,38 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
               color: isDark ? AppColors.borderDark : AppColors.borderLight,
             ),
           ),
-          child: Text(
-            loadedCount < totalCount
-                ? 'Cuộn xuống để nạp thêm... ($loadedCount/$totalCount đơn hàng)'
-                : 'Đã hiển thị tất cả $totalCount đơn hàng',
-            style: TextStyle(
-              fontSize: 13,
-              fontStyle: FontStyle.italic,
-              fontWeight: FontWeight.w500,
-              color: isDark
-                  ? AppColors.textSecondaryDark
-                  : AppColors.textSecondaryLight,
-            ),
+          child: Column(
+            children: [
+              Text(
+                filtering
+                    ? 'Đã hiển thị $loadedCount kết quả • Đã tải ${backend.repairOrders.length}/${backend.repairOrdersTotal} đơn'
+                    : 'Đã hiển thị $loadedCount/${backend.repairOrdersTotal} đơn hàng',
+                textAlign: TextAlign.center,
+              ),
+              if (backend.isLoadingMoreRepairOrders)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                )
+              else if (backend.repairOrdersPageError != null) ...[
+                Text(
+                  backend.repairOrdersPageError!,
+                  textAlign: TextAlign.center,
+                ),
+                TextButton(
+                  onPressed: _retryPage,
+                  child: const Text('Thử lại'),
+                ),
+              ] else if (hasMore)
+                TextButton(
+                  onPressed: _loadNextPage,
+                  child: const Text('Tải thêm đơn hàng'),
+                ),
+            ],
           ),
         ),
       ),

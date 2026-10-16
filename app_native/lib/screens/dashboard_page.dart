@@ -309,6 +309,9 @@ class _DashboardStat {
 List<_DashboardStat> _buildDashboardStats(BuildContext context) {
   final backend = context.watch<BackendDataProvider>();
   final orders = backend.repairOrders;
+  final loadedOrdersHint = backend.hasMoreRepairOrders
+      ? 'Trong ${orders.length} đơn đã tải'
+      : null;
   final boards = backend.boards;
   final employees = backend.employees;
   final attendance = backend.attendanceRecords;
@@ -316,7 +319,7 @@ List<_DashboardStat> _buildDashboardStats(BuildContext context) {
   return [
     _DashboardStat(
       label: 'Tổng đơn',
-      value: '${orders.length}',
+      value: '${backend.repairOrdersTotal}',
       icon: LucideIcons.wrench,
       color: AppColors.primary,
       background: AppColors.infoLight,
@@ -328,12 +331,13 @@ List<_DashboardStat> _buildDashboardStats(BuildContext context) {
       icon: LucideIcons.activity,
       color: AppColors.warning,
       background: AppColors.warningLight,
-      helper: 'Cần theo dõi',
+      helper: loadedOrdersHint ?? 'Cần theo dõi',
     ),
     _DashboardStat(
       label: 'Hoàn thành',
       value:
           '${orders.where((o) => o.status == RepairOrderStatus.completed).length}',
+      helper: loadedOrdersHint,
       icon: LucideIcons.circleCheck,
       color: AppColors.success,
       background: AppColors.successLight,
@@ -358,6 +362,7 @@ List<_DashboardStat> _buildDashboardStats(BuildContext context) {
     _DashboardStat(
       label: 'Đơn chờ phân công',
       value: '${orders.where((o) => o.assignedToId == null).length}',
+      helper: loadedOrdersHint,
       icon: LucideIcons.circle,
       color: AppColors.warning,
       background: AppColors.warningLight,

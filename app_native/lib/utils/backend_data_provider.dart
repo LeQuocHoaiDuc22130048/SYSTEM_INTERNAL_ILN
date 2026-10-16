@@ -21,6 +21,13 @@ class BackendDataProvider extends ChangeNotifier {
   List<User> employees = [];
   List<User> pendingUsers = [];
   List<RepairOrder> repairOrders = [];
+  int repairOrdersTotal = 0;
+  bool hasMoreRepairOrders = false;
+  bool isLoadingMoreRepairOrders = false;
+  String? repairOrdersPageError;
+  int _repairOrdersPage = 0;
+  int _repairOrdersPageSize = 200;
+  int _repairOrdersGeneration = 0;
   List<Board> boards = [];
   List<User> repairAssignees = [];
   List<Part> parts = [];
@@ -40,6 +47,12 @@ class BackendDataProvider extends ChangeNotifier {
     repairAssignees = [];
     pendingUsers = [];
     repairOrders = [];
+    _repairOrdersGeneration++;
+    _repairOrdersPageSize = 200;
+    repairOrdersTotal = 0;
+    hasMoreRepairOrders = false;
+    isLoadingMoreRepairOrders = false;
+    repairOrdersPageError = null;
     boards = [];
     parts = [];
     locations = [];
@@ -113,7 +126,14 @@ class BackendDataProvider extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
-  Future<void> loadRepairOrders({bool notify = true}) async {
+  Future<void> loadRepairOrders({
+    bool notify = true,
+    int? pageSize,
+  }) async {
+    final requestedPageSize = pageSize ?? _repairOrdersPageSize;
+    final generation = ++_repairOrdersGeneration;
+    isLoadingMoreRepairOrders = false;
+    repairOrdersPageError = null;
     isLoading = true;
     error = null;
     if (notify) notifyListeners();
@@ -121,17 +141,72 @@ class BackendDataProvider extends ChangeNotifier {
     try {
       final data = await api.get(
         '/api/v1/repair-orders',
-        queryParameters: {'size': 200},
+        queryParameters: {'page': 0, 'size': requestedPageSize},
       );
+      if (generation != _repairOrdersGeneration) return;
       repairOrders = _content(data).map(RepairOrder.fromJson).toList();
+      _repairOrdersPage = 0;
+      _repairOrdersPageSize = requestedPageSize;
+      _updateRepairOrdersPage(data);
       error = null;
     } on ApiException catch (e) {
+      if (generation != _repairOrdersGeneration) return;
       error = e.message;
     } catch (_) {
+      if (generation != _repairOrdersGeneration) return;
       error = 'Không thể tải dữ liệu từ backend.';
     } finally {
-      isLoading = false;
-      if (notify) notifyListeners();
+      if (generation == _repairOrdersGeneration) {
+        isLoading = false;
+        if (notify) notifyListeners();
+      }
+    }
+  }
+
+  void _updateRepairOrdersPage(dynamic data) {
+    repairOrdersTotal = data is Map && data['totalElements'] is num
+        ? (data['totalElements'] as num).toInt()
+        : repairOrders.length;
+    hasMoreRepairOrders = data is Map && data['last'] is bool
+        ? data['last'] == false
+        : repairOrders.length < repairOrdersTotal;
+  }
+
+  Future<void> loadMoreRepairOrders() async {
+    if (isLoading || isLoadingMoreRepairOrders || !hasMoreRepairOrders) return;
+    final generation = _repairOrdersGeneration;
+    isLoadingMoreRepairOrders = true;
+    repairOrdersPageError = null;
+    notifyListeners();
+    try {
+      final data = await api.get(
+        '/api/v1/repair-orders',
+        queryParameters: {
+          'page': _repairOrdersPage + 1,
+          'size': _repairOrdersPageSize,
+        },
+      );
+      if (generation != _repairOrdersGeneration) return;
+      final incoming = _content(data).map(RepairOrder.fromJson).toList();
+      final ids = repairOrders.map((order) => order.id).toSet();
+      repairOrders = [
+        ...repairOrders,
+        ...incoming.where((order) => ids.add(order.id)),
+      ];
+      _repairOrdersPage++;
+      _updateRepairOrdersPage(data);
+      if (incoming.isEmpty) hasMoreRepairOrders = false;
+    } on ApiException catch (e) {
+      if (generation != _repairOrdersGeneration) return;
+      repairOrdersPageError = e.message;
+    } catch (_) {
+      if (generation != _repairOrdersGeneration) return;
+      repairOrdersPageError = 'Không thể tải thêm đơn hàng.';
+    } finally {
+      if (generation == _repairOrdersGeneration) {
+        isLoadingMoreRepairOrders = false;
+        notifyListeners();
+      }
     }
   }
 
