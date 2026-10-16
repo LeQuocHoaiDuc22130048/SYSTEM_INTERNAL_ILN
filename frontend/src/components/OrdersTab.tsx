@@ -127,16 +127,23 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
         } else if (Array.isArray(result?.data)) {
           setEmployees(result.data);
         }
+      } else {
+        setEmployees([]);
+        showToast(response.status === 403
+          ? 'Bạn không có quyền tải danh sách kỹ thuật viên'
+          : 'Không thể tải danh sách kỹ thuật viên');
       }
     } catch (e) {
       console.error(e);
+      setEmployees([]);
+      showToast('Lỗi kết nối khi tải danh sách kỹ thuật viên');
     }
-  }, []);
+  }, [showToast]);
 
   useEffect(() => {
     fetchOrders();
-    fetchEmployees();
-  }, [fetchOrders, fetchEmployees]);
+    if (hasPermission(currentUser ?? null, 'REPAIR_ASSIGN')) fetchEmployees();
+  }, [fetchOrders, fetchEmployees, currentUser]);
 
   // Fetch timeline of selected order
   const fetchTimeline = async (orderId: string) => {
@@ -481,6 +488,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
     setSelectedTechs(selectedOrder.assignees.map((a) => a.id));
     setAssignNote('');
     setIsAssignModalOpen(true);
+    fetchEmployees();
   };
 
   // Assign Technicians API
@@ -1248,7 +1256,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                 <label>Chọn kỹ thuật viên (Chọn nhiều)</label>
                 <div className="tech-checkbox-list">
                   {employees
-                    .filter((emp) => emp.role === 'TECHNICIAN' || emp.role === 'ADMIN' || emp.role === 'SUPER_ADMIN')
+                    .filter((emp) => emp.role === 'EMPLOYEE' || emp.role === 'TECHNICIAN')
                     .map((emp) => {
                       const isChecked = selectedTechs.includes(emp.id);
                       return (

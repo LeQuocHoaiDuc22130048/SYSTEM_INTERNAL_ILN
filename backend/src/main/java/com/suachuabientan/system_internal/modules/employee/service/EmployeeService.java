@@ -50,7 +50,7 @@ public class EmployeeService implements InitializingBean {
     @Transactional(readOnly = true)
     public List<com.suachuabientan.system_internal.modules.employee.dto.response.RepairAssigneeResponse> getRepairAssignees() {
         return userRepository.findByRoleInAndStatusAndIsDeletedFalse(
-                List.of(UserRole.TECHNICIAN, UserRole.ADMIN, UserRole.SUPER_ADMIN), UserStatus.ACTIVE).stream()
+                List.of(UserRole.EMPLOYEE, UserRole.TECHNICIAN), UserStatus.ACTIVE).stream()
                 .map(user -> new com.suachuabientan.system_internal.modules.employee.dto.response.RepairAssigneeResponse(
                         user.getId(), user.getUsername(), user.getFullName(), user.getEmployeeCode(),
                         user.getRole().name(), user.getStatus().name(), user.getAvatarUrl()))

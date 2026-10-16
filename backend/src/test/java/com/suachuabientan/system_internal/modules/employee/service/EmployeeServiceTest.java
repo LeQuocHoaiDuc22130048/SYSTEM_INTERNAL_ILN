@@ -29,6 +29,39 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class EmployeeServiceTest {
     @Test
+    void repairAssigneesIncludeActiveEmployeesAndTechniciansOnly() {
+        org.mockito.Mockito.reset(userRepository);
+        activeEmployee.setId(employeeId);
+        activeEmployee.setFullName("Employee");
+        UserEntity technician = new UserEntity();
+        technician.setId(UUID.randomUUID());
+        technician.setRole(UserRole.TECHNICIAN);
+        technician.setStatus(UserStatus.ACTIVE);
+        technician.setFullName("Technician");
+        UserEntity admin = new UserEntity();
+        admin.setRole(UserRole.ADMIN);
+        admin.setStatus(UserStatus.ACTIVE);
+        UserEntity suspended = new UserEntity();
+        suspended.setRole(UserRole.TECHNICIAN);
+        suspended.setStatus(UserStatus.SUSPENDED);
+        when(userRepository.findByRoleInAndStatusAndIsDeletedFalse(any(), any()))
+                .thenAnswer(invocation -> {
+                    List<UserRole> roles = invocation.getArgument(0);
+                    UserStatus status = invocation.getArgument(1);
+                    return List.of(activeEmployee, technician, admin, suspended).stream()
+                            .filter(user -> roles.contains(user.getRole()) && user.getStatus() == status)
+                            .toList();
+                });
+
+        var assignees = employeeService.getRepairAssignees();
+
+        assertEquals(List.of(employeeId, technician.getId()),
+                assignees.stream().map(assignee -> assignee.id()).toList());
+        assertEquals(List.of("EMPLOYEE", "TECHNICIAN"),
+                assignees.stream().map(assignee -> assignee.role()).toList());
+    }
+
+    @Test
     void employeeManagementDoesNotAllowChangingRolesThroughProfileUpdate() {
         UUID actorId = UUID.randomUUID();
         UserEntity actor = new UserEntity();
