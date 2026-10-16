@@ -37,6 +37,10 @@ import java.util.UUID;
 @RequestMapping("/api/v1/attendance")
 @RequiredArgsConstructor
 public class AttendanceController {
+    private final com.suachuabientan.system_internal.modules.attendance.tablet.TabletDeviceService tabletDevices;
+    private final com.suachuabientan.system_internal.modules.attendance.tablet.TabletSyncService tabletSync;
+    private final com.suachuabientan.system_internal.modules.attendance.tablet.TabletCaptureService tabletCapture;
+    private final jakarta.servlet.http.HttpServletRequest servletRequest;
     private final AttendanceService attendanceService;
     private final FaceRecognitionMonitoringService faceRecognitionMonitoringService;
 
@@ -48,7 +52,7 @@ public class AttendanceController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         CheckinRequest safeRequest = request != null ? request : new CheckinRequest(null, null);
         return ResponseEntity.ok(ApiResponse.success(
-                attendanceService.check(userDetails.getUserId(), safeRequest),
+                tabletCapture.check(userDetails.getUserId(), servletRequest.getHeader("X-Attendance-Device-Id"), servletRequest.getHeader("X-Attendance-Device-Secret"), safeRequest),
                 "Cham cong thanh cong"));
     }
 
@@ -59,7 +63,7 @@ public class AttendanceController {
             @Valid @RequestBody FaceCheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
-                attendanceService.faceCheck(userDetails.getUserId(), request),
+                tabletCapture.faceCheck(userDetails.getUserId(), servletRequest.getHeader("X-Attendance-Device-Id"), servletRequest.getHeader("X-Attendance-Device-Secret"), request),
                 "Xac minh khuon mat va cham cong thanh cong"));
     }
 
@@ -70,7 +74,7 @@ public class AttendanceController {
             @Valid @RequestBody FaceCheckinRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
-                attendanceService.faceIdentify(userDetails.getUserId(), request),
+                tabletCapture.faceIdentify(userDetails.getUserId(), servletRequest.getHeader("X-Attendance-Device-Id"), servletRequest.getHeader("X-Attendance-Device-Secret"), request),
                 "Nhan dien khuon mat va cham cong thanh cong"));
     }
 
@@ -111,8 +115,16 @@ public class AttendanceController {
             @Valid @RequestBody AttendanceSyncRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
-                attendanceService.syncOfflineLogs(request, userDetails.getUserId()),
+                syncWithDevice(request, userDetails.getUserId()),
                 "Dong bo cham cong offline hoan tat"));
+    }
+
+    private AttendanceSyncResponse syncWithDevice(AttendanceSyncRequest request, java.util.UUID account) {
+        String id=servletRequest.getHeader("X-Attendance-Device-Id");
+        String secret=servletRequest.getHeader("X-Attendance-Device-Secret");
+        if (id!=null) return tabletSync.sync(account, tabletDevices.parseId(id), secret, request);
+        if (tabletDevices.enforced() && tabletDevices.attendanceAccount(account)) throw tabletDevices.error("DEVICE_ID_REQUIRED");
+        return attendanceService.syncOfflineLogs(request, account);
     }
 
     @Operation(summary = "Dong bo log ket qua nhan dien khuon mat de monitor false reject rate")
@@ -121,6 +133,10 @@ public class AttendanceController {
     public ResponseEntity<ApiResponse<Integer>> syncRecognitionLogs(
             @Valid @RequestBody FaceRecognitionLogBatchRequest request,
             @AuthenticationPrincipal CustomUserDetails userDetails) {
+        String id=servletRequest.getHeader("X-Attendance-Device-Id");
+        if(id!=null) tabletDevices.authenticate(userDetails.getUserId(),tabletDevices.parseId(id),servletRequest.getHeader("X-Attendance-Device-Secret"));
+        else if(tabletDevices.enforced() && tabletDevices.attendanceAccount(userDetails.getUserId())) throw tabletDevices.error("DEVICE_ID_REQUIRED");
+
         return ResponseEntity.ok(ApiResponse.success(
                 faceRecognitionMonitoringService.saveMobileLogs(request, userDetails.getUserId()),
                 "Dong bo log nhan dien hoan tat"));

@@ -262,6 +262,16 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         _lastProcessedAt = now;
         _isProcessingFrame = true;
         try {
+          if (!mounted) return;
+          final attendanceAuth = context.read<AuthProvider>();
+          if (_mode == AttendanceMode.verification &&
+              attendanceAuth.isAttendanceAccount &&
+              !await attendanceAuth.tablets.canCapture()) {
+            _setStatus(
+              'Thiết bị chưa được duyệt, bị khóa hoặc quyền offline đã hết 24 giờ. Kết nối server để xác nhận.',
+            );
+            continue;
+          }
           final offline = _network?.isOffline ?? false;
           if (_mode == AttendanceMode.verification &&
               offline &&
@@ -908,6 +918,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     try {
       _setStatus('Đang gửi ảnh lên server để xác minh...');
       final auth = context.read<AuthProvider>();
+      if (auth.isAttendanceAccount) await auth.tablets.captureContext();
       final selfCheckOnly = widget.selfCheckOnly;
       final response = await auth.api.post(
         selfCheckOnly
@@ -951,6 +962,13 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       }
       await Future<void>.delayed(const Duration(seconds: 3));
     } catch (error) {
+      if (mounted &&
+          error is ApiException &&
+          (error.statusCode == 401 || error.statusCode == 403) &&
+          error.message.startsWith('DEVICE_')) {
+        await context.read<AuthProvider>().tablets.revokeLocalAuthorization();
+      }
+
       final failureMessage = _serverFaceFailureMessage(error);
       _logFaceAuth('server_verification_rejected', {
         'error': error.toString(),
@@ -1046,17 +1064,30 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
     _isSaving = true;
     try {
-      await _databaseService.insertAttendanceLog(
+      if (!mounted) return;
+      final auth = context.read<AuthProvider>();
+      final tabletContext = auth.isAttendanceAccount
+          ? await auth.tablets.captureContext()
+          : null;
+      final insertedLogId = await _databaseService.insertAttendanceLog(
         match,
+        tabletContext: tabletContext,
         faceEmbedding: embedding,
         faceImageBase64: faceImageBase64,
         imageContentType: 'image/jpeg',
       );
-      final synced = await _syncPendingIfOnline(showStatus: false);
+      await _syncPendingIfOnline(showStatus: false);
+      final rowState = await _databaseService.attendanceLogSyncState(
+        insertedLogId,
+      );
       final nearbyDuplicate =
-          synced == 0 && _databaseService.lastSyncHadNearbyDuplicate;
-      final serverRejection = synced == 0
-          ? await _databaseService.getLatestPendingServerRejection()
+          rowState['sync_error']?.toString().contains('within 2 minutes') ??
+          false;
+      final synced = rowState['sync_state'] == 'SYNCED' && !nearbyDuplicate
+          ? 1
+          : 0;
+      final serverRejection = rowState['sync_state'] == 'REJECTED'
+          ? rowState['sync_error']?.toString() ?? 'Rejected'
           : null;
       _isPendingServerConfirmation =
           synced == 0 && serverRejection == null && !nearbyDuplicate;

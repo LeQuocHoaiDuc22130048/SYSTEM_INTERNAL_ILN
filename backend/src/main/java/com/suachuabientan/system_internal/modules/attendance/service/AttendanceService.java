@@ -318,6 +318,18 @@ public class AttendanceService {
         return new AttendanceSyncResponse(request.logs().size(), synced, skipped, failed, results);
     }
 
+    /** Called inside the tablet submission transaction, so record and receipt commit together. */
+    @Transactional
+    public AttendanceSyncItemResponse syncTabletLog(AttendanceSyncItemRequest item, UUID actor) {
+        var result = syncOfflineLog(item, actor, System.nanoTime());
+        if ("SYNCED".equals(result.status())) {
+            var record = attendanceRecordRepository.findById(result.serverRecordId()).orElseThrow();
+            record.setCheckTime(item.checkTime());
+            attendanceRecordRepository.saveAndFlush(record);
+        }
+        return result;
+    }
+
     private AttendanceSyncItemResponse syncOfflineLog(
             AttendanceSyncItemRequest item,
             UUID syncedByUserId,

@@ -5,6 +5,47 @@ import 'package:http/testing.dart';
 import 'package:system_inverter_likenew/utils/api_client.dart';
 
 void main() {
+  test(
+    'tablet retries cannot send an old payload under a new account',
+    () async {
+      late ApiClient api;
+      var submitted = 0;
+      final mock = MockClient((request) async {
+        if (request.url.path.endsWith('/refresh')) {
+          api.attendanceAccountId = 'new-account';
+          api.attendanceHeaders = () => {
+            'X-Attendance-Device-Id': 'new-device',
+            'X-Attendance-Device-Secret': 'new-secret',
+          };
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'accessToken': 'new-token',
+                'refreshToken': 'new-refresh',
+              },
+            }),
+            200,
+          );
+        }
+        submitted++;
+        return http.Response(jsonEncode({'message': 'expired'}), 401);
+      });
+      api = ApiClient(client: mock, baseUrl: 'https://test.local');
+      api.attendanceAccountId = 'old-account';
+      api.attendanceHeaders = () => {
+        'X-Attendance-Device-Id': 'old-device',
+        'X-Attendance-Device-Secret': 'old-secret',
+      };
+      api.accessToken = 'old-token';
+      api.refreshToken = 'old-refresh';
+      await expectLater(
+        api.post('/api/v1/attendance/sync', body: {'logs': []}),
+        throwsA(isA<ApiException>()),
+      );
+      expect(submitted, 1);
+    },
+  );
+
   group('ApiClient Tests', () {
     test(
       'TC1: ApiClient can be initialized with custom baseUrl and make requests',

@@ -6,7 +6,7 @@ import jakarta.validation.constraints.NotEmpty;
 import java.util.List;
 
 public record AttendanceSyncRequest(
-        @NotEmpty List<@Valid AttendanceSyncItemRequest> logs
+        @NotEmpty @jakarta.validation.constraints.Size(max = 100) List<@Valid AttendanceSyncItemRequest> logs
 ) {
 }
 

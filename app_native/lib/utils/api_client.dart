@@ -19,6 +19,27 @@ class ApiException implements Exception {
 enum TokenRefreshResult { success, rejected, unavailable }
 
 class ApiClient {
+  Map<String, String> Function()? attendanceHeaders;
+  String? attendanceAccountId;
+  Map<String, String> _tabletHeaders(String path) =>
+      path.startsWith('/api/v1/attendance/')
+      ? attendanceHeaders?.call() ?? {}
+      : {};
+
+  Map<String, String> _boundHeaders(
+    String path,
+    String? account,
+    Map<String, String> tablet,
+  ) {
+    if (account != null && path.startsWith('/api/v1/attendance/')) {
+      final current = _tabletHeaders(path);
+      if (account != attendanceAccountId || !mapEquals(current, tablet)) {
+        throw ApiException(401, 'DEVICE_SESSION_CHANGED');
+      }
+    }
+    return {..._headers(), ...tablet};
+  }
+
   final http.Client _client;
   final FlutterSecureStorage? _secureStorage;
   final String? _customBaseUrl;
@@ -151,20 +172,30 @@ class ApiClient {
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
+    final account = attendanceAccountId;
+    final tablet = Map<String, String>.from(_tabletHeaders(path));
     return _send(
       method: 'GET',
       path: path,
       queryParameters: queryParameters,
-      request: (requestUri) => _client.get(requestUri, headers: _headers()),
+      request: (requestUri) => _client.get(
+        requestUri,
+        headers: _boundHeaders(path, account, tablet),
+      ),
     );
   }
 
   Future<dynamic> post(String path, {Object? body}) async {
+    final account = attendanceAccountId;
+    final tablet = Map<String, String>.from(_tabletHeaders(path));
     return _send(
       method: 'POST',
       path: path,
-      request: (requestUri) =>
-          _client.post(requestUri, headers: _headers(), body: _encode(body)),
+      request: (requestUri) => _client.post(
+        requestUri,
+        headers: _boundHeaders(path, account, tablet),
+        body: _encode(body),
+      ),
     );
   }
 
@@ -273,6 +304,11 @@ class ApiClient {
         : candidatesList;
 
     for (final candidateBaseUrl in candidates) {
+      if (attendanceAccountId != null &&
+          path.startsWith('/api/v1/attendance/') &&
+          candidateBaseUrl != _effectiveBaseUrlCandidates.first) {
+        continue;
+      }
       requestUri = uriFor(candidateBaseUrl, path, queryParameters);
       stopwatch = Stopwatch()..start();
       _log('$method $requestUri');
@@ -362,6 +398,8 @@ class ApiClient {
     final completer = Completer<TokenRefreshResult>();
     _refreshCompleter = completer;
 
+    final refreshAccount = attendanceAccountId;
+    final originalRefreshToken = refreshToken;
     _log('Attempting to refresh token...');
     try {
       final refreshUri = Uri.parse('$activeBaseUrl/api/v1/auth/refresh');
@@ -374,6 +412,11 @@ class ApiClient {
           )
           .timeout(_timeout);
 
+      if (refreshAccount != attendanceAccountId ||
+          originalRefreshToken != refreshToken) {
+        completer.complete(TokenRefreshResult.unavailable);
+        return TokenRefreshResult.unavailable;
+      }
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic> && decoded.containsKey('data')) {

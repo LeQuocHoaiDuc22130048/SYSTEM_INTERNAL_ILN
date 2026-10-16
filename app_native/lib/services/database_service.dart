@@ -5,6 +5,9 @@ import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
 import '../utils/api_client.dart';
+import 'attendance_identifier.dart';
+import 'attendance_sync_outcome.dart';
+import 'attendance_queue_policy.dart';
 
 class EnrolledEmployee {
   final String id;
@@ -69,6 +72,8 @@ class FaceEmbeddingSample {
 
 class AttendanceLog {
   final int? id;
+  final String? localLogId;
+  final Map<String, dynamic>? tabletContext;
   final String employeeId;
   final String employeeName;
   final double confidence;
@@ -83,6 +88,8 @@ class AttendanceLog {
 
   const AttendanceLog({
     this.id,
+    this.localLogId,
+    this.tabletContext,
     required this.employeeId,
     required this.employeeName,
     required this.confidence,
@@ -99,6 +106,10 @@ class AttendanceLog {
   Map<String, Object?> toMap() {
     return {
       'id': id,
+      'local_log_id': localLogId,
+      'tablet_context': tabletContext == null
+          ? null
+          : jsonEncode(tabletContext),
       'employee_id': employeeId,
       'employee_name': employeeName,
       'confidence': confidence,
@@ -118,6 +129,12 @@ class AttendanceLog {
   factory AttendanceLog.fromMap(Map<String, Object?> map) {
     return AttendanceLog(
       id: map['id'] as int?,
+      localLogId: map['local_log_id'] as String?,
+      tabletContext: map['tablet_context'] == null
+          ? null
+          : Map<String, dynamic>.from(
+              jsonDecode(map['tablet_context'] as String) as Map,
+            ),
       employeeId: map['employee_id'] as String,
       employeeName: map['employee_name'] as String,
       confidence: (map['confidence'] as num).toDouble(),
@@ -214,6 +231,8 @@ class FaceMatchThresholdCalibration {
 }
 
 class DatabaseService {
+  final String databaseName;
+  DatabaseService({this.databaseName = 'offline_face_attendance.db'});
   Database? _db;
   int _lastNearbyDuplicateSkips = 0;
   static const embeddingMaxOfflineAge = Duration(days: 7);
@@ -275,13 +294,14 @@ class DatabaseService {
   }
 
   Future<Database> get database async {
-    if (_db != null) return _db!;
+    if (_db != null && _db!.isOpen) return _db!;
 
     final dbPath = await getDatabasesPath();
-    final path = p.join(dbPath, 'offline_face_attendance.db');
+    final path = p.join(dbPath, databaseName);
     _db = await openDatabase(
       path,
-      version: 10,
+      version: 11,
+      singleInstance: false,
       onCreate: _createSchema,
       onUpgrade: (db, oldVersion, newVersion) async {
         if (oldVersion < 2) {
@@ -361,6 +381,7 @@ class DatabaseService {
       },
     );
     await _ensureSchema(_db!);
+    await _ensureTabletSchema(_db!);
     await purgeExpiredSyncQueueEntries();
     return _db!;
   }
@@ -423,6 +444,121 @@ class DatabaseService {
     ''');
     await _createAttendanceLogIndexes(db);
     await _createFaceRecognitionAttemptIndexes(db);
+  }
+
+  static Future<void> _ensureTabletSchema(Database db) async {
+    for (final entry in {
+      'local_log_id': 'TEXT',
+      'tablet_context': 'TEXT',
+      'review_id': 'TEXT',
+      'sync_state': "TEXT NOT NULL DEFAULT 'PENDING_SYNC'",
+    }.entries) {
+      await _addColumnIfMissing(db, 'attendance_logs', entry.key, entry.value);
+    }
+    await db.execute(
+      "UPDATE attendance_logs SET sync_state = 'SYNCED' WHERE synced_at IS NOT NULL AND sync_state = 'PENDING_SYNC'",
+    );
+  }
+
+  Future<int> transferLegacyForReview(String account, String device) async {
+    final db = await database;
+    final rows = await db.query(
+      'attendance_logs',
+      where:
+          "tablet_context IS NULL AND synced_at IS NULL AND sync_state IN ('LEGACY_REVIEW','PENDING_SYNC')",
+    );
+    return db.transaction((transaction) async {
+      for (final row in rows) {
+        final log = AttendanceLog.fromMap(row);
+        await transaction.update(
+          'attendance_logs',
+          {
+            'local_log_id': _syncLogId(log),
+            'tablet_context': jsonEncode({
+              'accountId': account,
+              'deviceId': device,
+              'legacy': true,
+              'originalAccountUnknown': true,
+            }),
+            'sync_state': 'PENDING_SYNC',
+            'sync_error':
+                'Transferred legacy data for manual review; original account unknown',
+          },
+          where: 'id = ?',
+          whereArgs: [log.id],
+        );
+      }
+      return rows.length;
+    });
+  }
+
+  Future<(int, int)> tabletQueueCounts(String account, String device) async {
+    final rows = await (await database).query(
+      'attendance_logs',
+      columns: ['tablet_context', 'sync_state'],
+    );
+    var pending = 0, review = 0;
+    for (final row in rows) {
+      final raw = row['tablet_context'];
+      if (raw == null) continue;
+      final c = jsonDecode(raw as String) as Map;
+      if (c['accountId'] != account || c['deviceId'] != device) continue;
+      if (row['sync_state'] == 'PENDING_REVIEW') {
+        review++;
+      } else if (row['sync_state'] == 'PENDING_SYNC') {
+        pending++;
+      }
+    }
+    return (pending, review);
+  }
+
+  Future<void> refreshTabletReviews({required ApiClient api}) async {
+    final account = api.attendanceAccountId;
+    final device = api.attendanceHeaders?.call()['X-Attendance-Device-Id'];
+    if (account == null || device == null) return;
+    final db = await database;
+    final rows = await db.query(
+      'attendance_logs',
+      where: "sync_state = 'PENDING_REVIEW' AND review_id IS NOT NULL",
+    );
+    final eligible = AttendanceQueuePolicy.eligible(
+      rows,
+      accountId: account,
+      deviceId: device,
+      limit: rows.length + 1,
+    );
+    for (var offset = 0; offset < eligible.length; offset += 20) {
+      if (api.attendanceAccountId != account ||
+          api.attendanceHeaders?.call()['X-Attendance-Device-Id'] != device) {
+        return;
+      }
+      final ids = eligible
+          .skip(offset)
+          .take(20)
+          .map((r) => r['review_id'])
+          .join(',');
+      final result = await api.get(
+        '/api/v1/attendance/devices/me/reviews',
+        queryParameters: {'ids': ids},
+      );
+      if (result is! List) continue;
+      for (final item in result) {
+        if (item is! Map) continue;
+        final status = item['status'];
+        if (status != 'SYNCED' && status != 'SKIPPED' && status != 'REJECTED') {
+          continue;
+        }
+        await db.update(
+          'attendance_logs',
+          {
+            'sync_state': status == 'REJECTED' ? 'REJECTED' : 'SYNCED',
+            'sync_error': item['error'],
+          },
+          where: 'review_id = ? AND sync_state = ?',
+          whereArgs: [item['id'], 'PENDING_REVIEW'],
+        );
+      }
+    }
   }
 
   static Future<void> _createFaceRecognitionAttemptTable(Database db) async {
@@ -758,16 +894,21 @@ class DatabaseService {
     List<double>? faceEmbedding,
     String? faceImageBase64,
     String? imageContentType,
+    Map<String, dynamic>? tabletContext,
   }) async {
     final db = await database;
     final type = await _nextAttendanceType(match.employee.id);
     return db.insert(
       'attendance_logs',
       AttendanceLog(
+        localLogId: newAttendanceId(),
+        tabletContext: tabletContext,
         employeeId: match.employee.id,
         employeeName: match.employee.name,
         confidence: match.cosineSimilarity,
-        checkedAt: DateTime.now(),
+        checkedAt: tabletContext == null
+            ? DateTime.now()
+            : DateTime.parse(tabletContext['checkTime'] as String),
         type: type,
         backendEmployeeId: match.employee.backendEmployeeId,
         faceEmbedding: faceEmbedding,
@@ -829,7 +970,7 @@ class DatabaseService {
     final rows = await db.query(
       'attendance_logs',
       columns: ['sync_error'],
-      where: "sync_error LIKE 'Server rejected:%'",
+      where: "sync_state = 'REJECTED' OR sync_error LIKE 'Server rejected:%'",
       orderBy: 'checked_at DESC',
       limit: 1,
     );
@@ -837,15 +978,48 @@ class DatabaseService {
     return rows.first['sync_error']?.toString();
   }
 
+  Future<Map<String, Object?>> attendanceLogSyncState(int id) async {
+    final rows = await (await database).query(
+      'attendance_logs',
+      columns: ['sync_state', 'sync_error'],
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+    return rows.isEmpty ? {} : rows.single;
+  }
+
   Future<int> syncPendingAttendanceLogs({required ApiClient api}) async {
     _lastNearbyDuplicateSkips = 0;
     final db = await database;
     await purgeExpiredBiometricQueueData();
-    final pending = await db.query(
+    final account = api.attendanceAccountId;
+    final device = api.attendanceHeaders?.call()['X-Attendance-Device-Id'];
+    if (account != null) {
+      await db.update(
+        'attendance_logs',
+        {
+          'sync_state': 'LEGACY_REVIEW',
+          'sync_error':
+              'Legacy attendance requires administrator review; original account is unknown',
+        },
+        where:
+            "tablet_context IS NULL AND synced_at IS NULL AND sync_state = 'PENDING_SYNC'",
+      );
+    }
+    final rows = await db.query(
       'attendance_logs',
-      where: 'synced_at IS NULL',
+      where: "synced_at IS NULL AND sync_state = 'PENDING_SYNC'",
       orderBy: 'checked_at ASC',
     );
+    final pending = AttendanceQueuePolicy.eligible(
+      rows,
+      accountId: account,
+      deviceId: device,
+    );
+    if (api.attendanceAccountId != account ||
+        api.attendanceHeaders?.call()['X-Attendance-Device-Id'] != device) {
+      return 0;
+    }
     return _syncPendingAttendanceLogsBatch(db, pending, api);
     /*
     var synced = 0;
@@ -952,6 +1126,7 @@ class DatabaseService {
       'attendance_logs',
       where: '''
         checked_at < ?
+        AND sync_state NOT IN ('PENDING_SYNC','PENDING_REVIEW','LEGACY_REVIEW')
         AND (
           synced_at IS NOT NULL
           OR sync_error LIKE 'Server rejected:%'
@@ -981,6 +1156,26 @@ class DatabaseService {
     final logs = pending.map(AttendanceLog.fromMap).toList(growable: false);
     final readyLogs = <AttendanceLog>[];
     for (final log in logs) {
+      final owner = log.tabletContext;
+      if (api.attendanceAccountId != null) {
+        if (owner == null) {
+          await db.update(
+            'attendance_logs',
+            {'sync_error': 'Legacy attendance requires administrator review'},
+            where: 'id = ?',
+            whereArgs: [log.id],
+          );
+          continue;
+        }
+        if (owner['accountId'] != api.attendanceAccountId ||
+            owner['deviceId'] !=
+                api.attendanceHeaders?.call()['X-Attendance-Device-Id']) {
+          continue;
+        }
+      } else if (owner != null) {
+        continue;
+      }
+
       if (log.backendEmployeeId == null || log.backendEmployeeId!.isEmpty) {
         await db.update(
           'attendance_logs',
@@ -1014,47 +1209,28 @@ class DatabaseService {
         final log = logsBySyncId[localLogId];
         if (log == null) continue;
 
-        if (status == 'SYNCED' ||
-            (status == 'SKIPPED' && message == 'Duplicate device log')) {
-          await db.update(
-            'attendance_logs',
-            {
-              'synced_at': DateTime.now().toIso8601String(),
-              'sync_error': null,
-              'face_image_base64': null,
-              'face_embedding': null,
-            },
-            where: 'id = ?',
-            whereArgs: [log.id],
-          );
-          synced++;
-        } else if (status == 'SKIPPED' &&
-            message == 'Duplicate employee timestamp within 2 minutes') {
-          await db.update(
-            'attendance_logs',
-            {
-              'synced_at': DateTime.now().toIso8601String(),
-              'sync_error': 'Duplicate nearby attendance',
-              'face_image_base64': null,
-              'face_embedding': null,
-            },
-            where: 'id = ?',
-            whereArgs: [log.id],
-          );
+        final outcome = AttendanceSyncOutcome.fromResult(result);
+        final changes = <String, Object?>{
+          'sync_state': outcome.state,
+          'sync_error': message.isEmpty ? null : message,
+        };
+        if (outcome.terminal) {
+          changes['synced_at'] = DateTime.now().toIso8601String();
+          changes['review_id'] = result['reviewId'];
+        }
+        if (outcome.discardEvidence) {
+          changes['face_image_base64'] = null;
+          changes['face_embedding'] = null;
+        }
+        await db.update(
+          'attendance_logs',
+          changes,
+          where: 'id = ?',
+          whereArgs: [log.id],
+        );
+        if (outcome.recorded) synced++;
+        if (status == 'SKIPPED' && message.contains('within 2 minutes')) {
           _lastNearbyDuplicateSkips++;
-        } else {
-          await db.update(
-            'attendance_logs',
-            {
-              'synced_at': DateTime.now().toIso8601String(),
-              'sync_error':
-                  'Server rejected: ${message.isNotEmpty ? message : 'Face verification failed'}',
-              'face_image_base64': null,
-              'face_embedding': null,
-            },
-            where: 'id = ?',
-            whereArgs: [log.id],
-          );
         }
       }
       await purgeExpiredSyncQueueEntries();
@@ -1086,7 +1262,7 @@ class DatabaseService {
         'sync_error': 'Expired biometric queue data purged',
       },
       where:
-          'synced_at IS NULL AND checked_at < ? AND (face_image_base64 IS NOT NULL OR face_embedding IS NOT NULL)',
+          "sync_state IN ('SYNCED','REJECTED') AND checked_at < ? AND (face_image_base64 IS NOT NULL OR face_embedding IS NOT NULL)",
       whereArgs: [cutoff],
     );
   }
@@ -1094,6 +1270,9 @@ class DatabaseService {
   Map<String, Object?> _attendanceLogToSyncJson(AttendanceLog log) {
     return {
       'localLogId': _syncLogId(log),
+      if (log.tabletContext != null) 'leaseId': log.tabletContext!['leaseId'],
+      if (log.tabletContext != null)
+        'leaseSignature': log.tabletContext!['leaseSignature'],
       'employeeId': log.backendEmployeeId,
       'type': log.type,
       'checkTime': log.checkedAt.toUtc().toIso8601String(),
@@ -1102,12 +1281,14 @@ class DatabaseService {
       'faceEmbedding': log.faceEmbedding,
       'faceImageBase64': log.faceImageBase64,
       'imageContentType': log.imageContentType ?? 'image/jpeg',
-      'deviceId': 'flutter-mobile-offline-face',
+      'deviceId':
+          log.tabletContext?['deviceId'] ?? 'flutter-mobile-offline-face',
       'note': 'Offline face attendance (${log.type})',
     };
   }
 
   String _syncLogId(AttendanceLog log) {
+    if (log.localLogId != null) return log.localLogId!;
     return [
       'flutter-mobile-offline-face',
       log.employeeId,

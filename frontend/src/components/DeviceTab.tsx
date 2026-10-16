@@ -1,3 +1,4 @@
+import { AttendanceTabletPanel } from './AttendanceTabletPanel';
 import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { hasPermission } from '../utils/permissions';
@@ -335,6 +336,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
 
   return (
     <div className="device-container">
+      <AttendanceTabletPanel role={currentUser?.role} canStatus={canAction('DEVICE_STATUS_UPDATE')} canReview={canAction('ATTENDANCE_RECORD_UPDATE')} showToast={showToast} />
       {/* Bento Grid Stats */}
       <div className="device-stats-grid">
         <div className="device-stat-card">

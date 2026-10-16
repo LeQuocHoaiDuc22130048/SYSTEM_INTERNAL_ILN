@@ -6,7 +6,10 @@ public record AttendanceSyncItemResponse(
         String localLogId,
         String status,
         UUID serverRecordId,
-        String message
+        String message,
+        UUID reviewId,
+        String errorCode
 ) {
+ public AttendanceSyncItemResponse(String localLogId,String status,UUID serverRecordId,String message){this(localLogId,status,serverRecordId,message,null,null);}
 }
 

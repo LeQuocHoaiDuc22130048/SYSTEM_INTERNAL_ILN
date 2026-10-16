@@ -10,16 +10,23 @@ import java.util.List;
 import java.util.UUID;
 
 public record AttendanceSyncItemRequest(
-        @NotBlank String localLogId,
+        @NotBlank @Size(max = 120) String localLogId,
         @NotNull UUID employeeId,
         @NotNull AttendanceType type,
         @NotNull Instant checkTime,
         Instant mobileCheckTime,
         Double confidenceScore,
-        List<Double> faceEmbedding,
-        String faceImageBase64,
+        @Size(max = 1024) List<Double> faceEmbedding,
+        @Size(max = 3_000_000) String faceImageBase64,
         String imageContentType,
         @Size(max = 100, message = "Device ID tối đa 100 ký tự") String deviceId,
-        String note
+        String note,
+        UUID leaseId,
+        String leaseSignature
 ) {
+    public AttendanceSyncItemRequest(String localLogId,UUID employeeId,AttendanceType type,Instant checkTime,
+        Instant mobileCheckTime,Double confidenceScore,List<Double> faceEmbedding,String faceImageBase64,
+        String imageContentType,String deviceId,String note){
+        this(localLogId,employeeId,type,checkTime,mobileCheckTime,confidenceScore,faceEmbedding,faceImageBase64,imageContentType,deviceId,note,null,null);
+    }
 }

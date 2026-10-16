@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:async';
+import '../services/attendance_device_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/app_permission.dart';
@@ -13,9 +15,11 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider({ApiClient? apiClient})
     : api =
           apiClient ?? ApiClient(secureStorage: const FlutterSecureStorage()) {
+    tablets = AttendanceDeviceService(api);
     api.onSessionExpired = _expireSession;
   }
 
+  late final AttendanceDeviceService tablets;
   User? _currentUser;
   bool _isLoading = false;
   bool _isLoadingProfile = false;
@@ -75,6 +79,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       _currentUser = User.fromLoginJson(userInfo);
+      _startTablet();
       await _secureStorage.write(
         key: _userCacheKey,
         value: jsonEncode(_currentUser!.toJson()),
@@ -266,6 +271,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> logout() async {
+    tablets.stop();
     _log('Logout started');
     _logoutWarning = null;
     final token = api.refreshToken;
@@ -287,6 +293,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   void _expireSession() {
+    tablets.stop();
     api.accessToken = null;
     api.refreshToken = null;
     _currentUser = null;
@@ -331,6 +338,7 @@ class AuthProvider extends ChangeNotifier {
       }
 
       if (_currentUser != null) {
+        _startTablet();
         _log('Auto login successful for user=${_currentUser?.username}');
         return true;
       }
@@ -347,6 +355,20 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+  }
+
+  void _startTablet() {
+    if (isAttendanceAccount && _currentUser != null) {
+      unawaited(tablets.start(_currentUser!.id));
+    } else {
+      tablets.stop();
+    }
+  }
+
+  @override
+  void dispose() {
+    tablets.dispose();
+    super.dispose();
   }
 
   Future<void> _run(Future<void> Function() action) async {
