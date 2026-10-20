@@ -3094,6 +3094,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     required String hint,
     required IconData icon,
     bool alignLabelWithHint = false,
+    Widget? suffixIcon,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return InputDecoration(
@@ -3101,6 +3102,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
       hintText: hint,
       alignLabelWithHint: alignLabelWithHint,
       prefixIcon: Icon(icon, size: 20),
+      suffixIcon: suffixIcon,
       filled: true,
       fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       border: OutlineInputBorder(
@@ -3128,10 +3130,24 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
     TextInputType? keyboardType,
     int maxLines = 1,
     bool required = true,
+    TextInputAction? textInputAction,
+    Widget? suffixIcon,
   }) {
+    final effectiveSuffixIcon = suffixIcon ??
+        (keyboardType == TextInputType.phone ||
+                keyboardType == TextInputType.number
+            ? IconButton(
+                icon: const Icon(Icons.keyboard_hide_outlined, size: 20),
+                tooltip: 'Ẩn bàn phím',
+                onPressed: () => FocusScope.of(context).unfocus(),
+              )
+            : null);
+
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      textInputAction: textInputAction ??
+          (maxLines > 1 ? TextInputAction.newline : TextInputAction.next),
       maxLines: maxLines,
       style: const TextStyle(fontSize: 14),
       decoration: _unifiedInputDecoration(
@@ -3140,6 +3156,7 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
         hint: hint,
         icon: icon,
         alignLabelWithHint: maxLines > 1,
+        suffixIcon: effectiveSuffixIcon,
       ),
       validator: (value) {
         if (required && (value == null || value.trim().isEmpty)) {
@@ -3211,6 +3228,8 @@ class _EditOrderSheetState extends State<_EditOrderSheet> {
               ModalTopBar(title: 'Chỉnh sửa ${widget.order.orderNumber}'),
               Flexible(
                 child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                   child: Form(
                     key: _formKey,
@@ -4681,6 +4700,8 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
                 const ModalTopBar(title: 'Tạo đơn sửa chữa mới'),
                 Flexible(
                   child: SingleChildScrollView(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
                     child: Form(
                       key: _formKey,
@@ -5066,12 +5087,25 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
     TextInputType? keyboardType,
     int maxLines = 1,
     bool required = true,
+    TextInputAction? textInputAction,
+    Widget? suffixIcon,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final effectiveSuffixIcon = suffixIcon ??
+        (keyboardType == TextInputType.phone ||
+                keyboardType == TextInputType.number
+            ? IconButton(
+                icon: const Icon(Icons.keyboard_hide_outlined, size: 20),
+                tooltip: 'Ẩn bàn phím',
+                onPressed: () => FocusScope.of(context).unfocus(),
+              )
+            : null);
 
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
+      textInputAction: textInputAction ??
+          (maxLines > 1 ? TextInputAction.newline : TextInputAction.next),
       maxLines: maxLines,
       style: const TextStyle(fontSize: 14),
       decoration: InputDecoration(
@@ -5079,6 +5113,7 @@ class _CreateOrderSheetState extends State<_CreateOrderSheet> {
         hintText: hint,
         alignLabelWithHint: maxLines > 1,
         prefixIcon: Icon(icon, size: 20),
+        suffixIcon: effectiveSuffixIcon,
         filled: true,
         fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         border: OutlineInputBorder(
@@ -5115,11 +5150,15 @@ class _KeyboardBottomPadding extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedPadding(
-      padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
-      duration: const Duration(milliseconds: 120),
-      curve: Curves.easeOutCubic,
-      child: child,
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: AnimatedPadding(
+        padding: EdgeInsets.only(bottom: MediaQuery.viewInsetsOf(context).bottom),
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOutCubic,
+        child: child,
+      ),
     );
   }
 }
@@ -5598,6 +5637,7 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
         // Tên thiết bị
         TextFormField(
           controller: entry.nameController,
+          textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             labelText: 'Tên thiết bị *',
             hintText: 'Biến tần Yaskawa, Delta...',
@@ -5628,6 +5668,7 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
         // Số seri
         TextFormField(
           controller: entry.serialController,
+          textInputAction: TextInputAction.next,
           decoration: InputDecoration(
             labelText: 'Số seri',
             hintText: 'Nhập số seri (nếu có)',
@@ -5658,6 +5699,7 @@ class _DeviceFormCardState extends State<_DeviceFormCard> {
         TextFormField(
           controller: entry.descController,
           maxLines: 2,
+          textInputAction: TextInputAction.newline,
           decoration: InputDecoration(
             labelText: 'Tình trạng lỗi',
             hintText: 'Mô tả lỗi thiết bị',
