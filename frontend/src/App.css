@@ -533,6 +533,7 @@
 
 /* Mini Bar State Colors */
 .mini-day.p { background-color: var(--color-success); }
+.mini-day.w { background-color: #3b82f6; }
 .mini-day.l { background-color: var(--color-late); }
 .mini-day.a { background-color: var(--color-absent); }
 .mini-day.v { background-color: var(--color-leave); }

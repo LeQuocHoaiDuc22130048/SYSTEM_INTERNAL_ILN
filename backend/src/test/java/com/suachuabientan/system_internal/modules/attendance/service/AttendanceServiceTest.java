@@ -36,6 +36,7 @@ class AttendanceServiceTest {
         var day = new com.suachuabientan.system_internal.modules.attendance.entity.FieldWorkDay();
         day.setEmployeeId(employeeId);
         day.setWorkDate(date);
+        day.setStatus("APPROVED");
         day.setNote("Nhà máy ABC");
         when(fieldWorkDayRepository.findByEmployeeIdAndWorkDateAndIsDeletedFalse(employeeId, date))
                 .thenReturn(Optional.of(day));
@@ -52,6 +53,24 @@ class AttendanceServiceTest {
         assertEquals(null, response.checkOut());
         assertEquals(false, response.isLate());
         assertEquals(1, attendanceService.getReport(date).size());
+    }
+
+    @Test
+    void fieldWorkPendingDoesNotCreditFieldWork() {
+        var date = java.time.LocalDate.of(2026, 9, 21);
+        var day = new com.suachuabientan.system_internal.modules.attendance.entity.FieldWorkDay();
+        day.setEmployeeId(employeeId);
+        day.setWorkDate(date);
+        day.setStatus("PENDING");
+        day.setNote("Nhà máy ABC");
+        when(fieldWorkDayRepository.findByEmployeeIdAndWorkDateAndIsDeletedFalse(employeeId, date))
+                .thenReturn(Optional.of(day));
+        employee.setRole(com.suachuabientan.system_internal.modules.auth.enums.UserRole.EMPLOYEE);
+        org.mockito.Mockito.lenient().when(userRepository.findAll()).thenReturn(List.of(employee));
+        var response = attendanceService.getDaily(employeeId, date);
+        var json = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().valueToTree(response);
+        assertEquals("Nhà máy ABC", json.path("fieldWork").path("note").asText());
+        assertEquals(0.0, json.path("fieldWorkCredit").asDouble());
     }
     @Mock
     private AttendanceRecordRepository attendanceRecordRepository;

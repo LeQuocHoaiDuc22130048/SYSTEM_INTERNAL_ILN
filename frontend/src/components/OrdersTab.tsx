@@ -20,6 +20,7 @@ import type {
 } from '../types/orders';
 import type { Customer } from '../types/customer';
 import { getCustomers, createCustomer } from '../utils/customerApi';
+import { normalizeCustomerName } from '../utils/customerNameHelper';
 import { OrderListPanel } from './orders/OrderListPanel';
 import { OrderDetailPanel } from './orders/OrderDetailPanel';
 import './OrdersTab.css';
@@ -292,13 +293,14 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
   // Quick create customer
   const handleQuickCreateCustomer = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickName.trim()) {
+    const cleanName = normalizeCustomerName(quickName, quickType);
+    if (!cleanName) {
       showToast('Vui lòng nhập tên khách hàng');
       return;
     }
     setQuickCreating(true);
     const res = await createCustomer({
-      customerName: quickName.trim(),
+      customerName: cleanName,
       type: quickType,
       phone: quickPhone.trim() || null,
     });
@@ -1015,7 +1017,12 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
                   maxLength={100}
                   placeholder="VD: Công ty TNHH ABC hoặc Anh Tuấn"
                   value={quickName}
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
                   onChange={(e) => setQuickName(e.target.value)}
+                  onBlur={() => setQuickName((prev) => normalizeCustomerName(prev, quickType))}
                 />
               </div>
 

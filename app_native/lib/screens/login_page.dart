@@ -59,7 +59,7 @@ class _LoginPageState extends State<LoginPage> {
     if (!mounted) return;
 
     if (success) {
-      if (!auth.isAttendanceAccount) {
+      if (!auth.isAttendanceAccount && !auth.isCustomer) {
         context.read<BackendDataProvider>().loadAll(
           isManagerOrAbove: auth.isManagerOrAbove,
         );
@@ -202,7 +202,7 @@ class _LoginPageState extends State<LoginPage> {
 
       if (!mounted) return;
       setState(() => _loading = false);
-      if (!auth.isAttendanceAccount) {
+      if (!auth.isAttendanceAccount && !auth.isCustomer) {
         context.read<BackendDataProvider>().loadAll(
           isManagerOrAbove: auth.isManagerOrAbove,
         );

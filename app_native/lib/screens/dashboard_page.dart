@@ -87,7 +87,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                       crossAxisCount: wide ? 4 : 2,
                                       mainAxisSpacing: wide ? 20 : 10,
                                       crossAxisSpacing: wide ? 12 : 10,
-                                      mainAxisExtent: wide ? 112 : 98,
+                                      mainAxisExtent: wide ? 114 : 106,
                                     ),
                                 itemBuilder: (context, index) {
                                   final stat = stats[index];
@@ -409,11 +409,11 @@ class _DashboardStatCard extends StatelessWidget {
               children: [
                 Text(
                   stat.label,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     fontSize: 12,
-                    height: 1.1,
+                    height: 1.15,
                     color: isDark
                         ? AppColors.textSecondaryDark
                         : AppColors.textSecondaryLight,
@@ -2515,6 +2515,7 @@ _BadgeStyle _getStatusBadgeStyle(String status, bool isDark) {
         border: const Color(0xFFD8B4FE),
       );
     case 'PRESENT':
+    case 'WORKING':
       return _BadgeStyle(
         bg: isDark ? const Color(0xFF064E3B) : const Color(0xFFECFDF5),
         fg: const Color(0xFF10B981),

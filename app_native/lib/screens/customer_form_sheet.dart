@@ -108,12 +108,14 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
         ? null
         : _notesCtrl.text.trim();
 
+    final cleanName = normalizeCustomerName(_nameCtrl.text, _selectedType);
+
     try {
       Customer result;
       if (_isEditing) {
         result = await backend.updateCustomer(
           widget.customer!.id,
-          name: _nameCtrl.text.trim(),
+          name: cleanName,
           type: _selectedType,
           phone: cleanPhone,
           email: cleanEmail,
@@ -123,7 +125,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
         );
       } else {
         result = await backend.createCustomer(
-          name: _nameCtrl.text.trim(),
+          name: cleanName,
           type: _selectedType,
           phone: cleanPhone,
           email: cleanEmail,
@@ -163,6 +165,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
     int maxLines = 1,
     int? maxLength,
     TextInputType? keyboardType,
+    TextCapitalization textCapitalization = TextCapitalization.none,
     String? Function(String?)? validator,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -197,6 +200,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
           maxLines: maxLines,
           maxLength: maxLength,
           keyboardType: keyboardType,
+          textCapitalization: textCapitalization,
           style: TextStyle(
             fontSize: 14,
             color: isDark
@@ -405,6 +409,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
                             : LucideIcons.user,
                         required: true,
                         maxLength: 100,
+                        textCapitalization: TextCapitalization.words,
                         validator: (v) {
                           if (v == null || v.trim().isEmpty) {
                             return 'Vui lòng nhập tên khách hàng';
@@ -481,6 +486,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
                         icon: LucideIcons.mapPin,
                         maxLines: 2,
                         maxLength: 500,
+                        textCapitalization: TextCapitalization.sentences,
                         validator: (v) {
                           if (v != null && v.trim().length > 500) {
                             return 'Địa chỉ tối đa 500 ký tự';
@@ -497,6 +503,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
                         icon: LucideIcons.stickyNote,
                         maxLines: 3,
                         maxLength: 2000,
+                        textCapitalization: TextCapitalization.sentences,
                         validator: (v) {
                           if (v != null && v.trim().length > 2000) {
                             return 'Ghi chú tối đa 2000 ký tự';
@@ -554,5 +561,64 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
         ),
       ),
     );
+  }
+
+  static String normalizeCustomerName(String name, CustomerType type) {
+    if (name.trim().isEmpty) return '';
+    const acronyms = {
+      'TNHH',
+      'CP',
+      'JSC',
+      'MTV',
+      'TM',
+      'DV',
+      'TMDV',
+      'XNK',
+      'KCN',
+      'PCCC',
+      'EVN',
+      'ABB',
+      'VFD',
+      'PLC',
+      'SCADA',
+      'CNC',
+      'IT',
+      'AI',
+      'LLC',
+      'LTD',
+      'CO',
+      'CORP',
+      'INC',
+    };
+    const lowercaseCompanyWords = {'ty', 'và', 'của', 'tại', 'cho'};
+
+    String normalizeWord(String word, bool isCompany, int index) {
+      if (word.isEmpty) return '';
+      if (word.contains('-')) {
+        return word
+            .split('-')
+            .map((p) => normalizeWord(p, isCompany, index))
+            .join('-');
+      }
+      final upper = word.toUpperCase();
+      if (acronyms.contains(upper)) {
+        return upper;
+      }
+      final lower = word.toLowerCase();
+      if (isCompany && index > 0 && lowercaseCompanyWords.contains(lower)) {
+        return lower;
+      }
+      final first = word.substring(0, 1).toUpperCase();
+      final rest = word.length > 1 ? word.substring(1).toLowerCase() : '';
+      return first + rest;
+    }
+
+    final isCompany = type == CustomerType.company;
+    final words = name.trim().replaceAll(RegExp(r'\s+'), ' ').split(' ');
+    return words
+        .asMap()
+        .entries
+        .map((e) => normalizeWord(e.value, isCompany, e.key))
+        .join(' ');
   }
 }

@@ -17,6 +17,7 @@ import {
   X,
   Copy,
   Phone,
+  PhoneCall,
   Mail,
   MapPin,
   AlertCircle,
@@ -38,8 +39,11 @@ import {
   updateCustomerStatus,
   getCustomerRepairOrders,
 } from '../utils/customerApi';
+import { normalizeCustomerName } from '../utils/customerNameHelper';
 import './CustomersTab.css';
 import { CustomerOrderLinkModal } from './CustomerOrderLinkModal';
+import { CustomerAccountsSection } from './CustomerAccountsSection';
+import { PortalSupportConfigModal } from './PortalSupportConfigModal';
 
 interface CustomersTabProps {
   showToast: (msg: string) => void;
@@ -53,6 +57,7 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
 }) => {
   const canAction = usePermissionCheck();
   const canManage = hasPermission(currentUser ?? null, 'CUSTOMER_MANAGE');
+  const canManagePortalSupport = hasPermission(currentUser ?? null, 'CUSTOMER_ACCOUNTS_MANAGE') || canManage;
 
   // Search & Filter state
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -72,7 +77,7 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
-  const [detailTab, setDetailTab] = useState<'info' | 'orders'>('info');
+  const [detailTab, setDetailTab] = useState<'info' | 'orders' | 'portal'>('info');
 
   // Customer orders state
   const [customerOrders, setCustomerOrders] = useState<any[]>([]);
@@ -80,6 +85,7 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
   const [customerOrdersPage, setCustomerOrdersPage] = useState<number>(0);
   const [customerOrdersTotal, setCustomerOrdersTotal] = useState<number>(0);
   const [linkOrdersOpen, setLinkOrdersOpen] = useState(false);
+  const [isSupportConfigModalOpen, setIsSupportConfigModalOpen] = useState(false);
 
   // Form input state
   const [formName, setFormName] = useState<string>('');
@@ -177,7 +183,7 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
   // Open Edit Form
   const handleOpenEditModal = (c: Customer) => {
     setEditingCustomer(c);
-    setFormName(c.customerName);
+    setFormName(normalizeCustomerName(c.customerName, c.type));
     setFormType(c.type);
     setFormPhone(c.phone || '');
     setFormEmail(c.email || '');
@@ -205,11 +211,13 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
     e.preventDefault();
     if (submitting) return;
 
+    const cleanName = normalizeCustomerName(formName, formType);
+
     // Client-side quick checks
     const errors: Record<string, string> = {};
-    if (!formName.trim()) {
+    if (!cleanName) {
       errors.customerName = 'Tên khách hàng không được để trống';
-    } else if (formName.trim().length > 100) {
+    } else if (cleanName.length > 100) {
       errors.customerName = 'Tên khách hàng tối đa 100 ký tự';
     }
     if (formPhone.trim().length > 20) {
@@ -241,7 +249,7 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
     setFieldErrors({});
 
     const payload: CustomerRequest = {
-      customerName: formName.trim(),
+      customerName: cleanName,
       type: formType,
       phone: formPhone.trim() || null,
       email: formEmail.trim() || null,
@@ -328,6 +336,18 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
             Làm mới
           </button>
+          {canManagePortalSupport && (
+            <button
+              type="button"
+              className="btn-secondary-refresh"
+              onClick={() => setIsSupportConfigModalOpen(true)}
+              title="Cấu hình kênh hỗ trợ Portal (Hotline, Zalo)"
+              style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff' }}
+            >
+              <PhoneCall size={16} />
+              Kênh hỗ trợ Portal
+            </button>
+          )}
           {canManage && (
             (canAction('CUSTOMER_CREATE') && (<button
               type="button"
@@ -572,7 +592,12 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
                     maxLength={100}
                     placeholder="VD: Nguyễn Văn A hoặc Công ty TNHH Minh Anh"
                     value={formName}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     onChange={(e) => setFormName(e.target.value)}
+                    onBlur={() => setFormName((prev) => normalizeCustomerName(prev, formType))}
                   />
                   {fieldErrors.customerName && (
                     <span className="field-error">{fieldErrors.customerName}</span>
@@ -715,6 +740,13 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
                 >
                   Lịch sử đơn sửa chữa ({customerOrdersTotal})
                 </button>) }
+                <button
+                  type="button"
+                  className={`customer-tab-btn ${detailTab === 'portal' ? 'active' : ''}`}
+                  onClick={() => setDetailTab('portal')}
+                >
+                  Tài khoản Portal
+                </button>
               </div>
 
               {detailTab === 'info' ? (
@@ -845,7 +877,7 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : detailTab === 'orders' ? (
                 (canAction('CUSTOMER_HISTORY_VIEW') && (<div>
                   {customerOrdersLoading ? (
                     <div style={{ padding: '24px', textAlign: 'center', color: '#64748b' }}>
@@ -916,6 +948,12 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
                     </div>
                   )}
                 </div>))
+              ) : (
+                <CustomerAccountsSection
+                  customer={selectedCustomer}
+                  showToast={showToast}
+                  canManage={canManage || canAction('CUSTOMER_ACCOUNT_MANAGE')}
+                />
               )}
             </div>
 
@@ -1005,6 +1043,13 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Portal Support Config Modal */}
+      <PortalSupportConfigModal
+        isOpen={isSupportConfigModalOpen}
+        onClose={() => setIsSupportConfigModalOpen(false)}
+        showToast={showToast}
+      />
     </div>
   );
 };

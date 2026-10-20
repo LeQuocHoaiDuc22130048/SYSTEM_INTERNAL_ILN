@@ -19,6 +19,7 @@ import type { UserInfo } from '../../mockData';
 import type { Customer } from '../../types/customer';
 import { hasPermission } from '../../utils/permissions';
 import { getCustomers, linkRepairOrderCustomer } from '../../utils/customerApi';
+import { OrderCustomerPublishSection } from './OrderCustomerPublishSection';
 
 interface OrderDetailPanelProps {
   selectedOrder: RepairOrder;
@@ -369,6 +370,15 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
         </div>
       </div>
 
+      {/* Customer Portal Published Updates & Media */}
+      <OrderCustomerPublishSection
+        orderId={selectedOrder.id}
+        orderCode={selectedOrder.orderCode}
+        canPublish={canAction('REPAIR_CUSTOMER_PUBLISH')}
+        orderImages={selectedOrder.images}
+        showToast={showToast}
+      />
+
       {/* Timeline Event History */}
       {canAction('REPAIR_TIMELINE_VIEW') && (<div className="detail-content-section">
         <h4 className="section-title">Nhật ký xử lý đơn hàng</h4>
@@ -378,20 +388,33 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
           ) : timeline.length > 0 ? (
             <div className="timeline-events-list">
               {timeline.map((event, idx) => {
-                const statusMeta = getStatusMeta(event.status);
+                const actionLabel = event.action || event.status || 'Cập nhật';
+                const statusMeta = event.status ? getStatusMeta(event.status) : { label: actionLabel, color: 'status-default' };
+                const badgeText = event.action || statusMeta.label || 'Cập nhật';
+                const performer = event.changedByName || event.performedBy?.fullName || 'Hệ thống';
+
+                const rawDate = event.changedAt || event.createdAt;
+                let formattedTime = 'Vừa xong';
+                if (rawDate) {
+                  const d = new Date(rawDate);
+                  if (!isNaN(d.getTime())) {
+                    formattedTime = d.toLocaleString('vi-VN');
+                  }
+                }
+
                 return (
                   <div key={event.id || idx} className="timeline-event-item">
                     <div className="event-marker" />
                     <div className="event-content">
                       <div className="event-header-row">
-                        <span className={`status-badge sm ${statusMeta.color}`}>
-                          {statusMeta.label}
+                        <span className={`status-badge sm ${statusMeta.color || 'status-default'}`}>
+                          {badgeText}
                         </span>
                         <span className="event-time">
-                          {new Date(event.changedAt).toLocaleString('vi-VN')}
+                          {formattedTime}
                         </span>
                       </div>
-                      <div className="event-author">Thực hiện bởi: {event.changedByName}</div>
+                      <div className="event-author">Thực hiện bởi: <strong>{performer}</strong></div>
                       {event.note && <div className="event-note">{event.note}</div>}
                     </div>
                   </div>

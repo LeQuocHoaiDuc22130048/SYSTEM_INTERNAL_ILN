@@ -416,15 +416,19 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              _customer.customerCode,
-                              style: TextStyle(
-                                fontSize: 13,
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.bold,
-                                color: isDark
-                                    ? AppColors.textPrimaryDark
-                                    : AppColors.primary,
+                            Flexible(
+                              child: Text(
+                                _customer.customerCode,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontFamily: 'monospace',
+                                  fontWeight: FontWeight.bold,
+                                  color: isDark
+                                      ? AppColors.textPrimaryDark
+                                      : AppColors.primary,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 6),

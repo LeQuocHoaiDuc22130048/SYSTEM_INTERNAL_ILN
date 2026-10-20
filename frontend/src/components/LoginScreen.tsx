@@ -13,9 +13,10 @@ import {
 interface LoginScreenProps {
   onLoginSuccess: (userInfo: any) => void;
   showToast: (message: string) => void;
+  onNavigatePortal?: () => void;
 }
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showToast }) => {
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showToast, onNavigatePortal }) => {
   // Mode state: login or register
   const [isRegisterMode, setIsRegisterMode] = useState<boolean>(false);
 
@@ -282,6 +283,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showTo
                       style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
                     >
                       Chưa có tài khoản? Đăng ký ngay
+                    </button>
+                  </div>
+
+                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onNavigatePortal) {
+                          onNavigatePortal();
+                        } else {
+                          window.location.hash = '#track';
+                        }
+                      }}
+                      style={{
+                        background: '#eff6ff',
+                        border: '1px solid #bfdbfe',
+                        borderRadius: '8px',
+                        padding: '10px 16px',
+                        cursor: 'pointer',
+                        fontSize: '13.5px',
+                        fontWeight: '600',
+                        color: '#2563eb',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        transition: 'all 0.2s',
+                        width: '100%',
+                        justifyContent: 'center',
+                      }}
+                    >
+                      🔍 Tra cứu tiến độ đơn sửa chữa (Khách hàng)
                     </button>
                   </div>
                 </>

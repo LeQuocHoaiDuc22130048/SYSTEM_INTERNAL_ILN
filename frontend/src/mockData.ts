@@ -68,8 +68,8 @@ export interface UserInfo {
   permissions?: string[];
 }
 
-/** Ký tự đại diện cho trạng thái ngày trong dailyPattern (p=present, l=late, a=absent, v=leave, h=holiday, o=overtime, m=half-morning, c=half-afternoon, f=future) */
-export type DailyStatusChar = 'p' | 'l' | 'a' | 'v' | 'h' | 'o' | 'm' | 'c' | 'f';
+/** Ký tự đại diện cho trạng thái ngày trong dailyPattern (p=present, w=working, l=late, a=absent, v=leave, h=holiday, o=overtime, m=half-morning, c=half-afternoon, f=future) */
+export type DailyStatusChar = 'p' | 'w' | 'l' | 'a' | 'v' | 'h' | 'o' | 'm' | 'c' | 'f';
 
 /** Loại chấm công thủ công */
 export type AttendanceCheckType = 'IN' | 'OUT';

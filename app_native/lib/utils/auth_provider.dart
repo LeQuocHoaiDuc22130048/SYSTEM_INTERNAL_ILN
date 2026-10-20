@@ -40,6 +40,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isAttendanceAccount =>
       _currentUser?.username.trim().toLowerCase() == 'attendance' ||
       role == UserRole.attendance;
+  bool get isCustomer => role == UserRole.customer;
 
   bool can(AppPermission permission) {
     return _currentUser?.can(permission) ?? role.can(permission);

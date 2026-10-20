@@ -50,11 +50,20 @@ export interface Employee {
 
 export interface TimelineEvent {
   id: string;
-  status: string;
+  status?: string;
+  action?: string;
   note?: string;
-  changedByName: string;
-  changedAt: string;
+  changedByName?: string;
+  changedAt?: string;
+  createdAt?: string;
+  performedBy?: {
+    id: string;
+    fullName: string;
+    employeeCode?: string;
+    avatarUrl?: string;
+  };
 }
+
 
 export interface OrdersTabProps {
   showToast: (msg: string) => void;

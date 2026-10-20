@@ -23,6 +23,7 @@ import { CustomersTab } from './components/CustomersTab';
 import { WarehouseTab } from './components/WarehouseTab';
 import { AccountsTab } from './components/AccountsTab';
 import { DashboardTab } from './components/DashboardTab';
+import { CustomerPortalApp } from './components/portal/CustomerPortalApp';
 
 import { getAuthHeaders, getJsonAuthHeaders, createTimeoutController, STANDARD_WORK_DAYS } from './utils/auth';
 import { getDailyStatusFromPattern } from './utils/employee';
@@ -54,6 +55,18 @@ function App() {
       return null;
     }
   });
+
+  const [isPortalMode, setIsPortalMode] = useState<boolean>(() => {
+    return window.location.hash === '#portal' || window.location.hash === '#track';
+  });
+
+  useEffect(() => {
+    const handleHash = () => {
+      setIsPortalMode(window.location.hash === '#portal' || window.location.hash === '#track');
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -270,7 +283,7 @@ function App() {
   }, [showToast]);
 
   const fetchMonthlyData = useCallback(async () => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || currentUser?.role === 'CUSTOMER') return;
     setLoading(true);
     setDataSource('loading');
     setConnectionError(null);
@@ -320,7 +333,7 @@ function App() {
   }, [fetchMonthlyData, retryCount]);
 
   const fetchDailyReport = useCallback(async (dateStr: string) => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || currentUser?.role === 'CUSTOMER') return;
     setDailyLoading(true);
     try {
       const response = await fetch(`/api/v1/attendance/report?date=${dateStr}`, {
@@ -402,10 +415,8 @@ function App() {
   const dailyReportMap = useMemo(() => {
     const map: Record<string, any> = {};
     dailyReports.forEach(report => {
-      if (report.records?.length > 0) {
-        const empId = report.records[0].employeeId;
-        if (empId) map[empId] = report;
-      }
+      const empId = report.employeeId || (report.records?.length > 0 ? report.records[0].employeeId : null);
+      if (empId) map[empId] = report;
     });
     return map;
   }, [dailyReports]);
@@ -456,8 +467,13 @@ function App() {
       const statusChar = getDailyStatusFromPattern(emp, selectedDate);
 
       if (report) {
-        const hasIn = !!report.checkIn;
-        const hasOut = !!report.checkOut;
+        const isFieldWorkApproved = report.fieldWork?.status === 'APPROVED';
+        const isFieldWorkPending = report.fieldWork?.status === 'PENDING';
+        if (isFieldWorkApproved || isFieldWorkPending) {
+          onTime++;
+        } else {
+          const hasIn = !!report.checkIn;
+          const hasOut = !!report.checkOut;
 
         if (!hasIn && hasOut) {
           lateEarly++;
@@ -475,6 +491,7 @@ function App() {
             onTime++;
           }
         }
+      }
       } else {
         if (!isFuture && statusChar !== 'f' && statusChar !== 'h') {
           if (statusChar === 'a' || statusChar === 'v' || statusChar === '') {
@@ -499,14 +516,34 @@ function App() {
     };
   }, [activeEmployees]);
 
+  if (currentUser?.role === 'CUSTOMER' || (!isAuthenticated && isPortalMode)) {
+    return (
+      <CustomerPortalApp
+        currentUser={currentUser}
+        onLogout={handleLogout}
+        onNavigateLogin={() => {
+          setIsPortalMode(false);
+          window.location.hash = '';
+        }}
+      />
+    );
+  }
+
   if (!isAuthenticated) {
     return (
       <LoginScreen
         onLoginSuccess={(userInfo) => {
           setIsAuthenticated(true);
           setCurrentUser(userInfo);
+          if (userInfo?.role === 'CUSTOMER') {
+            setIsPortalMode(true);
+          }
         }}
         showToast={showToast}
+        onNavigatePortal={() => {
+          setIsPortalMode(true);
+          window.location.hash = '#track';
+        }}
       />
     );
   }

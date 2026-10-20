@@ -34,18 +34,19 @@ class FieldWorkApprovalPersistenceTest {
             }
         });
         tx.executeWithoutResult(t -> {
-            assertTrue(repo.findByEmployeeIdAndWorkDateAndIsDeletedFalse(employee, date).isEmpty());
-            assertTrue(repo.findByWorkDateAndIsDeletedFalse(date).isEmpty());
-            assertTrue(repo.findByWorkDateAndIsDeletedFalse(date.plusDays(2)).isEmpty());
-            assertEquals(1, repo.findByWorkDateBetweenAndIsDeletedFalse(date, date.plusDays(2)).size());
-            assertEquals(1, repo.findByEmployeeIdAndWorkDateBetweenAndIsDeletedFalseOrderByWorkDateAsc(employee, date, date.plusDays(2)).size());
+            assertTrue(repo.findByEmployeeIdAndWorkDateAndIsDeletedFalse(employee, date).isPresent());
+            assertEquals("PENDING", repo.findByEmployeeIdAndWorkDateAndIsDeletedFalse(employee, date).get().getStatus());
+            assertEquals(1, repo.findByWorkDateAndIsDeletedFalse(date).size());
+            assertEquals(1, repo.findByWorkDateAndIsDeletedFalse(date.plusDays(2)).size());
+            assertEquals(3, repo.findByWorkDateBetweenAndIsDeletedFalse(date, date.plusDays(2)).size());
+            assertEquals(3, repo.findByEmployeeIdAndWorkDateBetweenAndIsDeletedFalseOrderByWorkDateAsc(employee, date, date.plusDays(2)).size());
             assertEquals(3, repo.findByEmployeeIdAndWorkDateBetweenAndIsDeletedFalseOrderByWorkDateDesc(employee, date, date.plusDays(2)).size());
             var pending = repo.findTop100ByStatusAndIsDeletedFalseOrderByCreatedAtAsc("PENDING").getFirst();
             pending.setStatus("APPROVED"); repo.saveAndFlush(pending);
-            assertEquals(2, repo.findByWorkDateBetweenAndIsDeletedFalse(date, date.plusDays(2)).size());
+            assertEquals(3, repo.findByWorkDateBetweenAndIsDeletedFalse(date, date.plusDays(2)).size());
             assertTrue(repo.findTop100ByStatusAndIsDeletedFalseOrderByCreatedAtAsc("PENDING").isEmpty());
             pending.softDelete(employee); repo.saveAndFlush(pending);
-            assertEquals(1, repo.findByWorkDateBetweenAndIsDeletedFalse(date, date.plusDays(2)).size());
+            assertEquals(2, repo.findByWorkDateBetweenAndIsDeletedFalse(date, date.plusDays(2)).size());
         });
     }
 }

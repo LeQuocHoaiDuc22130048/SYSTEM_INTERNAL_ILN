@@ -378,6 +378,7 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                           case 'm': return 'Ca sáng';
                           case 'c': return 'Ca chiều';
                           case 'f': return isToday ? 'Hôm nay' : '';
+                          case 'WORKING': return 'Đang làm';
                           default: return state;
                         }
                       };

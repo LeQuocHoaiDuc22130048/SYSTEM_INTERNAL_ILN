@@ -13,5 +13,6 @@ public enum UserRole {
     TECHNICIAN,
     WAREHOUSE,
     EMPLOYEE,
-    ATTENDANCE
+    ATTENDANCE,
+    CUSTOMER
 }

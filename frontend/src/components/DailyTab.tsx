@@ -85,13 +85,25 @@ export const DailyTab: React.FC<DailyTabProps> = ({
       return <span className="pill-badge holiday">Chưa diễn ra</span>;
     }
 
-    if (report?.fieldWork || statusChar === 'p') {
+    const isFieldWorkApproved = report?.fieldWork?.status === 'APPROVED';
+    if (isFieldWorkApproved) {
       return (
         <span
           className="pill-badge field-work"
           style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f59e0b' }}
         >
           Đi công trình
+        </span>
+      );
+    }
+
+    if (report?.fieldWork && report.fieldWork.status === 'PENDING') {
+      return (
+        <span
+          className="pill-badge present"
+          title={`Chờ duyệt: ${report.fieldWork.note || 'Đi công trình'}`}
+        >
+          Đang làm
         </span>
       );
     }
@@ -143,6 +155,15 @@ export const DailyTab: React.FC<DailyTabProps> = ({
 
     if (isFuture || statusChar === 'f') {
       return <span className="pill-badge holiday">Chưa diễn ra</span>;
+    }
+    if (statusChar === 'w') {
+      return <span className="pill-badge present">Đang làm</span>;
+    }
+    if (statusChar === 'p') {
+      if (isToday) {
+        return <span className="pill-badge present">Đang làm</span>;
+      }
+      return <span className="pill-badge present">Đủ công</span>;
     }
     if (statusChar === 'o') {
       return <span className="pill-badge ot">Tăng ca</span>;

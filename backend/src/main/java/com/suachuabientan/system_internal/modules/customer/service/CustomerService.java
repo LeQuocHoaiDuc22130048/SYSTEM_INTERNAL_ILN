@@ -84,8 +84,55 @@ public class CustomerService {
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy khách hàng: " + id));
     }
 
+    private static final java.util.Set<String> ACRONYMS = java.util.Set.of(
+            "TNHH", "CP", "JSC", "MTV", "TM", "DV", "TMDV", "XNK",
+            "KCN", "PCCC", "EVN", "ABB", "VFD", "PLC", "SCADA",
+            "CNC", "IT", "AI", "LLC", "LTD", "CO", "CORP", "INC"
+    );
+
+    private static final java.util.Set<String> LOWERCASE_COMPANY_WORDS = java.util.Set.of(
+            "ty", "và", "của", "tại", "cho"
+    );
+
+    public static String normalizeCustomerName(String name, CustomerType type) {
+        if (name == null || name.isBlank()) return "";
+        String trimmed = name.strip().replaceAll("\\s+", " ");
+        String[] words = trimmed.split(" ");
+        StringBuilder sb = new StringBuilder();
+        boolean isCompany = type == CustomerType.COMPANY;
+        for (int i = 0; i < words.length; i++) {
+            if (i > 0) sb.append(" ");
+            sb.append(normalizeWord(words[i], isCompany, i));
+        }
+        return sb.toString();
+    }
+
+    private static String normalizeWord(String word, boolean isCompany, int index) {
+        if (word == null || word.isEmpty()) return "";
+        if (word.contains("-")) {
+            String[] parts = word.split("-");
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < parts.length; i++) {
+                if (i > 0) sb.append("-");
+                sb.append(normalizeWord(parts[i], isCompany, index));
+            }
+            return sb.toString();
+        }
+        String upper = word.toUpperCase(Locale.ROOT);
+        if (ACRONYMS.contains(upper)) {
+            return upper;
+        }
+        String lower = word.toLowerCase(Locale.ROOT);
+        if (isCompany && index > 0 && LOWERCASE_COMPANY_WORDS.contains(lower)) {
+            return lower;
+        }
+        String first = word.substring(0, 1).toUpperCase(Locale.ROOT);
+        String rest = word.length() > 1 ? word.substring(1).toLowerCase(Locale.ROOT) : "";
+        return first + rest;
+    }
+
     private void apply(Customer customer, CustomerRequest request) {
-        customer.setCustomerName(request.customerName().strip());
+        customer.setCustomerName(normalizeCustomerName(request.customerName(), request.type()));
         customer.setType(request.type());
         customer.setPhone(trimToNull(request.phone()));
         customer.setEmail(trimToNull(request.email()));

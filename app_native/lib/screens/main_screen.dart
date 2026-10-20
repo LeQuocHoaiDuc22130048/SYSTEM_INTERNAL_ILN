@@ -22,6 +22,7 @@ import '../widgets/navigation/side_navigation.dart';
 import '../widgets/app_quick_actions.dart';
 import 'attendance_only_page.dart';
 import 'attendance_screen.dart';
+import 'customer_portal_mobile_page.dart';
 import 'customers_page.dart';
 import 'dashboard_page.dart';
 import 'home_page.dart';
@@ -347,6 +348,9 @@ class _MainScreenState extends State<MainScreen> with WidgetsBindingObserver {
 
     if (auth.isAttendanceAccount) {
       return _buildAttendanceOnlyScaffold();
+    }
+    if (auth.isCustomer) {
+      return CustomerPortalMobilePage(onLogout: _logout);
     }
 
     final isWide = MediaQuery.sizeOf(context).width > 900;

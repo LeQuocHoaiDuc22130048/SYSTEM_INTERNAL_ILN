@@ -1,6 +1,15 @@
 import { getAuthHeaders, getJsonAuthHeaders } from './auth';
 import type { RepairOrder } from '../types/orders';
-import type { Customer, CustomerPageResponse, CustomerRequest, CustomerFilterParams } from '../types/customer';
+import type {
+  Customer,
+  CustomerPageResponse,
+  CustomerRequest,
+  CustomerFilterParams,
+  CustomerAccount,
+  CreateCustomerAccountRequest,
+  CustomerAccountCreatedResponse,
+  ResetCustomerPasswordRequest,
+} from '../types/customer';
 
 export interface ApiResult<T> {
   success: boolean;
@@ -230,6 +239,119 @@ export async function getCustomerRepairOrders(
     return {
       success: false,
       message: json?.message || 'Không thể tải đơn hàng của khách',
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
+  }
+}
+
+/**
+  * Tạo tài khoản portal cho khách hàng
+  */
+export async function createCustomerAccount(
+  customerId: string,
+  req: CreateCustomerAccountRequest
+): Promise<ApiResult<CustomerAccountCreatedResponse>> {
+  try {
+    const res = await fetch(`/api/v1/customers/${customerId}/accounts`, {
+      method: 'POST',
+      headers: getJsonAuthHeaders(),
+      body: JSON.stringify(req),
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok && json?.data) {
+      return { success: true, data: json.data, message: 'Tạo tài khoản thành công', statusCode: res.status };
+    }
+    return {
+      success: false,
+      message: json?.message || `Không thể tạo tài khoản (${res.status})`,
+      errors: json?.errors,
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
+  }
+}
+
+/**
+  * Lấy danh sách tài khoản portal của khách hàng
+  */
+export async function getCustomerAccounts(
+  customerId: string
+): Promise<ApiResult<CustomerAccount[]>> {
+  try {
+    const res = await fetch(`/api/v1/customers/${customerId}/accounts`, {
+      headers: getAuthHeaders(),
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok && json?.data) {
+      return { success: true, data: json.data, statusCode: res.status };
+    }
+    return {
+      success: false,
+      message: json?.message || 'Không thể tải danh sách tài khoản',
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
+  }
+}
+
+/**
+  * Đặt lại mật khẩu tài khoản portal
+  */
+export async function resetCustomerPassword(
+  customerId: string,
+  accountId: string,
+  req: ResetCustomerPasswordRequest
+): Promise<ApiResult<void>> {
+  try {
+    const res = await fetch(`/api/v1/customers/${customerId}/accounts/${accountId}/reset-password`, {
+      method: 'POST',
+      headers: getJsonAuthHeaders(),
+      body: JSON.stringify(req),
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok) {
+      return { success: true, message: 'Đổi mật khẩu thành công', statusCode: res.status };
+    }
+    return {
+      success: false,
+      message: json?.message || 'Không thể đổi mật khẩu',
+      errors: json?.errors,
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
+  }
+}
+
+/**
+  * Khóa / Mở khóa tài khoản portal
+  */
+export async function updateCustomerAccountStatus(
+  customerId: string,
+  accountId: string,
+  active: boolean
+): Promise<ApiResult<void>> {
+  try {
+    const res = await fetch(`/api/v1/customers/${customerId}/accounts/${accountId}/status`, {
+      method: 'PATCH',
+      headers: getJsonAuthHeaders(),
+      body: JSON.stringify({ active }),
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok) {
+      return {
+        success: true,
+        message: active ? 'Đã kích hoạt tài khoản' : 'Đã tạm khóa tài khoản',
+        statusCode: res.status,
+      };
+    }
+    return {
+      success: false,
+      message: json?.message || 'Không thể cập nhật trạng thái tài khoản',
       statusCode: res.status,
     };
   } catch (err: any) {

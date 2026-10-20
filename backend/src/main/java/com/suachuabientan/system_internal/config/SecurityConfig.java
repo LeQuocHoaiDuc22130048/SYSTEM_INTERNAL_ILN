@@ -73,10 +73,13 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/app-updates/ios/manifest.plist").permitAll()
                         .requestMatchers("/api/v1/app-updates/download/**").permitAll()
                         .requestMatchers("/api/v1/banners", "/api/v1/banners/active", "/api/v1/banners/images/**").permitAll()
+                        .requestMatchers("/api/v1/repair-media/**").permitAll()
                         .requestMatchers("/privacy-policy", "/api/v1/privacy-policy").permitAll()
                         // Actuator health check
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/health").permitAll()
+                        .requestMatchers("/api/v1/portal/**").permitAll()
+                        .requestMatchers("/api/v1/customer/**").hasAnyAuthority("CUSTOMER_PORTAL_VIEW", "ROLE_SUPER_ADMIN")
                         // Tất cả còn lại phải xác thực
                         .anyRequest().authenticated()
                 )

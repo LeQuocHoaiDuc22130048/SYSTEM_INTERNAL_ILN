@@ -8,8 +8,24 @@ public record RepairTimelineResponse(
         String action,
         String note,
         Instant createdAt,
-        PerformerInfo performedBy
+        PerformerInfo performedBy,
+        String status,
+        String changedByName,
+        Instant changedAt
 ) {
+    public RepairTimelineResponse(UUID id, String action, String note, Instant createdAt, PerformerInfo performedBy) {
+        this(
+                id,
+                action,
+                note,
+                createdAt,
+                performedBy,
+                action,
+                performedBy != null ? performedBy.fullName() : "Hệ thống",
+                createdAt
+        );
+    }
+
     public record PerformerInfo(
             UUID id,
             String fullName,
@@ -18,3 +34,4 @@ public record RepairTimelineResponse(
     ) {
     }
 }
+

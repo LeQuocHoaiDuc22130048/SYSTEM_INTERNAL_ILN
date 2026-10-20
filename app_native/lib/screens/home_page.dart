@@ -172,7 +172,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<Map<String, dynamic>> get _categories => const [
     {
       'id': 'dashboard',
-      'label': 'Dashboard',
+      'label': 'Thống kê',
       'tooltip': 'Dashboard - Bảng điều khiển',
       'tabIndex': MainTabs.dashboard,
       'icon': LucideIcons.layoutDashboard,

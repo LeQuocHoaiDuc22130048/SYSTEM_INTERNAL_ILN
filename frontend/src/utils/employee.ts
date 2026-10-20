@@ -62,6 +62,7 @@ export function normalizeMonthlyResponse(data: any): any[] {
 /** Map ký tự trạng thái ngày → nhãn tiếng Việt hiển thị trong mini-bar */
 export const DAILY_STATUS_LABEL_MAP: Record<DailyStatusChar, string> = {
   p: 'Đủ công',
+  w: 'Đang làm',
   l: 'Đi muộn',
   a: 'Vắng không phép',
   v: 'Nghỉ phép',
@@ -75,6 +76,7 @@ export const DAILY_STATUS_LABEL_MAP: Record<DailyStatusChar, string> = {
 /** Map ký tự trạng thái ngày → nhãn tiếng Anh hiển thị trong calendar */
 export const CALENDAR_STATUS_LABEL_MAP: Record<DailyStatusChar, string> = {
   p: 'PRESENT',
+  w: 'WORKING',
   l: 'LATE',
   a: 'ABSENT',
   v: 'LEAVE',

@@ -243,6 +243,8 @@ class DailyHistoryLog {
         return 'Về sớm';
       case 'PRESENT':
         return 'Đủ công';
+      case 'WORKING':
+        return 'Đang làm';
       case 'FIELD_WORK':
         return 'Đi công trình';
       case 'LEAVE':

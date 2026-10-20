@@ -570,7 +570,7 @@ public class AttendanceService {
         List<UUID> allowedUserIds = userRepository.findAll().stream()
                 .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
                 .filter(u -> u.getRole() != UserRole.ADMIN && u.getRole() != UserRole.SUPER_ADMIN)
-                .filter(u -> u.getRole() != UserRole.TECHNICIAN && u.getRole() != UserRole.WAREHOUSE && u.getRole() != UserRole.ATTENDANCE)
+                .filter(u -> u.getRole() != UserRole.TECHNICIAN && u.getRole() != UserRole.WAREHOUSE && u.getRole() != UserRole.ATTENDANCE && u.getRole() != UserRole.CUSTOMER)
                 .map(UserEntity::getId)
                 .toList();
 
@@ -654,19 +654,23 @@ public class AttendanceService {
                 ? Duration.between(checkIn, checkOut).toMinutes()
                 : null;
 
+        boolean isApprovedFieldWork = fieldDay != null
+                && "APPROVED".equalsIgnoreCase(fieldDay.getStatus())
+                && !Boolean.TRUE.equals(fieldDay.getIsDeleted());
+
         return new DailyAttendanceResponse(
                 date,
                 checkIn,
                 checkOut,
                 totalMinutes,
-                fieldDay == null && checkIn != null && checkIn.isAfter(shiftStartInstant.plus(LATE_GRACE)),
-                fieldDay == null && checkOut != null && checkOut.isBefore(shiftEndInstant),
+                !isApprovedFieldWork && checkIn != null && checkIn.isAfter(shiftStartInstant.plus(LATE_GRACE)),
+                !isApprovedFieldWork && checkOut != null && checkOut.isBefore(shiftEndInstant),
                 shiftStart.toString(),
                 shiftEnd.toString(),
                 records.stream().map(record -> toAttendanceResponse(record, null)).toList(),
                 employeeId,
                 fieldDay != null ? FieldWorkService.toResponse(fieldDay) : null,
-                fieldDay != null ? 1.0 : 0.0
+                isApprovedFieldWork ? 1.0 : 0.0
         );
     }
 

@@ -1286,6 +1286,7 @@ class _WarehousePageState extends State<WarehousePage> {
                   ),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<String>(
+                    isExpanded: true,
                     initialValue: selectedLot.id,
                     decoration: const InputDecoration(
                       contentPadding: EdgeInsets.symmetric(
@@ -4140,29 +4141,36 @@ class _PartDetailSheetState extends State<_PartDetailSheet> {
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        lot.storeLocationName,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w600,
-                                          color: isDark
-                                              ? AppColors.textPrimaryDark
-                                              : AppColors.textPrimaryLight,
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          lot.storeLocationName,
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w600,
+                                            color: isDark
+                                                ? AppColors.textPrimaryDark
+                                                : AppColors.textPrimaryLight,
+                                          ),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                      Text(
-                                        'Mã vị trí: ${lot.storeLocationCode}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF94A3B8),
+                                        Text(
+                                          'Mã vị trí: ${lot.storeLocationCode}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            color: Color(0xFF94A3B8),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
+                                  const SizedBox(width: 8),
                                   Text(
                                     lot.amount.toStringAsFixed(0),
                                     style: const TextStyle(

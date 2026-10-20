@@ -28,7 +28,7 @@ VALUES
   ('22222222-0000-0000-0000-000000000001', 'LOC-A1', 'Kệ A - Khay 1 (Linh kiện công suất)', 'Chứa IGBT, MOSFET công suất lớn', 'QR-LOC-A1', false, false),
   ('22222222-0000-0000-0000-000000000002', 'LOC-B1', 'Kệ B - Khay 1 (Vi mạch & Opto Driver)', 'Chứa IC, Microcontroller, Optocoupler', 'QR-LOC-B1', false, false),
   ('22222222-0000-0000-0000-000000000003', 'LOC-C1', 'Kệ C - Khay 1 (Tụ điện & Điện trở xả)', 'Chứa Tụ DC-Bus, Diode cầu, Điện trở xả', 'QR-LOC-C1', false, false)
-ON CONFLICT (code) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
 -- 3. 20 MÃ LINH KIỆN ĐIỆN TỬ (PARTS)

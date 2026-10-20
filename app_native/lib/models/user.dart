@@ -11,6 +11,7 @@ enum UserRole {
   warehouse,
   employee,
   attendance,
+  customer,
 }
 // {{END_USER_ROLE_ENUM}}
 
@@ -64,6 +65,8 @@ class User {
         return UserRole.warehouse;
       case 'ATTENDANCE':
         return UserRole.attendance;
+      case 'CUSTOMER':
+        return UserRole.customer;
       default:
         return UserRole.employee;
     }
@@ -172,6 +175,8 @@ extension UserRolePermissions on UserRole {
         return AppColors.success;
       case UserRole.attendance:
         return const Color(0xFF3B82F6);
+      case UserRole.customer:
+        return const Color(0xFF2563EB);
     }
   }
   // {{END_ROLE_AVATAR_COLOR}}
@@ -193,6 +198,8 @@ extension UserRolePermissions on UserRole {
         return 'Nhân viên';
       case UserRole.attendance:
         return 'Máy chấm công';
+      case UserRole.customer:
+        return 'Khách hàng';
     }
   }
   // {{END_ROLE_LABEL_GETTER}}
@@ -214,6 +221,8 @@ extension UserRolePermissions on UserRole {
         return 'EMPLOYEE';
       case UserRole.attendance:
         return 'ATTENDANCE';
+      case UserRole.customer:
+        return 'CUSTOMER';
     }
   }
   // {{END_ROLE_BACKEND_CODE}}
@@ -302,6 +311,8 @@ extension UserRolePermissions on UserRole {
         return _expandRoleDefaults(employeePermissions);
       case UserRole.attendance:
         return const {AppPermission.viewAttendance, AppPermission.useAttendanceKiosk};
+      case UserRole.customer:
+        return const {};
     }
     // {{END_ROLE_PERMISSIONS_SWITCH}}
   }

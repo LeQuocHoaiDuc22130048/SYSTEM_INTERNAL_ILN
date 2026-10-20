@@ -201,7 +201,7 @@ class _CustomersPageState extends State<CustomersPage> {
             ),
         ],
       ),
-      floatingActionButton: canManage
+      floatingActionButton: canManage && _customers.isNotEmpty
           ? FloatingActionButton.extended(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -520,15 +520,19 @@ class _CustomersPageState extends State<CustomersPage> {
                                               child: Row(
                                                 mainAxisSize: MainAxisSize.min,
                                                 children: [
-                                                  Text(
-                                                    customer.customerCode,
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      fontFamily: 'monospace',
-                                                      color: isDark
-                                                          ? Colors.white54
-                                                          : AppColors
-                                                                .textSecondaryLight,
+                                                  Flexible(
+                                                    child: Text(
+                                                      customer.customerCode,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        fontFamily: 'monospace',
+                                                        color: isDark
+                                                            ? Colors.white54
+                                                            : AppColors
+                                                                  .textSecondaryLight,
+                                                      ),
                                                     ),
                                                   ),
                                                   const SizedBox(width: 4),

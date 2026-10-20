@@ -717,7 +717,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // Helper to format checkin status pill
   const getAttendanceStatusBadge = (rec: AttendanceReportRecord) => {
-    if (rec.fieldWork) {
+    const isApprovedFieldWork = rec.fieldWorkCredit === 1 || (rec as any).fieldWork?.status === 'APPROVED';
+    if (isApprovedFieldWork) {
       return (
         <span
           className="att-badge warning"
@@ -726,6 +727,9 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           Đi công trình
         </span>
       );
+    }
+    if ((rec as any).fieldWork?.status === 'PENDING') {
+      return <span className="att-badge success">Đang làm</span>;
     }
     if (rec.isLate && rec.isEarlyLeave) {
       return <span className="att-badge warning">Muộn & Về sớm</span>;
@@ -737,7 +741,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       return <span className="att-badge warning">Về sớm</span>;
     }
     if (rec.checkIn) {
-      return <span className="att-badge success">Đủ công</span>;
+      return <span className="att-badge success">{rec.checkOut ? 'Đủ công' : 'Đang làm'}</span>;
     }
     return <span className="att-badge danger">Vắng</span>;
   };
@@ -768,6 +772,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             Đi công trình
           </span>
         );
+      case 'WORKING':
+        return <span className="att-badge success">Đang làm</span>;
       case 'PRESENT':
         return <span className="att-badge success">Đủ công</span>;
       case 'LATE':
@@ -1470,10 +1476,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       color: '#b45309',
                       borderColor: '#fde68a'
                     }}
-                    onClick={() => handleOpenFieldWork(toLocalDateStr(new Date()), '', myToday?.fieldWork)}
+                    onClick={() => handleOpenFieldWork(toLocalDateStr(new Date()), '', !!(myToday as any)?.fieldWork)}
                   >
                     <Briefcase size={13} />
-                    <span>{myToday?.fieldWork ? 'Sửa công trình' : 'Báo đi công trình'}</span>
+                    <span>{(myToday as any)?.fieldWork ? 'Sửa công trình' : 'Báo đi công trình'}</span>
                   </button>
                   {onViewPersonalAttendance && currentUser && (
                     <button
@@ -1495,7 +1501,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               <div className="personal-today-card">
                 <div className="ptc-header">
                   <span className="ptc-date">Hôm nay ({new Date().toLocaleDateString('vi-VN')})</span>
-                  {myToday?.fieldWork ? (
+                  {(myToday as any)?.fieldWork?.status === 'APPROVED' ? (
                     <span
                       className="att-badge warning"
                       style={{ backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#f59e0b', cursor: 'pointer' }}
@@ -1503,6 +1509,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       title="Bấm để chỉnh sửa ghi chú công trình"
                     >
                       Đi công trình (1.0 công) ✏️
+                    </span>
+                  ) : (myToday as any)?.fieldWork?.status === 'PENDING' ? (
+                    <span
+                      className="att-badge success"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleOpenFieldWork(toLocalDateStr(new Date()), '', true)}
+                      title="Yêu cầu đi công trình đang chờ duyệt"
+                    >
+                      Đang làm (Chờ duyệt) ✏️
                     </span>
                   ) : myToday?.checkIn ? (
                     myToday.isLate && myToday.isEarlyLeave ? (
@@ -1514,7 +1529,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     ) : myToday.checkOut ? (
                       <span className="att-badge success">Đủ công</span>
                     ) : (
-                      <span className="att-badge success">Đã vào ca</span>
+                      <span className="att-badge success">Đang làm</span>
                     )
                   ) : (
                     <span className="att-badge danger">Chưa chấm công</span>

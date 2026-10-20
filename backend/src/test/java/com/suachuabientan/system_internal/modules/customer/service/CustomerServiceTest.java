@@ -42,6 +42,13 @@ class CustomerServiceTest {
         assertNotEquals(first.customerCode(), second.customerCode());
     }
 
+    @Test void normalizeCustomerNameFixesImeCapitalizationGlitches() {
+        assertEquals("Anh Dũng", CustomerService.normalizeCustomerName("anh dŨNG", CustomerType.INDIVIDUAL));
+        assertEquals("Nguyên Lương Tuân", CustomerService.normalizeCustomerName("NguyÊn LƯƠNG TuÂn", CustomerType.INDIVIDUAL));
+        assertEquals("Nguyen Van A", CustomerService.normalizeCustomerName("nguyen van a", CustomerType.INDIVIDUAL));
+        assertEquals("Công ty TNHH MTV Giải Pháp ABB", CustomerService.normalizeCustomerName("công ty tnhh mtv giải pháp abb", CustomerType.COMPANY));
+    }
+
     @Test void inactiveCustomerRemainsReadableButCannotBeAssigned() {
         Customer customer = customer();
         customer.setActive(false);
@@ -67,7 +74,7 @@ class CustomerServiceTest {
                 "Tên mới", CustomerType.INDIVIDUAL, null, null, null, null, null));
         assertEquals("KH-EXISTING", response.customerCode());
         assertEquals(customer.getId(), response.id());
-        assertEquals("Tên mới", response.customerName());
+        assertEquals("Tên Mới", response.customerName());
         assertFalse(response.active());
     }
 

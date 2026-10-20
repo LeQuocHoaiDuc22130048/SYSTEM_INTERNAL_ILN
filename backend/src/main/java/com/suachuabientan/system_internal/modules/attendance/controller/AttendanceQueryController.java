@@ -53,7 +53,7 @@ public class AttendanceQueryController {
 
         List<UserEntity> employees = checkAndSeedUsers().stream()
                 .filter(u -> u.getRole() != UserRole.ADMIN && u.getRole() != UserRole.SUPER_ADMIN)
-                .filter(u -> u.getRole() != UserRole.TECHNICIAN && u.getRole() != UserRole.WAREHOUSE && u.getRole() != UserRole.ATTENDANCE)
+                .filter(u -> u.getRole() != UserRole.TECHNICIAN && u.getRole() != UserRole.WAREHOUSE && u.getRole() != UserRole.ATTENDANCE && u.getRole() != UserRole.CUSTOMER)
                 .filter(u -> !"attendance".equals(u.getUsername()))
                 .toList();
 
@@ -117,8 +117,17 @@ public class AttendanceQueryController {
 
                 // Thu thập lý do cập nhật/ghi chú và giờ vào/ra trong ngày d
                 Set<String> dayReasons = new LinkedHashSet<>();
-                if (fieldDay != null) {
+                boolean isApprovedFieldWork = fieldDay != null
+                        && "APPROVED".equalsIgnoreCase(fieldDay.getStatus())
+                        && !Boolean.TRUE.equals(fieldDay.getIsDeleted());
+                boolean isPendingFieldWork = fieldDay != null
+                        && "PENDING".equalsIgnoreCase(fieldDay.getStatus())
+                        && !Boolean.TRUE.equals(fieldDay.getIsDeleted());
+
+                if (isApprovedFieldWork) {
                     dayReasons.add(FieldWorkService.displayNote(fieldDay));
+                } else if (isPendingFieldWork) {
+                    dayReasons.add("Chờ duyệt: " + FieldWorkService.displayNote(fieldDay));
                 }
                 for (AttendanceRecord rec : dayRecords) {
                     if (rec.getNote() != null && !rec.getNote().isBlank()) {
@@ -188,11 +197,13 @@ public class AttendanceQueryController {
 
                 if (date.isAfter(today)) {
                     patternBuilder.append("f");
-                } else if (fieldDay != null) {
+                } else if (isApprovedFieldWork) {
                     patternBuilder.append("p");
                     dailyWorkDays.put(d, 1.0);
                     workDays += 1.0;
                     totalHours += fieldWorkRecordedHours(date, checkIn, checkOut);
+                } else if (isPendingFieldWork) {
+                    patternBuilder.append("w");
                 } else if (isWeekend && dayRecords.isEmpty()) {
                     patternBuilder.append("h");
                 } else {
@@ -382,13 +393,27 @@ public class AttendanceQueryController {
             double dayActualHours = 0.0;
             double dayOtHours = 0.0;
 
+            boolean isApprovedFieldWork = fieldDay != null
+                    && "APPROVED".equalsIgnoreCase(fieldDay.getStatus())
+                    && !Boolean.TRUE.equals(fieldDay.getIsDeleted());
+            boolean isPendingFieldWork = fieldDay != null
+                    && "PENDING".equalsIgnoreCase(fieldDay.getStatus())
+                    && !Boolean.TRUE.equals(fieldDay.getIsDeleted());
+
             if (date.isAfter(today)) {
                 status = "FUTURE";
-            } else if (fieldDay != null) {
+            } else if (isApprovedFieldWork) {
                 status = "FIELD_WORK";
                 workDays += 1.0;
                 dayActualHours = fieldWorkRecordedHours(date, checkIn, checkOut);
                 totalHours += dayActualHours;
+            } else if (isPendingFieldWork) {
+                status = "WORKING";
+                if (checkIn != null && checkOut != null) {
+                    double rawMinutes = Duration.between(checkIn, checkOut).toMinutes();
+                    dayActualHours = Math.max(0.0, rawMinutes / 60.0);
+                    totalHours += dayActualHours;
+                }
             } else if (isWeekend && dayRecords.isEmpty()) {
                 status = "HOLIDAY";
             } else {
@@ -505,8 +530,10 @@ public class AttendanceQueryController {
             String checkInStr = checkIn != null ? timeFormatter.format(checkIn) : null;
             String checkOutStr = checkOut != null ? timeFormatter.format(checkOut) : null;
             String dayNote = schedule != null && schedule.getNote() != null ? schedule.getNote() : "";
-            if (fieldDay != null) {
+            if (isApprovedFieldWork) {
                 dayNote = FieldWorkService.displayNote(fieldDay) + (dayNote.isBlank() ? "" : "; " + dayNote);
+            } else if (isPendingFieldWork) {
+                dayNote = "Chờ duyệt: " + FieldWorkService.displayNote(fieldDay) + (dayNote.isBlank() ? "" : "; " + dayNote);
             }
 
             daysList.add(new DailyHistoryLog(
