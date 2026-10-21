@@ -20,6 +20,9 @@ import com.suachuabientan.system_internal.modules.employee.dto.response.FaceEmbe
 import com.suachuabientan.system_internal.modules.employee.dto.response.EmployeeScheduleResponse;
 import com.suachuabientan.system_internal.modules.attendance.service.FaceRecognitionService;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
+import com.suachuabientan.system_internal.modules.repair.enums.RepairMediaType;
+import com.suachuabientan.system_internal.modules.repair.service.RepairMediaStorageService;
+import org.springframework.web.multipart.MultipartFile;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -62,6 +65,7 @@ public class EmployeeService implements InitializingBean {
     private final RepairOrderRepository repairOrderRepository;
     private final FaceRecognitionService faceRecognitionService;
     private final RbacService rbacService;
+    private final RepairMediaStorageService repairMediaStorageService;
     private static final ZoneId ZONE_VN = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final String FACE_MODEL_NAME = "face-embedding";
 
@@ -200,6 +204,25 @@ public class EmployeeService implements InitializingBean {
         }
 
         log.info("Cập nhật nhân viên: targetId={}, by={}", targetId, requesterId);
+        return toDetailResponse(userRepository.save(user));
+    }
+
+    /**
+     * Cập nhật ảnh đại diện (avatar) của nhân viên.
+     */
+    @Transactional
+    public EmployeeDetailResponse updateAvatar(UUID targetId, MultipartFile file, UUID requesterId, boolean isManager) {
+        if (!targetId.equals(requesterId) && !isManager) {
+            throw new BusinessException("Bạn không có quyền cập nhật ảnh đại diện của nhân viên khác", 403);
+        }
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("Tệp ảnh không được để trống", 400);
+        }
+
+        UserEntity user = findUserById(targetId);
+        RepairMediaStorageService.StoredMedia stored = repairMediaStorageService.store(file, RepairMediaType.IMAGE);
+        user.setAvatarUrl(stored.publicUrl());
+        log.info("Cập nhật avatar nhân viên: targetId={}, by={}, avatarUrl={}", targetId, requesterId, stored.publicUrl());
         return toDetailResponse(userRepository.save(user));
     }
 

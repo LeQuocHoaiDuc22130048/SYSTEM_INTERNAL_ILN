@@ -9,6 +9,9 @@ import com.suachuabientan.system_internal.modules.auth.repository.UserRepository
 import com.suachuabientan.system_internal.modules.auth.service.RbacService;
 import com.suachuabientan.system_internal.modules.attendance.service.FaceRecognitionService;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
+import com.suachuabientan.system_internal.modules.repair.enums.RepairMediaType;
+import com.suachuabientan.system_internal.modules.repair.service.RepairMediaStorageService;
+import org.springframework.mock.web.MockMultipartFile;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -73,6 +76,7 @@ class EmployeeServiceTest {
         assertThrows(BusinessException.class, () -> employeeService.update(employeeId, request, actorId, true));
         verify(rbacService, never()).updateRole(any(), any());
     }
+
     @Mock
     private UserRepository userRepository;
     @Mock
@@ -83,6 +87,8 @@ class EmployeeServiceTest {
     private FaceRecognitionService faceRecognitionService;
     @Mock
     private RbacService rbacService;
+    @Mock
+    private RepairMediaStorageService repairMediaStorageService;
 
     private EmployeeService employeeService;
     private UUID employeeId;
@@ -95,12 +101,13 @@ class EmployeeServiceTest {
                 attendanceRepository,
                 repairOrderRepository,
                 faceRecognitionService,
-                rbacService);
+                rbacService,
+                repairMediaStorageService);
         employeeId = UUID.randomUUID();
         activeEmployee = new UserEntity();
         activeEmployee.setRole(UserRole.EMPLOYEE);
         activeEmployee.setStatus(UserStatus.ACTIVE);
-        when(userRepository.findByIdAndIsDeletedFalse(employeeId))
+        org.mockito.Mockito.lenient().when(userRepository.findByIdAndIsDeletedFalse(employeeId))
                 .thenReturn(Optional.of(activeEmployee));
     }
 
@@ -131,5 +138,29 @@ class EmployeeServiceTest {
                 () -> employeeService.enrollFace(employeeId, "bad-image", "image/jpeg", UUID.randomUUID()));
 
         verify(userRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    void updateAvatarStoresFileAndUpdatesUserProfile() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "avatar.jpg", "image/jpeg", "image-content".getBytes());
+        when(repairMediaStorageService.store(file, RepairMediaType.IMAGE))
+                .thenReturn(new RepairMediaStorageService.StoredMedia("/api/v1/repair-media/avatar-123.jpg", "avatar.jpg"));
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        var response = employeeService.updateAvatar(employeeId, file, employeeId, false);
+
+        assertEquals("/api/v1/repair-media/avatar-123.jpg", response.avatarUrl());
+        assertEquals("/api/v1/repair-media/avatar-123.jpg", activeEmployee.getAvatarUrl());
+    }
+
+    @Test
+    void updateAvatarThrowsWhenNotSelfAndNotManager() {
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "avatar.jpg", "image/jpeg", "image-content".getBytes());
+        UUID anotherUser = UUID.randomUUID();
+
+        assertThrows(BusinessException.class, () ->
+                employeeService.updateAvatar(employeeId, file, anotherUser, false));
     }
 }

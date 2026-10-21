@@ -16,10 +16,12 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.time.Instant;
@@ -106,6 +108,37 @@ public class EmployeeController {
         return ResponseEntity.ok(ApiResponse.success(
                 employeeService.update(id, request,
                         userDetails.getUserId(), userDetails.hasPermission("EMPLOYEE_UPDATE"))));
+    }
+
+    @Operation(summary = "Cập nhật ảnh đại diện (avatar) của chính mình")
+    @PostMapping(value = "/me/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('PROFILE_UPDATE_SELF') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<EmployeeDetailResponse>> updateMyAvatar(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                employeeService.updateAvatar(
+                        userDetails.getUserId(),
+                        file,
+                        userDetails.getUserId(),
+                        true),
+                "Cập nhật ảnh đại diện thành công"));
+    }
+
+    @Operation(summary = "Cập nhật ảnh đại diện (avatar) của nhân viên")
+    @PostMapping(value = "/{id}/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasRole('SUPER_ADMIN') or hasAuthority('EMPLOYEE_UPDATE') or (hasAuthority('PROFILE_UPDATE_SELF') and #id == principal.userId)")
+    public ResponseEntity<ApiResponse<EmployeeDetailResponse>> updateAvatar(
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                employeeService.updateAvatar(
+                        id,
+                        file,
+                        userDetails.getUserId(),
+                        userDetails.hasPermission("EMPLOYEE_UPDATE")),
+                "Cập nhật ảnh đại diện thành công"));
     }
 
     // ── Khoá / Mở khoá ───────────────────────────────────────

@@ -10,6 +10,8 @@ import type {
   PublishCustomerUpdateRequest,
   PublishCustomerMediaRequest,
   CustomerChangePasswordRequest,
+  CustomerAccountProfileResponse,
+  UpdateCustomerAccountProfileRequest,
 } from '../types/customer';
 
 /**
@@ -266,3 +268,85 @@ export async function getPublishedCustomerMedia(
     return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
   }
 }
+
+/**
+ * Lấy thông tin tài khoản và avatar của khách hàng
+ */
+export async function getCustomerAccountProfile(): Promise<ApiResult<CustomerAccountProfileResponse>> {
+  try {
+    const res = await fetch('/api/v1/customer/account-profile', {
+      headers: getAuthHeaders(),
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok && json?.data) {
+      return { success: true, data: json.data, statusCode: res.status };
+    }
+    return {
+      success: false,
+      message: json?.message || 'Không thể lấy thông tin tài khoản',
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
+  }
+}
+
+/**
+ * Cập nhật thông tin cá nhân của tài khoản khách hàng
+ */
+export async function updateCustomerAccountProfile(
+  req: UpdateCustomerAccountProfileRequest
+): Promise<ApiResult<CustomerAccountProfileResponse>> {
+  try {
+    const res = await fetch('/api/v1/customer/account-profile', {
+      method: 'PUT',
+      headers: getJsonAuthHeaders(),
+      body: JSON.stringify(req),
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok && json?.data) {
+      return { success: true, data: json.data, message: 'Cập nhật thông tin thành công', statusCode: res.status };
+    }
+    return {
+      success: false,
+      message: json?.message || 'Không thể cập nhật thông tin',
+      errors: json?.errors,
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
+  }
+}
+
+/**
+ * Tải lên ảnh đại diện (avatar) của khách hàng
+ */
+export async function uploadCustomerAvatar(
+  file: File
+): Promise<ApiResult<CustomerAccountProfileResponse>> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const headers = getAuthHeaders();
+
+    const res = await fetch('/api/v1/customer/avatar', {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    const json = await res.json().catch(() => null);
+    if (res.ok && json?.data) {
+      return { success: true, data: json.data, message: 'Cập nhật ảnh đại diện thành công', statusCode: res.status };
+    }
+    return {
+      success: false,
+      message: json?.message || 'Không thể tải lên ảnh đại diện',
+      errors: json?.errors,
+      statusCode: res.status,
+    };
+  } catch (err: any) {
+    return { success: false, message: err.message || 'Lỗi kết nối máy chủ' };
+  }
+}
+

@@ -139,6 +139,36 @@ class User {
         .toSet();
   }
 
+  User copyWith({
+    String? id,
+    String? username,
+    String? name,
+    String? email,
+    String? employeeId,
+    UserRole? role,
+    UserStatus? status,
+    String? avatar,
+    String? department,
+    String? phone,
+    bool? faceEnrolled,
+    Set<AppPermission>? permissions,
+  }) {
+    return User(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      employeeId: employeeId ?? this.employeeId,
+      role: role ?? this.role,
+      status: status ?? this.status,
+      avatar: avatar ?? this.avatar,
+      department: department ?? this.department,
+      phone: phone ?? this.phone,
+      faceEnrolled: faceEnrolled ?? this.faceEnrolled,
+      permissions: permissions ?? this.permissions,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return {
       'id': id,

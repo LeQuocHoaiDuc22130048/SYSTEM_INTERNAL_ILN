@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:image_picker/image_picker.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 
@@ -21,6 +22,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _orders = [];
+  Map<String, dynamic>? _accountProfile;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Filter & Search states
   String _searchQuery = '';
@@ -40,6 +43,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     super.initState();
     _fetchOrders();
     _fetchSupportConfig();
+    _fetchAccountProfile();
   }
 
   @override
@@ -112,6 +116,24 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       }
     } catch (_) {
       // Giữ giá trị mặc định an toàn nếu offline hoặc lỗi mạng
+    }
+  }
+
+  Future<void> _fetchAccountProfile() async {
+    final api = context.read<AuthProvider>().api;
+    try {
+      final res = await api.get('/api/v1/customer/account-profile');
+      if (!mounted) return;
+      if (res is Map<String, dynamic>) {
+        final data = res.containsKey('data') && res['data'] is Map<String, dynamic>
+            ? res['data'] as Map<String, dynamic>
+            : res;
+        setState(() {
+          _accountProfile = data;
+        });
+      }
+    } catch (_) {
+      // Giữ thông tin cơ bản từ auth nếu không tải được profile mở rộng
     }
   }
 
@@ -254,6 +276,587 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     if (confirmed == true && mounted) {
       await widget.onLogout();
     }
+  }
+
+  Future<void> _showProfileDialog() async {
+    final auth = context.read<AuthProvider>();
+    final api = auth.api;
+
+    if (_accountProfile == null) {
+      await _fetchAccountProfile();
+    }
+    if (!mounted) return;
+
+    final user = auth.currentUser;
+    final contactNameController = TextEditingController(
+      text: _accountProfile?['contactName']?.toString() ?? user?.name ?? '',
+    );
+    final phoneController = TextEditingController(
+      text: _accountProfile?['phone']?.toString() ?? user?.phone ?? '',
+    );
+    final emailController = TextEditingController(
+      text: _accountProfile?['email']?.toString() ?? user?.email ?? '',
+    );
+
+    String? currentAvatarUrl = _accountProfile?['avatarUrl']?.toString() ?? user?.avatar;
+    final customerName = _accountProfile?['customerName']?.toString() ?? user?.name ?? 'Khách hàng';
+    final customerCode = _accountProfile?['customerCode']?.toString() ?? '';
+    final companyTaxCode = _accountProfile?['companyTaxCode']?.toString() ?? '';
+    final companyAddress = _accountProfile?['companyAddress']?.toString() ?? '';
+    final username = _accountProfile?['username']?.toString() ?? user?.username ?? '';
+
+    bool isSaving = false;
+    bool isUploadingAvatar = false;
+    String? dialogError;
+    String? dialogSuccess;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: !isSaving && !isUploadingAvatar,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final initials = _getInitials(
+            contactNameController.text.trim().isNotEmpty
+                ? contactNameController.text.trim()
+                : customerName,
+          );
+
+          Future<void> pickAndUploadAvatar(ImageSource source) async {
+            try {
+              final picked = await _imagePicker.pickImage(
+                source: source,
+                imageQuality: 85,
+                maxWidth: 1024,
+                maxHeight: 1024,
+              );
+              if (picked == null) return;
+
+              final bytes = await picked.readAsBytes();
+              if (bytes.lengthInBytes > 5 * 1024 * 1024) {
+                setDialogState(() => dialogError = 'Dung lượng ảnh đại diện tối đa 5MB.');
+                return;
+              }
+
+              setDialogState(() {
+                isUploadingAvatar = true;
+                dialogError = null;
+                dialogSuccess = null;
+              });
+
+              final ext = picked.name.split('.').last.toLowerCase();
+              final contentType = ext == 'png'
+                  ? 'image/png'
+                  : ext == 'webp'
+                      ? 'image/webp'
+                      : 'image/jpeg';
+              final res = await api.postMultipart(
+                '/api/v1/customer/avatar',
+                fields: {},
+                filename: picked.name,
+                bytes: bytes,
+                contentType: contentType,
+              );
+
+              final updatedData = res is Map<String, dynamic>
+                  ? (res.containsKey('data') && res['data'] is Map<String, dynamic>
+                      ? res['data'] as Map<String, dynamic>
+                      : res)
+                  : null;
+
+              if (updatedData != null) {
+                final newAvatar = updatedData['avatarUrl']?.toString();
+                setState(() {
+                  _accountProfile = updatedData;
+                });
+                auth.updateCurrentUser(
+                  avatar: newAvatar,
+                  name: updatedData['contactName']?.toString(),
+                  phone: updatedData['phone']?.toString(),
+                  email: updatedData['email']?.toString(),
+                );
+                setDialogState(() {
+                  currentAvatarUrl = newAvatar;
+                  isUploadingAvatar = false;
+                  dialogSuccess = 'Cập nhật ảnh đại diện thành công!';
+                });
+              } else {
+                setDialogState(() {
+                  isUploadingAvatar = false;
+                  dialogError = 'Phản hồi tải lên ảnh không hợp lệ.';
+                });
+              }
+            } on ApiException catch (e) {
+              setDialogState(() {
+                isUploadingAvatar = false;
+                dialogError = e.message;
+              });
+            } catch (e) {
+              setDialogState(() {
+                isUploadingAvatar = false;
+                dialogError = 'Không thể tải lên ảnh đại diện. Vui lòng thử lại.';
+              });
+            }
+          }
+
+          void showSourceSelection() {
+            if (isSaving || isUploadingAvatar) return;
+            showModalBottomSheet<void>(
+              context: ctx,
+              shape: const RoundedRectangleBorder(
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              builder: (sheetCtx) => SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Cập nhật ảnh đại diện',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 12),
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(LucideIcons.camera, color: Color(0xFF2563EB)),
+                        ),
+                        title: const Text('Chụp ảnh mới từ máy ảnh'),
+                        onTap: () {
+                          Navigator.of(sheetCtx).pop();
+                          pickAndUploadAvatar(ImageSource.camera);
+                        },
+                      ),
+                      ListTile(
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(LucideIcons.image, color: Color(0xFF334155)),
+                        ),
+                        title: const Text('Chọn ảnh từ thư viện'),
+                        onTap: () {
+                          Navigator.of(sheetCtx).pop();
+                          pickAndUploadAvatar(ImageSource.gallery);
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            titlePadding: const EdgeInsets.fromLTRB(20, 20, 16, 8),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            title: Row(
+              children: [
+                const Icon(LucideIcons.userCog, color: Color(0xFF2563EB), size: 22),
+                const SizedBox(width: 10),
+                const Expanded(
+                  child: Text(
+                    'Thông tin tài khoản',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(LucideIcons.x, size: 20, color: Color(0xFF64748B)),
+                  onPressed: isSaving || isUploadingAvatar ? null : () => Navigator.of(ctx).pop(),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            content: SizedBox(
+              width: double.maxFinite,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (dialogError != null)
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.red.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.red.shade200),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(LucideIcons.alertCircle, size: 16, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(dialogError!, style: TextStyle(color: Colors.red.shade800, fontSize: 13)),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (dialogSuccess != null)
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.green.shade50,
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.green.shade200),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(LucideIcons.checkCircle2, size: 16, color: Colors.green),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(dialogSuccess!, style: TextStyle(color: Colors.green.shade800, fontSize: 13)),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // Avatar Picker Section
+                    Center(
+                      child: Column(
+                        children: [
+                          GestureDetector(
+                            onTap: showSourceSelection,
+                            child: Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                Container(
+                                  width: 84,
+                                  height: 84,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: const Color(0xFF2563EB), width: 2),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF2563EB).withValues(alpha: 0.15),
+                                        blurRadius: 10,
+                                        offset: const Offset(0, 4),
+                                      ),
+                                    ],
+                                  ),
+                                  child: ClipOval(
+                                    child: Stack(
+                                      fit: StackFit.expand,
+                                      children: [
+                                        (currentAvatarUrl != null && currentAvatarUrl!.isNotEmpty)
+                                            ? Image.network(
+                                                context.read<AuthProvider>().api.resolveUrl(currentAvatarUrl!),
+                                                fit: BoxFit.cover,
+                                                errorBuilder: (c, e, s) => Container(
+                                                  color: const Color(0xFFEFF6FF),
+                                                  alignment: Alignment.center,
+                                                  child: Text(
+                                                    initials,
+                                                    style: const TextStyle(
+                                                      fontSize: 26,
+                                                      fontWeight: FontWeight.bold,
+                                                      color: Color(0xFF2563EB),
+                                                    ),
+                                                  ),
+                                                ),
+                                              )
+                                            : Container(
+                                                color: const Color(0xFFEFF6FF),
+                                                alignment: Alignment.center,
+                                                child: Text(
+                                                  initials,
+                                                  style: const TextStyle(
+                                                    fontSize: 26,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: Color(0xFF2563EB),
+                                                  ),
+                                                ),
+                                              ),
+                                        if (isUploadingAvatar)
+                                          Container(
+                                            color: Colors.black45,
+                                            child: const Center(
+                                              child: SizedBox(
+                                                width: 24,
+                                                height: 24,
+                                                child: CircularProgressIndicator(
+                                                  strokeWidth: 2.5,
+                                                  color: Colors.white,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: -2,
+                                  right: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2563EB),
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white, width: 2),
+                                    ),
+                                    child: const Icon(LucideIcons.camera, size: 14, color: Colors.white),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            username.isNotEmpty ? '@$username' : '',
+                            style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            ),
+                            onPressed: isSaving || isUploadingAvatar ? null : showSourceSelection,
+                            icon: const Icon(LucideIcons.camera, size: 14, color: Color(0xFF2563EB)),
+                            label: const Text(
+                              'Đổi ảnh đại diện',
+                              style: TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Section 1: Contact Info
+                    const Text(
+                      'THÔNG TIN LIÊN HỆ',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: contactNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Tên người liên hệ *',
+                        prefixIcon: const Icon(LucideIcons.user, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Số điện thoại',
+                        prefixIcon: const Icon(LucideIcons.phone, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: 'Email nhận thông báo',
+                        prefixIcon: const Icon(LucideIcons.mail, size: 18),
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Section 2: Enterprise Info (Read-only)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF8FAFC),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(LucideIcons.building2, size: 16, color: Color(0xFF475569)),
+                              SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  'Thông tin doanh nghiệp đối tác',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          _buildProfileInfoRow('Doanh nghiệp:', customerName),
+                          if (customerCode.isNotEmpty)
+                            _buildProfileInfoRow('Mã khách hàng:', customerCode),
+                          if (companyTaxCode.isNotEmpty)
+                            _buildProfileInfoRow('Mã số thuế:', companyTaxCode),
+                          if (companyAddress.isNotEmpty)
+                            _buildProfileInfoRow('Địa chỉ:', companyAddress),
+                          const SizedBox(height: 6),
+                          const Text(
+                            '* Thông tin pháp nhân doanh nghiệp do Admin quản lý. Để thay đổi vui lòng liên hệ Hotline.',
+                            style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actionsPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            actions: [
+              TextButton(
+                onPressed: isSaving || isUploadingAvatar ? null : () => Navigator.of(ctx).pop(),
+                child: const Text('Đóng'),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2563EB),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                onPressed: isSaving || isUploadingAvatar
+                    ? null
+                    : () async {
+                        final contactName = contactNameController.text.trim();
+                        final phone = phoneController.text.trim();
+                        final email = emailController.text.trim();
+
+                        if (contactName.isEmpty) {
+                          setDialogState(() => dialogError = 'Tên người liên hệ không được để trống.');
+                          return;
+                        }
+                        if (contactName.length > 100) {
+                          setDialogState(() => dialogError = 'Tên người liên hệ tối đa 100 ký tự.');
+                          return;
+                        }
+                        if (phone.isNotEmpty && !RegExp(r'^(0|\+84)[0-9]{9,10}$').hasMatch(phone)) {
+                          setDialogState(() => dialogError = 'Số điện thoại không hợp lệ (9-10 chữ số).');
+                          return;
+                        }
+                        if (email.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
+                          setDialogState(() => dialogError = 'Email không hợp lệ.');
+                          return;
+                        }
+
+                        setDialogState(() {
+                          isSaving = true;
+                          dialogError = null;
+                          dialogSuccess = null;
+                        });
+
+                        try {
+                          final res = await api.put(
+                            '/api/v1/customer/account-profile',
+                            body: {
+                              'contactName': contactName,
+                              'phone': phone,
+                              'email': email,
+                            },
+                          );
+
+                          final updatedData = res is Map<String, dynamic>
+                              ? (res.containsKey('data') && res['data'] is Map<String, dynamic>
+                                  ? res['data'] as Map<String, dynamic>
+                                  : res)
+                              : null;
+
+                          if (updatedData != null) {
+                            setState(() {
+                              _accountProfile = updatedData;
+                            });
+                            auth.updateCurrentUser(
+                              name: updatedData['contactName']?.toString(),
+                              phone: updatedData['phone']?.toString(),
+                              email: updatedData['email']?.toString(),
+                              avatar: updatedData['avatarUrl']?.toString(),
+                            );
+                            if (ctx.mounted) {
+                              Navigator.of(ctx).pop();
+                            }
+                            if (mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Cập nhật thông tin tài khoản thành công!'),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          }
+                        } on ApiException catch (e) {
+                          setDialogState(() {
+                            isSaving = false;
+                            dialogError = e.message;
+                          });
+                        } catch (e) {
+                          setDialogState(() {
+                            isSaving = false;
+                            dialogError = 'Không thể cập nhật thông tin. Vui lòng thử lại.';
+                          });
+                        }
+                      },
+                child: isSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Text('Lưu thay đổi'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildProfileInfoRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 86,
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _showChangePasswordDialog(BuildContext context) async {
@@ -502,8 +1105,10 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
     final user = auth.currentUser;
-    final companyName = user?.name ?? 'Khách hàng';
-    final initials = _getInitials(companyName);
+    final companyName = _accountProfile?['customerName']?.toString() ?? user?.name ?? 'Khách hàng';
+    final contactName = _accountProfile?['contactName']?.toString() ?? '';
+    final avatarUrl = _accountProfile?['avatarUrl']?.toString() ?? user?.avatar;
+    final initials = _getInitials(contactName.isNotEmpty ? contactName : companyName);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -544,22 +1149,43 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           ],
         ),
         actions: [
-          // Elegant user menu button
+          // Elegant user menu button with avatar
           PopupMenuButton<String>(
             tooltip: 'Tài khoản & Cài đặt',
             offset: const Offset(0, 48),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
             icon: Container(
-              padding: const EdgeInsets.all(6),
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 color: const Color(0xFFF1F5F9),
                 shape: BoxShape.circle,
                 border: Border.all(color: const Color(0xFFE2E8F0)),
               ),
-              child: const Icon(LucideIcons.userRound, size: 20, color: Color(0xFF334155)),
+              child: ClipOval(
+                child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? Image.network(
+                        context.read<AuthProvider>().api.resolveUrl(avatarUrl),
+                        width: 36,
+                        height: 36,
+                        fit: BoxFit.cover,
+                        errorBuilder: (ctx, err, stack) => const Icon(
+                          LucideIcons.userRound,
+                          size: 20,
+                          color: Color(0xFF334155),
+                        ),
+                      )
+                    : const Icon(
+                        LucideIcons.userRound,
+                        size: 20,
+                        color: Color(0xFF334155),
+                      ),
+              ),
             ),
             onSelected: (value) {
-              if (value == 'change_pwd') {
+              if (value == 'profile') {
+                _showProfileDialog();
+              } else if (value == 'change_pwd') {
                 _showChangePasswordDialog(context);
               } else if (value == 'logout') {
                 _confirmLogout(context);
@@ -572,8 +1198,20 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(companyName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.black87), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text(user?.username ?? '', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    if (contactName.isNotEmpty && contactName != companyName)
+                      Text(contactName, style: const TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w500)),
+                    Text(user?.username ?? '', style: const TextStyle(fontSize: 11, color: Colors.grey)),
                     const Divider(),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(LucideIcons.userCog, size: 18, color: Color(0xFF2563EB)),
+                    SizedBox(width: 10),
+                    Text('Hồ sơ cá nhân', style: TextStyle(fontSize: 14)),
                   ],
                 ),
               ),
@@ -607,6 +1245,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           await Future.wait([
             _fetchOrders(),
             _fetchSupportConfig(),
+            _fetchAccountProfile(),
           ]);
         },
         color: const Color(0xFF2563EB),
@@ -614,7 +1253,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           children: [
             // 1. VIP MEMBERSHIP CARD (Gradient Enterprise Card)
-            _buildVipMembershipCard(companyName, initials, user?.username),
+            _buildVipMembershipCard(companyName, contactName, initials, user?.username, avatarUrl),
             const SizedBox(height: 18),
 
             // 2. SEARCH BAR & QUICK FILTERS
@@ -688,7 +1327,13 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   }
 
   // VIP Enterprise Membership Card
-  Widget _buildVipMembershipCard(String companyName, String initials, String? username) {
+  Widget _buildVipMembershipCard(
+    String companyName,
+    String contactName,
+    String initials,
+    String? username,
+    String? avatarUrl,
+  ) {
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
@@ -773,80 +1418,121 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                 ),
                 const SizedBox(height: 16),
 
-                // Middle: Avatar + Company Name
+                // Middle: Avatar + Company Name (tap to view/edit profile)
                 Row(
                   children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.2),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                    GestureDetector(
+                      onTap: () => _showProfileDialog(),
+                      child: Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF60A5FA), Color(0xFF1D4ED8)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                        ],
-                      ),
-                      alignment: Alignment.center,
-                      child: Text(
-                        initials,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white.withValues(alpha: 0.6), width: 1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: ClipOval(
+                          child: (avatarUrl != null && avatarUrl.isNotEmpty)
+                              ? Image.network(
+                                  context.read<AuthProvider>().api.resolveUrl(avatarUrl),
+                                  width: 48,
+                                  height: 48,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (ctx, err, stack) => Center(
+                                    child: Text(
+                                      initials,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.w900,
+                                        letterSpacing: 1,
+                                      ),
+                                    ),
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    initials,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 1,
+                                    ),
+                                  ),
+                                ),
                         ),
                       ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            companyName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              height: 1.25,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 3),
-                          Row(
-                            children: [
-                              Container(
-                                width: 6,
-                                height: 6,
-                                decoration: const BoxDecoration(
-                                  color: Color(0xFF4ADE80), // Active green
-                                  shape: BoxShape.circle,
-                                ),
+                      child: GestureDetector(
+                        onTap: () => _showProfileDialog(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              companyName,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                height: 1.25,
                               ),
-                              Expanded(
-                                child: Text(
-                                  'Cổng theo dõi trực tuyến 24/7',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.8),
-                                    fontSize: 11,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (contactName.isNotEmpty && contactName != companyName) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                'Đại diện: $contactName',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.9),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
                                 ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
-                          ),
-                        ],
+                            const SizedBox(height: 3),
+                            Row(
+                              children: [
+                                Container(
+                                  width: 6,
+                                  height: 6,
+                                  decoration: const BoxDecoration(
+                                    color: Color(0xFF4ADE80), // Active green
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                const SizedBox(width: 5),
+                                Expanded(
+                                  child: Text(
+                                    'Cổng theo dõi trực tuyến 24/7',
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(alpha: 0.8),
+                                      fontSize: 11,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ],

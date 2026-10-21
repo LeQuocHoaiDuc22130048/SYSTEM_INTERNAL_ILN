@@ -19,6 +19,10 @@ import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import com.suachuabientan.system_internal.modules.customer.dto.CustomerAccountProfileResponse;
+import com.suachuabientan.system_internal.modules.customer.dto.UpdateCustomerAccountProfileRequest;
+import org.springframework.http.MediaType;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -30,6 +34,38 @@ import java.util.UUID;
 public class CustomerPortalController {
 
     private final CustomerPortalService portalService;
+
+    @Operation(summary = "Lấy thông tin tài khoản và avatar của khách hàng hiện tại")
+    @GetMapping("/account-profile")
+    @PreAuthorize("hasAuthority('CUSTOMER_PORTAL_VIEW') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerAccountProfileResponse>> getAccountProfile(
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(portalService.getAccountProfile(userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Cập nhật thông tin cá nhân của tài khoản khách hàng")
+    @PutMapping("/account-profile")
+    @PreAuthorize("hasAuthority('CUSTOMER_PORTAL_VIEW') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerAccountProfileResponse>> updateAccountProfile(
+            @Valid @RequestBody UpdateCustomerAccountProfileRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                portalService.updateAccountProfile(userDetails.getUserId(), request),
+                "Cập nhật thông tin thành công"
+        ));
+    }
+
+    @Operation(summary = "Cập nhật ảnh đại diện (avatar) của khách hàng")
+    @PostMapping(value = "/avatar", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAuthority('CUSTOMER_PORTAL_VIEW') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerAccountProfileResponse>> updateAvatar(
+            @RequestParam("file") MultipartFile file,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                portalService.updateAvatar(userDetails.getUserId(), file),
+                "Cập nhật ảnh đại diện thành công"
+        ));
+    }
 
     @Operation(summary = "Lấy thông tin hồ sơ của khách hàng hiện tại")
     @GetMapping("/me")

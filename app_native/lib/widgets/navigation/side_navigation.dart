@@ -341,25 +341,32 @@ class _UserProfile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = Provider.of<AuthProvider>(context).currentUser;
-    final name = currentUser?.name ?? 'Ng\u01B0\u1EDDi d\u00F9ng';
+    final auth = Provider.of<AuthProvider>(context);
+    final currentUser = auth.currentUser;
+    final name = currentUser?.name ?? 'Người dùng';
     final role = currentUser == null
         ? ''
         : '${currentUser.roleLabel} - ${currentUser.employeeId.isEmpty ? currentUser.username : currentUser.employeeId}';
     final initials = _initials(name);
+    final avatarUrl = currentUser?.avatar != null && currentUser!.avatar!.isNotEmpty
+        ? auth.api.resolveUrl(currentUser.avatar!)
+        : null;
 
     if (!isExpanded) {
       return CircleAvatar(
         radius: 18,
         backgroundColor: AppColors.primary,
-        child: Text(
-          initials,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+        child: avatarUrl == null
+            ? Text(
+                initials,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              )
+            : null,
       );
     }
 
@@ -368,14 +375,17 @@ class _UserProfile extends StatelessWidget {
         CircleAvatar(
           radius: 18,
           backgroundColor: const Color(0xFFD946EF),
-          child: Text(
-            initials,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
+          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+          child: avatarUrl == null
+              ? Text(
+                  initials,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                )
+              : null,
         ),
         const SizedBox(width: 12),
         Expanded(

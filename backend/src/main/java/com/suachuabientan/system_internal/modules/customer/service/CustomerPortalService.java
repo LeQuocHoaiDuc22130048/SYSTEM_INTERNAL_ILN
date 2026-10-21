@@ -22,12 +22,17 @@ import com.suachuabientan.system_internal.modules.auth.service.AuthService;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairCustomerMediaRepository;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairCustomerUpdateRepository;
+import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
+import com.suachuabientan.system_internal.modules.auth.repository.UserRepository;
+import com.suachuabientan.system_internal.modules.repair.enums.RepairMediaType;
+import com.suachuabientan.system_internal.modules.repair.service.RepairMediaStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.Instant;
 import java.util.List;
@@ -49,6 +54,79 @@ public class CustomerPortalService {
     private final RepairCustomerMediaRepository repairCustomerMediaRepository;
     private final RepairImageRepository repairImageRepository;
     private final AuthService authService;
+    private final UserRepository userRepository;
+    private final RepairMediaStorageService repairMediaStorageService;
+
+    @Transactional(readOnly = true)
+    public CustomerAccountProfileResponse getAccountProfile(UUID userId) {
+        CustomerAccount account = customerAccountRepository.findByUserIdAndActiveTrueAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new BusinessException("Tài khoản chưa được liên kết với hồ sơ khách hàng nào hoặc đã bị khóa", 403));
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài khoản: " + userId));
+
+        Customer customer = customerRepository.findByIdAndIsDeletedFalse(account.getCustomerId())
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy hồ sơ khách hàng: " + account.getCustomerId()));
+
+        return new CustomerAccountProfileResponse(
+                user.getId(),
+                user.getUsername(),
+                account.getContactName() != null ? account.getContactName() : user.getFullName(),
+                account.getPhone() != null ? account.getPhone() : user.getPhone(),
+                account.getEmail(),
+                user.getAvatarUrl(),
+                customer.getId(),
+                customer.getCustomerCode(),
+                customer.getCustomerName(),
+                customer.getAddress(),
+                customer.getTaxCode()
+        );
+    }
+
+    @Transactional
+    public CustomerAccountProfileResponse updateAccountProfile(UUID userId, UpdateCustomerAccountProfileRequest request) {
+        CustomerAccount account = customerAccountRepository.findByUserIdAndActiveTrueAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new BusinessException("Tài khoản chưa được liên kết với hồ sơ khách hàng nào hoặc đã bị khóa", 403));
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài khoản: " + userId));
+
+        String contactName = request.contactName() != null ? request.contactName().strip() : "";
+        String phone = request.phone() != null && !request.phone().isBlank() ? request.phone().strip() : null;
+        String email = request.email() != null && !request.email().isBlank() ? request.email().strip() : null;
+
+        user.setFullName(contactName);
+        if (phone != null) {
+            user.setPhone(phone);
+        }
+        userRepository.save(user);
+
+        account.setContactName(contactName);
+        account.setPhone(phone);
+        account.setEmail(email);
+        customerAccountRepository.save(account);
+
+        return getAccountProfile(userId);
+    }
+
+    @Transactional
+    public CustomerAccountProfileResponse updateAvatar(UUID userId, MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new BusinessException("Tệp tải lên không được để trống", 400);
+        }
+
+        CustomerAccount account = customerAccountRepository.findByUserIdAndActiveTrueAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new BusinessException("Tài khoản chưa được liên kết với hồ sơ khách hàng nào hoặc đã bị khóa", 403));
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin tài khoản: " + userId));
+
+        RepairMediaStorageService.StoredMedia stored = repairMediaStorageService.store(file, RepairMediaType.IMAGE);
+        user.setAvatarUrl(stored.publicUrl());
+        userRepository.save(user);
+
+        return getAccountProfile(userId);
+    }
 
     @Transactional(readOnly = true)
     public UUID getCurrentCustomerId(UUID userId) {

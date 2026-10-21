@@ -49,7 +49,7 @@ void main() {
     });
 
     // Helper method to setup provider with a mock response
-    void setupMockClient(Future<http.Response> Function(http.Request) handler) {
+    void setupMockClient(Future<http.Response> Function(dynamic) handler) {
       final mockClient = MockClient(handler);
       apiClient = ApiClient(client: mockClient);
       authProvider = AuthProvider(apiClient: apiClient);
@@ -452,6 +452,48 @@ void main() {
         expect(authProvider.logoutWarning, isNotNull);
       },
     );
+
+    test('uploadAvatar uploads file and updates current user avatar', () async {
+      setupMockClient((request) async {
+        if (request.url.path == '/api/v1/employees/me/avatar') {
+          return http.Response(
+            jsonEncode({
+              'data': {
+                'id': '11111111-1111-1111-1111-111111111111',
+                'username': 'emp',
+                'fullName': 'Employee One',
+                'role': 'EMPLOYEE',
+                'status': 'ACTIVE',
+                'avatarUrl': '/api/v1/repair-media/emp-avatar.jpg',
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+        return http.Response('Not found', 404);
+      });
+
+      mockSecureStorage['cached_user_info'] = jsonEncode({
+        'id': '11111111-1111-1111-1111-111111111111',
+        'username': 'emp',
+        'fullName': 'Employee One',
+        'email': 'emp',
+        'employeeCode': 'NV-001',
+        'role': 'EMPLOYEE',
+        'status': 'ACTIVE',
+      });
+      apiClient.accessToken = 'valid-token';
+      await authProvider.tryAutoLogin();
+
+      final avatar = await authProvider.uploadAvatar(
+        Uint8List.fromList([1, 2, 3]),
+        'avatar.jpg',
+      );
+
+      expect(avatar, '/api/v1/repair-media/emp-avatar.jpg');
+      expect(authProvider.currentUser?.avatar, '/api/v1/repair-media/emp-avatar.jpg');
+    });
   });
 
   group('Role permission matrix', () {

@@ -23,6 +23,7 @@ import {
 import type { UserInfo } from '../mockData';
 import { hasPermission, getRoleLabel } from '../utils/permissions';
 import { canAccessTab } from '../utils/tabPermissions';
+import { UserProfileModal } from './UserProfileModal';
 
 export type SidebarTab =
   | 'dashboard'
@@ -76,6 +77,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
   // Quản lý trạng thái mở của nhóm cha (Accordion: chỉ 1 nhóm mở tại 1 thời điểm)
   const [openGroup, setOpenGroup] = useState<GroupKey | null>(() => getGroupByTab(activeTab));
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
 
   // Tự động đồng bộ nhóm cha khi activeTab thay đổi sang nhóm khác
   useEffect(() => {
@@ -558,14 +560,34 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {currentUser && (
           <div
             className="sidebar-user-panel"
-            title={isCollapsed ? `${currentUser.fullName || currentUser.username} (${getRoleLabel(currentUser.role)})` : undefined}
+            title={isCollapsed ? `${currentUser.fullName || currentUser.username} (${getRoleLabel(currentUser.role)}) — Nhấp để xem hồ sơ` : undefined}
           >
-            <div className="user-avatar">
-              {currentUser.fullName
-                ? currentUser.fullName.charAt(0).toUpperCase()
-                : currentUser.username.charAt(0).toUpperCase()}
+            <div
+              className="user-avatar"
+              onClick={() => setIsProfileModalOpen(true)}
+              title="Xem và chỉnh sửa ảnh đại diện / thông tin cá nhân"
+            >
+              {currentUser.avatarUrl ? (
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.fullName || currentUser.username}
+                  className="user-avatar-img"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              ) : null}
+              <span>
+                {currentUser.fullName
+                  ? currentUser.fullName.charAt(0).toUpperCase()
+                  : currentUser.username.charAt(0).toUpperCase()}
+              </span>
             </div>
-            <div className="user-details">
+            <div
+              className="user-details user-details-clickable"
+              onClick={() => setIsProfileModalOpen(true)}
+              title="Nhấp để xem và chỉnh sửa thông tin cá nhân"
+            >
               <span className="user-name" title={currentUser.fullName || currentUser.username}>
                 {currentUser.fullName || currentUser.username}
               </span>
@@ -573,7 +595,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <button
               className="sidebar-logout-btn"
-              onClick={handleLogout}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLogout();
+              }}
               title="Đăng xuất"
               aria-label="Logout"
             >
@@ -582,6 +607,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
       </div>
+
+      {currentUser && (
+        <UserProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          currentUser={currentUser}
+        />
+      )}
     </aside>
   );
 };

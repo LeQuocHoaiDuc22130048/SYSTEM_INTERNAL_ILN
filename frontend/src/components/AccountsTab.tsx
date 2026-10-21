@@ -270,7 +270,17 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
                           className="user-avatar-sm"
                           style={{ background: avatarColor(user.role) }}
                         >
-                          {(user.fullName || user.username).charAt(0).toUpperCase()}
+                          {user.avatarUrl ? (
+                            <img
+                              src={user.avatarUrl}
+                              alt={user.fullName || user.username}
+                              className="user-avatar-img-sm"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : null}
+                          <span>{(user.fullName || user.username).charAt(0).toUpperCase()}</span>
                         </div>
                         <div className="user-cell-info">
                           <span className="user-cell-name" title={user.fullName}>

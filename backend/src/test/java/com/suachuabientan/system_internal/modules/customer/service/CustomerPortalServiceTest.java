@@ -67,6 +67,12 @@ class CustomerPortalServiceTest {
     @Mock
     private com.suachuabientan.system_internal.modules.auth.service.AuthService authService;
 
+    @Mock
+    private com.suachuabientan.system_internal.modules.auth.repository.UserRepository userRepository;
+
+    @Mock
+    private com.suachuabientan.system_internal.modules.repair.service.RepairMediaStorageService repairMediaStorageService;
+
     @InjectMocks
     private CustomerPortalService service;
 
@@ -264,6 +270,92 @@ class CustomerPortalServiceTest {
 
         verify(authService).changePassword(userId, req);
         assertFalse(account.isMustChangePassword());
+        verify(customerAccountRepository).save(account);
+    }
+
+    @Test
+    void getAccountProfile_success() {
+        CustomerAccount account = CustomerAccount.builder()
+                .userId(userId)
+                .customerId(customerId)
+                .contactName("Nguyen Van A")
+                .phone("0912345678")
+                .email("nva@gmail.com")
+                .active(true)
+                .build();
+
+        com.suachuabientan.system_internal.modules.auth.entity.UserEntity user = com.suachuabientan.system_internal.modules.auth.entity.UserEntity.builder()
+                .username("khachhang_a")
+                .fullName("Nguyen Van A")
+                .avatarUrl("/api/v1/repair-media/avatar.jpg")
+                .build();
+        user.setId(userId);
+
+        Customer customer = new Customer();
+        customer.setId(customerId);
+        customer.setCustomerCode("CUST-001");
+        customer.setCustomerName("Cong Ty ABC");
+        customer.setAddress("123 Duong 1");
+        customer.setTaxCode("0101234567");
+
+        when(customerAccountRepository.findByUserIdAndActiveTrueAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(account));
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(user));
+        when(customerRepository.findByIdAndIsDeletedFalse(customerId))
+                .thenReturn(Optional.of(customer));
+
+        var profile = service.getAccountProfile(userId);
+
+        assertNotNull(profile);
+        assertEquals("khachhang_a", profile.username());
+        assertEquals("Nguyen Van A", profile.contactName());
+        assertEquals("0912345678", profile.phone());
+        assertEquals("nva@gmail.com", profile.email());
+        assertEquals("/api/v1/repair-media/avatar.jpg", profile.avatarUrl());
+        assertEquals("Cong Ty ABC", profile.customerName());
+    }
+
+    @Test
+    void updateAccountProfile_success() {
+        CustomerAccount account = CustomerAccount.builder()
+                .userId(userId)
+                .customerId(customerId)
+                .contactName("Nguyen Van A")
+                .phone("0912345678")
+                .email("nva@gmail.com")
+                .active(true)
+                .build();
+
+        com.suachuabientan.system_internal.modules.auth.entity.UserEntity user = com.suachuabientan.system_internal.modules.auth.entity.UserEntity.builder()
+                .username("khachhang_a")
+                .fullName("Nguyen Van A")
+                .build();
+        user.setId(userId);
+
+        Customer customer = new Customer();
+        customer.setId(customerId);
+        customer.setCustomerCode("CUST-001");
+        customer.setCustomerName("Cong Ty ABC");
+
+        when(customerAccountRepository.findByUserIdAndActiveTrueAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(account));
+        when(userRepository.findByIdAndIsDeletedFalse(userId))
+                .thenReturn(Optional.of(user));
+        when(customerRepository.findByIdAndIsDeletedFalse(customerId))
+                .thenReturn(Optional.of(customer));
+
+        var req = new com.suachuabientan.system_internal.modules.customer.dto.UpdateCustomerAccountProfileRequest(
+                "Nguyen Van B", "0987654321", "nvb@gmail.com"
+        );
+
+        var updated = service.updateAccountProfile(userId, req);
+
+        assertNotNull(updated);
+        assertEquals("Nguyen Van B", updated.contactName());
+        assertEquals("0987654321", updated.phone());
+        assertEquals("nvb@gmail.com", updated.email());
+        verify(userRepository).save(user);
         verify(customerAccountRepository).save(account);
     }
 }

@@ -316,4 +316,136 @@ void main() {
     expect(find.text('Hotline Khẩn Cấp 24/7'), findsOneWidget);
     expect(find.text('Chat Zalo Kỹ Thuật Viên'), findsOneWidget);
   });
+
+  testWidgets('CustomerPortalMobilePage loads and displays account profile in VIP card and opens profile dialog', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': 'khachhangtest',
+              'fullName': 'Công ty TNHH Biến Tần',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({'content': [], 'totalElements': 0}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/account-profile') {
+        if (request.method == 'GET') {
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'data': {
+                'userId': '10',
+                'username': 'khachhangtest',
+                'contactName': 'Nguyễn Văn Tuấn',
+                'phone': '0987654321',
+                'email': 'tuan@bientan.vn',
+                'avatarUrl': '',
+                'customerId': 'cust-1',
+                'customerCode': 'KH-TEST-01',
+                'customerName': 'Công ty TNHH Biến Tần',
+                'companyAddress': '123 Đường ABC, TP.HCM',
+                'companyTaxCode': '0312345678',
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        } else if (request.method == 'PUT') {
+          final body = jsonDecode(request.body) as Map<String, dynamic>;
+          return http.Response(
+            jsonEncode({
+              'success': true,
+              'message': 'Cập nhật thành công',
+              'data': {
+                'userId': '10',
+                'username': 'khachhangtest',
+                'contactName': body['contactName'],
+                'phone': body['phone'],
+                'email': body['email'],
+                'avatarUrl': '',
+                'customerId': 'cust-1',
+                'customerCode': 'KH-TEST-01',
+                'customerName': 'Công ty TNHH Biến Tần',
+                'companyAddress': '123 Đường ABC, TP.HCM',
+                'companyTaxCode': '0312345678',
+              },
+            }),
+            200,
+            headers: {'content-type': 'application/json; charset=utf-8'},
+          );
+        }
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: 'khachhangtest', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify contact name appears on VIP card
+    expect(find.text('Đại diện: Nguyễn Văn Tuấn'), findsOneWidget);
+
+    // Open popup menu and tap 'Hồ sơ cá nhân'
+    final popupBtn = find.byType(PopupMenuButton<String>);
+    await tester.tap(popupBtn);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hồ sơ cá nhân'), findsOneWidget);
+    await tester.tap(find.text('Hồ sơ cá nhân'));
+    await tester.pumpAndSettle();
+
+    // Verify profile dialog opened
+    expect(find.text('Thông tin tài khoản'), findsOneWidget);
+    expect(find.text('KH-TEST-01'), findsOneWidget);
+    expect(find.text('0312345678'), findsOneWidget);
+    expect(find.text('123 Đường ABC, TP.HCM'), findsOneWidget);
+
+    // Edit contact name
+    final nameField = find.widgetWithText(TextField, 'Nguyễn Văn Tuấn');
+    expect(nameField, findsOneWidget);
+    await tester.enterText(nameField, 'Trần Minh Đức');
+    await tester.pumpAndSettle();
+
+    // Save changes
+    await tester.tap(find.widgetWithText(ElevatedButton, 'Lưu thay đổi'));
+    await tester.pumpAndSettle();
+
+    // Verify SnackBar and updated representation on card
+    expect(find.text('Cập nhật thông tin tài khoản thành công!'), findsOneWidget);
+    expect(find.text('Đại diện: Trần Minh Đức'), findsOneWidget);
+  });
 }

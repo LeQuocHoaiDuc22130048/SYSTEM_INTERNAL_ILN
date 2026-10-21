@@ -14,6 +14,7 @@ import '../utils/update_provider.dart';
 import '../widgets/navigation/app_back_button.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/app_quick_actions.dart';
+import 'package:image_picker/image_picker.dart';
 import 'privacy_policy_page.dart';
 
 /// Profile Page designed faithfully according to Stitch Home Service Marketplace
@@ -37,6 +38,8 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  bool _isUploadingAvatar = false;
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -210,34 +213,48 @@ class _ProfilePageState extends State<ProfilePage> {
             clipBehavior: Clip.none,
             children: [
               // Avatar Circle
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF2563EB).withValues(alpha: 0.22),
-                      blurRadius: 18,
-                      offset: const Offset(0, 6),
+              GestureDetector(
+                onTap: user == null ? null : _showAvatarOptionsSheet,
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                  border: Border.all(color: Colors.white, width: 3.5),
-                ),
-                child: ClipOval(
-                  child: user?.avatar != null && user!.avatar!.isNotEmpty
-                      ? Image.network(
-                          user.avatar!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              _buildInitialsWidget(initials),
-                        )
-                      : _buildInitialsWidget(initials),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF2563EB).withValues(alpha: 0.22),
+                        blurRadius: 18,
+                        offset: const Offset(0, 6),
+                      ),
+                    ],
+                    border: Border.all(color: Colors.white, width: 3.5),
+                  ),
+                  child: ClipOval(
+                    child: _isUploadingAvatar
+                        ? const Center(
+                            child: SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.5,
+                                color: Colors.white,
+                              ),
+                            ),
+                          )
+                        : (user?.avatar != null && user!.avatar!.isNotEmpty
+                            ? Image.network(
+                                context.read<AuthProvider>().api.resolveUrl(user.avatar!),
+                                fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    _buildInitialsWidget(initials),
+                              )
+                            : _buildInitialsWidget(initials)),
+                  ),
                 ),
               ),
 
@@ -250,7 +267,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: InkWell(
                     onTap: user == null
                         ? null
-                        : () => _showAccountSettings(user),
+                        : _showAvatarOptionsSheet,
                     borderRadius: BorderRadius.circular(20),
                     child: Container(
                       width: 32,
@@ -734,6 +751,86 @@ class _ProfilePageState extends State<ProfilePage> {
   // PRESERVED MODALS & ACTION HANDLERS (Identical Logic & Validation)
   // =========================================================================
 
+  Future<void> _pickAndUploadAvatar(ImageSource source) async {
+    try {
+      final picker = ImagePicker();
+      final picked = await picker.pickImage(
+        source: source,
+        maxWidth: 800,
+        maxHeight: 800,
+        imageQuality: 85,
+      );
+      if (picked == null) return;
+
+      setState(() => _isUploadingAvatar = true);
+      final bytes = await picked.readAsBytes();
+      if (!mounted) return;
+      await context.read<AuthProvider>().uploadAvatar(bytes, picked.name);
+      if (!mounted) return;
+      _showSnackBar('Cập nhật ảnh đại diện thành công.');
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      _showSnackBar(e.message, isError: true);
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackBar('Không thể tải ảnh lên: $e', isError: true);
+    } finally {
+      if (mounted) {
+        setState(() => _isUploadingAvatar = false);
+      }
+    }
+  }
+
+  void _showAvatarOptionsSheet() {
+    final user = context.read<AuthProvider>().currentUser;
+    if (user == null) return;
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Text(
+                  'Cập nhật ảnh đại diện',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(LucideIcons.camera, color: Color(0xFF2563EB)),
+                title: const Text('Chụp ảnh mới'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _pickAndUploadAvatar(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                leading: const Icon(LucideIcons.image, color: Color(0xFF16A34A)),
+                title: const Text('Chọn từ thư viện'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _pickAndUploadAvatar(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(LucideIcons.userCog, color: Color(0xFF4F46E5)),
+                title: const Text('Chỉnh sửa thông tin tài khoản'),
+                onTap: () {
+                  Navigator.of(sheetContext).pop();
+                  _showAccountSettings(user);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   Future<void> _handleLogout() async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -836,10 +933,59 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
                 content: Form(
                   key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Center(
+                          child: Stack(
+                            clipBehavior: Clip.none,
+                            children: [
+                              Container(
+                                width: 76,
+                                height: 76,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFF2563EB), Color(0xFF4F46E5)],
+                                  ),
+                                  border: Border.all(color: Colors.white, width: 2.5),
+                                ),
+                                child: ClipOval(
+                                  child: user.avatar != null && user.avatar!.isNotEmpty
+                                      ? Image.network(
+                                          context.read<AuthProvider>().api.resolveUrl(user.avatar!),
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (context, error, stackTrace) =>
+                                              _buildInitialsWidget(_initials(user.name)),
+                                        )
+                                      : _buildInitialsWidget(_initials(user.name)),
+                                ),
+                              ),
+                              Positioned(
+                                bottom: -2,
+                                right: -2,
+                                child: InkWell(
+                                  onTap: () {
+                                    Navigator.of(dialogContext).pop();
+                                    _showAvatarOptionsSheet();
+                                  },
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF2563EB),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(LucideIcons.camera, size: 14, color: Colors.white),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
                         controller: nameController,
                         decoration: _inputDecoration('Họ tên'),
                         textInputAction: TextInputAction.next,
@@ -883,7 +1029,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                   ),
                 ),
-                actions: [
+              ),
+              actions: [
                   TextButton(
                     onPressed: isSaving
                         ? null

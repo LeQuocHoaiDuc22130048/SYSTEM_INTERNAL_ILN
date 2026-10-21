@@ -177,6 +177,53 @@ class AuthProvider extends ChangeNotifier {
     });
   }
 
+  Future<String?> uploadAvatar(Uint8List fileBytes, String filename) async {
+    String? newAvatarUrl;
+    await _run(() async {
+      final res = await api.postMultipart(
+        '/api/v1/employees/me/avatar',
+        fields: const {},
+        bytes: fileBytes,
+        filename: filename,
+      );
+      if (res is Map<String, dynamic>) {
+        newAvatarUrl = res['avatarUrl']?.toString();
+        if (newAvatarUrl != null && _currentUser != null) {
+          _currentUser = _currentUser!.copyWith(avatar: newAvatarUrl);
+          await _secureStorage.write(
+            key: _userCacheKey,
+            value: jsonEncode(_currentUser!.toJson()),
+          );
+          _log('Avatar updated and cached: $newAvatarUrl');
+        }
+      }
+      notifyListeners();
+    });
+    return newAvatarUrl;
+  }
+
+  void updateCurrentUser({
+    String? name,
+    String? phone,
+    String? email,
+    String? avatar,
+  }) {
+    if (_currentUser == null) return;
+    _currentUser = _currentUser!.copyWith(
+      name: name,
+      phone: phone,
+      email: email,
+      avatar: avatar,
+    );
+    notifyListeners();
+    _secureStorage.write(
+      key: _userCacheKey,
+      value: jsonEncode(_currentUser!.toJson()),
+    ).catchError((e) {
+      _log('Error saving updated user: $e');
+    });
+  }
+
   Future<void> changePassword({
     required String currentPassword,
     required String newPassword,

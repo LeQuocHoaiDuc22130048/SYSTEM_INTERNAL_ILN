@@ -65,6 +65,8 @@ export interface UserInfo {
   status?: string;
   avatarUrl?: string;
   department?: string;
+  phone?: string;
+  employeeCode?: string;
   permissions?: string[];
 }
 

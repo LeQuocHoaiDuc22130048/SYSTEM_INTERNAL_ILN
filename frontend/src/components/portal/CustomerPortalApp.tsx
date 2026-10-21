@@ -18,12 +18,16 @@ import {
   Eye,
   EyeOff,
   ChevronDown,
+  Camera,
+  UserCog,
+  Building2,
 } from 'lucide-react';
 import type { UserInfo } from '../../mockData';
 import type {
   Customer,
   CustomerOrderResponse,
   CustomerOrderDetailResponse,
+  CustomerAccountProfileResponse,
 } from '../../types/customer';
 import {
   trackPortalOrder,
@@ -31,6 +35,9 @@ import {
   getMyCustomerOrderDetail,
   getMyCustomerProfile,
   changeCustomerPassword,
+  getCustomerAccountProfile,
+  updateCustomerAccountProfile,
+  uploadCustomerAvatar,
 } from '../../utils/portalApi';
 import './CustomerPortalApp.css';
 
@@ -203,6 +210,124 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
     }
   };
 
+  // Customer Account Profile & Avatar State
+  const [accountProfile, setAccountProfile] = useState<CustomerAccountProfileResponse | null>(null);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileContactName, setProfileContactName] = useState('');
+  const [profilePhone, setProfilePhone] = useState('');
+  const [profileEmail, setProfileEmail] = useState('');
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  const fetchAccountProfile = useCallback(async () => {
+    if (!isAuth) return;
+    const res = await getCustomerAccountProfile();
+    if (res.success && res.data) {
+      setAccountProfile(res.data);
+      setProfileContactName(res.data.contactName || '');
+      setProfilePhone(res.data.phone || '');
+      setProfileEmail(res.data.email || '');
+
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const userObj = JSON.parse(stored);
+          userObj.fullName = res.data.contactName;
+          if (res.data.avatarUrl) {
+            userObj.avatarUrl = res.data.avatarUrl;
+          }
+          localStorage.setItem('currentUser', JSON.stringify(userObj));
+        }
+      } catch (e) {}
+    }
+  }, [isAuth]);
+
+  useEffect(() => {
+    if (isAuth) {
+      void fetchAccountProfile();
+    }
+  }, [isAuth, fetchAccountProfile]);
+
+  const handleAvatarFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setProfileError('Vui lòng chọn tệp định dạng hình ảnh (JPG, PNG, WEBP,...)');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setProfileError('Ảnh đại diện không được vượt quá 10 MB');
+      return;
+    }
+
+    setAvatarUploading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+
+    const res = await uploadCustomerAvatar(file);
+    setAvatarUploading(false);
+
+    if (res.success && res.data) {
+      setAccountProfile(res.data);
+      setProfileSuccess('Cập nhật ảnh đại diện thành công!');
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const userObj = JSON.parse(stored);
+          userObj.avatarUrl = res.data.avatarUrl;
+          localStorage.setItem('currentUser', JSON.stringify(userObj));
+        }
+      } catch (e) {}
+    } else {
+      setProfileError(res.message || 'Không thể tải lên ảnh đại diện');
+    }
+
+    if (avatarInputRef.current) {
+      avatarInputRef.current.value = '';
+    }
+  };
+
+  const handleProfileSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!profileContactName.trim()) {
+      setProfileError('Vui lòng nhập tên người liên hệ');
+      return;
+    }
+
+    setProfileLoading(true);
+    setProfileError(null);
+    setProfileSuccess(null);
+
+    const res = await updateCustomerAccountProfile({
+      contactName: profileContactName.trim(),
+      phone: profilePhone.trim() || undefined,
+      email: profileEmail.trim() || undefined,
+    });
+    setProfileLoading(false);
+
+    if (res.success && res.data) {
+      setAccountProfile(res.data);
+      setProfileSuccess('Cập nhật thông tin tài khoản thành công!');
+      try {
+        const stored = localStorage.getItem('currentUser');
+        if (stored) {
+          const userObj = JSON.parse(stored);
+          userObj.fullName = res.data.contactName;
+          localStorage.setItem('currentUser', JSON.stringify(userObj));
+        }
+      } catch (e) {}
+      setTimeout(() => {
+        setProfileSuccess(null);
+      }, 2000);
+    } else {
+      setProfileError(res.message || 'Không thể cập nhật thông tin');
+    }
+  };
+
 
   // Open Order Detail from My Orders
   const handleOpenMyOrderDetail = async (orderId: string) => {
@@ -290,10 +415,18 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                     title="Menu tài khoản khách hàng"
                   >
                     <div className="portal-user-avatar">
-                      <User size={14} />
+                      {accountProfile?.avatarUrl || currentUser?.avatarUrl ? (
+                        <img
+                          src={accountProfile?.avatarUrl || currentUser?.avatarUrl}
+                          alt="Avatar"
+                          className="portal-avatar-img"
+                        />
+                      ) : (
+                        <User size={14} />
+                      )}
                     </div>
                     <span className="portal-user-name">
-                      {customerProfile?.customerName || currentUser?.fullName || currentUser?.username}
+                      {accountProfile?.contactName || customerProfile?.customerName || currentUser?.fullName || currentUser?.username}
                     </span>
                     <ChevronDown size={14} className={`portal-chevron ${isUserMenuOpen ? 'rotate' : ''}`} />
                   </button>
@@ -302,19 +435,44 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                     <div className="portal-user-dropdown-menu">
                       <div className="portal-user-menu-header">
                         <div className="portal-user-menu-avatar">
-                          <User size={18} />
+                          {accountProfile?.avatarUrl || currentUser?.avatarUrl ? (
+                            <img
+                              src={accountProfile?.avatarUrl || currentUser?.avatarUrl}
+                              alt="Avatar"
+                              className="portal-avatar-menu-img"
+                            />
+                          ) : (
+                            <User size={18} />
+                          )}
                         </div>
                         <div className="portal-user-menu-info">
                           <p className="portal-user-menu-name">
-                            {customerProfile?.customerName || currentUser?.fullName || currentUser?.username}
+                            {accountProfile?.contactName || customerProfile?.customerName || currentUser?.fullName || currentUser?.username}
                           </p>
                           <span className="portal-user-menu-sub">
-                            {currentUser?.username} • Khách hàng
+                            {accountProfile?.customerName || currentUser?.username}
                           </span>
                         </div>
                       </div>
 
                       <div className="portal-user-menu-divider" />
+
+                      <button
+                        type="button"
+                        className="portal-user-menu-item"
+                        onClick={() => {
+                          setIsUserMenuOpen(false);
+                          setProfileError(null);
+                          setProfileSuccess(null);
+                          setProfileContactName(accountProfile?.contactName || currentUser?.fullName || '');
+                          setProfilePhone(accountProfile?.phone || '');
+                          setProfileEmail(accountProfile?.email || '');
+                          setIsProfileModalOpen(true);
+                        }}
+                      >
+                        <UserCog size={15} />
+                        <span>Hồ sơ & Ảnh đại diện</span>
+                      </button>
 
                       <button
                         type="button"
@@ -757,6 +915,179 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
           </div>
         )}
       </footer>
+
+      {/* MODAL: HỒ SƠ TÀI KHOẢN & AVATAR */}
+      {isProfileModalOpen && (
+        <div className="portal-modal-overlay">
+          <div className="portal-modal-card">
+            <div className="portal-modal-header">
+              <h3>
+                <UserCog size={18} className="text-blue-600" />
+                Hồ sơ tài khoản & Ảnh đại diện
+              </h3>
+              <button
+                type="button"
+                className="portal-modal-close"
+                onClick={() => {
+                  setIsProfileModalOpen(false);
+                  setProfileError(null);
+                  setProfileSuccess(null);
+                }}
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="portal-modal-body">
+              {profileSuccess && (
+                <div className="portal-success-banner">
+                  <CheckCircle2 size={16} />
+                  <span>{profileSuccess}</span>
+                </div>
+              )}
+
+              {profileError && (
+                <div className="track-error-banner" style={{ marginBottom: '14px' }}>
+                  <AlertCircle size={16} />
+                  <span>{profileError}</span>
+                </div>
+              )}
+
+              {/* AVATAR UPLOAD SECTION */}
+              <div className="portal-avatar-upload-section">
+                <input
+                  type="file"
+                  ref={avatarInputRef}
+                  style={{ display: 'none' }}
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  onChange={handleAvatarFileSelected}
+                />
+                <div
+                  className="portal-avatar-large-wrapper"
+                  onClick={() => avatarInputRef.current?.click()}
+                  title="Nhấn để đổi ảnh đại diện"
+                >
+                  {accountProfile?.avatarUrl || currentUser?.avatarUrl ? (
+                    <img
+                      src={accountProfile?.avatarUrl || currentUser?.avatarUrl}
+                      alt="Avatar"
+                      className="portal-avatar-large-img"
+                    />
+                  ) : (
+                    <div className="portal-avatar-large-placeholder">
+                      <User size={38} />
+                    </div>
+                  )}
+                  <div className="portal-avatar-overlay">
+                    <Camera size={20} />
+                    <span>{avatarUploading ? 'Đang tải...' : 'Đổi ảnh'}</span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-portal-change-avatar"
+                  onClick={() => avatarInputRef.current?.click()}
+                  disabled={avatarUploading}
+                >
+                  <Camera size={14} />
+                  <span>{avatarUploading ? 'Đang cập nhật ảnh...' : 'Tải lên ảnh mới'}</span>
+                </button>
+                <span className="portal-avatar-hint">
+                  Hỗ trợ PNG, JPG, JPEG, WEBP. Tối đa 10 MB.
+                </span>
+              </div>
+
+              {/* PROFILE FORM */}
+              <form onSubmit={handleProfileSubmit}>
+                <div className="portal-field-group">
+                  <label>Tên người liên hệ (Họ và tên) *</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={100}
+                    placeholder="Nhập họ và tên người liên hệ"
+                    value={profileContactName}
+                    onChange={(e) => setProfileContactName(e.target.value)}
+                  />
+                </div>
+
+                <div className="portal-field-group">
+                  <label>Số điện thoại liên hệ</label>
+                  <input
+                    type="tel"
+                    placeholder="Ví dụ: 0912345678"
+                    value={profilePhone}
+                    onChange={(e) => setProfilePhone(e.target.value)}
+                  />
+                </div>
+
+                <div className="portal-field-group">
+                  <label>Email liên hệ</label>
+                  <input
+                    type="email"
+                    placeholder="Ví dụ: contact@company.com"
+                    value={profileEmail}
+                    onChange={(e) => setProfileEmail(e.target.value)}
+                  />
+                </div>
+
+                {/* READ-ONLY COMPANY INFO */}
+                <div className="portal-info-box">
+                  <div className="portal-info-box-title">
+                    <Building2 size={15} />
+                    <span>Thông tin doanh nghiệp liên kết</span>
+                  </div>
+                  <div className="portal-info-box-row">
+                    <span>Khách hàng / Công ty:</span>
+                    <span className="portal-info-box-val">
+                      {accountProfile?.customerName || customerProfile?.customerName || 'Đang cập nhật'}
+                    </span>
+                  </div>
+                  <div className="portal-info-box-row">
+                    <span>Mã khách hàng:</span>
+                    <span className="portal-info-box-val">
+                      {accountProfile?.customerCode || customerProfile?.customerCode || '—'}
+                    </span>
+                  </div>
+                  {accountProfile?.companyTaxCode && (
+                    <div className="portal-info-box-row">
+                      <span>Mã số thuế:</span>
+                      <span className="portal-info-box-val">{accountProfile.companyTaxCode}</span>
+                    </div>
+                  )}
+                  {accountProfile?.companyAddress && (
+                    <div className="portal-info-box-row">
+                      <span>Địa chỉ:</span>
+                      <span className="portal-info-box-val" style={{ textAlign: 'right', maxWidth: '60%' }}>
+                        {accountProfile.companyAddress}
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px' }}>
+                  <button
+                    type="button"
+                    className="btn-portal-logout"
+                    onClick={() => setIsProfileModalOpen(false)}
+                    disabled={profileLoading}
+                  >
+                    Đóng
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn-portal-login"
+                    disabled={profileLoading}
+                  >
+                    {profileLoading ? 'Đang lưu...' : 'Lưu thông tin'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* MODAL: ĐỔI MẬT KHẨU */}
       {isChangePasswordOpen && (

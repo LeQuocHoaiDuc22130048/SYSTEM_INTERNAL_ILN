@@ -152,3 +152,24 @@ export interface CustomerChangePasswordRequest {
   confirmPassword: string;
 }
 
+export interface CustomerAccountProfileResponse {
+  userId: string;
+  username: string;
+  contactName: string;
+  phone?: string | null;
+  email?: string | null;
+  avatarUrl?: string | null;
+  customerId: string;
+  customerCode: string;
+  customerName: string;
+  companyAddress?: string | null;
+  companyTaxCode?: string | null;
+}
+
+export interface UpdateCustomerAccountProfileRequest {
+  contactName: string;
+  phone?: string;
+  email?: string;
+}
+
+
