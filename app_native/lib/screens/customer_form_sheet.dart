@@ -166,9 +166,20 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
     int? maxLength,
     TextInputType? keyboardType,
     TextCapitalization textCapitalization = TextCapitalization.none,
+    TextInputAction? textInputAction,
+    Widget? suffixIcon,
     String? Function(String?)? validator,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final effectiveSuffixIcon = suffixIcon ??
+        (keyboardType == TextInputType.phone ||
+                keyboardType == TextInputType.number
+            ? IconButton(
+                icon: const Icon(Icons.keyboard_hide_outlined, size: 20),
+                tooltip: 'Ẩn bàn phím',
+                onPressed: () => FocusScope.of(context).unfocus(),
+              )
+            : null);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -200,6 +211,8 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
           maxLines: maxLines,
           maxLength: maxLength,
           keyboardType: keyboardType,
+          textInputAction: textInputAction ??
+              (maxLines > 1 ? TextInputAction.newline : TextInputAction.next),
           textCapitalization: textCapitalization,
           style: TextStyle(
             fontSize: 14,
@@ -214,6 +227,7 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
               color: isDark ? Colors.white38 : AppColors.textTertiaryLight,
             ),
             prefixIcon: Icon(icon, size: 18, color: AppColors.primary),
+            suffixIcon: effectiveSuffixIcon,
             filled: true,
             fillColor: isDark
                 ? const Color(0xFF1E293B)
@@ -259,28 +273,33 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final viewInsets = MediaQuery.viewInsetsOf(context);
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.92,
-      ),
-      margin: EdgeInsets.only(bottom: viewInsets.bottom),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ModalTopBar(
-              title: _isEditing
-                  ? 'Chỉnh sửa khách hàng'
-                  : 'Thêm mới khách hàng',
-            ),
-            Flexible(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.92,
+        ),
+        margin: EdgeInsets.only(bottom: viewInsets.bottom),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ModalTopBar(
+                title: _isEditing
+                    ? 'Chỉnh sửa khách hàng'
+                    : 'Thêm mới khách hàng',
+              ),
+              Flexible(
+                child: SingleChildScrollView(
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
                 child: Form(
                   key: _formKey,
                   child: Column(
@@ -560,8 +579,9 @@ class _CustomerFormSheetState extends State<CustomerFormSheet> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   static String normalizeCustomerName(String name, CustomerType type) {
     if (name.trim().isEmpty) return '';

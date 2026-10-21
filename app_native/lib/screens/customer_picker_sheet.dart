@@ -115,15 +115,18 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
     final auth = context.watch<AuthProvider>();
     final canManage = auth.can(AppPermission.manageCustomers);
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.sizeOf(context).height * 0.85,
-      ),
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.surfaceDark : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: SafeArea(
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.85,
+        ),
+        decoration: BoxDecoration(
+          color: isDark ? AppColors.surfaceDark : Colors.white,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SafeArea(
         child: Column(
           children: [
             ModalTopBar(
@@ -147,6 +150,11 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
               child: TextField(
                 controller: _searchCtrl,
+                textInputAction: TextInputAction.search,
+                onSubmitted: (_) {
+                  FocusScope.of(context).unfocus();
+                  _fetchCustomers();
+                },
                 onChanged: _onSearchChanged,
                 style: TextStyle(
                   fontSize: 14,
@@ -243,6 +251,8 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
                               ),
                             )
                           : ListView.separated(
+                              keyboardDismissBehavior:
+                                  ScrollViewKeyboardDismissBehavior.onDrag,
                               itemCount: _customers.length,
                               separatorBuilder: (_, _) => const Divider(height: 1),
                               itemBuilder: (context, index) {
@@ -327,6 +337,7 @@ class _CustomerPickerSheetState extends State<CustomerPickerSheet> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
