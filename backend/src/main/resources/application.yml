@@ -23,6 +23,11 @@ spring:
       hibernate:
         jdbc:
           time_zone: UTC
+  data:
+    web:
+      pageable:
+        max-page-size: 10000
+        default-page-size: 1000
 
 server:
   address: ${SERVER_ADDRESS:0.0.0.0}

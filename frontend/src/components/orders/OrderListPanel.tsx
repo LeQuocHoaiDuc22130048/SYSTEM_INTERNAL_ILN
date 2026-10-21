@@ -141,12 +141,17 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
         ref={listWrapperRef}
         onScroll={handleScrollList}
       >
-        {loading ? (
+        {loading && displayedOrders.length === 0 ? (
           <div className="list-status-msg">Đang tải danh sách đơn hàng...</div>
         ) : displayedOrders.length === 0 ? (
           <div className="list-status-msg">Không tìm thấy đơn hàng nào.</div>
         ) : (
           <>
+            {loading && (
+              <div style={{ textAlign: 'center', padding: '4px 8px', fontSize: '12px', color: '#64748b', background: 'rgba(0,0,0,0.03)', borderRadius: '4px', margin: '4px 8px' }}>
+                Đang làm mới dữ liệu...
+              </div>
+            )}
             <div className="orders-cards-list">
               {displayedOrders.map((order) => {
                 const statusMeta = getStatusMeta(order.status);

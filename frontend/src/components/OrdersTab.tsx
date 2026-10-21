@@ -33,6 +33,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
 
   // State
   const [orders, setOrders] = useState<RepairOrder[]>([]);
+  const [totalOrdersInDb, setTotalOrdersInDb] = useState<number | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>('');
@@ -90,20 +91,45 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
     setIsPreviewModalOpen(true);
   };
 
-  // Fetch orders
-  const fetchOrders = useCallback(async () => {
-    setLoading(true);
+  // Fetch orders (hỗ trợ silent refresh và nạp đầy đủ tất cả các trang, không giới hạn 200 đơn)
+  const fetchOrders = useCallback(async (isSilent = false) => {
+    if (!isSilent) setLoading(true);
     try {
-      const response = await fetch('/api/v1/repair-orders?size=200', {
+      const pageSize = 1000;
+      const response = await fetch(`/api/v1/repair-orders?page=0&size=${pageSize}`, {
         headers: getAuthHeaders(),
       });
       if (response.ok) {
         const result = await response.json();
+        let allOrders: RepairOrder[] = [];
         if (result?.data?.content) {
-          setOrders(result.data.content);
+          allOrders = [...result.data.content];
+          const totalPages = result.data.totalPages || 1;
+          const totalElements = result.data.totalElements ?? allOrders.length;
+          setTotalOrdersInDb(totalElements);
+
+          // Nếu có nhiều trang, fetch song song các trang còn lại để hiển thị đầy đủ 100%
+          if (totalPages > 1) {
+            const pagePromises = [];
+            for (let p = 1; p < totalPages; p++) {
+              pagePromises.push(
+                fetch(`/api/v1/repair-orders?page=${p}&size=${pageSize}`, {
+                  headers: getAuthHeaders(),
+                }).then((res) => (res.ok ? res.json() : null))
+              );
+            }
+            const otherResults = await Promise.all(pagePromises);
+            for (const r of otherResults) {
+              if (r?.data?.content && Array.isArray(r.data.content)) {
+                allOrders = allOrders.concat(r.data.content);
+              }
+            }
+          }
         } else if (Array.isArray(result?.data)) {
-          setOrders(result.data);
+          allOrders = result.data;
+          setTotalOrdersInDb(allOrders.length);
         }
+        setOrders(allOrders);
       } else {
         showToast('Không thể tải danh sách đơn hàng');
       }
@@ -111,7 +137,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
       console.error(e);
       showToast('Lỗi kết nối server');
     } finally {
-      setLoading(false);
+      if (!isSilent) setLoading(false);
     }
   }, [showToast]);
 
@@ -141,10 +167,19 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
     }
   }, [showToast]);
 
+  const canAssign = React.useMemo(() => hasPermission(currentUser ?? null, 'REPAIR_ASSIGN'), [currentUser]);
+
+  // Tải danh sách đơn hàng ban đầu khi mount
   useEffect(() => {
     fetchOrders();
-    if (hasPermission(currentUser ?? null, 'REPAIR_ASSIGN')) fetchEmployees();
-  }, [fetchOrders, fetchEmployees, currentUser]);
+  }, [fetchOrders]);
+
+  // Tải danh sách kỹ thuật viên nếu có quyền phân công
+  useEffect(() => {
+    if (canAssign) {
+      fetchEmployees();
+    }
+  }, [canAssign, fetchEmployees]);
 
   // Fetch timeline of selected order
   const fetchTimeline = async (orderId: string) => {
@@ -183,7 +218,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
         if (result?.data) setSelectedOrder(result.data);
       }
       fetchTimeline(selectedOrder.id);
-      fetchOrders();
+      fetchOrders(true);
     } catch (e) {
       console.error(e);
     }
@@ -435,7 +470,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
           const result = await refreshedOrder.json();
           if (result?.data) setSelectedOrder(result.data);
         }
-        fetchOrders();
+        fetchOrders(true);
       } else {
         const errData = await response.json();
         showToast(`Lỗi: ${errData.message || 'Không cập nhật được đơn'}`);
@@ -474,7 +509,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
           if (result?.data) setSelectedOrder(result.data);
         }
         fetchTimeline(selectedOrder.id);
-        fetchOrders();
+        fetchOrders(true);
       } else {
         showToast('Cập nhật trạng thái thất bại');
       }
@@ -520,7 +555,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
           if (result?.data) setSelectedOrder(result.data);
         }
         fetchTimeline(selectedOrder.id);
-        fetchOrders();
+        fetchOrders(true);
       } else {
         showToast('Phân công nhân viên thất bại');
       }
@@ -553,7 +588,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
           if (result?.data) setSelectedOrder(result.data);
         }
         fetchTimeline(selectedOrder.id);
-        fetchOrders();
+        fetchOrders(true);
       } else {
         showToast('Hủy đơn hàng thất bại');
       }
@@ -675,7 +710,7 @@ export const OrdersTab: React.FC<OrdersTabProps> = ({ showToast, currentUser }) 
           {/* Header Stats */}
           <div className="orders-summary-bar">
             <div className="summary-stat">
-              <span className="summary-val">{orders.length}</span>
+              <span className="summary-val">{totalOrdersInDb !== null ? Math.max(totalOrdersInDb, orders.length) : orders.length}</span>
               <span className="summary-lbl">Tổng số đơn</span>
             </div>
             <div className="summary-stat">

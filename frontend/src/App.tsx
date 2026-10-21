@@ -79,8 +79,12 @@ function App() {
         const response = await fetch('/api/v1/auth/me', { headers: getAuthHeaders() });
         const result = await response.json();
         if (!disposed && response.ok && result.data) {
-          localStorage.setItem('currentUser', JSON.stringify(result.data));
-          setCurrentUser(result.data);
+          const prevUserStr = localStorage.getItem('currentUser');
+          const newUserStr = JSON.stringify(result.data);
+          if (prevUserStr !== newUserStr) {
+            localStorage.setItem('currentUser', newUserStr);
+            setCurrentUser(result.data);
+          }
         }
       } catch {
         // Keep the last authenticated snapshot while offline; API checks remain authoritative.

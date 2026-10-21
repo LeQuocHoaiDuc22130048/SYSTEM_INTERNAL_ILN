@@ -85,8 +85,12 @@ async function doRefreshToken(): Promise<string | null> {
         localStorage.setItem('accessToken', accessToken);
         localStorage.setItem('refreshToken', newRefreshToken);
         if (result.data.userInfo) {
-          localStorage.setItem('currentUser', JSON.stringify(result.data.userInfo));
-          window.dispatchEvent(new Event('permissions-updated'));
+          const prevUser = localStorage.getItem('currentUser');
+          const newUser = JSON.stringify(result.data.userInfo);
+          if (prevUser !== newUser) {
+            localStorage.setItem('currentUser', newUser);
+            window.dispatchEvent(new Event('permissions-updated'));
+          }
         }
         return accessToken;
       }
@@ -104,14 +108,15 @@ async function doRefreshToken(): Promise<string | null> {
 }
 
 /**
- * Thiết lập interceptor cho window.fetch toàn cục để tự động refresh token khi gặp lỗi 401/403.
+ * Thiết lập interceptor cho window.fetch toàn cục để tự động refresh token khi gặp lỗi 401 (Unauthorized).
+ * Không refresh khi gặp 403 (Forbidden) vì 403 là lỗi thiếu quyền, việc refresh token cùng tài khoản sẽ gây vòng lặp vô hạn.
  */
 export function setupFetchInterceptor() {
   const originalFetch = window.fetch;
   window.fetch = async function (input, init) {
     const response = await originalFetch(input, init);
 
-    if (response.status === 401 || response.status === 403) {
+    if (response.status === 401) {
       const url = typeof input === 'string' ? input : (input instanceof URL ? input.toString() : (input as Request).url);
       
       // Không tự động refresh đối với các API auth cơ bản (login, refresh, logout) để tránh lặp vô hạn

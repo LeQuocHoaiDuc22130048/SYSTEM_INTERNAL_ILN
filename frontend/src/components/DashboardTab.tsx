@@ -184,15 +184,43 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       const queryYear = currentYear || today.getFullYear();
       const queryMonth = currentMonth || (today.getMonth() + 1);
 
-      // 1. Fetch Orders
-      const ordersRes = await fetch('/api/v1/repair-orders?size=200', { headers });
+      // 1. Fetch Orders (nạp đầy đủ không bị giới hạn 200 đơn)
+      const ordersRes = await fetch('/api/v1/repair-orders?page=0&size=1000', { headers });
       const ordersData = ordersRes.ok ? await ordersRes.json() : null;
-      const fetchedOrders: OrderRecord[] = ordersData?.data?.content || ordersData?.data || [];
+      let fetchedOrders: OrderRecord[] = ordersData?.data?.content || ordersData?.data || [];
+      if (ordersData?.data?.totalPages && ordersData.data.totalPages > 1) {
+        const orderPromises = [];
+        for (let p = 1; p < ordersData.data.totalPages; p++) {
+          orderPromises.push(
+            fetch(`/api/v1/repair-orders?page=${p}&size=1000`, { headers }).then(r => r.ok ? r.json() : null)
+          );
+        }
+        const moreOrders = await Promise.all(orderPromises);
+        for (const mo of moreOrders) {
+          if (mo?.data?.content && Array.isArray(mo.data.content)) {
+            fetchedOrders = fetchedOrders.concat(mo.data.content);
+          }
+        }
+      }
 
-      // 2. Fetch Boards
-      const boardsRes = await fetch('/api/v1/boards?size=200', { headers });
+      // 2. Fetch Boards (nạp đầy đủ không bị giới hạn 200 bo mạch)
+      const boardsRes = await fetch('/api/v1/boards?page=0&size=1000', { headers });
       const boardsData = boardsRes.ok ? await boardsRes.json() : null;
-      const fetchedBoards: BoardRecord[] = boardsData?.data?.content || boardsData?.data || [];
+      let fetchedBoards: BoardRecord[] = boardsData?.data?.content || boardsData?.data || [];
+      if (boardsData?.data?.totalPages && boardsData.data.totalPages > 1) {
+        const boardPromises = [];
+        for (let p = 1; p < boardsData.data.totalPages; p++) {
+          boardPromises.push(
+            fetch(`/api/v1/boards?page=${p}&size=1000`, { headers }).then(r => r.ok ? r.json() : null)
+          );
+        }
+        const moreBoards = await Promise.all(boardPromises);
+        for (const mb of moreBoards) {
+          if (mb?.data?.content && Array.isArray(mb.data.content)) {
+            fetchedBoards = fetchedBoards.concat(mb.data.content);
+          }
+        }
+      }
 
       let fetchedEmployees: any[] = [];
       let fetchedAttendance: AttendanceReportRecord[] = [];
@@ -203,7 +231,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
       if (canViewTeamAttendance) {
         // 3. Fetch Employees (Manager/Admin)
-        const employeesRes = await fetch('/api/v1/employees?size=200', { headers });
+        const employeesRes = await fetch('/api/v1/employees?size=1000', { headers });
         if (employeesRes.ok) {
           const empData = await employeesRes.json();
           fetchedEmployees = empData?.data?.employees || empData?.data?.content || empData?.data || [];
@@ -217,7 +245,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         }
 
         // 5. Fetch Pending Users (Admin)
-        const pendingRes = await fetch('/api/v1/auth/pending?size=200', { headers });
+        const pendingRes = await fetch('/api/v1/auth/pending?size=1000', { headers });
         if (pendingRes.ok) {
           const pendData = await pendingRes.json();
           fetchedPending = pendData?.data?.content || pendData?.data || [];
