@@ -1,5 +1,7 @@
 import '../widgets/app_quick_actions.dart';
 import '../widgets/home_attendance.dart';
+import '../widgets/field_work_requests.dart';
+import '../widgets/field_work_bottom_sheet.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -172,7 +174,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<Map<String, dynamic>> get _categories => const [
     {
       'id': 'dashboard',
-      'label': 'Thống kê',
+      'label': 'Dashboard',
       'tooltip': 'Dashboard - Bảng điều khiển',
       'tabIndex': MainTabs.dashboard,
       'icon': LucideIcons.layoutDashboard,
@@ -229,6 +231,15 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'bgColor': Color(0xFFEFF6FF),
       'textColor': Color(0xFF2563EB),
       'borderColor': Color(0xFFBFDBFE),
+    },
+    {
+      'id': 'field_work',
+      'label': 'Đi công trình',
+      'tooltip': 'Báo cáo đi công trình',
+      'icon': LucideIcons.briefcase,
+      'bgColor': Color(0xFFFEF3C7),
+      'textColor': Color(0xFFD97706),
+      'borderColor': Color(0xFFFDE68A),
     },
   ];
 
@@ -323,6 +334,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
                 // Service Categories Grid
                 _buildServiceCategories(isDark),
+                const SizedBox(height: 12),
+
+                // Field Work Requests / Báo cáo công trình section
+                const FieldWorkRequests(),
                 const SizedBox(height: 12),
 
                 // Today's Attendance
@@ -807,11 +822,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         color: Colors.white.withValues(alpha: 0.96),
         height: 1.2,
         shadows: const [
-          Shadow(
-            color: Color(0xB3000000),
-            blurRadius: 5,
-            offset: Offset(0, 1),
-          ),
+          Shadow(color: Color(0xB3000000), blurRadius: 5, offset: Offset(0, 1)),
         ],
       ),
     );
@@ -823,11 +834,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         fontWeight: FontWeight.bold,
         height: 1.2,
         shadows: [
-          Shadow(
-            color: Color(0xB3000000),
-            blurRadius: 5,
-            offset: Offset(0, 1),
-          ),
+          Shadow(color: Color(0xB3000000), blurRadius: 5, offset: Offset(0, 1)),
         ],
       ),
     );
@@ -1250,12 +1257,14 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   Widget _buildServiceCategories(bool isDark) {
     final auth = context.watch<AuthProvider>();
     final categories = auth.isAuthenticated && auth.currentUser != null
-        ? _categories
-              .where(
-                (category) =>
-                    canAccessMainTab(auth, category['tabIndex'] as int),
-              )
-              .toList()
+        ? _categories.where((category) {
+            if (category['id'] == 'field_work') {
+              return auth.isAdminOrAbove ||
+                  auth.can(AppPermission.saveFieldWork);
+            }
+            final tabIndex = category['tabIndex'] as int?;
+            return tabIndex != null && canAccessMainTab(auth, tabIndex);
+          }).toList()
         : <Map<String, dynamic>>[];
     if (categories.isEmpty) return const SizedBox.shrink();
 
@@ -1328,6 +1337,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 key: ValueKey('category-$catId'),
                 scaleDown: 0.94,
                 onTap: () {
+                  if (catId == 'field_work') {
+                    showFieldWorkBottomSheet(context, isDark: isDark);
+                    return;
+                  }
                   final auth = context.read<AuthProvider>();
                   if (!canAccessMainTab(auth, tabIndex)) {
                     ScaffoldMessenger.of(context).showSnackBar(

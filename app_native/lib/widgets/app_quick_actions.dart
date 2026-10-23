@@ -5,9 +5,11 @@ import '../models/app_permission.dart';
 import '../navigation/main_tabs.dart';
 import '../screens/repair_orders_page.dart';
 import '../utils/auth_provider.dart';
+import 'field_work_bottom_sheet.dart';
 
 enum QuickAction {
   createRepair,
+  fieldWork,
   repairOrders,
   warehouse,
   customers,
@@ -23,6 +25,8 @@ bool canUseQuickAction(AuthProvider auth, QuickAction action) {
     QuickAction.createRepair =>
       auth.can(AppPermission.viewRepairOrders) &&
           auth.can(AppPermission.createRepairOrders),
+    QuickAction.fieldWork =>
+      auth.isAdminOrAbove || auth.can(AppPermission.saveFieldWork),
     QuickAction.repairOrders => auth.can(AppPermission.viewRepairOrders),
     QuickAction.warehouse => auth.can(AppPermission.viewWarehouse),
     QuickAction.customers => auth.can(AppPermission.viewCustomers),
@@ -55,6 +59,13 @@ Future<void> showAppQuickActions(
     await showCreateRepairOrderSheet(context);
     return;
   }
+  if (action == QuickAction.fieldWork) {
+    await showFieldWorkBottomSheet(
+      context,
+      isDark: Theme.of(context).brightness == Brightness.dark,
+    );
+    return;
+  }
   final tab = switch (action) {
     QuickAction.repairOrders => MainTabs.repairOrders,
     QuickAction.warehouse => MainTabs.warehouse,
@@ -79,6 +90,7 @@ class _QuickActionsSheet extends StatelessWidget {
     final auth = context.watch<AuthProvider>();
     const labels = {
       QuickAction.createRepair: 'Tạo đơn sửa chữa',
+      QuickAction.fieldWork: 'Báo đi công trình',
       QuickAction.repairOrders: 'Đơn sửa chữa',
       QuickAction.warehouse: 'Kho linh kiện',
       QuickAction.customers: 'Khách hàng',
@@ -89,6 +101,7 @@ class _QuickActionsSheet extends StatelessWidget {
     };
     const icons = {
       QuickAction.createRepair: Icons.add_circle_outline,
+      QuickAction.fieldWork: Icons.business_center_outlined,
       QuickAction.repairOrders: Icons.build_outlined,
       QuickAction.warehouse: Icons.inventory_2_outlined,
       QuickAction.customers: Icons.people_alt_outlined,

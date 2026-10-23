@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../models/app_permission.dart';
 import '../models/attendance.dart';
@@ -6,6 +7,7 @@ import '../models/user.dart';
 import '../theme/app_colors.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
+import 'field_work_bottom_sheet.dart';
 
 class HomeAttendance extends StatefulWidget {
   const HomeAttendance({super.key});
@@ -312,6 +314,48 @@ class _HomeAttendanceState extends State<HomeAttendance> {
                 color: isDark
                     ? AppColors.textSecondaryDark
                     : const Color(0xFF64748B),
+              ),
+            ),
+          ),
+        if (auth.isAdminOrAbove || auth.can(AppPermission.saveFieldWork))
+          Padding(
+            padding: const EdgeInsets.only(top: 2, bottom: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                key: const ValueKey('home-field-work-button'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFD97706),
+                  side: const BorderSide(color: Color(0xFFFDE68A)),
+                  backgroundColor: isDark
+                      ? const Color(0xFF78350F).withValues(alpha: 0.15)
+                      : const Color(0xFFFFFBEB),
+                  padding: const EdgeInsets.symmetric(
+                    vertical: 9,
+                    horizontal: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                ),
+                onPressed: () async {
+                  await showFieldWorkBottomSheet(
+                    context,
+                    isDark: isDark,
+                    isExisting: own?.fieldWork == true,
+                  );
+                  if (mounted) _load();
+                },
+                icon: const Icon(LucideIcons.briefcase, size: 16),
+                label: Text(
+                  own?.fieldWork == true
+                      ? 'Đã báo đi công trình hôm nay (Chỉnh sửa / Huỷ)'
+                      : 'Báo đi công trình',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ),
           ),

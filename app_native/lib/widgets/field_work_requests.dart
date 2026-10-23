@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import '../models/attendance.dart';
 import '../utils/auth_provider.dart';
 import '../models/app_permission.dart';
 import '../utils/notification_provider.dart';
 import '../utils/backend_data_provider.dart';
+import 'field_work_bottom_sheet.dart';
 
 class FieldWorkRequests extends StatefulWidget {
   const FieldWorkRequests({super.key});
@@ -98,48 +100,17 @@ class _FieldWorkRequestsState extends State<FieldWorkRequests> {
   }
 
   Future<void> _edit(FieldWorkDay day) async {
-    final note = TextEditingController(text: day.note);
-    final action = await showDialog<String>(
-      context: context,
-      builder: (c) => AlertDialog(
-        title: const Text('Yêu cầu đi công trình'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('Sửa nội dung sẽ gửi lại để quản trị viên xét duyệt.'),
-            TextField(controller: note, maxLength: 2000, maxLines: 4),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c),
-            child: const Text('Đóng'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(c, 'cancel'),
-            child: const Text('Hủy yêu cầu'),
-          ),
-          FilledButton(
-            onPressed: () {
-              if (note.text.trim().isNotEmpty) Navigator.pop(c, 'save');
-            },
-            child: const Text('Gửi duyệt'),
-          ),
-        ],
-      ),
+    final dateStr =
+        '${day.workDate.year.toString().padLeft(4, '0')}-${day.workDate.month.toString().padLeft(2, '0')}-${day.workDate.day.toString().padLeft(2, '0')}';
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    await showFieldWorkBottomSheet(
+      context,
+      dateStr: dateStr,
+      initialNote: day.note,
+      isExisting: true,
+      isDark: isDark,
     );
-    final text = note.text;
-    // The dialog may still be animating out; its controller is disposed after the transition.
-    Future.delayed(const Duration(milliseconds: 300), note.dispose);
-    if (action == null || !mounted) return;
-    await _run(() async {
-      final backend = context.read<BackendDataProvider>();
-      if (action == 'cancel') {
-        await backend.removeFieldWork(day.workDate);
-      } else {
-        await backend.saveFieldWork(day.workDate, text);
-      }
-    });
+    if (mounted) _refresh();
   }
 
   @override
@@ -162,35 +133,92 @@ class _FieldWorkRequestsState extends State<FieldWorkRequests> {
           children: [
             Row(
               children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFD97706).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    LucideIcons.briefcase,
+                    color: Color(0xFFD97706),
+                    size: 16,
+                  ),
+                ),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    admin ? 'Duyệt đi công trình' : 'Yêu cầu đi công trình',
+                    admin ? 'Duyệt đi công trình' : 'Báo cáo công trình',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
                 IconButton(
+                  tooltip: 'Tải lại',
                   onPressed: _busy ? null : _refresh,
                   icon: const Icon(Icons.refresh),
                 ),
               ],
             ),
             if (!admin)
-              TextButton(
-                onPressed: _busy
-                    ? null
-                    : () async {
-                        final date = await showDatePicker(
-                          context: context,
-                          initialDate: _month,
-                          firstDate: DateTime(2020),
-                          lastDate: DateTime.now(),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4),
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.spaceBetween,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              final date = await showDatePicker(
+                                context: context,
+                                initialDate: _month,
+                                firstDate: DateTime(2020),
+                                lastDate: DateTime.now(),
+                              );
+                              if (date != null && mounted) {
+                                _month = date;
+                                _refresh();
+                              }
+                            },
+                      icon: const Icon(Icons.calendar_month, size: 16),
+                      label: Text('Tháng ${_month.month}/${_month.year}'),
+                    ),
+                    OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFD97706),
+                        side: const BorderSide(color: Color(0xFFFDE68A)),
+                        backgroundColor: const Color(0xFFFEF3C7),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        visualDensity: VisualDensity.compact,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      onPressed: () async {
+                        await showFieldWorkBottomSheet(
+                          context,
+                          isDark:
+                              Theme.of(context).brightness == Brightness.dark,
                         );
-                        if (date != null && mounted) {
-                          _month = date;
-                          _refresh();
-                        }
+                        if (mounted) _refresh();
                       },
-                child: Text('Tháng ${_month.month}/${_month.year}'),
+                      icon: const Icon(Icons.add, size: 14),
+                      label: const Text(
+                        'Báo công trình',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             FutureBuilder<List<FieldWorkDay>>(
               future: _requests,
