@@ -7,6 +7,7 @@ export function canAccessTab(user: UserInfo | null, tab: string): boolean {
     orders: ['REPAIR_VIEW'], customers: ['CUSTOMER_VIEW'], warehouse: ['WAREHOUSE_VIEW'], locations: ['WAREHOUSE_VIEW'],
     devices: ['DEVICE_VIEW'], banners: ['BANNER_VIEW'], updates: ['APP_UPDATE_VIEW'],
     accounts: ['PERMISSION_VIEW', 'EMPLOYEE_STATUS_UPDATE'],
+    terminal: ['SYSTEM_TERMINAL'],
   };
   return (permissions[tab] ?? []).some(permission => hasPermission(user, permission));
 }

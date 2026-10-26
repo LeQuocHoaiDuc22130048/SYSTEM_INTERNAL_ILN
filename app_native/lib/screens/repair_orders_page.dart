@@ -104,6 +104,7 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   final ScrollController _scrollController = ScrollController();
   bool _fillingPage = false;
   int _fillGeneration = 0;
+  String? _handledOrderId;
 
   void _resetPage() {
     _visibleCount.value = 20;
@@ -177,7 +178,9 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refreshOrders();
       if (!mounted) return;
-      if (widget.targetOrderId != null) {
+      if (widget.targetOrderId != null &&
+          widget.targetOrderId != _handledOrderId) {
+        _handledOrderId = widget.targetOrderId;
         _showOrderById(widget.targetOrderId!);
       }
     });
@@ -187,24 +190,30 @@ class _RepairOrdersPageState extends State<RepairOrdersPage> {
   void didUpdateWidget(covariant RepairOrdersPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.targetOrderId != null &&
-        widget.targetOrderId != oldWidget.targetOrderId) {
+        widget.targetOrderId != oldWidget.targetOrderId &&
+        widget.targetOrderId != _handledOrderId) {
+      _handledOrderId = widget.targetOrderId;
       _showOrderById(widget.targetOrderId!);
     }
   }
 
   void _showOrderById(String id) {
-    final orders = context.read<BackendDataProvider>().repairOrders;
-    final matchIndex = orders.indexWhere((o) => o.id == id);
-    if (matchIndex != -1) {
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (context) => _OrderDetailSheet(order: orders[matchIndex]),
-      );
-    } else {
-      showRepairOrderDetails(context, id);
-    }
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final orders = context.read<BackendDataProvider>().repairOrders;
+      final matchIndex = orders.indexWhere((o) => o.id == id);
+      if (matchIndex != -1) {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => _OrderDetailSheet(order: orders[matchIndex]),
+        );
+      } else {
+        showRepairOrderDetails(context, id);
+      }
+    });
   }
 
   @override

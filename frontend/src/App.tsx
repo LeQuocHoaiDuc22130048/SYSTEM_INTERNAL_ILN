@@ -23,6 +23,7 @@ import { CustomersTab } from './components/CustomersTab';
 import { WarehouseTab } from './components/WarehouseTab';
 import { AccountsTab } from './components/AccountsTab';
 import { DashboardTab } from './components/DashboardTab';
+import { TerminalTab } from './components/TerminalTab';
 import { CustomerPortalApp } from './components/portal/CustomerPortalApp';
 
 import { getAuthHeaders, getJsonAuthHeaders, createTimeoutController, STANDARD_WORK_DAYS } from './utils/auth';
@@ -34,7 +35,7 @@ import { exportAttendanceExcel } from './utils/excel';
 type DataSource = 'api' | 'error' | 'loading';
 
 /** Tab đang hiển thị */
-type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts';
+type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts' | 'terminal';
 
 /** Dữ liệu target để mở EditModal */
 interface EditModalTarget {
@@ -117,7 +118,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'customers', 'warehouse', 'locations', 'accounts'];
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'customers', 'warehouse', 'locations', 'accounts', 'terminal'];
     const hash = window.location.hash.replace('#', '') as ActiveTab;
     if (validTabs.includes(hash)) return hash;
 
@@ -680,6 +681,11 @@ function App() {
             <AccountsTab
               showToast={showToast}
               currentUser={currentUser}
+            />
+          ) : activeTab === 'terminal' ? (
+            <TerminalTab
+              currentUser={currentUser}
+              showToast={showToast}
             />
           ) : activeTab === 'locations' ? (
             <WarehouseTab

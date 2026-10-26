@@ -501,7 +501,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
     }
 
     var image = img.bakeOrientation(decoded);
-    const maxSide = 960;
+    const maxSide = 640;
     final largestSide = math.max(image.width, image.height);
     if (largestSide > maxSide) {
       image = img.copyResize(
@@ -510,7 +510,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         height: image.height > image.width ? maxSide : null,
       );
     }
-    return base64Encode(img.encodeJpg(image, quality: 86));
+    return base64Encode(img.encodeJpg(image, quality: 80));
   }
 
   void _trackOfflineBlink(Face face) {
@@ -929,6 +929,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           'imageContentType': 'image/jpeg',
           'deviceId': _serverFaceDeviceId,
         },
+        timeout: const Duration(seconds: 30),
       );
       _isPendingServerConfirmation = false;
       if (mounted &&

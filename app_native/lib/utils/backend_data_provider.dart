@@ -498,6 +498,7 @@ class BackendDataProvider extends ChangeNotifier {
         'imageContentType': imageContentType,
         if (samples != null && samples.isNotEmpty) 'samples': samples,
       },
+      timeout: const Duration(seconds: 60),
     );
     await loadEmployees();
   }

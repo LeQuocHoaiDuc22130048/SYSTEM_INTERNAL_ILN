@@ -281,7 +281,7 @@ class _NotificationTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      item.title,
+                      item.displayTitle,
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -292,7 +292,7 @@ class _NotificationTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 3),
                     Text(
-                      item.body,
+                      item.displayBody,
                       style: TextStyle(
                         fontSize: 11.5,
                         height: 1.25,

@@ -52,7 +52,7 @@ public class FaceRecognitionService {
         if (samples == null || samples.isEmpty()) {
             throw new BusinessException("Can it nhat mot mau khuon mat de dang ky");
         }
-        List<List<Double>> encodings = samples.stream()
+        List<List<Double>> encodings = samples.parallelStream()
                 .map(sample -> encode(sample.faceImageBase64(), sample.imageContentType()))
                 .toList();
         return averageAndNormalize(encodings);

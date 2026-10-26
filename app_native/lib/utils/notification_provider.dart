@@ -341,7 +341,11 @@ class NotificationProvider extends ChangeNotifier {
       _lastSyncToken = token;
       _suppressTokenUpload = false;
 
-      initializeFirebase().then((_) => _syncDeviceToken());
+      Future.delayed(const Duration(milliseconds: 1500), () {
+        if (_auth?.isAuthenticated == true && apiHasToken) {
+          initializeFirebase().then((_) => _syncDeviceToken());
+        }
+      });
       loadUnreadCount();
       loadNotifications(notify: false).then((_) => notifyListeners());
       _connectRealtime();
@@ -508,7 +512,7 @@ class NotificationProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> _uploadDeviceToken(String token) async {
+  Future<void> _uploadDeviceToken(String token, {int retryCount = 0}) async {
     if (!apiHasToken || _suppressTokenUpload || token == _lastUploadedToken) {
       return;
     }
@@ -517,10 +521,21 @@ class NotificationProvider extends ChangeNotifier {
       await api.put(
         '/api/v1/notifications/device-token',
         body: {'deviceToken': token},
+        timeout: const Duration(seconds: 20),
       );
       _lastUploadedToken = token;
+      _log('Device token uploaded successfully');
     } catch (e) {
-      _log('Device token upload failed: $e');
+      _log('Device token upload failed (attempt ${retryCount + 1}): $e');
+      if (retryCount < 2 && apiHasToken && !_suppressTokenUpload) {
+        Future.delayed(Duration(seconds: 3 * (retryCount + 1)), () {
+          if (token != _lastUploadedToken &&
+              apiHasToken &&
+              !_suppressTokenUpload) {
+            _uploadDeviceToken(token, retryCount: retryCount + 1);
+          }
+        });
+      }
     }
   }
 

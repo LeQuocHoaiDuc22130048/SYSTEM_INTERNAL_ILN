@@ -253,7 +253,7 @@ public class RepairService {
             notificationService.sendToUser(
                     techId,
                     NotificationType.ORDER_ASSIGNED,
-                    "Chuyen don sua chua cho nhan vien khac",
+                    "Chuyển đơn sửa chữa cho nhân viên khác",
                     STR."Đơn \{order.getOrderCode()} đã được chuyển giao cho nhân viên khác.",
                     "REPAIR_ORDER",
                     order.getId().toString(),
@@ -271,8 +271,10 @@ public class RepairService {
 
         // Validate transition hợp lệ
         if (!order.canTransitionTo(request.status())) {
+            String fromLabel = order.getStatus() != null ? order.getStatus().getLabel() : "Chưa xác định";
+            String toLabel = request.status() != null ? request.status().getLabel() : "Chưa xác định";
             throw new BusinessException(
-                    STR."Không thể chuyển từ \{order.getStatus().name()} sang \{request.status().name()}");
+                    STR."Không thể chuyển từ \{fromLabel} sang \{toLabel}");
         }
 
         UUID userId = userDetails != null ? userDetails.getUserId() : null;
@@ -502,7 +504,9 @@ public class RepairService {
     }
 
     private String getStatusAction(RepairStatus status) {
+        if (status == null) return "Cập nhật trạng thái";
         return switch (status) {
+            case PENDING -> "Tiếp nhận đơn";
             case WAITING_FOR_CHECK -> "Chờ kiểm tra";
             case CHECKING -> "Bắt đầu kiểm tra";
             case CHECKED -> "Đã kiểm tra";
@@ -510,7 +514,6 @@ public class RepairService {
             case COMPLETED -> "Hoàn thành sửa chữa";
             case DELIVERED -> "Giao hàng cho khách";
             case CANCELLED -> "Huỷ đơn";
-            default -> "Cập nhật trạng thái";
         };
     }
 
@@ -666,12 +669,14 @@ public class RepairService {
         }
 
         if (order.getAssignees() != null && !Objects.equals(oldStatus, order.getStatus())) {
+            String oldStatusLabel = oldStatus != null ? oldStatus.getLabel() : "Chưa xác định";
+            String newStatusLabel = order.getStatus() != null ? order.getStatus().getLabel() : "Chưa xác định";
             for (UUID techId : order.getAssignees()) {
                 notificationService.sendToUser(
                         techId,
                         NotificationType.ORDER_STATUS_CHANGED,
                         "Trạng thái đơn đã thay đổi",
-                        STR."Đơn \{order.getOrderCode()} chuyển từ \{oldStatus.name()} sang \{order.getStatus().name()}.",
+                        STR."Đơn \{order.getOrderCode()} chuyển từ \{oldStatusLabel} sang \{newStatusLabel}.",
                         "REPAIR_ORDER",
                         order.getId().toString(),
                         false);
@@ -685,7 +690,7 @@ public class RepairService {
                 notificationService.sendToUser(
                         techId,
                         NotificationType.ORDER_PRIORITY_CHANGED,
-                        "Uu tien don da thay doi",
+                        "Ưu tiên đơn đã thay đổi",
                         STR."Đơn \{order.getOrderCode()} được cập nhật mức ưu tiên \{priority}.",
                         "REPAIR_ORDER",
                         order.getId().toString(),

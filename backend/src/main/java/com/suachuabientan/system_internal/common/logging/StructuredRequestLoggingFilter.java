@@ -26,6 +26,13 @@ public class StructuredRequestLoggingFilter extends OncePerRequestFilter {
     private static final String REQUEST_ID_HEADER = "X-Request-Id";
     private static final String CORRELATION_ID_HEADER = "X-Correlation-Id";
 
+    private final org.springframework.beans.factory.ObjectProvider<com.suachuabientan.system_internal.modules.terminal.service.SystemActivityBuffer> activityBufferProvider;
+
+    public StructuredRequestLoggingFilter(
+            org.springframework.beans.factory.ObjectProvider<com.suachuabientan.system_internal.modules.terminal.service.SystemActivityBuffer> activityBufferProvider) {
+        this.activityBufferProvider = activityBufferProvider;
+    }
+
     @Override
     protected void doFilterInternal(
             @NonNull HttpServletRequest request,
@@ -57,7 +64,54 @@ public class StructuredRequestLoggingFilter extends OncePerRequestFilter {
             } else {
                 log.info("http_request result=OK");
             }
+
+            recordActivityIfApplicable(request, response.getStatus(), latencyMs);
             MDC.clear();
+        }
+    }
+
+    private void recordActivityIfApplicable(HttpServletRequest request, int statusCode, long latencyMs) {
+        String uri = request.getRequestURI();
+        if (uri == null || !uri.startsWith("/api/") || uri.contains("/terminal/stream")) {
+            return;
+        }
+
+        try {
+            com.suachuabientan.system_internal.modules.terminal.service.SystemActivityBuffer buffer = activityBufferProvider.getIfAvailable();
+            if (buffer == null) return;
+
+            String category = "HTTP";
+            if (uri.contains("/auth")) category = "AUTH";
+            else if (uri.contains("/repair")) category = "REPAIR";
+            else if (uri.contains("/attendance")) category = "ATTENDANCE";
+            else if (uri.contains("/parts") || uri.contains("/boards") || uri.contains("/warehouse")) category = "WAREHOUSE";
+            else if (uri.contains("/notifications")) category = "NOTIFICATION";
+            else if (uri.contains("/customers")) category = "CUSTOMER";
+
+            String status = statusCode >= 500 ? "ERROR" : (statusCode >= 400 ? "WARNING" : "SUCCESS");
+            String username = "guest";
+            String role = "GUEST";
+
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() instanceof CustomUserDetails userDetails) {
+                username = userDetails.getUsername();
+                role = userDetails.getRole() != null ? userDetails.getRole() : "USER";
+            }
+
+            buffer.record(new com.suachuabientan.system_internal.modules.terminal.dto.SystemActivityDto(
+                    UUID.randomUUID().toString(),
+                    java.time.Instant.now(),
+                    category,
+                    request.getMethod() + " " + uri,
+                    "HTTP " + statusCode + " (" + latencyMs + "ms)",
+                    username,
+                    role,
+                    clientIp(request),
+                    status,
+                    latencyMs
+            ));
+        } catch (Exception ex) {
+            log.trace("Failed to record activity into terminal buffer: {}", ex.getMessage());
         }
     }
 

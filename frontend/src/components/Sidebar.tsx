@@ -19,6 +19,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   MapPin,
+  Terminal as TerminalIcon,
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { hasPermission, getRoleLabel } from '../utils/permissions';
@@ -36,7 +37,8 @@ export type SidebarTab =
   | 'customers'
   | 'warehouse'
   | 'locations'
-  | 'accounts';
+  | 'accounts'
+  | 'terminal';
 
 type GroupKey = 'attendance' | 'device' | 'business' | 'accounts';
 
@@ -63,7 +65,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   dataSource = 'api',
 }) => {
-  const showAccountsTab = useMemo(() => canAccessTab(currentUser, 'accounts'), [currentUser]);
+  const showAccountsTab = useMemo(() => canAccessTab(currentUser, 'accounts') || canAccessTab(currentUser, 'terminal'), [currentUser]);
   const canViewCustomers = useMemo(() => hasPermission(currentUser, 'CUSTOMER_VIEW'), [currentUser]);
 
   // Xác định nhóm cha tương ứng với tab
@@ -71,7 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (tab === 'monthly' || tab === 'daily') return 'attendance';
     if (tab === 'devices' || tab === 'updates' || tab === 'banners') return 'device';
     if (tab === 'orders' || tab === 'customers' || tab === 'warehouse' || tab === 'locations') return 'business';
-    if (tab === 'accounts') return 'accounts';
+    if (tab === 'accounts' || tab === 'terminal') return 'accounts';
     return null;
   };
 
@@ -111,7 +113,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isAttendanceActive = activeTab === 'monthly' || activeTab === 'daily';
   const isDeviceActive = activeTab === 'devices' || activeTab === 'updates' || activeTab === 'banners';
   const isBusinessActive = activeTab === 'orders' || activeTab === 'customers' || activeTab === 'warehouse' || activeTab === 'locations';
-  const isAccountsActive = activeTab === 'accounts';
+  const isAccountsActive = activeTab === 'accounts' || activeTab === 'terminal';
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
@@ -500,14 +502,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {/* Submenu inline */}
             <div className={`menu-sub-items-wrapper ${openGroup === 'accounts' ? 'open' : ''}`}>
               <div className="menu-sub-items">
-                <button
-                  className={`menu-item ${activeTab === 'accounts' ? 'active' : ''}`}
-                  onClick={() => handleTabClick('accounts')}
-                style={{ display: canAccessTab(currentUser, 'accounts') ? undefined : 'none' }}
-                >
-                  <Users size={16} className="item-icon" />
-                  <span>Quản lý tài khoản</span>
-                </button>
+                {canAccessTab(currentUser, 'accounts') && (
+                  <button
+                    className={`menu-item ${activeTab === 'accounts' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('accounts')}
+                  >
+                    <Users size={16} className="item-icon" />
+                    <span>Quản lý tài khoản</span>
+                  </button>
+                )}
+                {canAccessTab(currentUser, 'terminal') && (
+                  <button
+                    className={`menu-item ${activeTab === 'terminal' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('terminal')}
+                  >
+                    <TerminalIcon size={16} className="item-icon" />
+                    <span>Terminal & Hoạt động</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -519,14 +531,24 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span>Phân quyền</span>
                 </div>
                 <div className="flyout-items">
-                  <button
-                    className={`flyout-item ${activeTab === 'accounts' ? 'active' : ''}`}
-                    onClick={() => handleTabClick('accounts')}
-                style={{ display: canAccessTab(currentUser, 'accounts') ? undefined : 'none' }}
-                  >
-                    <Users size={15} />
-                    <span>Quản lý tài khoản</span>
-                  </button>
+                  {canAccessTab(currentUser, 'accounts') && (
+                    <button
+                      className={`flyout-item ${activeTab === 'accounts' ? 'active' : ''}`}
+                      onClick={() => handleTabClick('accounts')}
+                    >
+                      <Users size={15} />
+                      <span>Quản lý tài khoản</span>
+                    </button>
+                  )}
+                  {canAccessTab(currentUser, 'terminal') && (
+                    <button
+                      className={`flyout-item ${activeTab === 'terminal' ? 'active' : ''}`}
+                      onClick={() => handleTabClick('terminal')}
+                    >
+                      <TerminalIcon size={15} />
+                      <span>Terminal & Hoạt động</span>
+                    </button>
+                  )}
                 </div>
               </div>
             )}

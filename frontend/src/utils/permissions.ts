@@ -41,6 +41,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   ACCOUNT_APPROVE: 'Duyệt tài khoản',
   PROFILE_VIEW: 'Xem hồ sơ',
   PROFILE_UPDATE_SELF: 'Cập nhật hồ sơ cá nhân',
+  SYSTEM_TERMINAL: 'Terminal quản trị hệ thống',
 };
 
 // ── Ma trận permissions mặc định theo role ────────────────────────────────
@@ -56,6 +57,7 @@ export const ROLE_DEFAULT_PERMISSIONS: Record<string, string[]> = {
     'ATTENDANCE_VIEW', 'ATTENDANCE_MANAGE',
     'EMPLOYEE_MANAGE', 'ACCOUNT_APPROVE', 'EMPLOYEE_SECURITY_MANAGE',
     'PROFILE_VIEW', 'PROFILE_UPDATE_SELF',
+    'SYSTEM_TERMINAL',
   ],
   MANAGER: [
     'DEVICE_VIEW', 'DEVICE_MANAGE', 'BANNER_MANAGE', 'REPAIR_DELETE',

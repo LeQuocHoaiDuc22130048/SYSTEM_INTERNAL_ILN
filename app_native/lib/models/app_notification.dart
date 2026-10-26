@@ -65,4 +65,30 @@ class AppNotification {
     if (diff.inDays == 1) return 'Hôm qua';
     return DateFormat('dd/MM/yyyy HH:mm').format(local);
   }
+
+  String get displayTitle {
+    if (title == 'Uu tien don da thay doi') return 'Ưu tiên đơn đã thay đổi';
+    if (title == 'Chuyen don sua chua cho nhan vien khac') {
+      return 'Chuyển đơn sửa chữa cho nhân viên khác';
+    }
+    return title;
+  }
+
+  String get displayBody {
+    var text = body;
+    const statusMap = {
+      'WAITING_FOR_CHECK': 'Chờ kiểm tra',
+      'IN_PROGRESS': 'Đang sửa',
+      'PENDING': 'Chưa kiểm tra',
+      'CHECKING': 'Đang kiểm tra',
+      'CHECKED': 'Đã kiểm tra',
+      'COMPLETED': 'Hoàn thành',
+      'DELIVERED': 'Đã giao',
+      'CANCELLED': 'Đã trả',
+    };
+    statusMap.forEach((code, vn) {
+      text = text.replaceAll(code, vn);
+    });
+    return text;
+  }
 }

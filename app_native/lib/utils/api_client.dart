@@ -171,6 +171,7 @@ class ApiClient {
   Future<dynamic> get(
     String path, {
     Map<String, dynamic>? queryParameters,
+    Duration? timeout,
   }) async {
     final account = attendanceAccountId;
     final tablet = Map<String, String>.from(_tabletHeaders(path));
@@ -182,10 +183,11 @@ class ApiClient {
         requestUri,
         headers: _boundHeaders(path, account, tablet),
       ),
+      timeout: timeout ?? _timeout,
     );
   }
 
-  Future<dynamic> post(String path, {Object? body}) async {
+  Future<dynamic> post(String path, {Object? body, Duration? timeout}) async {
     final account = attendanceAccountId;
     final tablet = Map<String, String>.from(_tabletHeaders(path));
     return _send(
@@ -196,6 +198,7 @@ class ApiClient {
         headers: _boundHeaders(path, account, tablet),
         body: _encode(body),
       ),
+      timeout: timeout ?? _timeout,
     );
   }
 
@@ -232,30 +235,33 @@ class ApiClient {
     );
   }
 
-  Future<dynamic> patch(String path, {Object? body}) async {
+  Future<dynamic> patch(String path, {Object? body, Duration? timeout}) async {
     return _send(
       method: 'PATCH',
       path: path,
       request: (requestUri) =>
           _client.patch(requestUri, headers: _headers(), body: _encode(body)),
+      timeout: timeout ?? _timeout,
     );
   }
 
-  Future<dynamic> put(String path, {Object? body}) async {
+  Future<dynamic> put(String path, {Object? body, Duration? timeout}) async {
     return _send(
       method: 'PUT',
       path: path,
       request: (requestUri) =>
           _client.put(requestUri, headers: _headers(), body: _encode(body)),
+      timeout: timeout ?? _timeout,
     );
   }
 
-  Future<dynamic> delete(String path, {Object? body}) async {
+  Future<dynamic> delete(String path, {Object? body, Duration? timeout}) async {
     return _send(
       method: 'DELETE',
       path: path,
       request: (requestUri) =>
           _client.delete(requestUri, headers: _headers(), body: _encode(body)),
+      timeout: timeout ?? _timeout,
     );
   }
 
@@ -330,11 +336,7 @@ class ApiClient {
 
     if (response == null || requestUri == null || stopwatch == null) {
       _log('$method $path -> all base URLs failed: $lastConnectionError');
-      throw ApiException(
-        0,
-        'Khong the ket noi may chu. Hay kiem tra tablet va may backend '
-        'dang cung mang WiFi, mo duoc /health, va cong 8080 khong bi firewall chan.',
-      );
+      throw ApiException(0, 'Không thể kết nối đến máy chủ.');
     }
 
     http.Response finalResponse = response;
