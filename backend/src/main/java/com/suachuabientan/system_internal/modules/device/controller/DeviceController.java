@@ -91,6 +91,16 @@ public class DeviceController {
         return ResponseEntity.ok(ApiResponse.success(deviceService.pingDevice(id, userId)));
     }
 
+    @Operation(summary = "Gửi lệnh ping kiểm tra toàn bộ thiết bị")
+    @PostMapping("/ping-all")
+    @PreAuthorize("hasAuthority('DEVICE_PING') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<List<DeviceResponse>>> pingAllDevices(
+            @AuthenticationPrincipal UserDetails userDetails
+    ) {
+        UUID userId = extractUserId(userDetails);
+        return ResponseEntity.ok(ApiResponse.success(deviceService.pingAllDevices(userId)));
+    }
+
     @Operation(summary = "API nhận Heartbeat từ thiết bị vật lý")
     @PostMapping("/heartbeat")
     public ResponseEntity<ApiResponse<Void>> heartbeat(@RequestParam String deviceId) {

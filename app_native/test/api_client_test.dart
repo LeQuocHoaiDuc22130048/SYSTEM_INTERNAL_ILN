@@ -157,5 +157,57 @@ void main() {
         expect(apiClient.accessToken, 'new_access_token');
       },
     );
+
+    test(
+      'TC3: ApiClient retries on transient connection error and succeeds on 2nd attempt',
+      () async {
+        int attempt = 0;
+        final mockClient = MockClient((request) async {
+          attempt++;
+          if (attempt == 1) {
+            throw http.ClientException('Connection closed before full header was received');
+          }
+          return http.Response(
+            jsonEncode({'data': {'recovered': true}}),
+            200,
+          );
+        });
+
+        final apiClient = ApiClient(
+          client: mockClient,
+          baseUrl: 'https://test.api.local',
+        );
+
+        final result = await apiClient.post('/api/v1/attendance/face-identify', body: {'test': true});
+        expect(result, {'recovered': true});
+        expect(attempt, 2);
+      },
+    );
+
+    test(
+      'TC4: ApiClient throws descriptive error on timeout without retrying endlessly',
+      () async {
+        final mockClient = MockClient((request) async {
+          await Future.delayed(const Duration(milliseconds: 100));
+          return http.Response('ok', 200);
+        });
+
+        final apiClient = ApiClient(
+          client: mockClient,
+          baseUrl: 'https://test.api.local',
+        );
+
+        expect(
+          () => apiClient.get('/api/v1/slow', timeout: const Duration(milliseconds: 10)),
+          throwsA(
+            isA<ApiException>().having(
+              (e) => e.message,
+              'message',
+              contains('timeout'),
+            ),
+          ),
+        );
+      },
+    );
   });
 }

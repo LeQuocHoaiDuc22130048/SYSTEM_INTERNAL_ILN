@@ -316,27 +316,48 @@ class ApiClient {
         continue;
       }
       requestUri = uriFor(candidateBaseUrl, path, queryParameters);
-      stopwatch = Stopwatch()..start();
-      _log('$method $requestUri');
 
-      try {
-        response = await request(requestUri).timeout(timeout);
-        stopwatch.stop();
-        _lastSuccessfulBaseUrl = candidateBaseUrl;
+      // Khi kết nối bị đứt đột ngột (stale keep-alive socket, NAT timeout, WiFi chập chờn),
+      // tự động thử lại 1 lần trên kết nối mới trước khi kết luận lỗi.
+      // Không thử lại nếu là TimeoutException (đã chờ hết thời gian cho phép).
+      const maxAttempts = 2;
+      for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+        stopwatch = Stopwatch()..start();
+        _log('$method $requestUri${attempt > 1 ? ' (retry #$attempt)' : ''}');
+
+        try {
+          response = await request(requestUri).timeout(timeout);
+          stopwatch.stop();
+          _lastSuccessfulBaseUrl = candidateBaseUrl;
+          break;
+        } catch (error) {
+          stopwatch.stop();
+          lastConnectionError = error;
+          _log(
+            '$method $requestUri -> connection failed on attempt $attempt in '
+            '${stopwatch.elapsedMilliseconds}ms: $error',
+          );
+          if (attempt < maxAttempts && error is! TimeoutException) {
+            await Future<void>.delayed(const Duration(milliseconds: 300));
+          } else {
+            break;
+          }
+        }
+      }
+
+      if (response != null) {
         break;
-      } catch (error) {
-        stopwatch.stop();
-        lastConnectionError = error;
-        _log(
-          '$method $requestUri -> connection failed in '
-          '${stopwatch.elapsedMilliseconds}ms: $error',
-        );
       }
     }
 
     if (response == null || requestUri == null || stopwatch == null) {
       _log('$method $path -> all base URLs failed: $lastConnectionError');
-      throw ApiException(0, 'Không thể kết nối đến máy chủ.');
+      String failureMessage = 'Không thể kết nối đến máy chủ.';
+      if (lastConnectionError is TimeoutException) {
+        failureMessage =
+            'Máy chủ phản hồi quá lâu (timeout). Vui lòng thử lại trong giây lát.';
+      }
+      throw ApiException(0, failureMessage);
     }
 
     http.Response finalResponse = response;

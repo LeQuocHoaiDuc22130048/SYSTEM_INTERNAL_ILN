@@ -104,11 +104,19 @@ public class AuthService {
      */
     @Transactional
     public LoginResponse login(LoginRequest request) {
-        authenticationManager.authenticate(
-                new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
-                        request.username(), request.password()
-                )
-        );
+        try {
+            authenticationManager.authenticate(
+                    new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(
+                            request.username(), request.password()
+                    )
+            );
+        } catch (org.springframework.security.authentication.AccountStatusException ex) {
+            UserEntity blockedUser = userRepository.findByUsernameAndIsDeletedFalse(request.username()).orElse(null);
+            if (blockedUser != null) {
+                throw new BusinessException(buildLoginBlockMessage(blockedUser.getStatus()), 403);
+            }
+            throw new BusinessException("Tài khoản đã bị tạm khoá. Vui lòng liên hệ Admin.", 403);
+        }
 
         UserEntity user = userRepository.findByUsernameAndIsDeletedFalse(request.username())
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng"));

@@ -53,6 +53,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
         refType == 'PART' ||
         refType == 'WAREHOUSE') {
       widget.onNavigateToTab!(2, refId: refId); // 2 = Warehouse tab
+    } else if (type.startsWith('ATTENDANCE_') ||
+        refType == 'ATTENDANCE_TABLET') {
+      widget.onNavigateToTab!(0); // 0 = Attendance tab
     }
   }
 
@@ -342,6 +345,18 @@ class _NotificationVisuals {
 
   factory _NotificationVisuals.fromType(String type) {
     switch (type) {
+      case 'ATTENDANCE_DEVICE_DISCONNECTED':
+        return const _NotificationVisuals(
+          icon: LucideIcons.wifiOff,
+          color: AppColors.error,
+          background: AppColors.errorLight,
+        );
+      case 'ATTENDANCE_DEVICE_RECONNECTED':
+        return const _NotificationVisuals(
+          icon: LucideIcons.wifi,
+          color: AppColors.success,
+          background: AppColors.successLight,
+        );
       case 'APP_UPDATE':
         return const _NotificationVisuals(
           icon: LucideIcons.download,

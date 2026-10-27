@@ -597,6 +597,9 @@ function App() {
           isSidebarOpen={isSidebarOpen}
           onRefreshData={handleGlobalRefresh}
           isRefreshing={isRefreshing}
+          currentUser={currentUser}
+          showToast={showToast}
+          onNavigateToTab={(tab) => setActiveTab(tab as ActiveTab)}
         />
 
         <div className="main-content-inner">

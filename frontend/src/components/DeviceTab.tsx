@@ -63,6 +63,8 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
   });
   
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const [pingingId, setPingingId] = useState<string | null>(null);
+  const [isPingingAll, setIsPingingAll] = useState<boolean>(false);
 
   // Check if current user is manager/admin
   const isManagerOrAbove = useMemo(() => {
@@ -137,6 +139,7 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
   // Actions handlers
   const handlePing = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation();
+    setPingingId(id);
     try {
       const response = await fetch(`/api/v1/devices/${id}/ping`, {
         method: 'POST',
@@ -147,7 +150,11 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
         if (result?.data) {
           // Update device in state
           setDevices(prev => prev.map(d => d.id === id ? result.data : d));
-          showToast(`Ping tới thiết bị thành công! Phản hồi: ${result.data.pingMs}ms`);
+          if (result.data.status === 'ONLINE') {
+            showToast(`Ping tới ${result.data.name} thành công! Phản hồi: ${result.data.pingMs}ms`);
+          } else {
+            showToast(`Thiết bị ${result.data.name} không phản hồi mạng (Offline)`);
+          }
         }
       } else {
         showToast('Lỗi gửi lệnh ping tới thiết bị.');
@@ -155,6 +162,33 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
     } catch (error) {
       console.error('Error pinging device:', error);
       showToast('Không thể kết nối đến máy chủ.');
+    } finally {
+      setPingingId(null);
+    }
+  };
+
+  const handlePingAll = async () => {
+    setIsPingingAll(true);
+    try {
+      const response = await fetch('/api/v1/devices/ping-all', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result?.data) {
+          setDevices(result.data);
+          const onlineCount = result.data.filter((d: DeviceInfo) => d.status === 'ONLINE').length;
+          showToast(`Đã kiểm tra ${result.data.length} thiết bị: ${onlineCount} Online, ${result.data.length - onlineCount} Offline`);
+        }
+      } else {
+        showToast('Lỗi gửi lệnh kiểm tra toàn bộ thiết bị.');
+      }
+    } catch (error) {
+      console.error('Error pinging all devices:', error);
+      showToast('Không thể kết nối máy chủ.');
+    } finally {
+      setIsPingingAll(false);
     }
   };
 
@@ -427,9 +461,22 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
             />
           </div>
 
-          <button className="action-btn" onClick={() => fetchDevices()} title="Làm mới">
+          <button className="action-btn" onClick={() => fetchDevices()} title="Làm mới danh sách">
             <RefreshCw size={16} className={loading ? 'spin' : ''} />
           </button>
+
+          {canAction('DEVICE_PING') && (
+            <button
+              className="action-btn"
+              onClick={handlePingAll}
+              disabled={isPingingAll || loading}
+              title="Ping kiểm tra mạng toàn bộ thiết bị"
+              style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '0 12px', width: 'auto' }}
+            >
+              <Activity size={16} className={isPingingAll ? 'spin' : ''} />
+              <span style={{ fontSize: '0.82rem', fontWeight: 600 }}>{isPingingAll ? 'Đang ping...' : 'Ping tất cả'}</span>
+            </button>
+          )}
 
           {isManagerOrAbove && (
             (canAction('DEVICE_CREATE') && (<button className="device-add-btn" onClick={handleOpenCreateModal}>
@@ -509,13 +556,14 @@ export const DeviceTab: React.FC<DeviceTabProps> = ({ showToast, currentUser }) 
                   v{device.version}
                 </div>
 
-                {/* Simulate heartbeat/ping (Any active user can call) */}
+                {/* Real network ping */}
                 {canAction('DEVICE_PING') && (<button
                   className="action-btn ping"
                   onClick={(e) => handlePing(device.id, e)}
-                  title="Gửi tín hiệu Ping"
+                  disabled={pingingId === device.id}
+                  title={pingingId === device.id ? "Đang gửi ping..." : "Gửi tín hiệu Ping kiểm tra thực tế"}
                 >
-                  <Wifi size={20} />
+                  <Wifi size={20} className={pingingId === device.id ? 'spin' : ''} />
                 </button>) }
 
                 {/* Toggle simulated status (Only managers/admins) */}

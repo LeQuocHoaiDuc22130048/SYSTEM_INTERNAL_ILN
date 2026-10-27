@@ -381,6 +381,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
                 if (useServerInference) {
                   await _handleServerVerification(
                     faceImageBase64: serverFaceImageBase64,
+                    detected: detected,
+                    alignedFaceImageBase64: alignedFaceImageBase64,
                   );
                 } else {
                   final alignedFace = _embeddingService.alignFace(
@@ -874,11 +876,15 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   String _serverFaceFailureMessage(Object error) {
     if (error is ApiException) {
-      final message = error.message.trim();
-      // Luôn ưu tiên message chi tiết từ server (đã được sửa để rõ ràng hơn)
-      if (message.isNotEmpty) return message;
       if (error.statusCode == 0) {
-        return 'Không kết nối được server chấm công. Kiểm tra WiFi, IP backend và cổng 8080.';
+        return error.message.isNotEmpty
+            ? error.message
+            : 'Không thể kết nối đến máy chủ chấm công. Vui lòng kiểm tra WiFi hoặc thử lại.';
+      }
+      final message = error.message.trim();
+      // Luôn ưu tiên message chi tiết từ server
+      if (message.isNotEmpty && message != 'Không thể kết nối đến máy chủ.') {
+        return message;
       }
       if (error.statusCode == 400) {
         return 'Khuôn mặt chưa được đăng ký trên server. Vui lòng liên hệ Admin để đăng ký khuôn mặt qua trang Quản lý nhân viên (cần kết nối mạng).';
@@ -893,7 +899,7 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
         return 'Khuôn mặt này đã được đăng ký cho nhân viên khác. Vui lòng kiểm tra lại hồ sơ nhân viên.';
       }
       if (error.statusCode >= 500) {
-        return 'Server chấm công đang lỗi. Vui lòng thử lại sau hoặc báo quản lý kiểm tra backend.';
+        return 'Server chấm công đang bận hoặc gặp sự cố. Vui lòng thử lại sau hoặc báo quản lý kiểm tra backend.';
       }
     }
     return 'Quét khuôn mặt thất bại. Vui lòng đưa mặt rõ hơn vào khung hình và thử lại.';
@@ -912,6 +918,8 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
 
   Future<void> _handleServerVerification({
     required String faceImageBase64,
+    DetectedFace? detected,
+    String? alignedFaceImageBase64,
   }) async {
     final stopwatch = Stopwatch()..start();
     _isSaving = true;
@@ -968,6 +976,47 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
           (error.statusCode == 401 || error.statusCode == 403) &&
           error.message.startsWith('DEVICE_')) {
         await context.read<AuthProvider>().tablets.revokeLocalAuthorization();
+      }
+
+      // Tự động chuyển sang xác minh offline nếu mất kết nối server hoặc server lỗi gateway/timeout
+      if (mounted &&
+          error is ApiException &&
+          (error.statusCode == 0 ||
+              error.statusCode == 502 ||
+              error.statusCode == 503 ||
+              error.statusCode == 504) &&
+          detected != null &&
+          alignedFaceImageBase64 != null) {
+        final localSampleCount = await _databaseService.countFaceSamples(
+          modelName: _embeddingService.modelName,
+        );
+        if (localSampleCount > 0) {
+          _logFaceAuth('server_verification_failed_fallback_to_offline', {
+            'error': error.toString(),
+            'local_samples': localSampleCount,
+            'latency_ms': stopwatch.elapsedMilliseconds,
+          });
+          _setStatus(
+            'Mất kết nối server. Đang chuyển sang xác minh offline...',
+          );
+          try {
+            final alignedFace = _embeddingService.alignFace(
+              frame: detected.frame,
+              face: detected.face,
+            );
+            final embedding = await _embeddingService
+                .extractEmbeddingFromAligned(alignedFace);
+            await _handleVerificationEmbedding(
+              embedding,
+              faceImageBase64: alignedFaceImageBase64,
+            );
+            return;
+          } catch (fallbackError) {
+            _logFaceAuth('offline_fallback_failed', {
+              'error': fallbackError.toString(),
+            });
+          }
+        }
       }
 
       final failureMessage = _serverFaceFailureMessage(error);

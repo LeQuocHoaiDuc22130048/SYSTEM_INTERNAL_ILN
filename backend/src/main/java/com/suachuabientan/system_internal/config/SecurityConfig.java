@@ -78,6 +78,7 @@ public class SecurityConfig {
                         // Actuator health check
                         .requestMatchers("/actuator/health").permitAll()
                         .requestMatchers("/health").permitAll()
+                        .requestMatchers("/api/v1/devices/heartbeat").permitAll()
                         .requestMatchers("/api/v1/portal/**").permitAll()
                         .requestMatchers("/api/v1/customer/**").hasAnyAuthority("CUSTOMER_PORTAL_VIEW", "ROLE_SUPER_ADMIN")
                         // Tất cả còn lại phải xác thực

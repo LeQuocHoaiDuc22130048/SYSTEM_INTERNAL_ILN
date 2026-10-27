@@ -273,4 +273,44 @@ class AuthServiceTest {
 
         verify(userRepository, never()).save(any());
     }
+
+    @Test
+    void loginWhenAccountLockedThrowsBusinessException403WithSuspendedMessage() {
+        UserEntity suspendedUser = new UserEntity();
+        suspendedUser.setId(UUID.randomUUID());
+        suspendedUser.setUsername("maychamcong");
+        suspendedUser.setStatus(UserStatus.SUSPENDED);
+
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new org.springframework.security.authentication.LockedException("User account is locked"));
+        when(userRepository.findByUsernameAndIsDeletedFalse("maychamcong"))
+                .thenReturn(Optional.of(suspendedUser));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                authService.login(new com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest(
+                        "maychamcong", "password123", "device-info")));
+
+        assertEquals(403, ex.getStatusCode());
+        assertTrue(ex.getMessage().contains("tạm khoá"));
+    }
+
+    @Test
+    void loginWhenAccountPendingApprovalThrowsBusinessException403WithPendingMessage() {
+        UserEntity pendingUser = new UserEntity();
+        pendingUser.setId(UUID.randomUUID());
+        pendingUser.setUsername("newuser");
+        pendingUser.setStatus(UserStatus.PENDING_APPROVAL);
+
+        when(authenticationManager.authenticate(any()))
+                .thenThrow(new org.springframework.security.authentication.LockedException("User account is locked"));
+        when(userRepository.findByUsernameAndIsDeletedFalse("newuser"))
+                .thenReturn(Optional.of(pendingUser));
+
+        BusinessException ex = assertThrows(BusinessException.class, () ->
+                authService.login(new com.suachuabientan.system_internal.modules.auth.dto.request.LoginRequest(
+                        "newuser", "password123", "device-info")));
+
+        assertEquals(403, ex.getStatusCode());
+        assertTrue(ex.getMessage().contains("chưa được duyệt"));
+    }
 }

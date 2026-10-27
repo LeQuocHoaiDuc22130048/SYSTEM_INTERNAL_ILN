@@ -15,6 +15,8 @@ public class TabletDeviceService {
     private final UserRepository users;
     private final TabletLeaseSigner signer;
     private final jakarta.persistence.EntityManager entityManager;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.suachuabientan.system_internal.modules.attendance.service.AttendanceTabletMonitoringService monitoringService;
     @Value("${app.attendance.tablets.enforce:false}") private boolean enforce;
     public boolean enforced() {
         return enforce;
@@ -73,7 +75,12 @@ public class TabletDeviceService {
         d.setPendingCount(request.pendingCount());
         d.setAppVersion(request.appVersion());
         TabletLease l=null;
-        if("APPROVED".equals(d.getStatus())) l=leases.save(signer.issue(id,account,d.getStatusVersion()));
+        if("APPROVED".equals(d.getStatus())) {
+            l=leases.save(signer.issue(id,account,d.getStatusVersion()));
+            if(monitoringService != null) {
+                monitoringService.onHeartbeatReceived(id);
+            }
+        }
         return new TabletContracts.Heartbeat(view(d),signer.now(),TabletContracts.Lease.from(l),enforce);
     }
     @Transactional public TabletContracts.Device action(UUID id,UUID actor,String action,String reason) {

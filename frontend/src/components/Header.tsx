@@ -8,6 +8,8 @@ import {
   Menu,
   X,
 } from 'lucide-react';
+import { NotificationBell } from './NotificationBell';
+import type { UserInfo } from '../mockData';
 
 interface HeaderProps {
   activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts' | 'terminal';
@@ -24,6 +26,9 @@ interface HeaderProps {
   isSidebarOpen?: boolean;
   onRefreshData?: () => void;
   isRefreshing?: boolean;
+  currentUser?: UserInfo | null;
+  showToast?: (message: string) => void;
+  onNavigateToTab?: (tab: any) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -41,6 +46,9 @@ export const Header: React.FC<HeaderProps> = ({
   isSidebarOpen = false,
   onRefreshData,
   isRefreshing = false,
+  currentUser,
+  showToast,
+  onNavigateToTab,
 }) => {
   // Định dạng ngày tháng tiếng Việt cho Header
   const getVietnameseDate = (): string => {
@@ -147,6 +155,13 @@ export const Header: React.FC<HeaderProps> = ({
               />
             </div>
           ) : null}
+
+          {/* Chuông thông báo hệ thống & cảnh báo thiết bị */}
+          <NotificationBell
+            currentUser={currentUser}
+            showToast={showToast}
+            onNavigateToTab={onNavigateToTab}
+          />
 
           {/* Nút Làm mới dữ liệu đưa lên Header */}
           {onRefreshData && (

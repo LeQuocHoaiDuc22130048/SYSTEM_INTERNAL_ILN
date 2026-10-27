@@ -211,10 +211,11 @@ class AttendanceDeviceService extends ChangeNotifier
       message = e.statusCode == 0
           ? 'Mất kết nối server; sử dụng quyền offline còn hạn'
           : e.message;
-    } catch (_) {
+    } catch (e, st) {
+      debugPrint('[TABLET_SERVICE] Error during refresh: $e\n$st');
       if (generation == _generation) {
         message =
-            'Chưa xác nhận được server. Kiểm tra kết nối và quyền offline.';
+            'Chưa xác nhận được server ($e). Kiểm tra kết nối và quyền offline.';
       }
     }
     if (generation == _generation) notifyListeners();
