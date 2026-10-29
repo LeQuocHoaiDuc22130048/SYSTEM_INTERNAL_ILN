@@ -711,3 +711,48 @@
   font-weight: 700;
   color: var(--color-success);
 }
+
+/* Responsive Mobile & Small Screens */
+@media (max-width: 640px) {
+  .device-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .device-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .device-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .device-card-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .device-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 380px) {
+  .device-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .device-card-details {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .device-card {
+    padding: 12px 10px;
+  }
+}

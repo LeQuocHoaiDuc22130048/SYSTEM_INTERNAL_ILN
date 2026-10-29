@@ -19,6 +19,7 @@ spring:
     time-zone: ${SPRING_JACKSON_TIME_ZONE:Asia/Ho_Chi_Minh}
     default-property-inclusion: non_null
   jpa:
+    open-in-view: false
     properties:
       hibernate:
         jdbc:
@@ -33,6 +34,14 @@ server:
   address: ${SERVER_ADDRESS:0.0.0.0}
   shutdown: graceful
   forward-headers-strategy: framework
+  tomcat:
+    connection-timeout: 20s
+    keep-alive-timeout: 30s
+    max-keep-alive-requests: 100
+    threads:
+      max: 200
+      min-spare: 20
+    accept-count: 100
   ssl:
     enabled: ${SERVER_SSL_ENABLED:true}
     protocol: TLS
@@ -84,8 +93,8 @@ app:
       retention-days: ${ATTENDANCE_BACKUP_RETENTION_DAYS:30}
       cron: ${ATTENDANCE_BACKUP_CRON:0 30 2 * * *}
     ai-smoke-test:
-      enabled: ${ATTENDANCE_AI_SMOKE_TEST_ENABLED:true}
-      fail-fast: ${ATTENDANCE_AI_SMOKE_TEST_FAIL_FAST:true}
+      enabled: ${ATTENDANCE_AI_SMOKE_TEST_ENABLED:false}
+      fail-fast: ${ATTENDANCE_AI_SMOKE_TEST_FAIL_FAST:false}
       known-good-image: ${ATTENDANCE_AI_SMOKE_KNOWN_GOOD:}
       expected-embedding: ${ATTENDANCE_AI_SMOKE_EXPECTED_EMBEDDING:}
       live-image: ${ATTENDANCE_AI_SMOKE_LIVE_IMAGE:}

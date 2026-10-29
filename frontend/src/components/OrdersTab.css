@@ -1299,13 +1299,18 @@
     height: auto;
   }
   .orders-list-panel {
-    height: 550px;
+    height: auto;
+    min-height: 360px;
   }
   .orders-list-wrapper {
     -webkit-overflow-scrolling: touch;
   }
   .orders-detail-panel {
-    height: 600px;
+    height: auto;
+    min-height: 400px;
+  }
+  .orders-detail-panel:has(.detail-empty-state) {
+    display: none;
   }
 }
 
@@ -1419,3 +1424,78 @@
   align-items: center;
   gap: 4px;
 }
+
+@media (max-width: 640px) {
+  .orders-container {
+    padding: 10px 8px;
+    height: auto;
+  }
+
+  .orders-summary-bar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+    padding: 10px 8px;
+  }
+
+  .orders-filter-card {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .summary-val {
+    font-size: 1.15rem;
+  }
+
+  .summary-lbl {
+    font-size: 0.68rem;
+  }
+
+  .search-box-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .search-box-row .btn-create-order {
+    width: 100%;
+    justify-content: center;
+    height: 38px;
+  }
+
+  .filters-row {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .filters-row > :last-child {
+    grid-column: span 2;
+  }
+}
+
+@media (max-width: 360px) {
+  .orders-container {
+    padding: 8px 6px;
+  }
+
+  .orders-summary-bar {
+    gap: 4px;
+    padding: 8px 6px;
+  }
+
+  .summary-val {
+    font-size: 1.05rem;
+  }
+
+  .summary-lbl {
+    font-size: 0.62rem;
+  }
+
+  .filters-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .filters-row > :last-child {
+    grid-column: span 1;
+  }
+}
+

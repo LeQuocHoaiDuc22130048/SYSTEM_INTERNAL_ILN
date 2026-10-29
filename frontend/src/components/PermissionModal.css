@@ -408,9 +408,12 @@
 }
 
 @media (max-width: 600px) {
-  .perm-modal { border-radius: 14px; }
-  .perm-modal-body { padding: 0.75rem 1rem; }
+  .perm-modal-overlay { padding: 8px; }
+  .perm-modal { border-radius: 12px; max-height: 94svh; }
+  .perm-modal-body { padding: 0.75rem 0.85rem; }
   .perm-modal-header,
-  .perm-modal-footer { padding: 1rem; }
+  .perm-modal-footer { padding: 0.85rem; }
+  .perm-modal-footer { flex-direction: column-reverse; gap: 8px; }
+  .perm-modal-footer button { width: 100%; justify-content: center; }
   .perm-row-code { display: none; }
 }

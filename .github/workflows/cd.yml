@@ -70,19 +70,19 @@ jobs:
 
             cd backend
             if [ "$DEPLOY_ENV" = "production" ]; then
-              COMPOSE_FILE="docker-compose.prod.yml"
+              COMPOSE_FILES="-f docker-compose.yml -f docker-compose.prod.yml"
               ENV_FILE=".env"
             else
-              COMPOSE_FILE="docker-compose.test.yml"
+              COMPOSE_FILES="-f docker-compose.test.yml"
               ENV_FILE=".env.test"
             fi
 
             # 4. Tái xây dựng và khởi chạy các container
-            echo "==> Khởi chạy các container với $COMPOSE_FILE..."
+            echo "==> Khởi chạy các container với $COMPOSE_FILES..."
             if [ -f "$ENV_FILE" ]; then
-              docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d --build
+              docker compose $COMPOSE_FILES --env-file "$ENV_FILE" up -d --build
             else
-              docker compose -f "$COMPOSE_FILE" up -d --build
+              docker compose $COMPOSE_FILES up -d --build
             fi
 
             # 5. Dọn dẹp các Docker image cũ không còn sử dụng để tiết kiệm ổ cứng

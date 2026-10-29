@@ -468,3 +468,38 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 480px) {
+  .upm-backdrop {
+    padding: 8px;
+  }
+  .upm-modal {
+    max-height: 94svh;
+    border-radius: 12px;
+  }
+  .upm-header {
+    padding: 10px 14px;
+  }
+  .upm-header-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 8px;
+  }
+  .upm-header-title h3 {
+    font-size: 1rem;
+  }
+  .upm-body {
+    padding: 12px 14px;
+    gap: 12px;
+  }
+  .upm-footer {
+    padding: 10px 14px;
+    flex-direction: column-reverse;
+    gap: 8px;
+  }
+  .upm-btn {
+    width: 100%;
+    justify-content: center;
+    padding: 8px 12px;
+  }
+}

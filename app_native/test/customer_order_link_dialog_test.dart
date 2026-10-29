@@ -18,6 +18,7 @@ class OrderApi extends ApiClient {
   Future<dynamic> get(
     String path, {
     Map<String, dynamic>? queryParameters,
+    Duration? timeout,
   }) async {
     queries.add(Map.of(queryParameters ?? {}));
     return {
@@ -36,7 +37,7 @@ class OrderApi extends ApiClient {
   }
 
   @override
-  Future<dynamic> put(String path, {Object? body}) async {
+  Future<dynamic> put(String path, {Object? body, Duration? timeout}) async {
     if (failSave) throw ApiException(403, 'Không có quyền gán đơn');
     saved = Map<String, dynamic>.from(body as Map);
     return {

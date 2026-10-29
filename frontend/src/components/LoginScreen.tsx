@@ -252,12 +252,11 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showTo
                       </div>
                     </div>
 
-                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '20px' }}>
+                    <div className="login-forgot-pwd-wrapper">
                       <button 
                         type="button" 
                         className="login-forgot-pwd-btn"
                         onClick={() => setShowForgotPasswordModal(true)}
-                        style={{ border: 'none', background: 'none', cursor: 'pointer' }}
                       >
                         Quên mật khẩu?
                       </button>
@@ -272,45 +271,29 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showTo
                     </button>
                   </form>
 
-                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+                  <div className="login-switch-mode-wrapper">
                     <button 
                       type="button" 
-                      className="login-forgot-pwd-btn"
+                      className="login-switch-mode-btn"
                       onClick={() => {
                         setIsRegisterMode(true);
                         setError('');
                       }}
-                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
                     >
                       Chưa có tài khoản? Đăng ký ngay
                     </button>
                   </div>
 
-                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '16px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+                  <div className="login-portal-wrapper">
                     <button
                       type="button"
+                      className="login-portal-btn"
                       onClick={() => {
                         if (onNavigatePortal) {
                           onNavigatePortal();
                         } else {
                           window.location.hash = '#track';
                         }
-                      }}
-                      style={{
-                        background: '#eff6ff',
-                        border: '1px solid #bfdbfe',
-                        borderRadius: '8px',
-                        padding: '10px 16px',
-                        cursor: 'pointer',
-                        fontSize: '13.5px',
-                        fontWeight: '600',
-                        color: '#2563eb',
-                        display: 'inline-flex',
-                        alignItems: 'center',
-                        gap: '6px',
-                        transition: 'all 0.2s',
-                        width: '100%',
-                        justifyContent: 'center',
                       }}
                     >
                       🔍 Tra cứu tiến độ đơn sửa chữa (Khách hàng)
@@ -413,17 +396,32 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess, showTo
                     </button>
                   </form>
 
-                  <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+                  <div className="login-switch-mode-wrapper">
                     <button 
                       type="button" 
-                      className="login-forgot-pwd-btn"
+                      className="login-switch-mode-btn"
                       onClick={() => {
                         setIsRegisterMode(false);
                         setError('');
                       }}
-                      style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
                     >
                       Đã có tài khoản? Đăng nhập ngay
+                    </button>
+                  </div>
+
+                  <div className="login-portal-wrapper">
+                    <button
+                      type="button"
+                      className="login-portal-btn"
+                      onClick={() => {
+                        if (onNavigatePortal) {
+                          onNavigatePortal();
+                        } else {
+                          window.location.hash = '#track';
+                        }
+                      }}
+                    >
+                      🔍 Tra cứu tiến độ đơn sửa chữa (Khách hàng)
                     </button>
                   </div>
                 </>

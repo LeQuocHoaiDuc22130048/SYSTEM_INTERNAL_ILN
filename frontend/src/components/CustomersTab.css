@@ -584,3 +584,86 @@
   gap: 8px;
   margin: 12px 0;
 }
+
+/* Responsive Mobile & Small Screens */
+@media (max-width: 640px) {
+  .customers-container {
+    padding: 10px 8px;
+    gap: 12px;
+  }
+
+  .customers-header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .customers-header-row button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .customers-toolbar-card {
+    padding: 10px;
+    gap: 10px;
+  }
+
+  .customers-filters-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .customer-search-wrap {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .filter-select {
+    width: 100%;
+  }
+
+  .customer-modal-backdrop {
+    padding: 8px;
+  }
+
+  .customer-modal-card {
+    max-height: 94svh;
+    border-radius: 10px;
+  }
+
+  .customer-modal-header {
+    padding: 12px 14px;
+  }
+
+  .customer-modal-body {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .customer-modal-footer {
+    padding: 10px 14px;
+    flex-direction: column-reverse;
+  }
+
+  .customer-modal-footer button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 360px) {
+  .customers-container {
+    padding: 8px 6px;
+  }
+
+  .customers-title-area h2 {
+    font-size: 1.15rem;
+  }
+
+  .customers-table th,
+  .customers-table td {
+    padding: 8px 10px;
+    font-size: 0.8rem;
+  }
+}

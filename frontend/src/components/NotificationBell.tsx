@@ -6,6 +6,7 @@ import {
   CheckCheck,
   AlertCircle,
   Info,
+  X,
 } from 'lucide-react';
 import { getAuthHeaders } from '../utils/auth';
 import type { UserInfo } from '../mockData';
@@ -268,62 +269,92 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
       </button>
 
       {isOpen && (
-        <div className="notif-dropdown">
-          <div className="notif-dropdown-header">
-            <div className="notif-header-title">
-              <span>Thông báo</span>
-              {unreadCount > 0 && (
-                <span className="notif-unread-tag">{unreadCount} mới</span>
+        <>
+          {/* Backdrop tối màu trên thiết bị di động */}
+          <div
+            className="notif-backdrop"
+            onClick={() => setIsOpen(false)}
+            aria-hidden="true"
+          />
+
+          <div
+            className="notif-dropdown notification-drawer notification-modal"
+            role="region"
+            aria-label="Bảng thông báo hệ thống"
+          >
+            {/* Thanh kéo handle bar khi hiển thị dạng Bottom Sheet trên di động */}
+            <div className="notif-sheet-handle" aria-hidden="true" />
+
+            <div className="notif-dropdown-header">
+              <div className="notif-header-title">
+                <span>Thông báo</span>
+                {unreadCount > 0 && (
+                  <span className="notif-unread-tag">{unreadCount} mới</span>
+                )}
+              </div>
+              <div className="notif-header-actions">
+                {unreadCount > 0 && (
+                  <button
+                    type="button"
+                    className="notif-mark-all-btn"
+                    onClick={handleMarkAllRead}
+                    title="Đánh dấu tất cả thông báo đã đọc"
+                  >
+                    <CheckCheck size={14} />
+                    <span>Đọc tất cả</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className="notif-close-btn"
+                  onClick={() => setIsOpen(false)}
+                  title="Đóng bảng thông báo"
+                  aria-label="Đóng bảng thông báo"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+
+            <div className="notif-list notification-list notification-modal-content">
+              {loading && notifications.length === 0 ? (
+                <div className="notif-empty">Đang tải thông báo...</div>
+              ) : notifications.length === 0 ? (
+                <div className="notif-empty">
+                  <Bell size={28} style={{ opacity: 0.3 }} />
+                  <span>Không có thông báo nào</span>
+                </div>
+              ) : (
+                notifications.map(item => {
+                  const visual = getVisual(item.type);
+                  return (
+                    <div
+                      key={item.id}
+                      className={`notif-item notification-item ${item.isRead ? '' : 'unread'} ${visual.className}`}
+                      onClick={() => handleMarkAsRead(item)}
+                    >
+                      <div className="notif-header-row">
+                        <div className={`notif-icon-box ${visual.className}`}>
+                          {visual.icon}
+                        </div>
+                        <div className="notif-title">
+                          <span className="notif-title-text">{item.title}</span>
+                          {!item.isRead && <span className="notif-unread-dot" title="Chưa đọc" />}
+                        </div>
+                      </div>
+                      <div className="notif-content">
+                        <p className="notif-body">{item.body}</p>
+                        <span className="notif-time">
+                          {formatRelativeTime(item.createdAt)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })
               )}
             </div>
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                className="notif-mark-all-btn"
-                onClick={handleMarkAllRead}
-              >
-                <CheckCheck size={14} />
-                Đọc tất cả
-              </button>
-            )}
           </div>
-
-          <div className="notif-list">
-            {loading && notifications.length === 0 ? (
-              <div className="notif-empty">Đang tải thông báo...</div>
-            ) : notifications.length === 0 ? (
-              <div className="notif-empty">
-                <Bell size={28} style={{ opacity: 0.3 }} />
-                <span>Không có thông báo nào</span>
-              </div>
-            ) : (
-              notifications.map(item => {
-                const visual = getVisual(item.type);
-                return (
-                  <div
-                    key={item.id}
-                    className={`notif-item ${item.isRead ? '' : 'unread'} ${visual.className}`}
-                    onClick={() => handleMarkAsRead(item)}
-                  >
-                    <div className={`notif-icon-box ${visual.className}`}>
-                      {visual.icon}
-                    </div>
-                    <div className="notif-content">
-                      <div className="notif-title">
-                        <span>{item.title}</span>
-                        {!item.isRead && <span className="notif-unread-dot" />}
-                      </div>
-                      <div className="notif-body">{item.body}</div>
-                      <div className="notif-time">
-                        {formatRelativeTime(item.createdAt)}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+        </>
       )}
     </div>
   );

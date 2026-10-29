@@ -29,7 +29,8 @@ class QueueStub extends DatabaseService {
 class TestApi extends ApiClient {
   late Future<dynamic> Function(String, Object?) handle;
   @override
-  Future<dynamic> post(String path, {Object? body}) => handle(path, body);
+  Future<dynamic> post(String path, {Object? body, Duration? timeout}) =>
+      handle(path, body);
 }
 
 void main() {

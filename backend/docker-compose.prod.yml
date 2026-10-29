@@ -1,4 +1,16 @@
 services:
+  backend:
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SERVER_SSL_ENABLED: ${SERVER_SSL_ENABLED:-false}
+      APP_REQUIRE_HTTPS: ${APP_REQUIRE_HTTPS:-false}
+      APP_HTTP_REDIRECT_ENABLED: ${APP_HTTP_REDIRECT_ENABLED:-false}
+      REDIS_PASSWORD: ${PROD_REDIS_PASSWORD:-${REDIS_PASSWORD:-}}
+    restart: always
+
+  frontend:
+    restart: always
+
   postgres:
     environment:
       POSTGRES_DB: ${DB_NAME}
@@ -10,7 +22,12 @@ services:
 
   redis:
     restart: always
-    command: redis-server --requirepass ${PROD_REDIS_PASSWORD}
+    command: >
+      sh -c 'if [ -n "$${PROD_REDIS_PASSWORD:-$${REDIS_PASSWORD:-}}" ]; then
+        exec redis-server --requirepass "$${PROD_REDIS_PASSWORD:-$${REDIS_PASSWORD}}";
+      else
+        exec redis-server;
+      fi'
 
   minio:
     environment:

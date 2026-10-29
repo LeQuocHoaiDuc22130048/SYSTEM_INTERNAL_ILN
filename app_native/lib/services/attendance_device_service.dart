@@ -129,7 +129,12 @@ class AttendanceDeviceService extends ChangeNotifier
     try {
       if (deviceId == null) {
         final key = 'tablet_identity_$account';
-        String? encoded = await storage.read(key: key);
+        String? encoded;
+        try {
+          encoded = await storage.read(key: key);
+        } catch (e) {
+          debugPrint('[TABLET_SERVICE] Warning reading identity storage: $e');
+        }
         Map<String, dynamic> identity;
         if (encoded == null) {
           identity = {
@@ -138,14 +143,29 @@ class AttendanceDeviceService extends ChangeNotifier
               List<int>.generate(32, (_) => Random.secure().nextInt(256)),
             ).replaceAll('=', ''),
           };
-          await storage.write(key: key, value: jsonEncode(identity));
+          try {
+            await storage.write(key: key, value: jsonEncode(identity));
+          } catch (e) {
+            debugPrint('[TABLET_SERVICE] Warning writing identity storage: $e');
+          }
         } else {
           identity = jsonDecode(encoded) as Map<String, dynamic>;
         }
-        final info = await PackageInfo.fromPlatform();
-        final native = await const MethodChannel(
-          'attendance/device_clock',
-        ).invokeMapMethod<String, dynamic>('snapshot');
+        String appVer = '1.1.28';
+        try {
+          final info = await PackageInfo.fromPlatform();
+          appVer = info.version;
+        } catch (e) {
+          debugPrint('[TABLET_SERVICE] Warning reading package info: $e');
+        }
+        Map<String, dynamic>? native;
+        try {
+          native = await const MethodChannel(
+            'attendance/device_clock',
+          ).invokeMapMethod<String, dynamic>('snapshot');
+        } catch (e) {
+          debugPrint('[TABLET_SERVICE] Warning reading device clock: $e');
+        }
         if (generation != _generation) return;
         final response = await api.post(
           '/api/v1/attendance/devices/register',
@@ -154,7 +174,7 @@ class AttendanceDeviceService extends ChangeNotifier
             'name': 'Tablet chấm công',
             'model': native?['model'] ?? 'Android',
             'osVersion': native?['osVersion'] ?? 'Android',
-            'appVersion': info.version,
+            'appVersion': appVer,
           },
         );
         if (generation != _generation) return;
@@ -168,13 +188,17 @@ class AttendanceDeviceService extends ChangeNotifier
       if (generation != _generation) return;
       pendingSync = counts.$1;
       pendingReview = counts.$2;
-      final info = await PackageInfo.fromPlatform();
+      String appVer = '1.1.28';
+      try {
+        final info = await PackageInfo.fromPlatform();
+        appVer = info.version;
+      } catch (_) {}
       // Baseline is sampled before the request: network latency can only shorten the lease.
       final snapshot = await clock.snapshot();
       if (generation != _generation) return;
       final response = await api.post(
         '/api/v1/attendance/devices/heartbeat',
-        body: {'pendingCount': pendingSync, 'appVersion': info.version},
+        body: {'pendingCount': pendingSync, 'appVersion': appVer},
       );
       if (generation != _generation) return;
       final data = Map<String, dynamic>.from(response as Map);
@@ -221,15 +245,21 @@ class AttendanceDeviceService extends ChangeNotifier
     if (generation == _generation) notifyListeners();
   }
 
-  Future<void> _save(String account) => storage.write(
-    key: 'tablet_session_$account',
-    value: jsonEncode({
-      'deviceId': deviceId,
-      'secret': _secret,
-      'device': device,
-      'authorization': authorization?.toJson(),
-    }),
-  );
+  Future<void> _save(String account) async {
+    try {
+      await storage.write(
+        key: 'tablet_session_$account',
+        value: jsonEncode({
+          'deviceId': deviceId,
+          'secret': _secret,
+          'device': device,
+          'authorization': authorization?.toJson(),
+        }),
+      );
+    } catch (e) {
+      debugPrint('[TABLET_SERVICE] Warning saving session storage: $e');
+    }
+  }
   Future<Map<String, dynamic>> captureContext() async {
     final auth = authorization;
     final account = accountId;

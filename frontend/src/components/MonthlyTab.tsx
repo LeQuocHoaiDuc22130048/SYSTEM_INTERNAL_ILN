@@ -2,7 +2,8 @@ import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect } from 'react';
 import {
   Search, Download, ExternalLink, Edit3, ChevronRight, X, Calendar,
-  Clock, Zap, CalendarCheck, AlertTriangle
+  Clock, Zap, CalendarCheck, AlertTriangle, LayoutGrid, CalendarDays,
+  CalendarRange, ChevronUp
 } from 'lucide-react';
 import type { EmployeeMonthlyStats, EmployeeHistoryResponse } from '../mockData';
 import { getAvatarLetters, normalizeHistoryResponse, DAILY_STATUS_LABEL_MAP } from '../utils/employee';
@@ -36,6 +37,19 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
   const [expandedEmployeeId, setExpandedEmployeeId] = useState<string | null>(null);
   const [expandedLogs, setExpandedLogs] = useState<Record<string, EmployeeHistoryResponse>>({});
   const [expandedLogsLoading, setExpandedLogsLoading] = useState<Record<string, boolean>>({});
+
+  // Chế độ hiển thị trên di động: 'overview' (thu gọn tổng quan) hoặc 'daily' (xem chi tiết theo ngày 1-31)
+  const [mobileViewMode, setMobileViewMode] = useState<'overview' | 'daily'>('overview');
+  // Xem chi tiết 31 ngày riêng cho từng thẻ nhân viên khi ở chế độ tổng quan
+  const [individualExpandedDays, setIndividualExpandedDays] = useState<Record<string, boolean>>({});
+
+  const toggleIndividualDays = (empId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIndividualExpandedDays(prev => ({
+      ...prev,
+      [empId]: !prev[empId],
+    }));
+  };
 
   const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
 
@@ -478,10 +492,12 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
             />
           </div>
         </div>
-        {canAction('ATTENDANCE_EXPORT') && (<button id="btn-export-excel" className="export-btn" onClick={handleExportExcel}>
-          <Download size={18} />
-          Xuất Excel
-        </button>) }
+        {canAction('ATTENDANCE_EXPORT') && (
+          <button id="btn-export-excel" className="export-btn desktop-only-export-btn" onClick={handleExportExcel}>
+            <Download size={18} />
+            <span>Xuất Excel</span>
+          </button>
+        )}
       </section>
 
       <main className="table-card">
@@ -646,9 +662,54 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
 
             {/* Mobile Card View (< 640px) */}
             <div className="mobile-card-view">
+              {/* Cụm thanh thao tác nhanh trên di động: [Xuất Excel], [Xem tổng quan], [Xem chi tiết ngày] */}
+              <div className="mobile-quick-actions-bar">
+                <div className="mobile-quick-actions-grid" role="toolbar" aria-label="Thao tác nhanh trên di động">
+                  {canAction('ATTENDANCE_EXPORT') && (
+                    <button
+                      type="button"
+                      id="btn-mobile-export-excel"
+                      className="mobile-action-btn mobile-export-btn"
+                      onClick={handleExportExcel}
+                      title="Xuất bảng công ra file Excel"
+                    >
+                      <Download size={16} />
+                      <span>Xuất Excel</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    role="tab"
+                    id="tab-mobile-overview"
+                    aria-selected={mobileViewMode === 'overview'}
+                    className={`mobile-action-btn ${mobileViewMode === 'overview' ? 'active' : ''}`}
+                    onClick={() => setMobileViewMode('overview')}
+                    title="Chế độ xem tổng quan gọn gàng"
+                  >
+                    <LayoutGrid size={16} />
+                    <span>Xem tổng quan</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    role="tab"
+                    id="tab-mobile-daily"
+                    aria-selected={mobileViewMode === 'daily'}
+                    className={`mobile-action-btn ${mobileViewMode === 'daily' ? 'active' : ''}`}
+                    onClick={() => setMobileViewMode('daily')}
+                    title={`Xem chi tiết lịch công từ ngày 1 đến ${daysInMonth}`}
+                  >
+                    <CalendarDays size={16} />
+                    <span>Xem chi tiết ngày</span>
+                  </button>
+                </div>
+              </div>
+
               {filteredEmployees.map((emp) => {
                 const isSelected = expandedEmployeeId === emp.id;
                 const attendancePercent = emp.workDays > 0 ? Math.min(100, Math.round((emp.workDays / 26) * 100)) : 0;
+                const isShowingDays = mobileViewMode === 'daily' || Boolean(individualExpandedDays[emp.id]);
                 return (
                   <div
                     key={emp.id}
@@ -709,57 +770,105 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                             style={{ width: `${attendancePercent}%` }}
                           />
                         </div>
-                        <div className="card-mini-bar-scroll" onClick={(e) => e.stopPropagation()}>
-                          <div className="mini-bar">
-                            {emp.dailyPattern.split('').slice(0, daysInMonth).map((char, index) => {
-                              const dayNum = index + 1;
-                              const d = new Date(currentYear, currentMonth - 1, dayNum);
-                              const isSun = d.getDay() === 0;
-                              const isSat = d.getDay() === 6;
-                              const dayOfWeekVi = isSun ? 'Chủ Nhật' : isSat ? 'Thứ 7' : `Thứ ${d.getDay() + 1}`;
-                              const statusLabel = DAILY_STATUS_LABEL_MAP[char as keyof typeof DAILY_STATUS_LABEL_MAP] ?? 'Đủ công';
-                              const updateReason = emp.updateNotes?.[dayNum] || emp.updateNotes?.[String(dayNum)];
-                              const alignClass = dayNum <= 4 ? 'tip-left' : dayNum >= daysInMonth - 4 ? 'tip-right' : 'tip-center';
-                              const isDayToday = isCurrentYear && isCurrentMonth && dayNum === todayDate;
-                              const dayTimes = getDayTimesDisplay(emp, dayNum, char, isDayToday);
 
-                              return (
-                                <div
-                                  key={index}
-                                  className={`mini-day ${char} ${isSun ? 'is-sunday' : isSat ? 'is-saturday' : ''}`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setExpandedEmployeeId(emp.id);
-                                  }}
-                                  role="button"
-                                  tabIndex={0}
-                                >
-                                  <span className="mini-day-direct-label">{dayNum}</span>
-                                  <div className={`mini-day-tooltip ${alignClass}`}>
-                                    <div className="tooltip-header">
-                                      <span className="tooltip-date">
-                                        {dayOfWeekVi}, {dayNum.toString().padStart(2, '0')}/{currentMonth.toString().padStart(2, '0')}
-                                      </span>
-                                      <span className={`tooltip-status-tag ${char}`}>{statusLabel}</span>
+                        {/* Nút bấm xem/thu gọn 31 ngày khi ở chế độ "Xem tổng quan" */}
+                        {mobileViewMode === 'overview' && (
+                          <button
+                            type="button"
+                            className="mobile-card-toggle-days-btn"
+                            onClick={(e) => toggleIndividualDays(emp.id, e)}
+                            aria-expanded={isShowingDays}
+                          >
+                            {isShowingDays ? (
+                              <>
+                                <ChevronUp size={15} />
+                                <span>Thu gọn lịch 31 ngày</span>
+                              </>
+                            ) : (
+                              <>
+                                <CalendarRange size={15} />
+                                <span>Xem chi tiết 31 ngày công</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+
+                        {/* Dãy ngày từ 1 đến 31 với cuộn ngang (horizontal scroll) mượt mà overflow-x: auto */}
+                        {isShowingDays && (
+                          <div className="mobile-daily-timeline-section" onClick={(e) => e.stopPropagation()}>
+                            <div className="mobile-timeline-header">
+                              <span className="mobile-timeline-title">
+                                <CalendarRange size={13} />
+                                Lịch công ngày 1 đến {daysInMonth}
+                              </span>
+                              <span className="mobile-timeline-hint">Cuộn ngang để xem ↔</span>
+                            </div>
+
+                            <div className="card-mini-bar-scroll mobile-timeline-scroll">
+                              <div className="mini-bar mobile-timeline-grid">
+                                {emp.dailyPattern.split('').slice(0, daysInMonth).map((char, index) => {
+                                  const dayNum = index + 1;
+                                  const d = new Date(currentYear, currentMonth - 1, dayNum);
+                                  const isSun = d.getDay() === 0;
+                                  const isSat = d.getDay() === 6;
+                                  const dayOfWeekVi = isSun ? 'CN' : isSat ? 'T7' : `T${d.getDay() + 1}`;
+                                  const statusLabel = DAILY_STATUS_LABEL_MAP[char as keyof typeof DAILY_STATUS_LABEL_MAP] ?? 'Đủ công';
+                                  const updateReason = emp.updateNotes?.[dayNum] || emp.updateNotes?.[String(dayNum)];
+                                  const workHours = emp.dailyWorkDays?.[dayNum] || emp.dailyWorkDays?.[String(dayNum)];
+                                  const alignClass = dayNum <= 4 ? 'tip-left' : dayNum >= daysInMonth - 4 ? 'tip-right' : 'tip-center';
+                                  const isDayToday = isCurrentYear && isCurrentMonth && dayNum === todayDate;
+                                  const dayTimes = getDayTimesDisplay(emp, dayNum, char, isDayToday);
+
+                                  return (
+                                    <div
+                                      key={index}
+                                      className={`mobile-day-slot mini-day ${char} ${isSun ? 'is-sunday' : isSat ? 'is-saturday' : ''} ${isDayToday ? 'is-today' : ''}`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setExpandedEmployeeId(emp.id);
+                                      }}
+                                      role="button"
+                                      tabIndex={0}
+                                      title={`Ngày ${dayNum}/${currentMonth}: ${statusLabel}`}
+                                    >
+                                      <span className="mobile-slot-weekday">{dayOfWeekVi}</span>
+                                      <span className="mobile-slot-num">{dayNum}</span>
+                                      <span className="mobile-slot-status-dot" />
+
+                                      <div className={`mini-day-tooltip ${alignClass}`}>
+                                        <div className="tooltip-header">
+                                          <span className="tooltip-date">
+                                            {dayOfWeekVi}, {dayNum.toString().padStart(2, '0')}/{currentMonth.toString().padStart(2, '0')}
+                                          </span>
+                                          <span className={`tooltip-status-tag ${char}`}>{statusLabel}</span>
+                                        </div>
+                                        {dayTimes && (
+                                          <div className="tooltip-detail-row time-row">
+                                            <span className="tooltip-label">Thời gian:</span>
+                                            <strong className="tooltip-time-val">{dayTimes}</strong>
+                                          </div>
+                                        )}
+                                        {workHours !== undefined && (
+                                          <div className="tooltip-detail-row">
+                                            <span>Giờ công:</span>
+                                            <strong>{workHours} công</strong>
+                                          </div>
+                                        )}
+                                        {updateReason && (
+                                          <div className="tooltip-detail-row reason">
+                                            <span>Ghi chú:</span>
+                                            <em>{updateReason}</em>
+                                          </div>
+                                        )}
+                                        <div className="tooltip-footer-hint">Bấm để mở chi tiết tháng</div>
+                                      </div>
                                     </div>
-                                    {dayTimes && (
-                                      <div className="tooltip-detail-row time-row">
-                                        <span className="tooltip-label">Thời gian:</span>
-                                        <strong className="tooltip-time-val">{dayTimes}</strong>
-                                      </div>
-                                    )}
-                                    {updateReason && (
-                                      <div className="tooltip-detail-row reason">
-                                        <span>Ghi chú:</span>
-                                        <em>{updateReason}</em>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                  );
+                                })}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     </div>
                   </div>

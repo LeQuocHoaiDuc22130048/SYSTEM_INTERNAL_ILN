@@ -127,7 +127,7 @@ public class HealthCheckService {
         if (status instanceof String value && ("DOWN".equalsIgnoreCase(value) || "ERROR".equalsIgnoreCase(value))) {
             return true;
         }
-        for (String key : new String[]{"modelLoaded", "faceModelLoaded", "miniFasNetLoaded", "minifasnetLoaded"}) {
+        for (String key : new String[]{"modelLoaded", "faceModelLoaded"}) {
             Object value = body.get(key);
             if (value instanceof Boolean loaded && !loaded) return true;
         }

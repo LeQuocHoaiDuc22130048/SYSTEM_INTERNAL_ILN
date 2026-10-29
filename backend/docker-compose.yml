@@ -26,11 +26,26 @@ services:
       - ./releases:/app/releases
       - uploads_data:/app/uploads
     depends_on:
-      - postgres
-      - redis
-      - minio
-      - face-ai
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      face-ai:
+        condition: service_started
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f -k -s -H 'X-Forwarded-Proto: https' http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   postgres:
     image: pgvector/pgvector:pg15
@@ -43,7 +58,18 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-admin} -d ${DB_NAME:-system_internal_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   redis:
     image: redis:alpine
@@ -52,7 +78,17 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   minio:
     image: quay.io/minio/minio:latest
@@ -67,6 +103,11 @@ services:
       - minio_data:/data
     command: server /data --address ":9000" --console-address ":9001"
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   face-ai:
     build:
@@ -83,7 +124,18 @@ services:
       - "5000:5000"
     volumes:
       - face_ai_models:/models
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import urllib.request; urllib.request.urlopen(\"http://127.0.0.1:5000/health\")' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
   frontend:
     build:
@@ -95,6 +147,11 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
 
 volumes:
   uploads_data:
@@ -112,3 +169,4 @@ volumes:
   face_ai_models:
     external: true
     name: backend_face_ai_models
+

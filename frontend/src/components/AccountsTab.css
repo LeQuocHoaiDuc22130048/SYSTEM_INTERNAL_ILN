@@ -477,9 +477,21 @@
 }
 
 @media (max-width: 640px) {
-  .accounts-tab { padding: 0 0.75rem 1.5rem; }
+  .accounts-tab { padding: 0 0.5rem 1.5rem; }
+  .accounts-search-box { min-width: 0; width: 100%; }
+  .accounts-filter-select { width: 100%; }
+  .accounts-table-card { border-radius: 10px; }
   .accounts-table thead th:nth-child(4),
   .accounts-table tbody td:nth-child(4) {
     display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .accounts-tab { padding: 0 0.25rem 1rem; }
+  .accounts-table th,
+  .accounts-table td {
+    padding: 8px 10px;
+    font-size: 0.8rem;
   }
 }

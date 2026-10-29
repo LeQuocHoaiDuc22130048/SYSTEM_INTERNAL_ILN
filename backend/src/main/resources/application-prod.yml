@@ -1,13 +1,22 @@
 spring:
   datasource:
-    url: ${PROD_DB_URL}
-    username: ${PROD_DB_USERNAME}
-    password: ${PROD_DB_PASSWORD}
+    url: ${PROD_DB_URL:${DB_URL}}
+    username: ${PROD_DB_USERNAME:${DB_USERNAME}}
+    password: ${PROD_DB_PASSWORD:${DB_PASSWORD}}
     hikari:
-      maximum-pool-size: 50
-      minimum-idle: 10
+      maximum-pool-size: ${PROD_DB_MAX_POOL_SIZE:25}
+      minimum-idle: ${PROD_DB_MIN_IDLE:10}
+      connection-timeout: 20000
+      idle-timeout: 300000
+      max-lifetime: 1200000
+      keepalive-time: 60000
+      leak-detection-threshold: 30000
+      data-source-properties:
+        socketTimeout: 30
+        tcpKeepAlive: true
 
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate
     show-sql: false
@@ -18,14 +27,24 @@ spring:
 
   data:
     redis:
-      host: ${PROD_REDIS_HOST}
-      password: ${PROD_REDIS_PASSWORD}
+      host: ${PROD_REDIS_HOST:${REDIS_HOST:localhost}}
+      port: ${PROD_REDIS_PORT:${REDIS_PORT:6379}}
+      password: ${PROD_REDIS_PASSWORD:${REDIS_PASSWORD:}}
+      timeout: 5s
+      connect-timeout: 5s
+      lettuce:
+        pool:
+          enabled: true
+          max-active: 16
+          max-idle: 8
+          min-idle: 2
+          max-wait: 3s
 
 server:
   ssl:
     enabled: ${SERVER_SSL_ENABLED:true}
-    key-store: ${SERVER_SSL_KEY_STORE}
-    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD}
+    key-store: ${SERVER_SSL_KEY_STORE:}
+    key-store-password: ${SERVER_SSL_KEY_STORE_PASSWORD:}
     key-store-type: ${SERVER_SSL_KEY_STORE_TYPE:PKCS12}
     key-alias: ${SERVER_SSL_KEY_ALIAS:}
 
@@ -34,13 +53,13 @@ app:
     super-admin:
       username: ${SUPER_ADMIN_USERNAME}
       password: ${SUPER_ADMIN_PASSWORD}
-      full-name: ${SUPER_ADMIN_FULL_NAME}
+      full-name: ${SUPER_ADMIN_FULL_NAME:Super Admin}
     admin:
       username: ${ADMIN_USERNAME:}
       password: ${ADMIN_PASSWORD:}
-      full-name: ${ADMIN_FULL_NAME:}
+      full-name: ${ADMIN_FULL_NAME:Admin}
   cors:
-    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:${CORS_ALLOWED_ORIGINS}}
+    allowed-origin-patterns: ${CORS_ALLOWED_ORIGIN_PATTERNS:${CORS_ALLOWED_ORIGINS:*}}
   security:
     require-https: ${APP_REQUIRE_HTTPS:true}
     http-redirect:
@@ -48,6 +67,10 @@ app:
   firebase:
     service-account-path: ${FIREBASE_SERVICE_ACCOUNT_PATH:firebase-service-account.json}
     project-id: ${FIREBASE_PROJECT_ID:}
+  attendance:
+    ai-smoke-test:
+      enabled: ${ATTENDANCE_AI_SMOKE_TEST_ENABLED:false}
+      fail-fast: ${ATTENDANCE_AI_SMOKE_TEST_FAIL_FAST:false}
 
 application:
   security:

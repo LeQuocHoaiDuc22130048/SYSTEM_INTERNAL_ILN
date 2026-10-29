@@ -156,26 +156,28 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           ) : null}
 
-          {/* Chuông thông báo hệ thống & cảnh báo thiết bị */}
-          <NotificationBell
-            currentUser={currentUser}
-            showToast={showToast}
-            onNavigateToTab={onNavigateToTab}
-          />
+          <div className="header-actions">
+            {/* Chuông thông báo hệ thống & cảnh báo thiết bị */}
+            <NotificationBell
+              currentUser={currentUser}
+              showToast={showToast}
+              onNavigateToTab={onNavigateToTab}
+            />
 
-          {/* Nút Làm mới dữ liệu đưa lên Header */}
-          {onRefreshData && (
-            <button
-              type="button"
-              className="btn-header-refresh"
-              onClick={onRefreshData}
-              disabled={isRefreshing}
-              title="Làm mới dữ liệu"
-            >
-              <RefreshCw size={15} className={isRefreshing ? 'spin' : ''} />
-              <span>Làm mới dữ liệu</span>
-            </button>
-          )}
+            {/* Nút Làm mới dữ liệu đưa lên Header */}
+            {onRefreshData && (
+              <button
+                type="button"
+                className="btn-header-refresh"
+                onClick={onRefreshData}
+                disabled={isRefreshing}
+                title="Làm mới dữ liệu"
+              >
+                <RefreshCw size={15} className={isRefreshing ? 'spin' : ''} />
+                <span>Làm mới dữ liệu</span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
     </>

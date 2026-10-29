@@ -73,19 +73,21 @@
 /* Stats Grid */
 .dashboard-stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 16px;
 }
 
 @media (max-width: 1200px) {
   .dashboard-stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
   }
 }
 
 @media (max-width: 600px) {
   .dashboard-stats-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 10px;
   }
 }
 
@@ -1187,4 +1189,95 @@
     font-size: 11px;
   }
 }
+
+/* Mobile Viewports (<= 600px) */
+@media (max-width: 600px) {
+  .dashboard-panel {
+    padding: 14px 12px;
+    border-radius: var(--radius-md, 12px);
+  }
+
+  .panel-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .panel-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .personal-summary-chips {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+
+  .preset-buttons {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 4px !important;
+    width: 100% !important;
+    padding: 3px !important;
+  }
+
+  .filter-preset-btn {
+    padding: 7px 6px !important;
+    font-size: 11.5px !important;
+    justify-content: center !important;
+    width: 100% !important;
+  }
+
+  .stat-card {
+    padding: 12px 14px;
+  }
+
+  .stat-value {
+    font-size: 1.4rem;
+  }
+
+  .status-ratio-wrapper {
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-ratio-legend {
+    width: 100%;
+  }
+}
+
+/* Ultra-Small Screens (<= 360px) */
+@media (max-width: 360px) {
+  .dashboard-panel {
+    padding: 10px 8px;
+  }
+
+  .panel-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .panel-header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .panel-header .btn-link {
+    align-self: flex-start;
+  }
+
+  .stat-card {
+    padding: 10px 12px;
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+}
+
 

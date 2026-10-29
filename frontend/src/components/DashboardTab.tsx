@@ -1491,7 +1491,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     {personalSummary ? `${personalSummary.workDays} công` : 'Cá nhân'}
                   </span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="panel-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   <button
                     className="action-btn-outline action-btn-sm"
                     style={{
