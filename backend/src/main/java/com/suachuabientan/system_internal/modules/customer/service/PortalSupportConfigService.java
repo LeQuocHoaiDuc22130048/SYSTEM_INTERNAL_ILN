@@ -34,10 +34,10 @@ public class PortalSupportConfigService {
 
         config.setHotlineNumber(request.getHotlineNumber().trim());
         config.setHotlineLabel(request.getHotlineLabel() != null && !request.getHotlineLabel().isBlank()
-                ? request.getHotlineLabel().trim() : "Hotline Kỹ Thuật");
-        config.setZaloUrl(request.getZaloUrl().trim());
+                ? request.getHotlineLabel().trim() : "Liên hệ kỹ thuật");
+        config.setZaloUrl(request.getZaloUrl() != null ? request.getZaloUrl().trim() : "");
         config.setZaloLabel(request.getZaloLabel() != null && !request.getZaloLabel().isBlank()
-                ? request.getZaloLabel().trim() : "Chat Zalo Tiếp Nhận");
+                ? request.getZaloLabel().trim() : "");
         if (request.getWorkingHours() != null) {
             config.setWorkingHours(request.getWorkingHours().trim());
         }
@@ -55,10 +55,10 @@ public class PortalSupportConfigService {
     private PortalSupportConfig createDefaultConfig() {
         PortalSupportConfig defaultConfig = PortalSupportConfig.builder()
                 .id(DEFAULT_CONFIG_ID)
-                .hotlineNumber("0909000000")
-                .hotlineLabel("Hotline Kỹ Thuật")
-                .zaloUrl("https://zalo.me")
-                .zaloLabel("Chat Zalo Tiếp Nhận")
+                .hotlineNumber("0964 266 771")
+                .hotlineLabel("Liên hệ kỹ thuật")
+                .zaloUrl("")
+                .zaloLabel("")
                 .workingHours("08:00 - 17:30 (Thứ 2 - Thứ 7)")
                 .workshopAddress("Trung tâm kỹ thuật sửa chữa thiết bị công nghiệp")
                 .updatedAt(LocalDateTime.now())
@@ -67,9 +67,17 @@ public class PortalSupportConfigService {
     }
 
     private PortalSupportConfigResponse mapToResponse(PortalSupportConfig entity) {
+        String phone = entity.getHotlineNumber();
+        if (phone == null || phone.isBlank() || "0909000000".equals(phone.replaceAll("\\s+", ""))) {
+            phone = "0964 266 771";
+        }
+        String label = entity.getHotlineLabel();
+        if (label == null || label.isBlank() || "Hotline Kỹ Thuật".equalsIgnoreCase(label.trim())) {
+            label = "Liên hệ kỹ thuật";
+        }
         return PortalSupportConfigResponse.builder()
-                .hotlineNumber(entity.getHotlineNumber())
-                .hotlineLabel(entity.getHotlineLabel())
+                .hotlineNumber(phone)
+                .hotlineLabel(label)
                 .zaloUrl(entity.getZaloUrl())
                 .zaloLabel(entity.getZaloLabel())
                 .workingHours(entity.getWorkingHours())

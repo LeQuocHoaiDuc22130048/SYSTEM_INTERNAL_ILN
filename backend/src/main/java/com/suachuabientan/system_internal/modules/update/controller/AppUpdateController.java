@@ -2,13 +2,11 @@ package com.suachuabientan.system_internal.modules.update.controller;
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
 import com.suachuabientan.system_internal.modules.update.dto.AppUpdateInfo;
-import com.suachuabientan.system_internal.modules.update.dto.CreateUpdateDto;
 import com.suachuabientan.system_internal.modules.update.entity.AppUpdate;
 import com.suachuabientan.system_internal.modules.update.service.AppUpdateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -61,7 +59,7 @@ public class AppUpdateController {
     @Value("${app.update.ios.app-title:System Inverter Likenew}")
     private String iosAppTitle;
 
-    @Value("${app.update.ios.app-store-url:https://apps.apple.com/app/id6740000000}")
+    @Value("${app.update.ios.app-store-url:https://apps.apple.com/us/app/inverter-like-new-system/id6809314317}")
     private String iosAppStoreUrl;
 
     @Operation(summary = "Kiểm tra phiên bản cập nhật")
@@ -69,20 +67,31 @@ public class AppUpdateController {
     public ResponseEntity<ApiResponse<AppUpdateInfo>> checkUpdate(
             @RequestParam String version,
             @RequestParam(required = false, defaultValue = "android") String platform,
+            @RequestParam(required = false, defaultValue = "PRODUCTION") String channel,
             HttpServletRequest request) {
-        String normalizedPlatform = (platform != null && "ios".equalsIgnoreCase(platform.trim())) ? "IOS" : "ANDROID";
-        AppUpdate latest = appUpdateService.getLatestReleased(normalizedPlatform);
+        String normalizedPlatform = (platform != null && "ios".equalsIgnoreCase(platform.trim())) ? "IOS" : 
+                ((platform != null && "web".equalsIgnoreCase(platform.trim())) ? "WEB" : "ANDROID");
+        String normalizedChannel = (channel != null && !channel.isBlank()) ? channel.trim().toUpperCase() : "PRODUCTION";
+        
+        AppUpdate latest = appUpdateService.getLatestReleased(normalizedPlatform, normalizedChannel);
         
         String currentLatestVersion;
         String currentDownloadUrl;
         boolean currentMandatory;
         String currentChangelog;
+        String sha256 = null;
+        Long fileSize = null;
+        String minSupportedVersion = null;
 
         if (latest != null) {
             currentLatestVersion = latest.getVersion();
             currentDownloadUrl = latest.getDownloadUrl();
-            currentMandatory = latest.getMandatory();
+            currentMandatory = appUpdateService.isMandatory(latest, version);
             currentChangelog = latest.getChangelog();
+            sha256 = latest.getSha256();
+            fileSize = latest.getFileSize();
+            minSupportedVersion = latest.getMinSupportedVersion();
+            normalizedChannel = latest.getChannel();
         } else {
             currentLatestVersion = latestVersion;
             currentMandatory = mandatory;
@@ -90,7 +99,7 @@ public class AppUpdateController {
             if ("IOS".equals(normalizedPlatform)) {
                 currentDownloadUrl = (iosAppStoreUrl != null && !iosAppStoreUrl.isBlank())
                         ? iosAppStoreUrl
-                        : "https://apps.apple.com/app/id6740000000";
+                        : "https://apps.apple.com/us/app/inverter-like-new-system/id6809314317";
             } else {
                 currentDownloadUrl = downloadUrl;
             }
@@ -103,23 +112,54 @@ public class AppUpdateController {
             currentLatestVersion,
             currentDownloadUrl,
             currentMandatory,
-            formattedChangelog
+            formattedChangelog,
+            sha256,
+            fileSize,
+            minSupportedVersion,
+            normalizedChannel
         );
         return ResponseEntity.ok(ApiResponse.success(updateInfo));
+    }
+
+    @Operation(summary = "Lấy thông tin phiên bản Web hiện tại")
+    @GetMapping("/web-version")
+    public ResponseEntity<ApiResponse<AppUpdateInfo>> getWebVersion() {
+        AppUpdate latest = appUpdateService.getLatestReleased("WEB", "PRODUCTION");
+        String currentVersion = latest != null ? latest.getVersion() : latestVersion;
+        String currentChangelog = latest != null ? latest.getChangelog() : changelog;
+        return ResponseEntity.ok(ApiResponse.success(new AppUpdateInfo(
+            false,
+            currentVersion,
+            "",
+            false,
+            currentChangelog != null ? currentChangelog.replace("\\n", "\n") : "",
+            null,
+            null,
+            null,
+            "PRODUCTION"
+        )));
     }
 
     @Operation(summary = "Tải manifest.plist cho môi trường iOS")
     @GetMapping(value = "/ios/manifest.plist", produces = {"application/x-plist;charset=UTF-8", "text/xml;charset=UTF-8", MediaType.APPLICATION_XML_VALUE})
     public ResponseEntity<String> getIosManifest(
             @RequestParam(required = false) String version,
+            @RequestParam(required = false, defaultValue = "PRODUCTION") String channel,
             HttpServletRequest request) {
-        AppUpdate latest = appUpdateService.getLatestReleased("IOS");
+        AppUpdate latest = appUpdateService.getLatestReleased("IOS", channel);
         String targetVersion = (version != null && !version.isBlank())
                 ? version
                 : (latest != null ? latest.getVersion() : latestVersion);
 
         String baseUrl = getBaseUrl(request);
-        String ipaUrl = baseUrl + "/api/v1/app-updates/download/system_inverter_v" + targetVersion + ".ipa";
+        String ipaUrl;
+        if ((version == null || version.isBlank()) && latest != null
+                && latest.getDownloadUrl() != null && latest.getDownloadUrl().toLowerCase().endsWith(".ipa")) {
+            String rawUrl = latest.getDownloadUrl().trim();
+            ipaUrl = rawUrl.startsWith("/") ? baseUrl + rawUrl : rawUrl;
+        } else {
+            ipaUrl = baseUrl + "/api/v1/app-updates/download/system_internal_v" + targetVersion + ".ipa";
+        }
 
         String plistXml = """
                 <?xml version="1.0" encoding="UTF-8"?>
@@ -188,9 +228,10 @@ public class AppUpdateController {
     @GetMapping
     @PreAuthorize("hasAuthority('APP_UPDATE_VIEW') or hasRole('SUPER_ADMIN')")
     public ResponseEntity<ApiResponse<List<AppUpdate>>> getAllUpdates(
-            @RequestParam(value = "platform", required = false) String platform
+            @RequestParam(value = "platform", required = false) String platform,
+            @RequestParam(value = "channel", required = false) String channel
     ) {
-        return ResponseEntity.ok(ApiResponse.success(appUpdateService.getAllUpdates(platform)));
+        return ResponseEntity.ok(ApiResponse.success(appUpdateService.getAllUpdates(platform, channel)));
     }
 
     @Operation(summary = "Tạo mới bản cập nhật")
@@ -203,7 +244,11 @@ public class AppUpdateController {
             @RequestParam("changelog") String changelog,
             @RequestParam(value = "downloadUrl", required = false) String downloadUrl,
             @RequestParam(value = "mandatory", defaultValue = "false") boolean mandatory,
-            @RequestParam(value = "status", defaultValue = "DRAFT") String status
+            @RequestParam(value = "status", defaultValue = "DRAFT") String status,
+            @RequestParam(value = "minSupportedVersion", required = false) String minSupportedVersion,
+            @RequestParam(value = "channel", defaultValue = "PRODUCTION") String channel,
+            @RequestParam(value = "sha256", required = false) String sha256,
+            @RequestParam(value = "fileSize", required = false) Long fileSize
     ) {
         AppUpdate created = appUpdateService.createUpdate(
             file,
@@ -212,7 +257,11 @@ public class AppUpdateController {
             changelog,
             downloadUrl,
             mandatory,
-            status
+            status,
+            minSupportedVersion,
+            channel,
+            sha256,
+            fileSize
         );
         return ResponseEntity.ok(ApiResponse.success(created));
     }
@@ -223,6 +272,14 @@ public class AppUpdateController {
     public ResponseEntity<ApiResponse<AppUpdate>> releaseUpdate(@PathVariable UUID id) {
         AppUpdate released = appUpdateService.releaseUpdate(id);
         return ResponseEntity.ok(ApiResponse.success(released));
+    }
+
+    @Operation(summary = "Thu hồi bản cập nhật (Rollback)")
+    @PostMapping("/{id}/rollback")
+    @PreAuthorize("hasAuthority('APP_UPDATE_RELEASE') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<AppUpdate>> rollbackUpdate(@PathVariable UUID id) {
+        AppUpdate rolledBack = appUpdateService.rollbackUpdate(id);
+        return ResponseEntity.ok(ApiResponse.success(rolledBack));
     }
 
     @Operation(summary = "Xóa bản cập nhật")

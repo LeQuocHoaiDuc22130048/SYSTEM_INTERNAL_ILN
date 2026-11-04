@@ -654,23 +654,23 @@ public class AttendanceService {
                 ? Duration.between(checkIn, checkOut).toMinutes()
                 : null;
 
-        boolean isApprovedFieldWork = fieldDay != null
-                && "APPROVED".equalsIgnoreCase(fieldDay.getStatus())
-                && !Boolean.TRUE.equals(fieldDay.getIsDeleted());
+        boolean isFieldWork = fieldDay != null
+                && !Boolean.TRUE.equals(fieldDay.getIsDeleted())
+                && !"REJECTED".equalsIgnoreCase(fieldDay.getStatus());
 
         return new DailyAttendanceResponse(
                 date,
                 checkIn,
                 checkOut,
                 totalMinutes,
-                !isApprovedFieldWork && checkIn != null && checkIn.isAfter(shiftStartInstant.plus(LATE_GRACE)),
-                !isApprovedFieldWork && checkOut != null && checkOut.isBefore(shiftEndInstant),
+                !isFieldWork && checkIn != null && checkIn.isAfter(shiftStartInstant.plus(LATE_GRACE)),
+                !isFieldWork && checkOut != null && checkOut.isBefore(shiftEndInstant),
                 shiftStart.toString(),
                 shiftEnd.toString(),
                 records.stream().map(record -> toAttendanceResponse(record, null)).toList(),
                 employeeId,
                 fieldDay != null ? FieldWorkService.toResponse(fieldDay) : null,
-                isApprovedFieldWork ? 1.0 : 0.0
+                isFieldWork ? 1.0 : 0.0
         );
     }
 

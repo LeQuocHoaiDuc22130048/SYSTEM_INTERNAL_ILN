@@ -22,8 +22,8 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const [hotlineNumber, setHotlineNumber] = useState<string>('0909000000');
-  const [hotlineLabel, setHotlineLabel] = useState<string>('Hotline Kỹ Thuật');
+  const [hotlineNumber, setHotlineNumber] = useState<string>('0964 266 771');
+  const [hotlineLabel, setHotlineLabel] = useState<string>('Liên hệ kỹ thuật');
   const [zaloUrl, setZaloUrl] = useState<string>('https://zalo.me');
   const [zaloLabel, setZaloLabel] = useState<string>('Chat Zalo Tiếp Nhận');
   const [workingHours, setWorkingHours] = useState<string>('08:00 - 17:30 (Thứ 2 - Thứ 7)');
@@ -38,10 +38,10 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
     getPortalSupportConfig()
       .then((cfg: PortalSupportConfig) => {
         if (cfg) {
-          setHotlineNumber(cfg.hotlineNumber || '');
-          setHotlineLabel(cfg.hotlineLabel || 'Hotline Kỹ Thuật');
+          setHotlineNumber(cfg.hotlineNumber || '0964 266 771');
+          setHotlineLabel(cfg.hotlineLabel || 'Liên hệ kỹ thuật');
           setZaloUrl(cfg.zaloUrl || '');
-          setZaloLabel(cfg.zaloLabel || 'Chat Zalo Tiếp Nhận');
+          setZaloLabel(cfg.zaloLabel || '');
           setWorkingHours(cfg.workingHours || '');
           setWorkshopAddress(cfg.workshopAddress || '');
         }
@@ -58,8 +58,8 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!hotlineNumber.trim() || !zaloUrl.trim()) {
-      setErrorMsg('Vui lòng nhập đầy đủ Số hotline và Đường dẫn Zalo.');
+    if (!hotlineNumber.trim()) {
+      setErrorMsg('Vui lòng nhập Số điện thoại liên hệ.');
       return;
     }
 

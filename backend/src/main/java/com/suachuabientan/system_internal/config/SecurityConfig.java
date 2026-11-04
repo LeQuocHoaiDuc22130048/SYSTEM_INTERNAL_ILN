@@ -70,6 +70,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/auth/forgot-password/otp").permitAll()
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/v1/app-updates/check").permitAll()
+                        .requestMatchers("/api/v1/app-updates/web-version").permitAll()
                         .requestMatchers("/api/v1/app-updates/ios/manifest.plist").permitAll()
                         .requestMatchers("/api/v1/app-updates/download/**").permitAll()
                         .requestMatchers("/api/v1/banners", "/api/v1/banners/active", "/api/v1/banners/images/**").permitAll()

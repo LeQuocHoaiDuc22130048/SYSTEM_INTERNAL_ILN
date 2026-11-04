@@ -21,5 +21,16 @@ public record CreateUpdateDto(
     String status,
 
     @Size(max = 20, message = "Nền tảng không vượt quá 20 ký tự")
-    String platform
+    String platform,
+
+    @Size(max = 50, message = "Phiên bản hỗ trợ tối thiểu không vượt quá 50 ký tự")
+    String minSupportedVersion,
+
+    @Size(max = 20, message = "Kênh phát hành không vượt quá 20 ký tự")
+    String channel,
+
+    @Size(max = 64, message = "Mã băm SHA-256 không vượt quá 64 ký tự")
+    String sha256,
+
+    Long fileSize
 ) {}

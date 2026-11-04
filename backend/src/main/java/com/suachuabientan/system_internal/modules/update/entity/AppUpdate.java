@@ -28,11 +28,24 @@ public class AppUpdate extends BaseEntity {
 
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private String status = "DRAFT"; // DRAFT, RELEASED
+    private String status = "DRAFT"; // DRAFT, RELEASED, ROLLED_BACK
 
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private String platform = "ANDROID"; // ANDROID, IOS
+    private String platform = "ANDROID"; // ANDROID, IOS, WEB
+
+    @Column(length = 64)
+    private String sha256;
+
+    @Column(name = "file_size")
+    private Long fileSize;
+
+    @Column(name = "min_supported_version", length = 50)
+    private String minSupportedVersion;
+
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String channel = "PRODUCTION"; // PRODUCTION, BETA, INTERNAL
 
     @Column(name = "released_at")
     private Instant releasedAt;

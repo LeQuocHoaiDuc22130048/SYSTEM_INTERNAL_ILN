@@ -61,6 +61,12 @@ export async function exportAttendanceExcel(
     fgColor: { argb: 'FFFF0000' } // Đỏ cho đi muộn (l) hoặc vắng không phép (a)
   };
 
+  const fieldWorkFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFEF3C7' } // Vàng cam ấm nhẹ nhàng (Amber 100) cho Đi công trình
+  };
+
   const startDayColIndex = 3; // Cột C (bắt đầu từ ngày 1)
   const endDayColIndex = 2 + daysInMonth; // Cột cuối cùng của ngày
   const totalColIndex = 2 + daysInMonth + 1; // Cột Tổng cộng
@@ -206,10 +212,26 @@ export async function exportAttendanceExcel(
         ? emp.dailyPattern[d - 1] 
         : 'f';
 
-      const isWorked = statusChar === 'p' || statusChar === 'l' || statusChar === 'o';
+      // Nhận diện ngày đi công trình:
+      // statusChar === 'w' (Field work pending) hoặc statusChar === 'p' khi ghi chú có 'Đi công trình'
+      // hoặc updateNotes của ngày d có chứa 'Đi công trình'
+      const isFieldWork = statusChar === 'w' 
+        || (emp.updateNotes?.[d]?.includes('Đi công trình') ?? false);
+
+      const isWorked = statusChar === 'p' || statusChar === 'l' || statusChar === 'o' || statusChar === 'w' || isFieldWork || (emp.dailyWorkDays?.[d] !== undefined && emp.dailyWorkDays[d] > 0);
       const isHalfDay = statusChar === 'm' || statusChar === 'c';
 
-      if (isHalfDay) {
+      if (isFieldWork) {
+        if (isSunday) {
+          cell.value = 1.5;
+          cell.fill = yellowFill;
+          cell.font = { name: 'Arial', size: 10, color: { argb: 'FFD66A00' }, bold: true };
+        } else {
+          cell.value = emp.dailyWorkDays?.[d] ?? 1.0;
+          cell.fill = fieldWorkFill;
+          cell.font = { name: 'Arial', size: 10, color: { argb: 'FF92400E' }, bold: true }; // Chữ nâu cam đậm trên nền vàng cam nhạt
+        }
+      } else if (isHalfDay) {
         cell.value = isSunday ? 1.5 : 0.5;
         cell.font = { name: 'Arial', size: 10, bold: true };
         if (isSunday) {
@@ -364,6 +386,12 @@ export async function exportEmployeeHistoryExcel(
     fgColor: { argb: 'FFFFFFCE' } // Vàng nhạt cho Chủ Nhật
   };
 
+  const fieldWorkFill: ExcelJS.Fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'FFFEF3C7' } // Vàng cam ấm nhẹ nhàng (Amber 100) cho Đi công trình
+  };
+
   const lateFill: ExcelJS.Fill = {
     type: 'pattern',
     pattern: 'solid',
@@ -479,7 +507,17 @@ export async function exportEmployeeHistoryExcel(
     };
 
     let effectiveStatus = day.status;
-    if (checkOutEvent?.logTime) {
+    const isFieldWorkDay = effectiveStatus === 'FIELD_WORK' 
+      || day.status === 'FIELD_WORK' 
+      || (day.note && day.note.includes('Đi công trình'));
+
+    if (isFieldWorkDay) {
+      effectiveStatus = 'FIELD_WORK';
+      if (hoursVal === 0) {
+        // Nếu nhân viên đi công trình cả ngày không có check-in/out tại công ty, tính chuẩn 7.5h
+        hoursVal = 7.5;
+      }
+    } else if (checkOutEvent?.logTime) {
       const [oh, om] = checkOutEvent.logTime.split(':').map(Number);
       const isOt = !!checkInEvent && checkInEvent.logTime < '12:30'
         && !isNaN(oh) && (oh > 21 || (oh === 21 && (isNaN(om) || om >= 0)));
@@ -506,7 +544,7 @@ export async function exportEmployeeHistoryExcel(
     let noteText = '';
     if (day.note && day.note.trim()) {
       const cleanDayNote = day.note.trim();
-      noteText = cleanDayNote.startsWith('Đi công trình') ? cleanDayNote : `Đi công trình — ${cleanDayNote}`;
+      noteText = cleanDayNote.includes('Đi công trình') ? cleanDayNote : `Đi công trình — ${cleanDayNote}`;
     }
 
     if (manualNotes.length > 0) {
@@ -543,7 +581,10 @@ export async function exportEmployeeHistoryExcel(
 
     // Tô màu trạng thái đặc biệt
     const statusCell = row.getCell(7);
-    if (day.status === 'LATE' || day.status === 'ABSENT') {
+    if (effectiveStatus === 'FIELD_WORK') {
+      statusCell.fill = fieldWorkFill;
+      statusCell.font = { name: 'Arial', size: 10, color: { argb: 'FF92400E' }, bold: true };
+    } else if (day.status === 'LATE' || day.status === 'ABSENT') {
       statusCell.fill = lateFill;
       statusCell.font = { name: 'Arial', size: 10, color: { argb: 'FF9C0006' }, bold: true };
     } else if (day.status === 'LEAVE') {

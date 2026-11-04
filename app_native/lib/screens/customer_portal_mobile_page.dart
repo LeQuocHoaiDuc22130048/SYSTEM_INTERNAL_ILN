@@ -32,13 +32,10 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   final TextEditingController _searchController = TextEditingController();
   int _currentNavIndex = 0;
 
-  static const String defaultHotlinePhone = '0909000000'; // Hotline CSKH tiếp nhận mặc định
-  static const String defaultZaloOaUrl = 'https://zalo.me'; // Zalo OA hỗ trợ kỹ thuật mặc định
+  static const String defaultHotlinePhone = '0964 266 771'; // Số điện thoại hỗ trợ kỹ thuật
 
   String _hotlineNumber = defaultHotlinePhone;
-  String _hotlineLabel = 'Hotline Kỹ Thuật';
-  String _zaloUrl = defaultZaloOaUrl;
-  String _zaloLabel = 'Chat Zalo Tiếp Nhận';
+  String _hotlineLabel = 'Liên hệ kỹ thuật';
 
   @override
   void initState() {
@@ -99,20 +96,18 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       if (res is Map<String, dynamic>) {
         setState(() {
           final hNum = res['hotlineNumber']?.toString().trim();
-          if (hNum != null && hNum.isNotEmpty) {
+          if (hNum != null && hNum.isNotEmpty && hNum != '0909000000') {
             _hotlineNumber = hNum;
+          } else {
+            _hotlineNumber = defaultHotlinePhone;
           }
           final hLbl = res['hotlineLabel']?.toString().trim();
-          if (hLbl != null && hLbl.isNotEmpty) {
+          if (hLbl != null &&
+              hLbl.isNotEmpty &&
+              !hLbl.toLowerCase().contains('hotline')) {
             _hotlineLabel = hLbl;
-          }
-          final zUrl = res['zaloUrl']?.toString().trim();
-          if (zUrl != null && zUrl.isNotEmpty) {
-            _zaloUrl = zUrl;
-          }
-          final zLbl = res['zaloLabel']?.toString().trim();
-          if (zLbl != null && zLbl.isNotEmpty) {
-            _zaloLabel = zLbl;
+          } else {
+            _hotlineLabel = 'Liên hệ kỹ thuật';
           }
         });
       }
@@ -162,38 +157,113 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     }
   }
 
-  // Zalo Support Launcher
-  Future<void> _openZaloSupport() async {
-    final targetUrl = _zaloUrl.isNotEmpty ? _zaloUrl : defaultZaloOaUrl;
-    final uri = Uri.parse(targetUrl);
-    try {
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Không thể mở liên kết Zalo Hỗ trợ')),
-          );
-        }
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không thể kết nối tới ứng dụng Zalo')),
-        );
+  static String _translateStatusToVietnamese(String status, [String? rawLabel]) {
+    final normalizedStatus = status.trim().toUpperCase();
+    if (rawLabel != null && rawLabel.trim().isNotEmpty) {
+      final cleanLabel = rawLabel.trim();
+      final upperLabel = cleanLabel.toUpperCase();
+      const rawCodes = {
+        'PENDING',
+        'WAITING_FOR_CHECK',
+        'CHECKING',
+        'CHECKED',
+        'IN_PROGRESS',
+        'COMPLETED',
+        'DELIVERED',
+        'CANCELLED',
+      };
+      if (!rawCodes.contains(upperLabel)) {
+        return cleanLabel.replaceAll('test', 'kiểm tra');
       }
     }
+    switch (normalizedStatus) {
+      case 'PENDING':
+        return 'Đã tiếp nhận';
+      case 'WAITING_FOR_CHECK':
+        return 'Chờ kiểm tra';
+      case 'CHECKING':
+        return 'Đang kiểm tra & chẩn đoán';
+      case 'CHECKED':
+        return 'Đã kiểm tra';
+      case 'IN_PROGRESS':
+        return 'Đang tiến hành sửa chữa';
+      case 'COMPLETED':
+        return 'Đã sửa xong & kiểm tra thành công';
+      case 'DELIVERED':
+        return 'Đã bàn giao cho khách';
+      case 'CANCELLED':
+        return 'Đã trả thiết bị / Hủy đơn';
+      default:
+        return 'Đang xử lý';
+    }
+  }
+
+  static String _resolveOrderTitle(Map<String, dynamic> ord) {
+    final deviceName = (ord['deviceName'] ?? '').toString().trim();
+    final deviceType = (ord['deviceType'] ?? '').toString().trim();
+    if (deviceName.isNotEmpty) {
+      if (deviceType.isNotEmpty && !deviceName.toLowerCase().contains(deviceType.toLowerCase())) {
+        return '$deviceName ($deviceType)';
+      }
+      return deviceName;
+    }
+    if (deviceType.isNotEmpty) {
+      return deviceType;
+    }
+    final orderTitle = (ord['orderTitle'] ?? '').toString().trim();
+    if (orderTitle.isNotEmpty && orderTitle != 'Đơn sửa chữa') {
+      return orderTitle;
+    }
+    final devices = ord['devices'];
+    if (devices is List && devices.isNotEmpty && devices.first is Map) {
+      final firstDev = devices.first as Map;
+      final firstDevName = (firstDev['deviceName'] ?? firstDev['modelName'] ?? '').toString().trim();
+      final firstDevType = (firstDev['deviceType'] ?? firstDev['model'] ?? '').toString().trim();
+      if (firstDevName.isNotEmpty) {
+        return firstDevType.isNotEmpty && !firstDevName.toLowerCase().contains(firstDevType.toLowerCase())
+            ? '$firstDevName ($firstDevType)'
+            : firstDevName;
+      }
+      if (firstDevType.isNotEmpty) {
+        return firstDevType;
+      }
+    }
+    final desc = (ord['description'] ?? '').toString().trim();
+    if (desc.isNotEmpty) {
+      return desc;
+    }
+    if (orderTitle.isNotEmpty) {
+      return orderTitle;
+    }
+    return 'Đơn sửa chữa thiết bị';
+  }
+
+  static String _formatVietnameseDate(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return '';
+    final clean = raw.trim();
+    final datePart = clean.split('T').first.split(' ').first;
+    final parts = datePart.split('-');
+    if (parts.length == 3 && parts[0].length == 4) {
+      return '${parts[2]}/${parts[1]}/${parts[0]}';
+    }
+    return datePart;
   }
 
   // Filtered orders getter
   List<Map<String, dynamic>> get _filteredOrders {
     return _orders.where((ord) {
       final code = (ord['orderCode'] ?? '').toString().toLowerCase();
-      final title = (ord['orderTitle'] ?? '').toString().toLowerCase();
+      final title = _resolveOrderTitle(ord).toLowerCase();
+      final serial = (ord['serialNumber'] ?? '').toString().toLowerCase();
+      final desc = (ord['description'] ?? '').toString().toLowerCase();
       final status = (ord['status'] ?? '').toString().toUpperCase();
       final q = _searchQuery.trim().toLowerCase();
 
-      if (q.isNotEmpty && !code.contains(q) && !title.contains(q)) {
+      if (q.isNotEmpty &&
+          !code.contains(q) &&
+          !title.contains(q) &&
+          !serial.contains(q) &&
+          !desc.contains(q)) {
         return false;
       }
 
@@ -453,25 +523,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                     _makePhoneCall(_hotlineNumber);
                   },
                   icon: const Icon(LucideIcons.phoneCall, size: 18),
-                  label: Text('Gọi hotline tiếp nhận ($_hotlineNumber)', style: const TextStyle(fontWeight: FontWeight.bold)),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                height: 46,
-                child: OutlinedButton.icon(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
-                    side: const BorderSide(color: Color(0xFFBFDBFE)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    _openZaloSupport();
-                  },
-                  icon: const Icon(LucideIcons.messageSquare, size: 18),
-                  label: const Text('Gửi thông tin qua Zalo Tiếp Nhận', style: TextStyle(fontWeight: FontWeight.w600)),
+                  label: Text('Gọi điện tiếp nhận ($_hotlineNumber)', style: const TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
@@ -481,7 +533,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     );
   }
 
-  // Support & hotline information bottom sheet
+  // Support & phone contact bottom sheet
   void _showSupportInfoSheet() {
     showModalBottomSheet<void>(
       context: context,
@@ -537,28 +589,6 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   ),
                   onPressed: () => _makePhoneCall(_hotlineNumber),
                   child: const Text('Gọi ngay'),
-                ),
-              ),
-              const Divider(),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(LucideIcons.messageSquare, color: Color(0xFF2563EB), size: 20),
-                ),
-                title: Text(_zaloLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                subtitle: const Text('Tư vấn & Báo giá kỹ thuật nhanh', style: TextStyle(fontSize: 12)),
-                trailing: OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                  onPressed: _openZaloSupport,
-                  child: const Text('Mở Zalo'),
                 ),
               ),
             ],
@@ -1027,7 +1057,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         controller: phoneController,
                         keyboardType: TextInputType.phone,
                         decoration: InputDecoration(
-                          labelText: 'Số điện thoại nhận tin Zalo / SMS tiến độ',
+                          labelText: 'Số điện thoại liên hệ',
                           labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
                           prefixIcon: Container(
                             margin: const EdgeInsets.only(right: 8),
@@ -1059,7 +1089,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         controller: emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          labelText: 'Email nhận biên bản & hóa đơn VAT',
+                          labelText: 'Địa chỉ thư điện tử',
                           labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
                           prefixIcon: const Icon(LucideIcons.mail, size: 18, color: Color(0xFF64748B)),
                           suffixIcon: Container(
@@ -1114,13 +1144,12 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                               _buildProfileInfoRow('Mã khách hàng:', customerCode),
                             if (companyTaxCode.isNotEmpty)
                               _buildProfileInfoRow('Mã số thuế:', companyTaxCode),
-                            _buildProfileInfoRow('Hợp đồng:', 'HD-2026/VIP-09'),
                             if (companyAddress.isNotEmpty)
                               _buildProfileInfoRow('Địa chỉ:', companyAddress),
                             const SizedBox(height: 6),
-                            const Text(
-                              '* Thông tin pháp nhân doanh nghiệp do Admin quản lý. Để thay đổi vui lòng liên hệ Hotline.',
-                              style: TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
+                            Text(
+                              '* Thông tin doanh nghiệp do Quản trị viên quản lý. Để thay đổi vui lòng liên hệ số điện thoại $_hotlineNumber.',
+                              style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
                             ),
                           ],
                         ),
@@ -1876,7 +1905,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     String? avatarUrl,
   ) {
     final customerCode = _accountProfile?['customerCode']?.toString() ?? '';
-    final codeDisplay = customerCode.isNotEmpty ? customerCode : (username ?? 'DN-84920');
+    final codeDisplay = customerCode.isNotEmpty ? customerCode : (username ?? 'Chưa cập nhật');
 
     final completed = _completedCount;
     final inProgress = _inProgressCount;
@@ -2132,7 +2161,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                 ),
                 const SizedBox(height: 14),
 
-                // Hotline 1-Touch Contact Banner
+                // Phone 1-Touch Contact Banner
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   decoration: BoxDecoration(
@@ -2149,7 +2178,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                           color: const Color(0xFF10B981).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(LucideIcons.headset, size: 16, color: Color(0xFF34D399)),
+                        child: const Icon(LucideIcons.phoneCall, size: 16, color: Color(0xFF34D399)),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
@@ -2157,14 +2186,14 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Kỹ thuật viên quản lý chuyên trách',
-                              style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
+                              _hotlineLabel,
+                              style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.75)),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
-                            const Text(
-                              'Cty TNHH DV Inverter Like New',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
+                            Text(
+                              'Số điện thoại: $_hotlineNumber',
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2178,7 +2207,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                           onTap: () => _makePhoneCall(_hotlineNumber),
                           borderRadius: BorderRadius.circular(8),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                             decoration: BoxDecoration(
                               color: const Color(0xFF10B981),
                               borderRadius: BorderRadius.circular(8),
@@ -2197,7 +2226,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                                 const SizedBox(width: 4),
                                 Flexible(
                                   child: Text(
-                                    _hotlineLabel,
+                                    'Gọi $_hotlineNumber',
                                     style: const TextStyle(
                                       color: Color(0xFF022C22),
                                       fontWeight: FontWeight.bold,
@@ -2213,35 +2242,6 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         ),
                       ),
                     ],
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                // Secondary Zalo action touch
-                InkWell(
-                  onTap: _openZaloSupport,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.06),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(LucideIcons.messageSquare, size: 12, color: Color(0xFF60A5FA)),
-                        const SizedBox(width: 6),
-                        Flexible(
-                          child: Text(
-                            _zaloLabel,
-                            style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
                   ),
                 ),
                 const SizedBox(height: 14),
@@ -2367,7 +2367,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         controller: _searchController,
         onChanged: (val) => setState(() => _searchQuery = val),
         decoration: InputDecoration(
-          hintText: 'Tìm kiếm mã đơn, tên máy hoặc serial...',
+          hintText: 'Tìm kiếm mã đơn, tên thiết bị hoặc số sê-ri...',
           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
           prefixIcon: const Icon(LucideIcons.search, size: 18, color: Color(0xFF64748B)),
           suffixIcon: Row(
@@ -2469,11 +2469,19 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   // Modern Order Card with Inline 5-Step Stepper (Stitch Screen 1)
   Widget _buildOrderCard(Map<String, dynamic> ord) {
     final orderCode = ord['orderCode']?.toString() ?? '';
-    final orderTitle = ord['orderTitle']?.toString() ?? 'Đơn sửa chữa';
-    final status = ord['status']?.toString() ?? 'PENDING';
-    final friendlyStatus = ord['friendlyStatus']?.toString() ?? status;
-    final deviceCount = ord['deviceCount'] ?? 1;
-    final receivedDate = ord['receivedDate']?.toString() ?? '';
+    final orderTitle = _resolveOrderTitle(ord);
+    final status = (ord['status'] ?? 'PENDING').toString();
+    final friendlyStatus = _translateStatusToVietnamese(
+      status,
+      (ord['statusLabel'] ?? ord['friendlyStatus'])?.toString(),
+    );
+    final deviceCount = ord['deviceCount'] ?? ord['devicesCount'] ?? 1;
+    final receivedRaw = (ord['receivedAt'] ?? ord['receivedDate'] ?? '').toString();
+    final receivedDate = _formatVietnameseDate(receivedRaw);
+    final estimatedRaw = (ord['estimatedDone'] ?? ord['expectedDeliveryDate'] ?? '').toString();
+    final estimatedDate = _formatVietnameseDate(estimatedRaw);
+    final serialNumber = (ord['serialNumber'] ?? '').toString().trim();
+    final description = (ord['description'] ?? '').toString().trim();
 
     final isCompleted = status == 'COMPLETED' || status == 'DELIVERED';
     final statusColor = _getStatusColor(status);
@@ -2597,16 +2605,52 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                       Text(
                         orderTitle,
                         style: const TextStyle(
-                           fontSize: 15,
+                          fontSize: 15,
                           fontWeight: FontWeight.w800,
                           color: Color(0xFF0F172A),
                           height: 1.3,
                         ),
                       ),
+                      if (serialNumber.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            const Text(
+                              'Số sê-ri: ',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            ),
+                            Flexible(
+                              child: Text(
+                                serialNumber,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.bold,
+                                  fontFamily: 'monospace',
+                                  color: Color(0xFF1E293B),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                      if (description.isNotEmpty && description != orderTitle) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          'Tình trạng: $description',
+                          style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                       const SizedBox(height: 10),
 
                       // Tags Row (Equipment count & Times)
-                      Row(
+                      Wrap(
+                        spacing: 10,
+                        runSpacing: 6,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -2631,19 +2675,30 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                               ],
                             ),
                           ),
-                          const SizedBox(width: 10),
-                          if (receivedDate.isNotEmpty) ...[
-                            const Icon(LucideIcons.clock, size: 12, color: Color(0xFF94A3B8)),
-                            const SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                'Cập nhật: ${receivedDate.split("T").first}',
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                          if (receivedDate.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(LucideIcons.calendar, size: 12, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Ngày nhận: $receivedDate',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                              ],
                             ),
-                          ],
+                          if (estimatedDate.isNotEmpty)
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(LucideIcons.clock, size: 12, color: Color(0xFF94A3B8)),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Dự kiến: $estimatedDate',
+                                  style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                ),
+                              ],
+                            ),
                         ],
                       ),
                       const SizedBox(height: 14),
@@ -3247,55 +3302,45 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
     );
   }
 
-  void _confirmAcceptance() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(LucideIcons.checkCheck, color: Color(0xFF10B981)),
-            SizedBox(width: 10),
-            Text('Nghiệm thu thiết bị', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-          'Quý khách xác nhận đã hoàn tất nghiệm thu kỹ thuật và muốn đặt lịch bàn giao / nhận máy?',
-          style: TextStyle(fontSize: 13, height: 1.4, color: Color(0xFF475569)),
-        ),
-        actions: [
-          OutlinedButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Để sau'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-            ),
-            onPressed: () {
-              Navigator.of(ctx).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã ghi nhận nghiệm thu. Kỹ thuật viên sẽ liên hệ bàn giao ngay!'),
-                  backgroundColor: Color(0xFF059669),
-                ),
-              );
-            },
-            child: const Text('Xác nhận & Đặt lịch'),
-          ),
-        ],
-      ),
-    );
+  String _getStaffInitials(String name) {
+    if (name.trim().isEmpty) return 'KT';
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.length == 1) {
+      return parts.first.substring(0, parts.first.length >= 2 ? 2 : 1).toUpperCase();
+    }
+    return '${parts.first[0]}${parts.last[0]}'.toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 0.92;
-    final status = _detail?['status']?.toString() ?? 'PENDING';
+    final status = (_detail?['status'] ?? 'PENDING').toString();
     final isCompleted = status == 'COMPLETED' || status == 'DELIVERED';
+    final friendlyStatus = _CustomerPortalMobilePageState._translateStatusToVietnamese(
+      status,
+      (_detail?['statusLabel'] ?? _detail?['friendlyStatus'])?.toString(),
+    );
     final orderCode = _detail?['orderCode']?.toString() ?? '';
-    final orderTitle = _detail?['orderTitle']?.toString() ?? '';
+    final orderTitle = _detail != null
+        ? _CustomerPortalMobilePageState._resolveOrderTitle(_detail!)
+        : '';
+    final orderDescription = (_detail?['description'] ?? '').toString().trim();
+    final receivedDate = _CustomerPortalMobilePageState._formatVietnameseDate(
+      (_detail?['receivedAt'] ?? _detail?['receivedDate'])?.toString(),
+    );
+    final estimatedDate = _CustomerPortalMobilePageState._formatVietnameseDate(
+      (_detail?['estimatedDone'] ?? _detail?['expectedDeliveryDate'])?.toString(),
+    );
+    final completedDate = _CustomerPortalMobilePageState._formatVietnameseDate(
+      _detail?['completedAt']?.toString(),
+    );
+    final deliveredDate = _CustomerPortalMobilePageState._formatVietnameseDate(
+      _detail?['deliveredAt']?.toString(),
+    );
+    final underWarranty = _detail?['underWarranty'] == true;
+    final assignedTechName = (_detail?['assignedTechnicianName'] ?? '').toString().trim();
+    final assignedTechCode = (_detail?['assignedTechnicianCode'] ?? '').toString().trim();
+    final receivedByName = (_detail?['receivedByName'] ?? '').toString().trim();
     final devices = (_detail?['devices'] as List?) ?? [];
     final updates = (_detail?['updates'] as List?) ?? [];
     final media = (_detail?['media'] as List?) ?? [];
@@ -3354,21 +3399,25 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                             ),
                           ),
                           const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: isCompleted ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: isCompleted ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE),
+                          Flexible(
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isCompleted ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isCompleted ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE),
+                                ),
                               ),
-                            ),
-                            child: Text(
-                              isCompleted ? 'Sẵn sàng bàn giao' : 'Đang xử lý kỹ thuật',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: isCompleted ? const Color(0xFF065F46) : const Color(0xFF1E40AF),
+                              child: Text(
+                                friendlyStatus,
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isCompleted ? const Color(0xFF065F46) : const Color(0xFF1E40AF),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ),
@@ -3404,45 +3453,147 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                         children: [
                           // 1. 5-Stage Stepper Card
                           _buildStepperCard(status),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
+
+                          // Order Metadata Summary Card from Database
+                          if (receivedDate.isNotEmpty ||
+                              estimatedDate.isNotEmpty ||
+                              completedDate.isNotEmpty ||
+                              deliveredDate.isNotEmpty ||
+                              orderDescription.isNotEmpty) ...[
+                            Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: const Color(0xFFE2E8F0)),
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      const Expanded(
+                                        child: Row(
+                                          children: [
+                                            Icon(LucideIcons.clipboardList, size: 15, color: Color(0xFF2563EB)),
+                                            SizedBox(width: 6),
+                                            Flexible(
+                                              child: Text(
+                                                'Thông tin tiếp nhận',
+                                                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: underWarranty ? const Color(0xFFECFDF5) : const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(6),
+                                        ),
+                                        child: Text(
+                                          underWarranty ? 'Trong bảo hành' : 'Dịch vụ sửa chữa',
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.bold,
+                                            color: underWarranty ? const Color(0xFF059669) : const Color(0xFF475569),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 10),
+                                  if (receivedDate.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Text(
+                                        'Ngày tiếp nhận: $receivedDate',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
+                                      ),
+                                    ),
+                                  if (estimatedDate.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Text(
+                                        'Dự kiến hoàn thành: $estimatedDate',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF334155)),
+                                      ),
+                                    ),
+                                  if (completedDate.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Text(
+                                        'Ngày hoàn thành: $completedDate',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF059669), fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  if (deliveredDate.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 4),
+                                      child: Text(
+                                        'Ngày bàn giao: $deliveredDate',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF0D9488), fontWeight: FontWeight.w600),
+                                      ),
+                                    ),
+                                  if (orderDescription.isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 2),
+                                      child: Text(
+                                        'Ghi chú tình trạng: $orderDescription',
+                                        style: const TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.35),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
 
                           // 2. Equipment Section
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Expanded(
-                                child: Row(
-                                  children: [
-                                    const Icon(LucideIcons.cpu, size: 16, color: Color(0xFF2563EB)),
-                                    const SizedBox(width: 8),
-                                    Expanded(
-                                      child: Text(
-                                        'Thiết bị (${devices.length})',
-                                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                              const Icon(LucideIcons.cpu, size: 16, color: Color(0xFF2563EB)),
                               const SizedBox(width: 8),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFECFDF5),
-                                  borderRadius: BorderRadius.circular(6),
-                                ),
-                                child: const Text(
-                                  'Đã kiểm thử QC',
-                                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                              Expanded(
+                                child: Text(
+                                  'Thiết bị (${devices.length})',
+                                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
                               ),
                             ],
                           ),
                           const SizedBox(height: 10),
                           ...devices.map((dev) {
-                            final serial = dev['serialNumber']?.toString() ?? 'Chưa rõ';
+                            final rawSerial = (dev['serialNumber'] ?? '').toString().trim();
+                            final serial = rawSerial.isNotEmpty ? rawSerial : 'Chưa cập nhật';
+                            final devName = (dev['deviceName'] ?? dev['modelName'] ?? '').toString().trim();
+                            final devType = (dev['deviceType'] ?? dev['model'] ?? '').toString().trim();
+                            final String devDisplayName;
+                            if (devName.isNotEmpty) {
+                              devDisplayName = (devType.isNotEmpty && !devName.toLowerCase().contains(devType.toLowerCase()))
+                                  ? '$devName ($devType)'
+                                  : devName;
+                            } else if (devType.isNotEmpty) {
+                              devDisplayName = devType;
+                            } else {
+                              devDisplayName = orderTitle.isNotEmpty ? orderTitle : 'Thiết bị sửa chữa';
+                            }
+                            final devStatus = (dev['status'] ?? status).toString();
+                            final devStatusLabel = _CustomerPortalMobilePageState._translateStatusToVietnamese(
+                              devStatus,
+                              (dev['statusLabel'] ?? dev['friendlyStatus'])?.toString(),
+                            );
+                            final devIssue = (dev['description'] ?? dev['issueDescription'] ?? dev['symptom'] ?? '').toString().trim();
+                            final devWarranty = dev['underWarranty'] == true;
+
                             return Container(
                               margin: const EdgeInsets.only(bottom: 10),
                               padding: const EdgeInsets.all(14),
@@ -3474,21 +3625,26 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                                           children: [
                                             Expanded(
                                               child: Text(
-                                                dev['modelName']?.toString() ?? 'Thiết bị kỹ thuật',
+                                                devDisplayName,
                                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF0F172A)),
-                                                maxLines: 1,
+                                                maxLines: 2,
                                                 overflow: TextOverflow.ellipsis,
                                               ),
                                             ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFECFDF5),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                'Tải 100% OK',
-                                                style: TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                                            const SizedBox(width: 6),
+                                            Flexible(
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFEFF6FF),
+                                                  borderRadius: BorderRadius.circular(4),
+                                                ),
+                                                child: Text(
+                                                  devStatusLabel,
+                                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.bold, color: Color(0xFF1D4ED8)),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
                                             ),
                                           ],
@@ -3496,33 +3652,46 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                                         const SizedBox(height: 6),
                                         Row(
                                           children: [
-                                            const Text('Serial: ', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFF1F5F9),
-                                                borderRadius: BorderRadius.circular(6),
-                                              ),
-                                              child: Text(
-                                                serial,
-                                                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF1E293B)),
-                                              ),
-                                            ),
-                                            const SizedBox(width: 6),
-                                            InkWell(
-                                              onTap: () => _copyToClipboard(serial),
-                                              child: const Padding(
-                                                padding: EdgeInsets.all(2),
-                                                child: Icon(LucideIcons.copy, size: 13, color: Color(0xFF2563EB)),
+                                            const Text('Số sê-ri: ', style: TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                                            Flexible(
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: const Color(0xFFF1F5F9),
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  serial,
+                                                  style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF1E293B)),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
                                             ),
+                                            if (rawSerial.isNotEmpty) ...[
+                                              const SizedBox(width: 6),
+                                              InkWell(
+                                                onTap: () => _copyToClipboard(rawSerial),
+                                                child: const Padding(
+                                                  padding: EdgeInsets.all(2),
+                                                  child: Icon(LucideIcons.copy, size: 13, color: Color(0xFF2563EB)),
+                                                ),
+                                              ),
+                                            ],
                                           ],
                                         ),
-                                        if ((dev['issueDescription'] ?? '').toString().isNotEmpty) ...[
+                                        if (devIssue.isNotEmpty) ...[
                                           const SizedBox(height: 4),
                                           Text(
-                                            'Lỗi: ${dev["issueDescription"]}',
-                                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                            'Tình trạng: $devIssue',
+                                            style: const TextStyle(fontSize: 11, color: Color(0xFF475569)),
+                                          ),
+                                        ],
+                                        if (devWarranty) ...[
+                                          const SizedBox(height: 4),
+                                          const Text(
+                                            'Bảo hành: Thiết bị trong thời hạn bảo hành',
+                                            style: TextStyle(fontSize: 11, color: Color(0xFF059669), fontWeight: FontWeight.w600),
                                           ),
                                         ],
                                       ],
@@ -3573,118 +3742,128 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                                     style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontStyle: FontStyle.italic),
                                   )
                                 else
-                                  ...updates.map((up) => Padding(
-                                        padding: const EdgeInsets.only(bottom: 12),
-                                        child: Row(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Container(
-                                              margin: const EdgeInsets.only(top: 2),
-                                              width: 14,
-                                              height: 14,
-                                              decoration: const BoxDecoration(
-                                                color: Color(0xFF10B981),
-                                                shape: BoxShape.circle,
-                                              ),
-                                              child: const Center(
-                                                child: Icon(LucideIcons.check, size: 8, color: Colors.white),
-                                              ),
+                                  ...updates.map((up) {
+                                    final upTitle = (up['title'] ?? '').toString().trim();
+                                    final upDate = _CustomerPortalMobilePageState._formatVietnameseDate(
+                                      (up['publishedAt'] ?? up['createdAt'])?.toString(),
+                                    );
+                                    final upMessage = (up['message'] ?? up['content'] ?? '').toString().trim();
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Container(
+                                            margin: const EdgeInsets.only(top: 2),
+                                            width: 14,
+                                            height: 14,
+                                            decoration: const BoxDecoration(
+                                              color: Color(0xFF10B981),
+                                              shape: BoxShape.circle,
                                             ),
-                                            const SizedBox(width: 10),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Row(
-                                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                                    children: [
-                                                      const Expanded(
-                                                        child: Text(
-                                                          'Ghi nhận tiến độ',
-                                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                                                          maxLines: 1,
-                                                          overflow: TextOverflow.ellipsis,
-                                                        ),
+                                            child: const Center(
+                                              child: Icon(LucideIcons.check, size: 8, color: Colors.white),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 10),
+                                          Expanded(
+                                            child: Column(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              children: [
+                                                Row(
+                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                  children: [
+                                                    Expanded(
+                                                      child: Text(
+                                                        upTitle.isNotEmpty ? upTitle : 'Ghi nhận tiến độ',
+                                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                                                        maxLines: 1,
+                                                        overflow: TextOverflow.ellipsis,
                                                       ),
+                                                    ),
+                                                    if (upDate.isNotEmpty) ...[
                                                       const SizedBox(width: 8),
                                                       Text(
-                                                        (up['publishedAt'] ?? up['createdAt'])?.toString().split("T").first ?? '',
+                                                        upDate,
                                                         style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
                                                       ),
                                                     ],
-                                                  ),
+                                                  ],
+                                                ),
+                                                if (upMessage.isNotEmpty) ...[
                                                   const SizedBox(height: 2),
                                                   Text(
-                                                    up['content']?.toString() ?? up['message']?.toString() ?? '',
+                                                    upMessage,
                                                     style: const TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.35),
                                                   ),
                                                 ],
-                                              ),
+                                              ],
                                             ),
+                                          ),
+                                        ],
+                                      ),
+                                    );
+                                  }),
+
+                                // Real Technician / Receiver Profile Box from Database (only if assigned/recorded)
+                                if (assignedTechName.isNotEmpty || receivedByName.isNotEmpty) ...[
+                                  const Divider(height: 20, color: Color(0xFFF1F5F9)),
+                                  Row(
+                                    children: [
+                                      Container(
+                                        width: 32,
+                                        height: 32,
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFFF1F5F9),
+                                          borderRadius: BorderRadius.circular(16),
+                                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                                        ),
+                                        child: Center(
+                                          child: Text(
+                                            _getStaffInitials(assignedTechName.isNotEmpty ? assignedTechName : receivedByName),
+                                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF334155)),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              assignedTechName.isNotEmpty
+                                                  ? 'Kỹ thuật viên: $assignedTechName'
+                                                  : 'Người tiếp nhận: $receivedByName',
+                                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            if (assignedTechCode.isNotEmpty)
+                                              Text(
+                                                'Mã nhân sự: $assignedTechCode',
+                                                style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              )
+                                            else if (assignedTechName.isNotEmpty && receivedByName.isNotEmpty)
+                                              Text(
+                                                'Tiếp nhận bởi: $receivedByName',
+                                                style: const TextStyle(fontSize: 10, color: Color(0xFF64748B)),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                           ],
                                         ),
-                                      )),
-
-                                // Lead Technician Profile Box (Stitch Design)
-                                const Divider(height: 20, color: Color(0xFFF1F5F9)),
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 32,
-                                      height: 32,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF1F5F9),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: const Color(0xFFE2E8F0)),
                                       ),
-                                      child: const Center(
-                                        child: Text('NA', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11, color: Color(0xFF334155))),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 10),
-                                    const Expanded(
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            'KTV. Nguyễn Văn An',
-                                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          Text(
-                                            'Mã kỹ thuật: ENG-4820',
-                                            style: TextStyle(fontSize: 10, color: Color(0xFF64748B)),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFECFDF5),
-                                        borderRadius: BorderRadius.circular(6),
-                                      ),
-                                      child: const Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(LucideIcons.checkCheck, size: 10, color: Color(0xFF059669)),
-                                          SizedBox(width: 4),
-                                          Text('Duyệt QC', style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF059669))),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                                    ],
+                                  ),
+                                ],
                               ],
                             ),
                           ),
                           const SizedBox(height: 18),
 
-                          // 4. Evidence Media Photos (Hình ảnh kiểm tra & Nghiệm thu)
+                          // 4. Evidence Media Photos (Hình ảnh kiểm tra & Đo đạc)
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -3728,6 +3907,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                                 scrollDirection: Axis.horizontal,
                                 children: media.map((med) {
                                   final rawUrl = med['mediaUrl']?.toString() ?? med['fileUrl']?.toString() ?? '';
+                                  final caption = (med['caption'] ?? '').toString().trim();
                                   final api = context.read<AuthProvider>().api;
                                   final resolvedUrl = api.resolveUrl(rawUrl);
                                   final headers = api.mediaHeadersFor(resolvedUrl);
@@ -3754,21 +3934,22 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                                               child: Icon(LucideIcons.imageOff, size: 24, color: Color(0xFF94A3B8)),
                                             ),
                                           ),
-                                          Positioned(
-                                            top: 6,
-                                            right: 6,
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFF10B981),
-                                                borderRadius: BorderRadius.circular(4),
-                                              ),
-                                              child: const Text(
-                                                'QC PASS',
-                                                style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold, color: Colors.white),
+                                          if (caption.isNotEmpty)
+                                            Positioned(
+                                              bottom: 0,
+                                              left: 0,
+                                              right: 0,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                                                color: Colors.black54,
+                                                child: Text(
+                                                  caption,
+                                                  style: const TextStyle(fontSize: 9, color: Colors.white),
+                                                  maxLines: 1,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
                                               ),
                                             ),
-                                          ),
                                         ],
                                       ),
                                     ),
@@ -3781,46 +3962,30 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                       ),
           ),
 
-          // Sticky Footer Actions (Stitch Design)
+          // Sticky Footer Actions (1 Contact Method: Phone Call)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
-                      foregroundColor: Colors.white,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    onPressed: _confirmAcceptance,
-                    icon: const Icon(LucideIcons.checkCheck, size: 18),
-                    label: const Text('Xác Nhận Nghiệm Thu & Đặt Lịch Nhận Máy', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  ),
+            child: SizedBox(
+              width: double.infinity,
+              height: 46,
+              child: ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: double.infinity,
-                  height: 40,
-                  child: OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF475569),
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: () => widget.onMakeCall(widget.hotlineNumber),
-                    icon: const Icon(LucideIcons.headset, size: 15),
-                    label: const Text('Trao đổi thêm với Kỹ thuật viên (Hotline 24/7)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                  ),
+                onPressed: () => widget.onMakeCall(widget.hotlineNumber),
+                icon: const Icon(LucideIcons.phoneCall, size: 16),
+                label: Text(
+                  'Liên hệ kỹ thuật (${widget.hotlineNumber})',
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
                 ),
-              ],
+              ),
             ),
           ),
         ],

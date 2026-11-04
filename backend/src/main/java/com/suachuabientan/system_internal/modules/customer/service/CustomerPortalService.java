@@ -14,9 +14,11 @@ import com.suachuabientan.system_internal.modules.repair.entity.RepairImage;
 import com.suachuabientan.system_internal.modules.repair.entity.RepairOrder;
 import com.suachuabientan.system_internal.modules.repair.entity.RepairCustomerMedia;
 import com.suachuabientan.system_internal.modules.repair.entity.RepairCustomerUpdate;
+import com.suachuabientan.system_internal.modules.repair.entity.RepairTimeline;
 import com.suachuabientan.system_internal.modules.repair.enums.RepairStatus;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairDeviceRepository;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairImageRepository;
+import com.suachuabientan.system_internal.modules.repair.repository.RepairTimelineRepository;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ChangePasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.service.AuthService;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
@@ -53,6 +55,7 @@ public class CustomerPortalService {
     private final RepairCustomerUpdateRepository repairCustomerUpdateRepository;
     private final RepairCustomerMediaRepository repairCustomerMediaRepository;
     private final RepairImageRepository repairImageRepository;
+    private final RepairTimelineRepository repairTimelineRepository;
     private final AuthService authService;
     private final UserRepository userRepository;
     private final RepairMediaStorageService repairMediaStorageService;
@@ -281,8 +284,33 @@ public class CustomerPortalService {
 
     @Transactional(readOnly = true)
     public List<CustomerUpdateResponse> getPublishedUpdates(UUID orderId) {
-        return repairCustomerUpdateRepository.findByOrderIdAndIsDeletedFalseOrderByPublishedAtDesc(orderId).stream()
+        List<CustomerUpdateResponse> published = repairCustomerUpdateRepository.findByOrderIdAndIsDeletedFalseOrderByPublishedAtDesc(orderId).stream()
                 .map(this::toUpdateResponse)
+                .toList();
+        if (!published.isEmpty()) {
+            return published;
+        }
+        if (repairTimelineRepository == null) {
+            return List.of();
+        }
+        List<RepairTimeline> timeline = repairTimelineRepository.findByOrderIdOrderByCreatedAtDesc(orderId);
+        if (timeline == null || timeline.isEmpty()) {
+            return List.of();
+        }
+        return timeline.stream()
+                .filter(tl -> tl.getAction() != null && !tl.getAction().startsWith("Xóa "))
+                .map(tl -> {
+                    String note = tl.getNote() != null && !tl.getNote().isBlank()
+                            ? tl.getNote().strip()
+                            : tl.getAction();
+                    return new CustomerUpdateResponse(
+                            tl.getId(),
+                            tl.getAction(),
+                            note,
+                            null,
+                            tl.getCreatedAt()
+                    );
+                })
                 .toList();
     }
 
@@ -332,33 +360,97 @@ public class CustomerPortalService {
 
     private CustomerOrderDetailResponse buildOrderDetail(RepairOrder order) {
         List<RepairDevice> deviceEntities = repairDeviceRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
-        List<CustomerDeviceResponse> devices = deviceEntities.stream()
-                .map(d -> new CustomerDeviceResponse(
-                        d.getId(),
-                        d.getDeviceName(),
-                        d.getDeviceType(),
-                        d.getSerialNumber(),
-                        d.getDescription(),
-                        d.getStatus(),
-                        CustomerOrderResponse.getFriendlyStatusLabel(d.getStatus()),
-                        d.getUnderWarranty()
-                ))
-                .toList();
+        List<CustomerDeviceResponse> devices;
+        if (deviceEntities != null && !deviceEntities.isEmpty()) {
+            devices = deviceEntities.stream()
+                    .map(d -> {
+                        String statusLbl = CustomerOrderResponse.getFriendlyStatusLabel(
+                                d.getStatus() != null ? d.getStatus() : order.getStatus());
+                        String techName = resolveUserFullName(d.getAssignedTo());
+                        return new CustomerDeviceResponse(
+                                d.getId(),
+                                d.getDeviceName(),
+                                d.getDeviceName(),
+                                d.getDeviceType(),
+                                d.getDeviceType(),
+                                d.getSerialNumber(),
+                                d.getDescription(),
+                                d.getDescription(),
+                                d.getDescription(),
+                                d.getStatus() != null ? d.getStatus() : order.getStatus(),
+                                statusLbl,
+                                statusLbl,
+                                d.getUnderWarranty(),
+                                d.getWarrantyExpiry(),
+                                techName
+                        );
+                    })
+                    .toList();
+        } else if (order.getDeviceName() != null && !order.getDeviceName().isBlank()) {
+            String statusLbl = CustomerOrderResponse.getFriendlyStatusLabel(order.getStatus());
+            devices = List.of(new CustomerDeviceResponse(
+                    order.getId(),
+                    order.getDeviceName(),
+                    order.getDeviceName(),
+                    order.getDeviceType(),
+                    order.getDeviceType(),
+                    order.getSerialNumber(),
+                    order.getDescription(),
+                    order.getDescription(),
+                    order.getDescription(),
+                    order.getStatus(),
+                    statusLbl,
+                    statusLbl,
+                    order.getUnderWarranty(),
+                    null,
+                    resolveUserFullName(order.getAssignedTo())
+            ));
+        } else {
+            devices = List.of();
+        }
 
         List<CustomerUpdateResponse> updates = getPublishedUpdates(order.getId());
         List<CustomerMediaResponse> media = getPublishedMedia(order.getId());
 
+        String primaryDeviceName = order.getDeviceName();
+        String primaryDeviceType = order.getDeviceType();
+        String primarySerial = order.getSerialNumber();
+        if ((primaryDeviceName == null || primaryDeviceName.isBlank()) && !devices.isEmpty()) {
+            primaryDeviceName = devices.get(0).deviceName();
+            primaryDeviceType = devices.get(0).deviceType();
+            primarySerial = devices.get(0).serialNumber();
+        }
+
+        String statusLabel = CustomerOrderResponse.getFriendlyStatusLabel(order.getStatus());
+        String orderTitle = CustomerOrderResponse.buildOrderTitle(primaryDeviceName, primaryDeviceType, order.getDescription());
+
+        UserEntity assignedTech = resolveUser(order.getAssignedTo());
+        if (assignedTech == null && order.getAssignees() != null && !order.getAssignees().isEmpty()) {
+            assignedTech = resolveUser(order.getAssignees().iterator().next());
+        }
+        UserEntity receiver = resolveUser(order.getReceivedBy());
+
         return new CustomerOrderDetailResponse(
                 order.getId(),
                 order.getOrderCode(),
+                orderTitle,
+                primaryDeviceName,
+                primaryDeviceType,
+                primarySerial,
                 order.getStatus(),
-                CustomerOrderResponse.getFriendlyStatusLabel(order.getStatus()),
+                statusLabel,
+                statusLabel,
                 order.getReceivedAt(),
+                order.getReceivedAt(),
+                order.getEstimatedDone(),
                 order.getEstimatedDone(),
                 order.getCompletedAt(),
                 order.getDeliveredAt(),
                 order.getCustomerName(),
                 order.getDescription(),
+                assignedTech != null ? assignedTech.getFullName() : null,
+                assignedTech != null ? assignedTech.getEmployeeCode() : null,
+                receiver != null ? receiver.getFullName() : null,
                 devices,
                 updates,
                 media
@@ -367,20 +459,61 @@ public class CustomerPortalService {
 
     private CustomerOrderResponse toOrderSummary(RepairOrder order) {
         List<RepairDevice> devices = repairDeviceRepository.findByOrderIdOrderByCreatedAtAsc(order.getId());
+        String deviceName = order.getDeviceName();
+        String deviceType = order.getDeviceType();
+        String serialNumber = order.getSerialNumber();
+        String description = order.getDescription();
+
+        if (devices != null && !devices.isEmpty()) {
+            RepairDevice first = devices.get(0);
+            if (deviceName == null || deviceName.isBlank()) {
+                deviceName = first.getDeviceName();
+            }
+            if (deviceType == null || deviceType.isBlank()) {
+                deviceType = first.getDeviceType();
+            }
+            if (serialNumber == null || serialNumber.isBlank()) {
+                serialNumber = first.getSerialNumber();
+            }
+            if (description == null || description.isBlank()) {
+                description = first.getDescription();
+            }
+        }
+
+        int count = (devices != null && !devices.isEmpty()) ? devices.size() : 1;
+        String statusLabel = CustomerOrderResponse.getFriendlyStatusLabel(order.getStatus());
+        String orderTitle = CustomerOrderResponse.buildOrderTitle(deviceName, deviceType, description);
+
         return new CustomerOrderResponse(
                 order.getId(),
                 order.getOrderCode(),
-                order.getDeviceName(),
-                order.getDeviceType(),
-                order.getSerialNumber(),
+                orderTitle,
+                deviceName,
+                deviceType,
+                serialNumber,
+                description,
                 order.getStatus(),
-                CustomerOrderResponse.getFriendlyStatusLabel(order.getStatus()),
+                statusLabel,
+                statusLabel,
                 order.getReceivedAt(),
+                order.getReceivedAt(),
+                order.getEstimatedDone(),
                 order.getEstimatedDone(),
                 order.getCompletedAt(),
                 order.getDeliveredAt(),
-                devices.size()
+                count,
+                count
         );
+    }
+
+    private UserEntity resolveUser(UUID userId) {
+        if (userId == null || userRepository == null) return null;
+        return userRepository.findByIdAndIsDeletedFalse(userId).orElse(null);
+    }
+
+    private String resolveUserFullName(UUID userId) {
+        UserEntity u = resolveUser(userId);
+        return u != null ? u.getFullName() : null;
     }
 
     private CustomerUpdateResponse toUpdateResponse(RepairCustomerUpdate u) {

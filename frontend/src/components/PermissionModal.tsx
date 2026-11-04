@@ -1,6 +1,6 @@
 import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useCallback } from 'react';
-import { X, Shield, RotateCcw, Save, CheckCircle2, XCircle, MinusCircle } from 'lucide-react';
+import { X, Shield, RotateCcw, Save, CheckCircle2, XCircle, MinusCircle, Key } from 'lucide-react';
 import { PERMISSION_LABELS } from '../utils/permissions';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import './PermissionModal.css';
@@ -23,6 +23,7 @@ interface PermissionModalProps {
   userRole: string;
   onClose: () => void;
   showToast: (msg: string) => void;
+  onOpenResetPassword?: () => void;
 }
 
 // ── Module display names ───────────────────────────────────────────────────
@@ -67,7 +68,7 @@ function stateToOverride(state: OverrideState): boolean | null {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export const PermissionModal: React.FC<PermissionModalProps> = ({
-  userId, userName, userRole, onClose, showToast,
+  userId, userName, userRole, onClose, showToast, onOpenResetPassword,
 }) => {
   const canAction = usePermissionCheck();
   const protectedRole = userRole.toUpperCase() === 'SUPER_ADMIN';
@@ -227,6 +228,17 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
               Role: {userRole} &nbsp;·&nbsp; {activeGrantCount} quyền cấp thêm &nbsp;·&nbsp; {activeDenyCount} quyền thu hồi
             </p>
           </div>
+          {onOpenResetPassword && (
+            <button
+              type="button"
+              className="perm-modal-reset-pwd-btn"
+              onClick={onOpenResetPassword}
+              title="Đổi mật khẩu cho nhân viên này"
+            >
+              <Key size={14} />
+              <span>Đổi mật khẩu</span>
+            </button>
+          )}
           <button className="perm-modal-close" onClick={onClose} id="perm-modal-close-btn">
             <X size={16} />
           </button>

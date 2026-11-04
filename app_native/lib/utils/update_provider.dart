@@ -4,6 +4,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'dart:io';
 import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
@@ -18,6 +19,10 @@ class AppUpdateInfo {
   final String downloadUrl;
   final bool mandatory;
   final String changelog;
+  final String? sha256;
+  final int? fileSize;
+  final String? minSupportedVersion;
+  final String channel;
 
   AppUpdateInfo({
     required this.updateAvailable,
@@ -25,6 +30,10 @@ class AppUpdateInfo {
     required this.downloadUrl,
     required this.mandatory,
     required this.changelog,
+    this.sha256,
+    this.fileSize,
+    this.minSupportedVersion,
+    this.channel = 'PRODUCTION',
   });
 
   factory AppUpdateInfo.fromJson(Map<String, dynamic> json) {
@@ -34,6 +43,14 @@ class AppUpdateInfo {
       downloadUrl: json['downloadUrl'] ?? '',
       mandatory: json['mandatory'] ?? false,
       changelog: json['changelog'] ?? '',
+      sha256: json['sha256'],
+      fileSize: json['fileSize'] is int
+          ? json['fileSize']
+          : (json['fileSize'] is num
+              ? (json['fileSize'] as num).toInt()
+              : null),
+      minSupportedVersion: json['minSupportedVersion'],
+      channel: json['channel'] ?? 'PRODUCTION',
     );
   }
 }
@@ -75,6 +92,7 @@ class UpdateProvider with ChangeNotifier {
   Future<void> checkForUpdate(
     BuildContext context, {
     required bool manual,
+    String channel = 'PRODUCTION',
   }) async {
     if (_isChecking || _isDownloading) return;
 
@@ -92,6 +110,7 @@ class UpdateProvider with ChangeNotifier {
         queryParameters: {
           'version': _currentVersion,
           'platform': Platform.operatingSystem,
+          'channel': channel,
         },
       );
 
@@ -187,7 +206,12 @@ class UpdateProvider with ChangeNotifier {
     );
   }
 
-  Future<void> _downloadAndInstall(BuildContext context, String url) async {
+  Future<void> _downloadAndInstall(
+    BuildContext context,
+    String url, {
+    String? sha256Checksum,
+    int? totalSizeBytes,
+  }) async {
     if (_isDownloading) return;
 
     _isDownloading = true;
@@ -205,7 +229,9 @@ class UpdateProvider with ChangeNotifier {
         throw Exception('Mã phản hồi lỗi từ máy chủ: ${response.statusCode}');
       }
 
-      final contentLength = response.contentLength ?? 0;
+      final contentLength = (response.contentLength != null && response.contentLength! > 0)
+          ? response.contentLength!
+          : (totalSizeBytes ?? 0);
       int downloadedBytes = 0;
       final List<int> bytes = [];
 
@@ -234,6 +260,19 @@ class UpdateProvider with ChangeNotifier {
           )
           .asFuture();
 
+      // Xác thực mã băm SHA-256 bảo vệ toàn vẹn tệp
+      if (sha256Checksum != null && sha256Checksum.trim().isNotEmpty) {
+        _downloadStatus = 'Đang xác thực tính toàn vẹn (SHA-256)...';
+        notifyListeners();
+        final calculatedHash = crypto.sha256.convert(bytes).toString().toLowerCase();
+        if (calculatedHash != sha256Checksum.trim().toLowerCase()) {
+          throw Exception(
+            'Mã xác thực SHA-256 không khớp! Tệp cài đặt tải về bị lỗi đường truyền hoặc không toàn vẹn.\n'
+            'Kỳ vọng: $sha256Checksum\nThực tế: $calculatedHash',
+          );
+        }
+      }
+
       _downloadStatus = 'Đang chuẩn bị file cài đặt...';
       notifyListeners();
 
@@ -260,7 +299,7 @@ class UpdateProvider with ChangeNotifier {
         }
       }
 
-      // Close dialog if not mandatory
+      // Đóng dialog nếu không phải cập nhật bắt buộc
       if (context.mounted && Navigator.canPop(context)) {
         Navigator.pop(context);
       }
@@ -286,7 +325,12 @@ class UpdateProvider with ChangeNotifier {
       await _openAppStore(context, info);
     } else {
       final downloadUrlResolved = api.resolveUrl(info.downloadUrl);
-      await _downloadAndInstall(context, downloadUrlResolved);
+      await _downloadAndInstall(
+        context,
+        downloadUrlResolved,
+        sha256Checksum: info.sha256,
+        totalSizeBytes: info.fileSize,
+      );
     }
   }
 
@@ -299,7 +343,7 @@ class UpdateProvider with ChangeNotifier {
                   rawUrl.startsWith('https://') ||
                   rawUrl.startsWith('itms-apps://'))
           ? rawUrl
-          : 'https://apps.apple.com/app/id6740000000';
+          : 'https://apps.apple.com/us/app/inverter-like-new-system/id6809314317';
 
       final uri = Uri.parse(targetUrl);
       if (await canLaunchUrl(uri)) {
@@ -387,6 +431,47 @@ class UpdateProvider with ChangeNotifier {
                           ),
                         ),
                       ),
+                      if (info.fileSize != null && info.fileSize! > 0) ...[
+                        const SizedBox(height: 4),
+                        Center(
+                          child: Text(
+                            'Dung lượng: ${(info.fileSize! / (1024 * 1024)).toStringAsFixed(1)} MB',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (info.minSupportedVersion != null && info.mandatory) ...[
+                        const SizedBox(height: 12),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.amber.withValues(alpha: isDark ? 0.2 : 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.warning_amber_rounded, color: Colors.amber, size: 20),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  'Bản cập nhật bắt buộc: Phiên bản tối thiểu được hỗ trợ là v${info.minSupportedVersion}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: isDark ? Colors.amber[200] : Colors.amber[900],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                       const SizedBox(height: 20),
                       Text(
                         'Chi tiết cập nhật:',

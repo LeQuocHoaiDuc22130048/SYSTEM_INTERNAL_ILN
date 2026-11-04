@@ -3,6 +3,7 @@ package com.suachuabientan.system_internal.modules.auth.service;
 import com.suachuabientan.system_internal.common.exception.BusinessException;
 import com.suachuabientan.system_internal.common.util.EmployeeCodeGenerator;
 import com.suachuabientan.system_internal.common.util.JwtUtil;
+import com.suachuabientan.system_internal.modules.auth.dto.request.AdminResetPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.DeleteAccountRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ForgotPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.RequestPasswordResetOtpRequest;
@@ -312,5 +313,53 @@ class AuthServiceTest {
 
         assertEquals(403, ex.getStatusCode());
         assertTrue(ex.getMessage().contains("chưa được duyệt"));
+    }
+
+    @Test
+    void adminResetPasswordSuccess() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+        UserEntity targetUser = new UserEntity();
+        targetUser.setId(targetUserId);
+        targetUser.setUsername("testemployee");
+        targetUser.setPasswordHash("old_hashed_password");
+
+        when(userRepository.findByIdAndIsDeletedFalse(targetUserId)).thenReturn(Optional.of(targetUser));
+        when(passwordEncoder.encode("NewPass123")).thenReturn("new_hashed_password");
+
+        AdminResetPasswordRequest request = new AdminResetPasswordRequest("NewPass123", "NewPass123");
+        authService.adminResetPassword(targetUserId, request, adminId);
+
+        assertEquals("new_hashed_password", targetUser.getPasswordHash());
+        verify(userRepository).save(targetUser);
+        verify(refreshTokenRepository).revokeAllByUserId(targetUserId);
+        verify(notificationService).clearDeviceToken(targetUserId);
+    }
+
+    @Test
+    void adminResetPasswordMismatchThrowsException() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+
+        AdminResetPasswordRequest request = new AdminResetPasswordRequest("NewPass123", "DifferentPass123");
+        assertThrows(BusinessException.class, () ->
+                authService.adminResetPassword(targetUserId, request, adminId));
+
+        verify(userRepository, never()).save(any());
+        verify(refreshTokenRepository, never()).revokeAllByUserId(any());
+    }
+
+    @Test
+    void adminResetPasswordUserNotFoundThrowsException() {
+        UUID targetUserId = UUID.randomUUID();
+        UUID adminId = UUID.randomUUID();
+
+        when(userRepository.findByIdAndIsDeletedFalse(targetUserId)).thenReturn(Optional.empty());
+
+        AdminResetPasswordRequest request = new AdminResetPasswordRequest("NewPass123", "NewPass123");
+        assertThrows(com.suachuabientan.system_internal.common.exception.ResourceNotFoundException.class, () ->
+                authService.adminResetPassword(targetUserId, request, adminId));
+
+        verify(userRepository, never()).save(any());
     }
 }

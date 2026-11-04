@@ -2,6 +2,7 @@ package com.suachuabientan.system_internal.modules.auth.controller;
 
 
 import com.suachuabientan.system_internal.common.dto.ApiResponse;
+import com.suachuabientan.system_internal.modules.auth.dto.request.AdminResetPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ChangePasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.DeleteAccountRequest;
@@ -186,6 +187,17 @@ public class AuthController {
             @AuthenticationPrincipal CustomUserDetails userDetails) {
         return ResponseEntity.ok(ApiResponse.success(
                 authService.updateUserRole(userId, request.role(), userDetails.getUserId())));
+    }
+
+    @Operation(summary = "Đặt lại mật khẩu cho nhân viên — chỉ SUPER_ADMIN")
+    @PostMapping("/users/{userId}/reset-password")
+    @PreAuthorize("hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Void>> adminResetPassword(
+            @PathVariable UUID userId,
+            @Valid @RequestBody AdminResetPasswordRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        authService.adminResetPassword(userId, request, userDetails.getUserId());
+        return ResponseEntity.ok(ApiResponse.success(null, "Đặt lại mật khẩu cho nhân viên thành công"));
     }
 
     @Operation(summary = "Suspend hoặc Activate tài khoản — chỉ ADMIN+")

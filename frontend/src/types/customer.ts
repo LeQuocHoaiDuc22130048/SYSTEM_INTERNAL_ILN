@@ -77,9 +77,16 @@ export interface ResetCustomerPasswordRequest {
 export interface CustomerDeviceResponse {
   id: string;
   deviceName: string;
+  deviceType?: string | null;
+  modelName?: string | null;
   model?: string | null;
   serialNumber?: string | null;
+  description?: string | null;
+  issueDescription?: string | null;
   status: string;
+  statusLabel?: string | null;
+  friendlyStatus?: string | null;
+  underWarranty?: boolean;
   symptom?: string | null;
 }
 
@@ -107,11 +114,22 @@ export interface CustomerOrderResponse {
   id: string;
   orderCode: string;
   orderTitle: string;
+  deviceName?: string | null;
+  deviceType?: string | null;
+  serialNumber?: string | null;
+  description?: string | null;
   status: string;
+  statusLabel?: string;
   friendlyStatus: string;
+  deviceCount?: number;
   devicesCount: number;
+  receivedAt?: string | null;
   receivedDate: string;
+  estimatedDone?: string | null;
   expectedDeliveryDate?: string | null;
+  completedAt?: string | null;
+  deliveredAt?: string | null;
+  underWarranty?: boolean;
   updatedAt: string;
 }
 
@@ -119,11 +137,24 @@ export interface CustomerOrderDetailResponse {
   id: string;
   orderCode: string;
   orderTitle: string;
+  deviceName?: string | null;
+  deviceType?: string | null;
+  serialNumber?: string | null;
+  description?: string | null;
   status: string;
+  statusLabel?: string;
   friendlyStatus: string;
+  receivedAt?: string | null;
   receivedDate: string;
+  estimatedDone?: string | null;
   expectedDeliveryDate?: string | null;
-  updatedAt: string;
+  completedAt?: string | null;
+  deliveredAt?: string | null;
+  underWarranty?: boolean;
+  assignedTechnicianName?: string | null;
+  assignedTechnicianCode?: string | null;
+  receivedByName?: string | null;
+  updatedAt?: string;
   devices: CustomerDeviceResponse[];
   updates: CustomerUpdateResponse[];
   media: CustomerMediaResponse[];

@@ -5,5 +5,19 @@ public record AppUpdateInfo(
     String latestVersion,
     String downloadUrl,
     boolean mandatory,
-    String changelog
-) {}
+    String changelog,
+    String sha256,
+    Long fileSize,
+    String minSupportedVersion,
+    String channel
+) {
+    public AppUpdateInfo(
+        boolean updateAvailable,
+        String latestVersion,
+        String downloadUrl,
+        boolean mandatory,
+        String changelog
+    ) {
+        this(updateAvailable, latestVersion, downloadUrl, mandatory, changelog, null, null, null, "PRODUCTION");
+    }
+}

@@ -84,6 +84,46 @@ class AttendanceQueryControllerTest {
     }
 
     @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(booleans = {false, true})
+    @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
+    void pendingFieldWorkCountsExactlyOneDayAndIncludesExcelNote(boolean withAttendance) throws Exception {
+        UserEntity employee = new UserEntity();
+        employee.setId(employeeId);
+        employee.setRole(UserRole.EMPLOYEE);
+        when(userRepository.findAll()).thenReturn(java.util.List.of(employee));
+        when(userRepository.findByIdAndIsDeletedFalse(employeeId)).thenReturn(Optional.of(employee));
+        var date = java.time.LocalDate.of(2026, 6, 7);
+        var field = new com.suachuabientan.system_internal.modules.attendance.entity.FieldWorkDay();
+        field.setEmployeeId(employeeId);
+        field.setStatus("PENDING");
+        field.setWorkDate(date);
+        field.setNote("Nhà máy ABC");
+        when(fieldWorkDayRepository.findByWorkDateBetweenAndIsDeletedFalse(any(), any()))
+                .thenReturn(java.util.List.of(field));
+        when(fieldWorkDayRepository.findByEmployeeIdAndWorkDateBetweenAndIsDeletedFalseOrderByWorkDateAsc(any(), any(), any()))
+                .thenReturn(java.util.List.of(field));
+        var zone = java.time.ZoneId.of("Asia/Ho_Chi_Minh");
+        var in = AttendanceRecord.builder().employeeId(employeeId).type(AttendanceType.IN)
+                .checkTime(date.atTime(13, 54).atZone(zone).toInstant()).isValid(true).build();
+        var out = AttendanceRecord.builder().employeeId(employeeId).type(AttendanceType.OUT)
+                .checkTime(date.atTime(21, 30).atZone(zone).toInstant()).isValid(true).build();
+        var records = withAttendance ? java.util.List.of(in, out) : java.util.List.<AttendanceRecord>of();
+        when(attendanceRecordRepository.findByCheckTimeBetween(any(), any())).thenReturn(records);
+        when(attendanceRecordRepository.findByEmployeeIdAndCheckTimeBetween(any(), any(), any())).thenReturn(records);
+        mockMvc.perform(get("/api/attendance/monthly").param("year", "2026").param("month", "6"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].workDays").value(1.0))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].dailyWorkDays.7").value(1.0))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].updateNotes.7").value(org.hamcrest.Matchers.containsString("Chờ duyệt: Đi công trình — Nhà máy ABC")))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.employees[0].lateCount").value(0));
+        mockMvc.perform(get("/api/attendance/" + employeeId + "/logs").param("year", "2026").param("month", "6"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.summary.workDays").value(1.0))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.days[6].status").value("FIELD_WORK"))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.data.days[6].note").value("Chờ duyệt: Đi công trình — Nhà máy ABC"));
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.CsvSource({"13, 54, 17, 49", "8, 54, 12, 0"})
     @WithMockUser(authorities = {"ROLE_MANAGER", "ATTENDANCE_REPORT_VIEW"})
     void lateHalfDayKeepsHalfWorkDayForExcel(int inHour, int inMinute, int outHour, int outMinute) throws Exception {

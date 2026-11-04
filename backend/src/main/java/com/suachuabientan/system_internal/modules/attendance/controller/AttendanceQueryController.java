@@ -67,7 +67,7 @@ public class AttendanceQueryController {
         Map<UUID, Map<LocalDate, FieldWorkDay>> fieldDaysByEmployee = fieldWorkDayRepository
                 .findByWorkDateBetweenAndIsDeletedFalse(startLocalDate, endLocalDate).stream()
                 .collect(Collectors.groupingBy(FieldWorkDay::getEmployeeId,
-                        Collectors.toMap(FieldWorkDay::getWorkDate, day -> day)));
+                        Collectors.toMap(FieldWorkDay::getWorkDate, day -> day, (d1, d2) -> d1)));
 
         Map<UUID, List<AttendanceRecord>> recordsByEmployee = monthRecords.stream()
                 .collect(Collectors.groupingBy(AttendanceRecord::getEmployeeId));
@@ -204,6 +204,9 @@ public class AttendanceQueryController {
                     totalHours += fieldWorkRecordedHours(date, checkIn, checkOut);
                 } else if (isPendingFieldWork) {
                     patternBuilder.append("w");
+                    dailyWorkDays.put(d, 1.0);
+                    workDays += 1.0;
+                    totalHours += fieldWorkRecordedHours(date, checkIn, checkOut);
                 } else if (isWeekend && dayRecords.isEmpty()) {
                     patternBuilder.append("h");
                 } else {
@@ -351,7 +354,7 @@ public class AttendanceQueryController {
         List<WorkSchedule> monthSchedules = workScheduleRepository.findByEmployeeAndDateRange(employeeId, startLocalDate, endLocalDate);
         Map<LocalDate, FieldWorkDay> fieldDays = fieldWorkDayRepository
                 .findByEmployeeIdAndWorkDateBetweenAndIsDeletedFalseOrderByWorkDateAsc(employeeId, startLocalDate, endLocalDate)
-                .stream().collect(Collectors.toMap(FieldWorkDay::getWorkDate, day -> day));
+                .stream().collect(Collectors.toMap(FieldWorkDay::getWorkDate, day -> day, (d1, d2) -> d1));
 
         Map<LocalDate, WorkSchedule> schedulesByDate = monthSchedules.stream()
                 .collect(Collectors.toMap(WorkSchedule::getWorkDate, ws -> ws, (ws1, ws2) -> ws1));
@@ -402,18 +405,11 @@ public class AttendanceQueryController {
 
             if (date.isAfter(today)) {
                 status = "FUTURE";
-            } else if (isApprovedFieldWork) {
+            } else if (isApprovedFieldWork || isPendingFieldWork) {
                 status = "FIELD_WORK";
                 workDays += 1.0;
                 dayActualHours = fieldWorkRecordedHours(date, checkIn, checkOut);
                 totalHours += dayActualHours;
-            } else if (isPendingFieldWork) {
-                status = "WORKING";
-                if (checkIn != null && checkOut != null) {
-                    double rawMinutes = Duration.between(checkIn, checkOut).toMinutes();
-                    dayActualHours = Math.max(0.0, rawMinutes / 60.0);
-                    totalHours += dayActualHours;
-                }
             } else if (isWeekend && dayRecords.isEmpty()) {
                 status = "HOLIDAY";
             } else {

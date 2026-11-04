@@ -25,6 +25,7 @@ import { AccountsTab } from './components/AccountsTab';
 import { DashboardTab } from './components/DashboardTab';
 import { TerminalTab } from './components/TerminalTab';
 import { CustomerPortalApp } from './components/portal/CustomerPortalApp';
+import { WebUpdateBanner } from './components/WebUpdateBanner';
 
 import { getAuthHeaders, getJsonAuthHeaders, createTimeoutController, STANDARD_WORK_DAYS } from './utils/auth';
 import { getDailyStatusFromPattern } from './utils/employee';
@@ -745,6 +746,7 @@ function App() {
           }}
         />
       )}
+      <WebUpdateBanner />
     </div>
     </PermissionUserContext.Provider>
   );

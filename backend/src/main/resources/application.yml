@@ -121,4 +121,4 @@ app:
     mandatory: ${APP_UPDATE_MANDATORY:true}
     release-dir: ${APP_UPDATE_RELEASE_DIR:./releases}
     ios:
-      app-store-url: ${APP_UPDATE_IOS_APP_STORE_URL:https://apps.apple.com/app/id6740000000}
+      app-store-url: ${APP_UPDATE_IOS_APP_STORE_URL:https://apps.apple.com/us/app/inverter-like-new-system/id6809314317}

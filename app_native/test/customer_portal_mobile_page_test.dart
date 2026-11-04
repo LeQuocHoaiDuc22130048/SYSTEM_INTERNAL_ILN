@@ -103,8 +103,10 @@ void main() {
     // Verify VIP Membership Card
     expect(find.text('ĐỐI TÁC DOANH NGHIỆP'), findsOneWidget);
     expect(find.text('Cong Ty Tnhh Tu Dong Hoa Bien Tany'), findsOneWidget);
-    expect(find.text('Hotline Kỹ Thuật'), findsOneWidget);
-    expect(find.text('Chat Zalo Tiếp Nhận'), findsOneWidget);
+    expect(find.text('Liên hệ kỹ thuật'), findsOneWidget);
+    expect(find.text('Số điện thoại: 0964 266 771'), findsOneWidget);
+    expect(find.text('Gọi 0964 266 771'), findsOneWidget);
+    expect(find.text('Chat Zalo Tiếp Nhận'), findsNothing);
 
     // Verify Search Bar & Quick Filters
     expect(find.byType(TextField), findsOneWidget);
@@ -167,12 +169,14 @@ void main() {
               {
                 'id': 'ord-123',
                 'orderCode': 'SC-2026-009',
-                'orderTitle': 'Sửa biến tần Schneider ATV310 7.5kW',
-                'status': 'IN_PROGRESS',
-                'friendlyStatus': 'Đang sửa chữa',
+                'deviceName': 'Schneider ATV310 7.5kW',
+                'deviceType': 'Biến tần',
+                'serialNumber': 'SN-SCH-99812',
+                'description': 'Mất nguồn điều khiển',
+                'status': 'PENDING',
                 'deviceCount': 2,
-                'receivedDate': '2026-10-18T08:30:00',
-                'expectedDeliveryDate': '2026-10-22T17:00:00',
+                'receivedAt': '2026-10-18T08:30:00',
+                'estimatedDone': '2026-10-22T17:00:00',
               }
             ],
             'totalElements': 1,
@@ -186,19 +190,25 @@ void main() {
           jsonEncode({
             'id': 'ord-123',
             'orderCode': 'SC-2026-009',
-            'orderTitle': 'Sửa biến tần Schneider ATV310 7.5kW',
-            'status': 'IN_PROGRESS',
+            'deviceName': 'Schneider ATV310 7.5kW',
+            'deviceType': 'Biến tần',
+            'status': 'PENDING',
+            'receivedAt': '2026-10-18T08:30:00',
+            'assignedTechnicianName': 'Lê Hoàng Nam',
             'devices': [
               {
-                'modelName': 'Schneider ATV310HD11N4E',
+                'deviceName': 'Schneider ATV310HD11N4E',
+                'deviceType': 'Biến tần 3 pha',
                 'serialNumber': 'SN-SCH-99812',
-                'issueDescription': 'Nổ IGBT nhánh U, mất nguồn 24V'
+                'description': 'Nổ IGBT nhánh U, mất nguồn 24V',
+                'status': 'CHECKING',
               }
             ],
             'updates': [
               {
-                'content': 'Đã thay thế module IGBT và kích thử xung',
-                'createdAt': '2026-10-18T14:20:00',
+                'title': 'Kiểm tra bo công suất',
+                'message': 'Đã thay thế module IGBT và kích thử xung',
+                'publishedAt': '2026-10-18T14:20:00',
               }
             ],
             'media': [],
@@ -229,21 +239,26 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify order card is displayed
+    // Verify order card is displayed with Vietnamese status and real DB fields
     expect(find.text('SC-2026-009'), findsOneWidget);
-    expect(find.text('Sửa biến tần Schneider ATV310 7.5kW'), findsOneWidget);
-    expect(find.text('Đang sửa chữa'), findsOneWidget);
+    expect(find.text('Schneider ATV310 7.5kW (Biến tần)'), findsOneWidget);
+    expect(find.text('Đã tiếp nhận'), findsOneWidget);
+    expect(find.text('PENDING'), findsNothing);
     expect(find.text('2 thiết bị'), findsOneWidget);
 
     // Tap on the order card to open detail sheet
     await tester.tap(find.text('SC-2026-009'));
     await tester.pumpAndSettle();
 
-    // Verify detail sheet opened
-    expect(find.text('Chi tiết đơn hàng'), findsNothing); // Should find order code title
-    expect(find.text('Schneider ATV310HD11N4E'), findsOneWidget);
-    expect(find.text('SN-SCH-99812'), findsOneWidget);
+    // Verify detail sheet opened with real database data and no mock labels
+    expect(find.text('Schneider ATV310HD11N4E (Biến tần 3 pha)'), findsOneWidget);
+    expect(find.text('SN-SCH-99812'), findsWidgets);
+    expect(find.text('Tình trạng: Nổ IGBT nhánh U, mất nguồn 24V'), findsOneWidget);
     expect(find.text('Đã thay thế module IGBT và kích thử xung'), findsOneWidget);
+    expect(find.text('Kỹ thuật viên: Lê Hoàng Nam'), findsOneWidget);
+    expect(find.text('KTV. Nguyễn Văn An'), findsNothing);
+    expect(find.text('Đã kiểm thử QC'), findsNothing);
+    expect(find.text('Tải 100% OK'), findsNothing);
   });
 
   testWidgets('CustomerPortalMobilePage loads and displays dynamic support contact info', (tester) async {
@@ -279,10 +294,8 @@ void main() {
       if (request.url.path == '/api/v1/customer/support-info') {
         return http.Response(
           jsonEncode({
-            'hotlineNumber': '0912345678',
-            'hotlineLabel': 'Hotline Khẩn Cấp 24/7',
-            'zaloUrl': 'https://zalo.me/0912345678',
-            'zaloLabel': 'Chat Zalo Kỹ Thuật Viên',
+            'hotlineNumber': '0964 266 771',
+            'hotlineLabel': 'Tổng đài kỹ thuật 24/7',
             'workingHours': '07:30 - 18:00',
             'workshopAddress': '123 Đường Công Nghệ Cao, TP.HCM',
           }),
@@ -312,9 +325,9 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify dynamic labels rendered
-    expect(find.text('Hotline Khẩn Cấp 24/7'), findsOneWidget);
-    expect(find.text('Chat Zalo Kỹ Thuật Viên'), findsOneWidget);
+    // Verify dynamic Vietnamese label and single phone contact rendered
+    expect(find.text('Tổng đài kỹ thuật 24/7'), findsOneWidget);
+    expect(find.text('Số điện thoại: 0964 266 771'), findsOneWidget);
   });
 
   testWidgets('CustomerPortalMobilePage loads and displays account profile in VIP card and opens profile dialog', (tester) async {

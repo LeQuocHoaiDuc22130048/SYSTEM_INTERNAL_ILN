@@ -11,6 +11,7 @@ import com.suachuabientan.system_internal.modules.auth.entity.RefreshToken;
 import com.suachuabientan.system_internal.modules.auth.entity.PasswordResetOtp;
 import com.suachuabientan.system_internal.modules.auth.entity.UserEntity;
 import com.suachuabientan.system_internal.modules.auth.entity.UserRegistrationRequestEntity;
+import com.suachuabientan.system_internal.modules.auth.dto.request.AdminResetPasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ApproveUserRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.ChangePasswordRequest;
 import com.suachuabientan.system_internal.modules.auth.dto.request.DeleteAccountRequest;
@@ -254,6 +255,29 @@ public class AuthService {
         refreshTokenRepository.revokeAllByUserId(user.getId());
         notificationService.clearDeviceToken(user.getId());
         log.info("Changed password and revoked sessions for userId={}", user.getId());
+    }
+
+    /**
+     * Super Admin đặt lại mật khẩu cho nhân viên.
+     */
+    @Transactional
+    public void adminResetPassword(UUID targetUserId, AdminResetPasswordRequest request, UUID performedByUserId) {
+        if (!request.newPassword().equals(request.confirmPassword())) {
+            throw new BusinessException("Mật khẩu xác nhận không khớp", 400);
+        }
+
+        UserEntity user = userRepository.findByIdAndIsDeletedFalse(targetUserId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng: " + targetUserId));
+
+        user.setPasswordHash(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+
+        // Thu hồi toàn bộ refresh token và xóa device token để bắt buộc đăng nhập lại
+        refreshTokenRepository.revokeAllByUserId(user.getId());
+        notificationService.clearDeviceToken(user.getId());
+
+        log.info("Super Admin đặt lại mật khẩu cho nhân viên thành công: targetUserId={}, username={}, performedBy={}",
+                user.getId(), user.getUsername(), performedByUserId);
     }
 
     private UserEntity findPasswordResetUser(String username, String phone) {

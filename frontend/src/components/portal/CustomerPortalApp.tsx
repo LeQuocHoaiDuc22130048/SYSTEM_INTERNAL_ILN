@@ -361,6 +361,33 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
     }
   };
 
+  const getVietnameseStatus = (status: string, rawLabel?: string | null) => {
+    const rawCodes = ['PENDING', 'WAITING_FOR_CHECK', 'CHECKING', 'CHECKED', 'IN_PROGRESS', 'COMPLETED', 'DELIVERED', 'CANCELLED'];
+    if (rawLabel && rawLabel.trim() && !rawCodes.includes(rawLabel.trim().toUpperCase())) {
+      return rawLabel.trim().replace('test', 'kiểm tra');
+    }
+    switch ((status || '').toUpperCase()) {
+      case 'PENDING':
+        return 'Đã tiếp nhận';
+      case 'WAITING_FOR_CHECK':
+        return 'Chờ kiểm tra';
+      case 'CHECKING':
+        return 'Đang kiểm tra & chẩn đoán';
+      case 'CHECKED':
+        return 'Đã kiểm tra';
+      case 'IN_PROGRESS':
+        return 'Đang tiến hành sửa chữa';
+      case 'COMPLETED':
+        return 'Đã sửa xong & kiểm tra thành công';
+      case 'DELIVERED':
+        return 'Đã bàn giao cho khách';
+      case 'CANCELLED':
+        return 'Đã trả thiết bị / Hủy đơn';
+      default:
+        return 'Đang xử lý';
+    }
+  };
+
   // Calculate step index for stepper
   // Steps: 0: Tiếp nhận, 1: Kiểm tra, 2: Đang sửa, 3: Hoàn thành, 4: Đã giao
   const getStepIndex = (status: string): number => {
@@ -602,20 +629,24 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span className="order-code-badge">{selectedOrder.orderCode}</span>
                     <span className={`portal-status-pill ${getStatusBadgeClass(selectedOrder.status)}`}>
-                      {selectedOrder.friendlyStatus}
+                      {getVietnameseStatus(selectedOrder.status, selectedOrder.statusLabel || selectedOrder.friendlyStatus)}
                     </span>
                   </div>
                   <h3 style={{ margin: '6px 0 0', fontSize: '1.25rem', color: '#0f172a' }}>
-                    {selectedOrder.orderTitle}
+                    {selectedOrder.orderTitle || selectedOrder.deviceName || selectedOrder.deviceType || 'Đơn sửa chữa thiết bị'}
                   </h3>
                 </div>
               </div>
 
               <div style={{ fontSize: '0.82rem', color: '#64748b', textAlign: 'right' }}>
-                <div>Ngày nhận: {new Date(selectedOrder.receivedDate).toLocaleDateString('vi-VN')}</div>
-                {selectedOrder.expectedDeliveryDate && (
+                {(selectedOrder.receivedAt || selectedOrder.receivedDate) && (
                   <div>
-                    Dự kiến giao: {new Date(selectedOrder.expectedDeliveryDate).toLocaleDateString('vi-VN')}
+                    Ngày nhận: {new Date((selectedOrder.receivedAt || selectedOrder.receivedDate) as string).toLocaleDateString('vi-VN')}
+                  </div>
+                )}
+                {(selectedOrder.estimatedDone || selectedOrder.expectedDeliveryDate) && (
+                  <div>
+                    Dự kiến giao: {new Date((selectedOrder.estimatedDone || selectedOrder.expectedDeliveryDate) as string).toLocaleDateString('vi-VN')}
                   </div>
                 )}
               </div>
@@ -665,11 +696,13 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
               <div className="portal-devices-list">
                 {selectedOrder.devices?.map((dev) => (
                   <div key={dev.id} className="portal-device-card">
-                    <div className="portal-device-name">{dev.deviceName}</div>
+                    <div className="portal-device-name">{dev.deviceName || dev.modelName || 'Thiết bị'}</div>
                     <div className="portal-device-meta">
-                      {dev.model && <span><strong>Model:</strong> {dev.model}</span>}
-                      {dev.serialNumber && <span><strong>Số serial:</strong> {dev.serialNumber}</span>}
-                      {dev.symptom && <span><strong>Mô tả lỗi:</strong> {dev.symptom}</span>}
+                      {(dev.deviceType || dev.model) && <span><strong>Loại thiết bị:</strong> {dev.deviceType || dev.model}</span>}
+                      {dev.serialNumber && <span><strong>Số sê-ri:</strong> {dev.serialNumber}</span>}
+                      {(dev.description || dev.issueDescription || dev.symptom) && (
+                        <span><strong>Tình trạng:</strong> {dev.description || dev.issueDescription || dev.symptom}</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -846,42 +879,56 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
               </div>
             ) : (
               <div className="portal-orders-grid">
-                {orders.map((ord) => (
-                  <div
-                    key={ord.id}
-                    className="portal-order-card"
-                    onClick={() => handleOpenMyOrderDetail(ord.id)}
-                  >
-                    <div>
-                      <div className="card-top-row">
-                        <span className="order-code-badge">{ord.orderCode}</span>
-                        <span className={`portal-status-pill ${getStatusBadgeClass(ord.status)}`}>
-                          {ord.friendlyStatus}
-                        </span>
-                      </div>
-                      <h4 className="order-title">{ord.orderTitle}</h4>
-                    </div>
-
-                    <div className="order-meta-info">
-                      <div className="meta-row">
-                        <span>Số lượng thiết bị:</span>
-                        <strong>{ord.devicesCount} máy</strong>
-                      </div>
-                      <div className="meta-row">
-                        <span>Ngày nhận:</span>
-                        <span>{new Date(ord.receivedDate).toLocaleDateString('vi-VN')}</span>
-                      </div>
-                      {ord.expectedDeliveryDate && (
-                        <div className="meta-row">
-                          <span>Dự kiến giao:</span>
-                          <span style={{ color: '#2563eb', fontWeight: 600 }}>
-                            {new Date(ord.expectedDeliveryDate).toLocaleDateString('vi-VN')}
+                {orders.map((ord) => {
+                  const receivedStr = ord.receivedAt || ord.receivedDate;
+                  const estimatedStr = ord.estimatedDone || ord.expectedDeliveryDate;
+                  return (
+                    <div
+                      key={ord.id}
+                      className="portal-order-card"
+                      onClick={() => handleOpenMyOrderDetail(ord.id)}
+                    >
+                      <div>
+                        <div className="card-top-row">
+                          <span className="order-code-badge">{ord.orderCode}</span>
+                          <span className={`portal-status-pill ${getStatusBadgeClass(ord.status)}`}>
+                            {getVietnameseStatus(ord.status, ord.statusLabel || ord.friendlyStatus)}
                           </span>
                         </div>
-                      )}
+                        <h4 className="order-title">
+                          {ord.orderTitle || ord.deviceName || ord.deviceType || 'Đơn sửa chữa thiết bị'}
+                        </h4>
+                      </div>
+
+                      <div className="order-meta-info">
+                        {ord.serialNumber && (
+                          <div className="meta-row">
+                            <span>Số sê-ri:</span>
+                            <strong>{ord.serialNumber}</strong>
+                          </div>
+                        )}
+                        <div className="meta-row">
+                          <span>Số lượng thiết bị:</span>
+                          <strong>{ord.deviceCount ?? ord.devicesCount ?? 1} máy</strong>
+                        </div>
+                        {receivedStr && (
+                          <div className="meta-row">
+                            <span>Ngày nhận:</span>
+                            <span>{new Date(receivedStr).toLocaleDateString('vi-VN')}</span>
+                          </div>
+                        )}
+                        {estimatedStr && (
+                          <div className="meta-row">
+                            <span>Dự kiến giao:</span>
+                            <span style={{ color: '#2563eb', fontWeight: 600 }}>
+                              {new Date(estimatedStr).toLocaleDateString('vi-VN')}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

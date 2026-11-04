@@ -2,9 +2,10 @@ import { usePermissionCheck } from '../utils/permissionContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Search, Shield, UserCheck, RefreshCw, ChevronLeft, ChevronRight,
-  ShieldAlert, Users, User, Lock, KeyRound,
+  ShieldAlert, Users, User, Lock, KeyRound, Key,
 } from 'lucide-react';
 import { PermissionModal } from './PermissionModal';
+import { ResetPasswordModal } from './ResetPasswordModal';
 import type { UserInfo } from '../mockData';
 import {
   ROLE_LABELS, ROLE_COLORS, PERMISSION_LABELS, ROLE_DEFAULT_PERMISSIONS,
@@ -75,6 +76,7 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
 
   // Modal state
   const [permModalUser, setPermModalUser] = useState<{ id: string; fullName: string; role: string } | null>(null);
+  const [resetPwdUser, setResetPwdUser] = useState<UserRecord | null>(null);
 
   const fetchUsers = useCallback(async (kw: string, pg: number) => {
     setLoading(true);
@@ -354,6 +356,20 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
                           </select>
                         )}
 
+                        {/* Đổi mật khẩu nhân viên — chỉ SUPER_ADMIN */}
+                        {isSuperAdmin && !isMe && (
+                          <button
+                            className="btn-icon-sm"
+                            onClick={() => setResetPwdUser(user)}
+                            disabled={isBusy}
+                            title="Đổi mật khẩu nhân viên"
+                            id={`btn-reset-pwd-${user.id}`}
+                            style={{ color: '#d97706' }}
+                          >
+                            <Key size={14} />
+                          </button>
+                        )}
+
                         {/* Phân quyền chi tiết — ADMIN+ */}
                         {canManagePermissions && !isMe && (
                           (canAction('PERMISSION_VIEW') && (<button
@@ -499,6 +515,22 @@ export const AccountsTab: React.FC<AccountsTabProps> = ({ showToast, currentUser
           userName={permModalUser.fullName}
           userRole={permModalUser.role}
           onClose={() => setPermModalUser(null)}
+          showToast={showToast}
+          onOpenResetPassword={isSuperAdmin ? () => {
+            const target = displayUsers.find(u => u.id === permModalUser.id);
+            if (target) {
+              setResetPwdUser(target);
+            }
+          } : undefined}
+        />
+      )}
+
+      {/* Reset Password Modal — SUPER_ADMIN */}
+      {resetPwdUser && (
+        <ResetPasswordModal
+          user={resetPwdUser}
+          onClose={() => setResetPwdUser(null)}
+          onSuccess={() => fetchUsers(keyword, page)}
           showToast={showToast}
         />
       )}
