@@ -461,4 +461,126 @@ void main() {
     expect(find.text('Cập nhật thông tin tài khoản thành công!'), findsOneWidget);
     expect(find.text('Đại diện: Trần Minh Đức'), findsOneWidget);
   });
+
+  testWidgets('CustomerPortalMobilePage displays application logo, distinct status badges, and supports time/device filtering', (tester) async {
+    tester.view.physicalSize = const Size(600, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': 'khachhangtest',
+              'fullName': 'Cong Ty Tnhh Tu Dong Hoa Bien Tany',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({
+            'content': [
+              {
+                'id': 'ord-1',
+                'orderCode': 'SC-2026-001',
+                'deviceName': 'Biến tần Fuji Mega 15kW',
+                'deviceType': 'Biến tần',
+                'status': 'PENDING',
+                'receivedAt': '2026-11-01T10:00:00',
+              },
+              {
+                'id': 'ord-2',
+                'orderCode': 'SC-2026-002',
+                'deviceName': 'PLC Siemens S7-1200',
+                'deviceType': 'PLC',
+                'status': 'IN_PROGRESS',
+                'receivedAt': '2026-10-15T09:00:00',
+              },
+              {
+                'id': 'ord-3',
+                'orderCode': 'SC-2026-003',
+                'deviceName': 'Màn hình HMI Mitsubishi GOT2000',
+                'deviceType': 'HMI',
+                'status': 'DELIVERED',
+                'receivedAt': '2026-09-01T08:00:00',
+              },
+            ],
+            'totalElements': 3,
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: 'khachhangtest', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // 1. Verify app logo in AppBar
+    final logoFinder = find.byWidgetPredicate(
+      (widget) => widget is Image && widget.image is AssetImage && (widget.image as AssetImage).assetName == 'assets/images/app_logo.png',
+    );
+    expect(logoFinder, findsOneWidget);
+
+    // 2. Verify all 3 orders and their distinct status labels
+    expect(find.text('SC-2026-001'), findsOneWidget);
+    expect(find.text('SC-2026-002'), findsOneWidget);
+    expect(find.text('SC-2026-003'), findsOneWidget);
+    expect(find.text('Đã tiếp nhận'), findsOneWidget);
+    expect(find.text('Đang tiến hành sửa chữa'), findsOneWidget);
+    expect(find.text('Đã bàn giao cho khách'), findsOneWidget);
+
+    // 3. Verify filter tabs counts
+    expect(find.text('Tất cả (3)'), findsOneWidget);
+    expect(find.text('Đang xử lý (2)'), findsOneWidget); // PENDING + IN_PROGRESS
+    expect(find.text('Đã bàn giao (1)'), findsOneWidget);
+
+    // 4. Test device type filtering
+    await tester.tap(find.text('Tất cả thiết bị'));
+    await tester.pumpAndSettle();
+    expect(find.text('Lọc theo thiết bị'), findsOneWidget);
+    await tester.tap(find.text('PLC').last);
+    await tester.pumpAndSettle();
+
+    // Now only PLC order should be visible
+    expect(find.text('SC-2026-002'), findsOneWidget);
+    expect(find.text('SC-2026-001'), findsNothing);
+    expect(find.text('SC-2026-003'), findsNothing);
+
+    // 5. Reset filter
+    expect(find.text('Xóa lọc'), findsOneWidget);
+    await tester.tap(find.text('Xóa lọc'));
+    await tester.pumpAndSettle();
+
+    // All orders restored
+    expect(find.text('SC-2026-001'), findsOneWidget);
+    expect(find.text('SC-2026-002'), findsOneWidget);
+    expect(find.text('SC-2026-003'), findsOneWidget);
+  });
 }

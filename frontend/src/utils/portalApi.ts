@@ -72,6 +72,7 @@ export async function getMyCustomerOrders(params?: {
   page?: number;
   size?: number;
   keyword?: string;
+  status?: string;
 }): Promise<
   ApiResult<{
     content: CustomerOrderResponse[];
@@ -85,6 +86,7 @@ export async function getMyCustomerOrders(params?: {
   if (params?.page !== undefined) query.append('page', String(params.page));
   if (params?.size !== undefined) query.append('size', String(params.size));
   if (params?.keyword && params.keyword.trim()) query.append('keyword', params.keyword.trim());
+  if (params?.status && params.status.trim()) query.append('status', params.status.trim());
 
   try {
     const res = await fetch(`/api/v1/customer/orders?${query.toString()}`, {

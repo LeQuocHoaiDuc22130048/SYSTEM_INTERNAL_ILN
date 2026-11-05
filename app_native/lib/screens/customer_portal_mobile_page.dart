@@ -28,7 +28,9 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
 
   // Filter & Search states
   String _searchQuery = '';
-  String _selectedFilter = 'ALL'; // 'ALL', 'IN_PROGRESS', 'COMPLETED', 'HISTORY'
+  String _selectedFilter = 'ALL'; // 'ALL', 'IN_PROGRESS', 'PENDING', 'CHECKING', 'REPAIRING', 'COMPLETED', 'DELIVERED', 'HISTORY'
+  String _selectedTimeFilter = 'ALL'; // 'ALL', '30_DAYS', 'THIS_MONTH', '3_MONTHS', 'THIS_YEAR'
+  String _selectedDeviceType = 'ALL';
   final TextEditingController _searchController = TextEditingController();
   int _currentNavIndex = 0;
 
@@ -256,28 +258,73 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       final title = _resolveOrderTitle(ord).toLowerCase();
       final serial = (ord['serialNumber'] ?? '').toString().toLowerCase();
       final desc = (ord['description'] ?? '').toString().toLowerCase();
+      final devType = (ord['deviceType'] ?? '').toString().toLowerCase();
+      final devName = (ord['deviceName'] ?? '').toString().toLowerCase();
       final status = (ord['status'] ?? '').toString().toUpperCase();
       final q = _searchQuery.trim().toLowerCase();
 
+      // Search query filter
       if (q.isNotEmpty &&
           !code.contains(q) &&
           !title.contains(q) &&
           !serial.contains(q) &&
+          !devType.contains(q) &&
+          !devName.contains(q) &&
           !desc.contains(q)) {
         return false;
       }
 
+      // Status filter
       if (_selectedFilter == 'IN_PROGRESS') {
-        return status == 'PENDING' ||
+        final match = status == 'PENDING' ||
             status == 'WAITING_FOR_CHECK' ||
             status == 'CHECKING' ||
             status == 'CHECKED' ||
             status == 'IN_PROGRESS';
+        if (!match) return false;
+      } else if (_selectedFilter == 'PENDING') {
+        if (status != 'PENDING' && status != 'WAITING_FOR_CHECK') return false;
+      } else if (_selectedFilter == 'CHECKING') {
+        if (status != 'CHECKING' && status != 'CHECKED') return false;
+      } else if (_selectedFilter == 'REPAIRING') {
+        if (status != 'IN_PROGRESS') return false;
       } else if (_selectedFilter == 'COMPLETED') {
-        return status == 'COMPLETED' || status == 'DELIVERED';
+        if (status != 'COMPLETED' && status != 'DELIVERED') return false;
+      } else if (_selectedFilter == 'DELIVERED') {
+        if (status != 'DELIVERED') return false;
       } else if (_selectedFilter == 'HISTORY') {
-        return status == 'DELIVERED' || status == 'COMPLETED' || status == 'CANCELLED';
+        final match = status == 'DELIVERED' || status == 'COMPLETED' || status == 'CANCELLED';
+        if (!match) return false;
       }
+
+      // Time filter
+      if (_selectedTimeFilter != 'ALL') {
+        final rawDate = (ord['receivedAt'] ?? ord['receivedDate'] ?? ord['updatedAt'] ?? '').toString();
+        if (rawDate.isNotEmpty) {
+          final dt = DateTime.tryParse(rawDate);
+          if (dt != null) {
+            final now = DateTime.now();
+            if (_selectedTimeFilter == '30_DAYS') {
+              final diff = now.difference(dt).inDays;
+              if (diff < 0 || diff > 30) return false;
+            } else if (_selectedTimeFilter == 'THIS_MONTH') {
+              if (dt.month != now.month || dt.year != now.year) return false;
+            } else if (_selectedTimeFilter == '3_MONTHS') {
+              final diff = now.difference(dt).inDays;
+              if (diff < 0 || diff > 90) return false;
+            } else if (_selectedTimeFilter == 'THIS_YEAR') {
+              if (dt.year != now.year) return false;
+            }
+          }
+        }
+      }
+
+      // Device type filter
+      if (_selectedDeviceType != 'ALL') {
+        final dt = (ord['deviceType'] ?? ord['deviceName'] ?? '').toString().trim().toLowerCase();
+        if (dt != _selectedDeviceType.toLowerCase()) return false;
+      }
+
       return true;
     }).toList();
   }
@@ -291,10 +338,39 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             s == 'IN_PROGRESS';
       }).length;
 
+  int get _pendingCount => _orders.where((o) {
+        final s = (o['status'] ?? '').toString().toUpperCase();
+        return s == 'PENDING' || s == 'WAITING_FOR_CHECK';
+      }).length;
+
+  int get _checkingCount => _orders.where((o) {
+        final s = (o['status'] ?? '').toString().toUpperCase();
+        return s == 'CHECKING' || s == 'CHECKED';
+      }).length;
+
+  int get _repairingCount => _orders.where((o) {
+        final s = (o['status'] ?? '').toString().toUpperCase();
+        return s == 'IN_PROGRESS';
+      }).length;
+
   int get _completedCount => _orders.where((o) {
         final s = (o['status'] ?? '').toString().toUpperCase();
         return s == 'COMPLETED' || s == 'DELIVERED';
       }).length;
+
+  int get _deliveredCount => _orders.where((o) {
+        final s = (o['status'] ?? '').toString().toUpperCase();
+        return s == 'DELIVERED';
+      }).length;
+
+  List<String> get _availableDeviceTypes {
+    final set = <String>{};
+    for (final ord in _orders) {
+      final t = (ord['deviceType'] ?? ord['deviceName'] ?? '').toString().trim();
+      if (t.isNotEmpty) set.add(t);
+    }
+    return set.toList();
+  }
 
   // Extract initials for business avatar
   String _getInitials(String name) {
@@ -1540,37 +1616,86 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     );
   }
 
-  Color _getStatusColor(String status) {
-    switch (status) {
+  static Color _getStatusColor(String status) {
+    switch (status.toUpperCase()) {
       case 'PENDING':
-        return const Color(0xFFD97706);
+        return const Color(0xFFD97706); // Amber
       case 'WAITING_FOR_CHECK':
+        return const Color(0xFF4F46E5); // Indigo
       case 'CHECKING':
+        return const Color(0xFF9333EA); // Purple
       case 'CHECKED':
-        return const Color(0xFF4F46E5);
+        return const Color(0xFF0891B2); // Cyan
       case 'IN_PROGRESS':
-        return const Color(0xFF2563EB);
+        return const Color(0xFF2563EB); // Blue
       case 'COMPLETED':
-        return const Color(0xFF059669);
+        return const Color(0xFF059669); // Emerald
       case 'DELIVERED':
-        return const Color(0xFF0D9488);
+        return const Color(0xFF0D9488); // Teal
       case 'CANCELLED':
-        return const Color(0xFFDC2626);
+        return const Color(0xFFE11D48); // Rose
       default:
-        return const Color(0xFF2563EB);
+        return const Color(0xFF475569);
     }
   }
 
-  IconData _getStatusIcon(String status) {
-    switch (status) {
+  static Color _getStatusBgColor(String status) {
+    switch (status.toUpperCase()) {
       case 'PENDING':
-        return LucideIcons.clock;
+        return const Color(0xFFFEF3C7);
       case 'WAITING_FOR_CHECK':
+        return const Color(0xFFEEF2FF);
       case 'CHECKING':
+        return const Color(0xFFF3E8FF);
       case 'CHECKED':
-        return LucideIcons.search;
+        return const Color(0xFFCFFAFE);
       case 'IN_PROGRESS':
-        return LucideIcons.settings;
+        return const Color(0xFFDBEAFE);
+      case 'COMPLETED':
+        return const Color(0xFFD1FAE5);
+      case 'DELIVERED':
+        return const Color(0xFFCCFBF1);
+      case 'CANCELLED':
+        return const Color(0xFFFFE4E6);
+      default:
+        return const Color(0xFFF1F5F9);
+    }
+  }
+
+  static Color _getStatusBorderColor(String status) {
+    switch (status.toUpperCase()) {
+      case 'PENDING':
+        return const Color(0xFFFDE68A);
+      case 'WAITING_FOR_CHECK':
+        return const Color(0xFFC7D2FE);
+      case 'CHECKING':
+        return const Color(0xFFE9D5FF);
+      case 'CHECKED':
+        return const Color(0xFFA5F3FC);
+      case 'IN_PROGRESS':
+        return const Color(0xFFBFDBFE);
+      case 'COMPLETED':
+        return const Color(0xFFA7F3D0);
+      case 'DELIVERED':
+        return const Color(0xFF99F6E4);
+      case 'CANCELLED':
+        return const Color(0xFFFECDD3);
+      default:
+        return const Color(0xFFE2E8F0);
+    }
+  }
+
+  static IconData _getStatusIcon(String status) {
+    switch (status.toUpperCase()) {
+      case 'PENDING':
+      case 'WAITING_FOR_CHECK':
+        return LucideIcons.clock;
+      case 'CHECKING':
+        return LucideIcons.search;
+      case 'CHECKED':
+        return LucideIcons.checkCircle2;
+      case 'IN_PROGRESS':
+        return LucideIcons.wrench;
       case 'COMPLETED':
         return LucideIcons.checkCircle2;
       case 'DELIVERED':
@@ -1619,27 +1744,35 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         titleSpacing: 16,
         title: Row(
           children: [
-            // Microchip Logo Chip (Stitch Design)
+            // App Brand Logo
             Container(
               width: 38,
               height: 38,
+              padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF1D4ED8), Color(0xFF4F46E5)],
-                  begin: Alignment.bottomLeft,
-                  end: Alignment.topRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
                 boxShadow: [
                   BoxShadow(
-                    color: const Color(0xFF2563EB).withValues(alpha: 0.3),
-                    blurRadius: 8,
-                    offset: const Offset(0, 3),
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
                   ),
                 ],
-                border: Border.all(color: const Color(0xFFDBEAFE), width: 1.5),
               ),
-              child: const Icon(LucideIcons.cpu, color: Colors.white, size: 20),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(6),
+                child: Image.asset(
+                  'assets/images/app_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    LucideIcons.wrench,
+                    color: Color(0xFF2563EB),
+                    size: 20,
+                  ),
+                ),
+              ),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1824,6 +1957,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             _buildSearchBar(),
             const SizedBox(height: 12),
             _buildFilterTabs(),
+            _buildSecondaryFilters(),
             const SizedBox(height: 16),
 
             // 3. SECTION HEADER
@@ -2255,85 +2389,112 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   child: Row(
                     children: [
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                total < 10 ? '0$total' : '$total',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Colors.white,
-                                  fontFamily: 'monospace',
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedFilter = 'ALL'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _selectedFilter == 'ALL'
+                                  ? Colors.white.withValues(alpha: 0.16)
+                                  : Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: _selectedFilter == 'ALL'
+                                  ? Border.all(color: Colors.white.withValues(alpha: 0.4))
+                                  : null,
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  total < 10 ? '0$total' : '$total',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: Colors.white,
+                                    fontFamily: 'monospace',
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Đơn sửa chữa',
-                                style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
-                              ),
-                            ],
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Đơn sửa chữa',
+                                  style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                completed < 10 ? '0$completed' : '$completed',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF34D399),
-                                  fontFamily: 'monospace',
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedFilter = 'COMPLETED'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _selectedFilter == 'COMPLETED'
+                                  ? Colors.white.withValues(alpha: 0.16)
+                                  : Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: _selectedFilter == 'COMPLETED'
+                                  ? Border.all(color: const Color(0xFF34D399).withValues(alpha: 0.6))
+                                  : null,
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  completed < 10 ? '0$completed' : '$completed',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF34D399),
+                                    fontFamily: 'monospace',
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Sẵn sàng nhận',
-                                style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
-                              ),
-                            ],
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Sẵn sàng nhận',
+                                  style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          decoration: BoxDecoration(
-                            color: Colors.white.withValues(alpha: 0.06),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                inProgress < 10 ? '0$inProgress' : '$inProgress',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.w900,
-                                  color: Color(0xFF60A5FA),
-                                  fontFamily: 'monospace',
+                        child: InkWell(
+                          onTap: () => setState(() => _selectedFilter = 'IN_PROGRESS'),
+                          borderRadius: BorderRadius.circular(12),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: _selectedFilter == 'IN_PROGRESS'
+                                  ? Colors.white.withValues(alpha: 0.16)
+                                  : Colors.white.withValues(alpha: 0.06),
+                              borderRadius: BorderRadius.circular(12),
+                              border: _selectedFilter == 'IN_PROGRESS'
+                                  ? Border.all(color: const Color(0xFF60A5FA).withValues(alpha: 0.6))
+                                  : null,
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  inProgress < 10 ? '0$inProgress' : '$inProgress',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w900,
+                                    color: Color(0xFF60A5FA),
+                                    fontFamily: 'monospace',
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Đang thực hiện',
-                                style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
-                              ),
-                            ],
+                                const SizedBox(height: 2),
+                                Text(
+                                  'Đang thực hiện',
+                                  style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -2414,10 +2575,317 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           const SizedBox(width: 8),
           _buildFilterChip('COMPLETED', 'Sẵn sàng nhận ($_completedCount)', LucideIcons.checkCircle, const Color(0xFF10B981)),
           const SizedBox(width: 8),
+          _buildFilterChip('DELIVERED', 'Đã bàn giao ($_deliveredCount)', LucideIcons.packageCheck, const Color(0xFF0D9488)),
+          const SizedBox(width: 8),
           _buildFilterChip('HISTORY', 'Lịch sử trả hàng', LucideIcons.archive, const Color(0xFF64748B)),
         ],
       ),
     );
+  }
+
+  void _showTimeFilterPicker() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Text(
+              'Lọc theo khoảng thời gian',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 12),
+            _buildTimeOption(ctx, 'ALL', 'Tất cả thời gian'),
+            _buildTimeOption(ctx, '30_DAYS', '30 ngày qua'),
+            _buildTimeOption(ctx, 'THIS_MONTH', 'Trong tháng này'),
+            _buildTimeOption(ctx, '3_MONTHS', '3 tháng qua'),
+            _buildTimeOption(ctx, 'THIS_YEAR', 'Năm nay'),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimeOption(BuildContext ctx, String key, String label) {
+    final isSelected = _selectedTimeFilter == key;
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedTimeFilter = key);
+        Navigator.pop(ctx);
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
+              size: 16,
+              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showDeviceTypePicker() {
+    final types = _availableDeviceTypes;
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFCBD5E1),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const Text(
+              'Lọc theo thiết bị',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 12),
+            _buildDeviceTypeOption(ctx, 'ALL', 'Tất cả thiết bị'),
+            ...types.map((t) => _buildDeviceTypeOption(ctx, t, t)),
+            const SizedBox(height: 12),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDeviceTypeOption(BuildContext ctx, String key, String label) {
+    final isSelected = _selectedDeviceType == key;
+    return InkWell(
+      onTap: () {
+        setState(() => _selectedDeviceType = key);
+        Navigator.pop(ctx);
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        margin: const EdgeInsets.only(bottom: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFEFF6FF) : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(
+          children: [
+            Icon(
+              isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
+              size: 16,
+              color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                label,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                  color: isSelected ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSecondaryFilters() {
+    final hasActiveFilter = _selectedTimeFilter != 'ALL' || _selectedDeviceType != 'ALL';
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          // Time Filter Trigger
+          Expanded(
+            child: InkWell(
+              onTap: _showTimeFilterPicker,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: _selectedTimeFilter != 'ALL' ? const Color(0xFFEFF6FF) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _selectedTimeFilter != 'ALL' ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.calendar,
+                      size: 13,
+                      color: _selectedTimeFilter != 'ALL' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _getTimeFilterLabel(_selectedTimeFilter),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: _selectedTimeFilter != 'ALL' ? FontWeight.w700 : FontWeight.w500,
+                          color: _selectedTimeFilter != 'ALL' ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(LucideIcons.chevronDown, size: 12, color: Color(0xFF94A3B8)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+
+          // Device Type Trigger
+          Expanded(
+            child: InkWell(
+              onTap: _showDeviceTypePicker,
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(
+                  color: _selectedDeviceType != 'ALL' ? const Color(0xFFEFF6FF) : Colors.white,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: _selectedDeviceType != 'ALL' ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      LucideIcons.cpu,
+                      size: 13,
+                      color: _selectedDeviceType != 'ALL' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _selectedDeviceType == 'ALL' ? 'Tất cả thiết bị' : _selectedDeviceType,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: _selectedDeviceType != 'ALL' ? FontWeight.w700 : FontWeight.w500,
+                          color: _selectedDeviceType != 'ALL' ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const Icon(LucideIcons.chevronDown, size: 12, color: Color(0xFF94A3B8)),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          if (hasActiveFilter) ...[
+            const SizedBox(width: 6),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedTimeFilter = 'ALL';
+                  _selectedDeviceType = 'ALL';
+                });
+              },
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFECDD3)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.rotateCcw, size: 12, color: Color(0xFFDC2626)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Xóa lọc',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getTimeFilterLabel(String key) {
+    switch (key) {
+      case '30_DAYS':
+        return '30 ngày qua';
+      case 'THIS_MONTH':
+        return 'Tháng này';
+      case '3_MONTHS':
+        return '3 tháng qua';
+      case 'THIS_YEAR':
+        return 'Năm nay';
+      default:
+        return 'Tất cả thời gian';
+    }
   }
 
   Widget _buildFilterChip(String filterKey, String title, IconData icon, Color? iconTint) {
@@ -2485,6 +2953,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
 
     final isCompleted = status == 'COMPLETED' || status == 'DELIVERED';
     final statusColor = _getStatusColor(status);
+    final statusBgColor = _getStatusBgColor(status);
+    final statusBorderColor = _getStatusBorderColor(status);
     final statusIcon = _getStatusIcon(status);
     final timelineStep = _getTimelineStep(status);
 
@@ -2494,9 +2964,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
-          color: isCompleted
-              ? const Color(0xFFD1FAE5)
-              : (status == 'IN_PROGRESS' ? const Color(0xFFDBEAFE) : const Color(0xFFE2E8F0)),
+          color: statusBorderColor,
         ),
         boxShadow: [
           BoxShadow(
@@ -2515,11 +2983,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             Container(
               height: 4,
               decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: isCompleted
-                      ? [const Color(0xFF34D399), const Color(0xFF14B8A6)]
-                      : [const Color(0xFF3B82F6), const Color(0xFF4F46E5)],
-                ),
+                color: statusColor,
               ),
             ),
 
@@ -2571,13 +3035,22 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                               decoration: BoxDecoration(
-                                color: statusColor.withValues(alpha: 0.1),
+                                color: statusBgColor,
                                 borderRadius: BorderRadius.circular(20),
-                                border: Border.all(color: statusColor.withValues(alpha: 0.25)),
+                                border: Border.all(color: statusBorderColor),
                               ),
                               child: Row(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: BoxDecoration(
+                                      color: statusColor,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
                                   Icon(statusIcon, size: 12, color: statusColor),
                                   const SizedBox(width: 4),
                                   Flexible(
@@ -3401,23 +3874,36 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                           const SizedBox(width: 8),
                           Flexible(
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: isCompleted ? const Color(0xFFECFDF5) : const Color(0xFFEFF6FF),
+                                color: _CustomerPortalMobilePageState._getStatusBgColor(status),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: isCompleted ? const Color(0xFFA7F3D0) : const Color(0xFFBFDBFE),
+                                  color: _CustomerPortalMobilePageState._getStatusBorderColor(status),
                                 ),
                               ),
-                              child: Text(
-                                friendlyStatus,
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: isCompleted ? const Color(0xFF065F46) : const Color(0xFF1E40AF),
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _CustomerPortalMobilePageState._getStatusIcon(status),
+                                    size: 11,
+                                    color: _CustomerPortalMobilePageState._getStatusColor(status),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: Text(
+                                      friendlyStatus,
+                                      style: TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: _CustomerPortalMobilePageState._getStatusColor(status),
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
                           ),

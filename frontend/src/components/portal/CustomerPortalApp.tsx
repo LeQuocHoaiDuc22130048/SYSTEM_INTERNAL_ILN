@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Wrench,
   Search,
@@ -21,6 +21,13 @@ import {
   Camera,
   UserCog,
   Building2,
+  Calendar,
+  CheckCheck,
+  PackageCheck,
+  X,
+  RotateCcw,
+  Inbox,
+  ArrowUpDown,
 } from 'lucide-react';
 import type { UserInfo } from '../../mockData';
 import type {
@@ -77,6 +84,12 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderSearchKeyword, setOrderSearchKeyword] = useState('');
 
+  // Filter & Sort States
+  const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
+  const [selectedTimeFilter, setSelectedTimeFilter] = useState<string>('ALL');
+  const [selectedDeviceType, setSelectedDeviceType] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'estimated' | 'code'>('newest');
+
   // User Menu State
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
@@ -127,12 +140,13 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
   const fetchOrders = useCallback(async () => {
     if (!isAuth) return;
     setOrdersLoading(true);
-    const res = await getMyCustomerOrders({ keyword: orderSearchKeyword });
+    // Request with size: 100 to get customer order history for fast client-side filtering & stats
+    const res = await getMyCustomerOrders({ size: 100 });
     if (res.success && res.data) {
       setOrders(res.data.content || []);
     }
     setOrdersLoading(false);
-  }, [isAuth, orderSearchKeyword]);
+  }, [isAuth]);
 
   useEffect(() => {
     if (isAuth && activeTab === 'orders' && !selectedOrder) {
@@ -339,15 +353,45 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
     }
   };
 
-  // Status mapping for badge and stepper
+  // Status labels mapping (Vietnamese)
+  const getVietnameseStatus = (status: string, rawLabel?: string | null) => {
+    const rawCodes = ['PENDING', 'WAITING_FOR_CHECK', 'CHECKING', 'CHECKED', 'IN_PROGRESS', 'COMPLETED', 'DELIVERED', 'CANCELLED'];
+    if (rawLabel && rawLabel.trim() && !rawCodes.includes(rawLabel.trim().toUpperCase())) {
+      return rawLabel.trim().replace(/test/gi, 'kiểm tra');
+    }
+    switch ((status || '').toUpperCase()) {
+      case 'PENDING':
+        return 'Đang tiếp nhận';
+      case 'WAITING_FOR_CHECK':
+        return 'Chờ kiểm tra';
+      case 'CHECKING':
+        return 'Đang kiểm tra & chẩn đoán';
+      case 'CHECKED':
+        return 'Đã kiểm tra xong';
+      case 'IN_PROGRESS':
+        return 'Đang sửa chữa';
+      case 'COMPLETED':
+        return 'Đã sửa xong';
+      case 'DELIVERED':
+        return 'Đã bàn giao cho khách';
+      case 'CANCELLED':
+        return 'Đã trả thiết bị / Hủy';
+      default:
+        return 'Đang xử lý';
+    }
+  };
+
+  // Status mapping for badge CSS class
   const getStatusBadgeClass = (status: string) => {
-    switch (status) {
+    switch ((status || '').toUpperCase()) {
       case 'PENDING':
         return 'pending';
       case 'WAITING_FOR_CHECK':
+        return 'waiting-check';
       case 'CHECKING':
-      case 'CHECKED':
         return 'checking';
+      case 'CHECKED':
+        return 'checked';
       case 'IN_PROGRESS':
         return 'progress';
       case 'COMPLETED':
@@ -361,40 +405,65 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
     }
   };
 
-  const getVietnameseStatus = (status: string, rawLabel?: string | null) => {
-    const rawCodes = ['PENDING', 'WAITING_FOR_CHECK', 'CHECKING', 'CHECKED', 'IN_PROGRESS', 'COMPLETED', 'DELIVERED', 'CANCELLED'];
-    if (rawLabel && rawLabel.trim() && !rawCodes.includes(rawLabel.trim().toUpperCase())) {
-      return rawLabel.trim().replace('test', 'kiểm tra');
-    }
-    switch ((status || '').toUpperCase()) {
+  // Render Status Badge with distinctive colors, clear text and intuitive icons
+  const renderStatusBadge = (status: string, rawLabel?: string | null, isLarge: boolean = false) => {
+    const st = (status || '').toUpperCase();
+    const label = getVietnameseStatus(status, rawLabel);
+    let className = `portal-status-pill ${getStatusBadgeClass(st)}`;
+    let iconNode = <Clock size={isLarge ? 15 : 12} />;
+    let hasPulse = false;
+
+    switch (st) {
       case 'PENDING':
-        return 'Đã tiếp nhận';
+        iconNode = <Inbox size={isLarge ? 15 : 12} />;
+        break;
       case 'WAITING_FOR_CHECK':
-        return 'Chờ kiểm tra';
+        iconNode = <Clock size={isLarge ? 15 : 12} />;
+        break;
       case 'CHECKING':
-        return 'Đang kiểm tra & chẩn đoán';
+        iconNode = <Search size={isLarge ? 15 : 12} />;
+        hasPulse = true;
+        break;
       case 'CHECKED':
-        return 'Đã kiểm tra';
+        iconNode = <CheckCheck size={isLarge ? 15 : 12} />;
+        break;
       case 'IN_PROGRESS':
-        return 'Đang tiến hành sửa chữa';
+        iconNode = <Wrench size={isLarge ? 15 : 12} />;
+        hasPulse = true;
+        break;
       case 'COMPLETED':
-        return 'Đã sửa xong & kiểm tra thành công';
+        iconNode = <CheckCircle2 size={isLarge ? 15 : 12} />;
+        break;
       case 'DELIVERED':
-        return 'Đã bàn giao cho khách';
+        iconNode = <PackageCheck size={isLarge ? 15 : 12} />;
+        break;
       case 'CANCELLED':
-        return 'Đã trả thiết bị / Hủy đơn';
+        iconNode = <AlertCircle size={isLarge ? 15 : 12} />;
+        break;
       default:
-        return 'Đang xử lý';
+        iconNode = <Clock size={isLarge ? 15 : 12} />;
     }
+
+    if (isLarge) {
+      className += ' portal-status-pill-lg';
+    }
+
+    return (
+      <span className={className}>
+        {hasPulse && <span className="status-pulse-dot" />}
+        {iconNode}
+        <span>{label}</span>
+      </span>
+    );
   };
 
   // Calculate step index for stepper
   // Steps: 0: Tiếp nhận, 1: Kiểm tra, 2: Đang sửa, 3: Hoàn thành, 4: Đã giao
   const getStepIndex = (status: string): number => {
-    switch (status) {
+    switch ((status || '').toUpperCase()) {
       case 'PENDING':
-        return 0;
       case 'WAITING_FOR_CHECK':
+        return 0;
       case 'CHECKING':
       case 'CHECKED':
         return 1;
@@ -406,6 +475,233 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
         return 4;
       default:
         return 1;
+    }
+  };
+
+  // Filter Helper: Time filter
+  const filterByTime = (order: CustomerOrderResponse, timeRange: string): boolean => {
+    if (timeRange === 'ALL') return true;
+    const dateStr = order.receivedAt || order.receivedDate || order.updatedAt;
+    if (!dateStr) return true;
+    const orderDate = new Date(dateStr);
+    if (isNaN(orderDate.getTime())) return true;
+    const now = new Date();
+
+    if (timeRange === '30_DAYS') {
+      const diffDays = (now.getTime() - orderDate.getTime()) / (1000 * 3600 * 24);
+      return diffDays >= 0 && diffDays <= 30;
+    }
+    if (timeRange === 'THIS_MONTH') {
+      return orderDate.getMonth() === now.getMonth() && orderDate.getFullYear() === now.getFullYear();
+    }
+    if (timeRange === '3_MONTHS') {
+      const diffDays = (now.getTime() - orderDate.getTime()) / (1000 * 3600 * 24);
+      return diffDays >= 0 && diffDays <= 90;
+    }
+    if (timeRange === 'THIS_YEAR') {
+      return orderDate.getFullYear() === now.getFullYear();
+    }
+    return true;
+  };
+
+  // Filter Helper: Status filter
+  const filterByStatus = (order: CustomerOrderResponse, filterKey: string): boolean => {
+    if (filterKey === 'ALL') return true;
+    const st = (order.status || '').toUpperCase();
+    if (filterKey === 'PROCESSING') {
+      return ['PENDING', 'WAITING_FOR_CHECK', 'CHECKING', 'CHECKED', 'IN_PROGRESS'].includes(st);
+    }
+    if (filterKey === 'PENDING') {
+      return st === 'PENDING' || st === 'WAITING_FOR_CHECK';
+    }
+    if (filterKey === 'CHECKING') {
+      return st === 'CHECKING' || st === 'CHECKED';
+    }
+    if (filterKey === 'IN_PROGRESS') {
+      return st === 'IN_PROGRESS';
+    }
+    if (filterKey === 'COMPLETED') {
+      return st === 'COMPLETED';
+    }
+    if (filterKey === 'DELIVERED') {
+      return st === 'DELIVERED';
+    }
+    if (filterKey === 'CANCELLED') {
+      return st === 'CANCELLED';
+    }
+    return st === filterKey;
+  };
+
+  // Extract distinct device types
+  const availableDeviceTypes = useMemo(() => {
+    const typesSet = new Set<string>();
+    orders.forEach((ord) => {
+      if (ord.deviceType && ord.deviceType.trim()) {
+        typesSet.add(ord.deviceType.trim());
+      } else if (ord.deviceName && ord.deviceName.trim()) {
+        typesSet.add(ord.deviceName.trim());
+      }
+    });
+    return Array.from(typesSet);
+  }, [orders]);
+
+  // Overall KPI Metrics for customer
+  const metrics = useMemo(() => {
+    const total = orders.length;
+    let processing = 0;
+    let completed = 0;
+    let delivered = 0;
+    let cancelled = 0;
+
+    orders.forEach((ord) => {
+      const st = (ord.status || '').toUpperCase();
+      if (['PENDING', 'WAITING_FOR_CHECK', 'CHECKING', 'CHECKED', 'IN_PROGRESS'].includes(st)) {
+        processing++;
+      } else if (st === 'COMPLETED') {
+        completed++;
+      } else if (st === 'DELIVERED') {
+        delivered++;
+      } else if (st === 'CANCELLED') {
+        cancelled++;
+      }
+    });
+
+    return { total, processing, completed, delivered, cancelled };
+  }, [orders]);
+
+  // Count by status filter tab
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {
+      ALL: orders.length,
+      PROCESSING: 0,
+      PENDING: 0,
+      CHECKING: 0,
+      IN_PROGRESS: 0,
+      COMPLETED: 0,
+      DELIVERED: 0,
+      CANCELLED: 0,
+    };
+    orders.forEach((ord) => {
+      const st = (ord.status || '').toUpperCase();
+      if (['PENDING', 'WAITING_FOR_CHECK', 'CHECKING', 'CHECKED', 'IN_PROGRESS'].includes(st)) {
+        counts.PROCESSING++;
+      }
+      if (st === 'PENDING' || st === 'WAITING_FOR_CHECK') {
+        counts.PENDING++;
+      } else if (st === 'CHECKING' || st === 'CHECKED') {
+        counts.CHECKING++;
+      } else if (st === 'IN_PROGRESS') {
+        counts.IN_PROGRESS++;
+      } else if (st === 'COMPLETED') {
+        counts.COMPLETED++;
+      } else if (st === 'DELIVERED') {
+        counts.DELIVERED++;
+      } else if (st === 'CANCELLED') {
+        counts.CANCELLED++;
+      }
+    });
+    return counts;
+  }, [orders]);
+
+  // Filtered and Sorted Orders List
+  const sortedAndFilteredOrders = useMemo(() => {
+    return orders
+      .filter((ord) => {
+        // 1. Status filter
+        if (!filterByStatus(ord, selectedStatusFilter)) return false;
+        // 2. Time filter
+        if (!filterByTime(ord, selectedTimeFilter)) return false;
+        // 3. Device type filter
+        if (selectedDeviceType !== 'ALL') {
+          const typeMatch =
+            (ord.deviceType && ord.deviceType.trim().toLowerCase() === selectedDeviceType.toLowerCase()) ||
+            (ord.deviceName && ord.deviceName.trim().toLowerCase() === selectedDeviceType.toLowerCase());
+          if (!typeMatch) return false;
+        }
+        // 4. Keyword search
+        if (orderSearchKeyword.trim()) {
+          const kw = orderSearchKeyword.trim().toLowerCase();
+          const codeMatch = ord.orderCode.toLowerCase().includes(kw);
+          const titleMatch = (ord.orderTitle || '').toLowerCase().includes(kw);
+          const devMatch =
+            (ord.deviceName || '').toLowerCase().includes(kw) ||
+            (ord.deviceType || '').toLowerCase().includes(kw);
+          const snMatch = (ord.serialNumber || '').toLowerCase().includes(kw);
+          const descMatch = (ord.description || '').toLowerCase().includes(kw);
+          if (!codeMatch && !titleMatch && !devMatch && !snMatch && !descMatch) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'newest') {
+          const dateA = new Date(a.receivedAt || a.receivedDate || a.updatedAt || 0).getTime();
+          const dateB = new Date(b.receivedAt || b.receivedDate || b.updatedAt || 0).getTime();
+          return dateB - dateA;
+        }
+        if (sortBy === 'oldest') {
+          const dateA = new Date(a.receivedAt || a.receivedDate || a.updatedAt || 0).getTime();
+          const dateB = new Date(b.receivedAt || b.receivedDate || b.updatedAt || 0).getTime();
+          return dateA - dateB;
+        }
+        if (sortBy === 'estimated') {
+          const dateA = new Date(a.estimatedDone || a.expectedDeliveryDate || 0).getTime();
+          const dateB = new Date(b.estimatedDone || b.expectedDeliveryDate || 0).getTime();
+          return dateB - dateA;
+        }
+        if (sortBy === 'code') {
+          return a.orderCode.localeCompare(b.orderCode);
+        }
+        return 0;
+      });
+  }, [orders, selectedStatusFilter, selectedTimeFilter, selectedDeviceType, orderSearchKeyword, sortBy]);
+
+  const isFiltering =
+    selectedStatusFilter !== 'ALL' ||
+    selectedTimeFilter !== 'ALL' ||
+    selectedDeviceType !== 'ALL' ||
+    Boolean(orderSearchKeyword.trim());
+
+  const handleResetFilters = () => {
+    setSelectedStatusFilter('ALL');
+    setSelectedTimeFilter('ALL');
+    setSelectedDeviceType('ALL');
+    setOrderSearchKeyword('');
+    setSortBy('newest');
+  };
+
+  const getTimeLabel = (key: string) => {
+    switch (key) {
+      case '30_DAYS':
+        return '30 ngày gần nhất';
+      case 'THIS_MONTH':
+        return 'Trong tháng này';
+      case '3_MONTHS':
+        return '3 tháng gần nhất';
+      case 'THIS_YEAR':
+        return 'Trong năm nay';
+      default:
+        return 'Tất cả thời gian';
+    }
+  };
+
+  const getStatusFilterLabel = (key: string) => {
+    switch (key) {
+      case 'PROCESSING':
+        return 'Đang xử lý';
+      case 'PENDING':
+        return 'Tiếp nhận';
+      case 'CHECKING':
+        return 'Đang kiểm tra';
+      case 'IN_PROGRESS':
+        return 'Đang sửa';
+      case 'COMPLETED':
+        return 'Đã sửa xong';
+      case 'DELIVERED':
+        return 'Đã bàn giao';
+      case 'CANCELLED':
+        return 'Đã hủy/trả';
+      default:
+        return 'Tất cả';
     }
   };
 
@@ -421,8 +717,20 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
               if (isAuth) setActiveTab('orders');
             }}
           >
-            <div className="portal-logo-icon">
-              <Wrench size={22} />
+            <div className="portal-brand-logo-wrapper">
+              <img
+                src="/app_logo.png"
+                alt="Logo ứng dụng"
+                className="portal-brand-logo"
+                onError={(e) => {
+                  e.currentTarget.style.display = 'none';
+                  const fallback = e.currentTarget.parentElement?.querySelector('.portal-logo-fallback') as HTMLElement;
+                  if (fallback) fallback.style.display = 'flex';
+                }}
+              />
+              <div className="portal-logo-fallback" style={{ display: 'none' }}>
+                <Wrench size={20} />
+              </div>
             </div>
             <div className="portal-brand-text">
               <h1>Cổng Tra Cứu Khách Hàng</h1>
@@ -626,11 +934,9 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                   Quay lại danh sách
                 </button>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span className="order-code-badge">{selectedOrder.orderCode}</span>
-                    <span className={`portal-status-pill ${getStatusBadgeClass(selectedOrder.status)}`}>
-                      {getVietnameseStatus(selectedOrder.status, selectedOrder.statusLabel || selectedOrder.friendlyStatus)}
-                    </span>
+                    {renderStatusBadge(selectedOrder.status, selectedOrder.statusLabel || selectedOrder.friendlyStatus, true)}
                   </div>
                   <h3 style={{ margin: '6px 0 0', fontSize: '1.25rem', color: '#0f172a' }}>
                     {selectedOrder.orderTitle || selectedOrder.deviceName || selectedOrder.deviceType || 'Đơn sửa chữa thiết bị'}
@@ -656,11 +962,11 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
             {selectedOrder.status !== 'CANCELLED' ? (
               <div className="portal-stepper">
                 {[
-                  { label: 'Tiếp nhận', step: 0 },
-                  { label: 'Kiểm tra', step: 1 },
-                  { label: 'Đang sửa chữa', step: 2 },
-                  { label: 'Hoàn tất', step: 3 },
-                  { label: 'Đã giao hàng', step: 4 },
+                  { label: 'Tiếp nhận', sub: 'Nhận thiết bị', step: 0 },
+                  { label: 'Kiểm tra', sub: 'Chẩn đoán lỗi', step: 1 },
+                  { label: 'Sửa chữa', sub: 'Xử lý kỹ thuật', step: 2 },
+                  { label: 'Hoàn tất', sub: 'Kiểm thử OK', step: 3 },
+                  { label: 'Bàn giao', sub: 'Đã giao khách', step: 4 },
                 ].map((s) => {
                   const currentStep = getStepIndex(selectedOrder.status);
                   const isDone = s.step < currentStep;
@@ -676,6 +982,7 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                         {isDone ? <CheckCircle2 size={18} /> : s.step + 1}
                       </div>
                       <span className="step-label">{s.label}</span>
+                      <span className="step-sub">{s.sub}</span>
                     </div>
                   );
                 })}
@@ -683,7 +990,7 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
             ) : (
               <div className="track-error-banner" style={{ marginBottom: '20px' }}>
                 <AlertCircle size={18} />
-                <span>Đơn hàng này đã được xác nhận hủy xử lý.</span>
+                <span>Đơn hàng này đã được xác nhận trả thiết bị / hủy xử lý.</span>
               </div>
             )}
 
@@ -793,6 +1100,16 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
           /* VIEW 2: QUICK TRACK FORM */
           <div className="track-hero-card">
             <div className="track-hero-header">
+              <div className="track-hero-logo-box">
+                <img
+                  src="/app_logo.png"
+                  alt="Logo ứng dụng"
+                  className="track-hero-logo"
+                  onError={(e) => {
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
               <h2>Tra Cứu Nhanh Tiến Độ Sửa Chữa</h2>
               <p>Nhập mã đơn hàng và số điện thoại đăng ký nhận máy để xem tình trạng sửa chữa</p>
             </div>
@@ -851,37 +1168,268 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
         ) : (
           /* VIEW 3: MY ORDERS LIST (When Authenticated) */
           <div>
+            {/* METRICS KPI OVERVIEW */}
+            {orders.length > 0 && (
+              <div className="portal-metrics-overview">
+                <div
+                  className={`portal-metric-card ${selectedStatusFilter === 'ALL' ? 'active' : ''}`}
+                  onClick={() => setSelectedStatusFilter('ALL')}
+                  title="Nhấn để xem toàn bộ đơn hàng"
+                >
+                  <div className="metric-icon-box total">
+                    <Package size={20} />
+                  </div>
+                  <div className="metric-content">
+                    <span className="metric-label">Tổng đơn hàng</span>
+                    <span className="metric-val">{metrics.total}</span>
+                  </div>
+                </div>
+
+                <div
+                  className={`portal-metric-card ${selectedStatusFilter === 'PROCESSING' ? 'active' : ''}`}
+                  onClick={() => setSelectedStatusFilter('PROCESSING')}
+                  title="Nhấn để xem các đơn đang trong quá trình tiếp nhận, kiểm tra hoặc sửa chữa"
+                >
+                  <div className="metric-icon-box processing">
+                    <Wrench size={20} />
+                  </div>
+                  <div className="metric-content">
+                    <span className="metric-label">Đang xử lý / sửa</span>
+                    <span className="metric-val">{metrics.processing}</span>
+                  </div>
+                </div>
+
+                <div
+                  className={`portal-metric-card ${selectedStatusFilter === 'COMPLETED' ? 'active' : ''}`}
+                  onClick={() => setSelectedStatusFilter('COMPLETED')}
+                  title="Nhấn để xem các đơn đã sửa xong, kiểm thử hoàn tất"
+                >
+                  <div className="metric-icon-box completed">
+                    <CheckCircle2 size={20} />
+                  </div>
+                  <div className="metric-content">
+                    <span className="metric-label">Đã sửa xong</span>
+                    <span className="metric-val">{metrics.completed}</span>
+                  </div>
+                </div>
+
+                <div
+                  className={`portal-metric-card ${selectedStatusFilter === 'DELIVERED' ? 'active' : ''}`}
+                  onClick={() => setSelectedStatusFilter('DELIVERED')}
+                  title="Nhấn để xem các đơn đã bàn giao cho khách"
+                >
+                  <div className="metric-icon-box delivered">
+                    <PackageCheck size={20} />
+                  </div>
+                  <div className="metric-content">
+                    <span className="metric-label">Đã bàn giao</span>
+                    <span className="metric-val">{metrics.delivered}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ADVANCED FILTER & SEARCH TOOLBAR */}
+            {orders.length > 0 && (
+              <div className="portal-filter-container">
+                {/* TOP ROW: SEARCH + TIME FILTER + DEVICE FILTER + SORT */}
+                <div className="portal-filter-top">
+                  <div className="portal-search-wrapper">
+                    <Search size={16} className="search-icon" />
+                    <input
+                      type="text"
+                      placeholder="Tìm theo mã đơn, model máy, sê-ri, lỗi..."
+                      value={orderSearchKeyword}
+                      onChange={(e) => setOrderSearchKeyword(e.target.value)}
+                    />
+                    {orderSearchKeyword && (
+                      <button
+                        type="button"
+                        className="btn-clear-search"
+                        onClick={() => setOrderSearchKeyword('')}
+                        title="Xóa tìm kiếm"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="portal-filter-controls">
+                    {/* Time filter */}
+                    <div className="portal-select-wrapper">
+                      <Calendar size={14} className="select-icon" />
+                      <select
+                        value={selectedTimeFilter}
+                        onChange={(e) => setSelectedTimeFilter(e.target.value)}
+                        aria-label="Lọc theo thời gian"
+                      >
+                        <option value="ALL">Tất cả thời gian</option>
+                        <option value="30_DAYS">30 ngày gần nhất</option>
+                        <option value="THIS_MONTH">Trong tháng này</option>
+                        <option value="3_MONTHS">3 tháng gần nhất</option>
+                        <option value="THIS_YEAR">Trong năm nay</option>
+                      </select>
+                      <ChevronDown size={13} className="select-arrow" />
+                    </div>
+
+                    {/* Device filter */}
+                    {availableDeviceTypes.length > 0 && (
+                      <div className="portal-select-wrapper">
+                        <Cpu size={14} className="select-icon" />
+                        <select
+                          value={selectedDeviceType}
+                          onChange={(e) => setSelectedDeviceType(e.target.value)}
+                          aria-label="Lọc theo loại thiết bị"
+                        >
+                          <option value="ALL">Tất cả thiết bị ({availableDeviceTypes.length})</option>
+                          {availableDeviceTypes.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown size={13} className="select-arrow" />
+                      </div>
+                    )}
+
+                    {/* Sort */}
+                    <div className="portal-select-wrapper">
+                      <ArrowUpDown size={14} className="select-icon" />
+                      <select
+                        value={sortBy}
+                        onChange={(e) => setSortBy(e.target.value as any)}
+                        aria-label="Sắp xếp danh sách"
+                      >
+                        <option value="newest">Mới nhất trước</option>
+                        <option value="oldest">Cũ nhất trước</option>
+                        <option value="estimated">Theo ngày hẹn giao</option>
+                        <option value="code">Theo mã đơn (A-Z)</option>
+                      </select>
+                      <ChevronDown size={13} className="select-arrow" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* BOTTOM ROW: STATUS FILTER PILLS */}
+                <div className="portal-status-pills-bar">
+                  {[
+                    { key: 'ALL', label: 'Tất cả', count: statusCounts.ALL },
+                    { key: 'PROCESSING', label: 'Đang xử lý', count: statusCounts.PROCESSING },
+                    { key: 'PENDING', label: 'Tiếp nhận', count: statusCounts.PENDING },
+                    { key: 'CHECKING', label: 'Đang kiểm tra', count: statusCounts.CHECKING },
+                    { key: 'IN_PROGRESS', label: 'Đang sửa', count: statusCounts.IN_PROGRESS },
+                    { key: 'COMPLETED', label: 'Đã sửa xong', count: statusCounts.COMPLETED },
+                    { key: 'DELIVERED', label: 'Đã bàn giao', count: statusCounts.DELIVERED },
+                    ...(statusCounts.CANCELLED > 0 ? [{ key: 'CANCELLED', label: 'Đã hủy/trả', count: statusCounts.CANCELLED }] : []),
+                  ].map((tab) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      className={`portal-filter-pill-btn ${selectedStatusFilter === tab.key ? 'active' : ''}`}
+                      onClick={() => setSelectedStatusFilter(tab.key)}
+                    >
+                      <span>{tab.label}</span>
+                      <span className="pill-count-tag">{tab.count}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* ACTIVE FILTER CHIPS & RESET BUTTON */}
+                {isFiltering && (
+                  <div className="portal-active-filters-row">
+                    <div className="active-filters-chips">
+                      <span className="active-filters-label">Đang áp dụng:</span>
+                      {selectedStatusFilter !== 'ALL' && (
+                        <span className="filter-chip">
+                          Trạng thái: <strong>{getStatusFilterLabel(selectedStatusFilter)}</strong>
+                          <button type="button" onClick={() => setSelectedStatusFilter('ALL')} title="Bỏ lọc trạng thái">✕</button>
+                        </span>
+                      )}
+                      {selectedTimeFilter !== 'ALL' && (
+                        <span className="filter-chip">
+                          Thời gian: <strong>{getTimeLabel(selectedTimeFilter)}</strong>
+                          <button type="button" onClick={() => setSelectedTimeFilter('ALL')} title="Bỏ lọc thời gian">✕</button>
+                        </span>
+                      )}
+                      {selectedDeviceType !== 'ALL' && (
+                        <span className="filter-chip">
+                          Thiết bị: <strong>{selectedDeviceType}</strong>
+                          <button type="button" onClick={() => setSelectedDeviceType('ALL')} title="Bỏ lọc thiết bị">✕</button>
+                        </span>
+                      )}
+                      {orderSearchKeyword.trim() && (
+                        <span className="filter-chip">
+                          Từ khóa: <strong>"{orderSearchKeyword.trim()}"</strong>
+                          <button type="button" onClick={() => setOrderSearchKeyword('')} title="Xóa từ khóa">✕</button>
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn-reset-filters"
+                      onClick={handleResetFilters}
+                    >
+                      <RotateCcw size={12} />
+                      Đặt lại bộ lọc
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ORDERS HEADER BAR */}
             <div className="portal-orders-header">
               <h2 className="portal-orders-title">
-                Đơn hàng của Quý khách ({orders.length})
+                Đơn hàng của Quý khách
+                {orders.length > 0 && (
+                  <span className="portal-orders-count-badge">
+                    {sortedAndFilteredOrders.length} / {orders.length} đơn
+                  </span>
+                )}
               </h2>
-              <div className="portal-orders-search">
-                <Search size={15} className="search-icon" />
-                <input
-                  type="text"
-                  placeholder="Tìm mã đơn, tên máy..."
-                  value={orderSearchKeyword}
-                  onChange={(e) => setOrderSearchKeyword(e.target.value)}
-                />
-              </div>
             </div>
 
             {ordersLoading ? (
-              <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 8px' }} />
-                Đang tải danh sách đơn hàng của bạn...
+              <div style={{ textAlign: 'center', padding: '50px', color: '#64748b' }}>
+                <RefreshCw size={26} className="animate-spin" style={{ margin: '0 auto 10px' }} />
+                <p>Đang tải danh sách đơn hàng của bạn...</p>
               </div>
             ) : orders.length === 0 ? (
               <div className="track-hero-card" style={{ textAlign: 'center' }}>
-                <Package size={36} style={{ color: '#94a3b8', margin: '0 auto 12px' }} />
-                <h3>Chưa tìm thấy đơn hàng nào</h3>
-                <p>Quý khách chưa có đơn sửa chữa nào hoặc từ khóa tìm kiếm không khớp.</p>
+                <Package size={40} style={{ color: '#94a3b8', margin: '0 auto 12px' }} />
+                <h3>Chưa có đơn hàng nào</h3>
+                <p>Quý khách chưa có đơn sửa chữa nào được liên kết với tài khoản này.</p>
+              </div>
+            ) : sortedAndFilteredOrders.length === 0 ? (
+              <div className="portal-empty-filtered">
+                <div className="empty-filter-icon">
+                  <Search size={28} />
+                </div>
+                <h3>Không tìm thấy đơn hàng phù hợp</h3>
+                <p>Không có đơn sửa chữa nào khớp với bộ lọc hoặc từ khóa tìm kiếm hiện tại.</p>
+                <button
+                  type="button"
+                  className="btn-portal-reset"
+                  onClick={handleResetFilters}
+                >
+                  <RotateCcw size={14} /> Xóa bộ lọc & xem tất cả ({orders.length} đơn)
+                </button>
               </div>
             ) : (
               <div className="portal-orders-grid">
-                {orders.map((ord) => {
+                {sortedAndFilteredOrders.map((ord) => {
                   const receivedStr = ord.receivedAt || ord.receivedDate;
                   const estimatedStr = ord.estimatedDone || ord.expectedDeliveryDate;
+                  const currentStepIdx = getStepIndex(ord.status);
+                  const stepText = [
+                    'Bước 1/5: Tiếp nhận',
+                    'Bước 2/5: Kiểm tra',
+                    'Bước 3/5: Đang sửa',
+                    'Bước 4/5: Hoàn tất',
+                    'Bước 5/5: Đã bàn giao',
+                  ][currentStepIdx] || '';
+
                   return (
                     <div
                       key={ord.id}
@@ -891,16 +1439,25 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                       <div>
                         <div className="card-top-row">
                           <span className="order-code-badge">{ord.orderCode}</span>
-                          <span className={`portal-status-pill ${getStatusBadgeClass(ord.status)}`}>
-                            {getVietnameseStatus(ord.status, ord.statusLabel || ord.friendlyStatus)}
-                          </span>
+                          {renderStatusBadge(ord.status, ord.statusLabel || ord.friendlyStatus)}
                         </div>
                         <h4 className="order-title">
                           {ord.orderTitle || ord.deviceName || ord.deviceType || 'Đơn sửa chữa thiết bị'}
                         </h4>
+                        {(ord.deviceType || ord.deviceName) && (
+                          <div className="order-device-tag">
+                            <Cpu size={12} />
+                            <span>{ord.deviceType || ord.deviceName}</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="order-meta-info">
+                        {ord.status !== 'CANCELLED' && (
+                          <div className="meta-row meta-progress-row">
+                            <span className="step-hint-badge">{stepText}</span>
+                          </div>
+                        )}
                         {ord.serialNumber && (
                           <div className="meta-row">
                             <span>Số sê-ri:</span>
