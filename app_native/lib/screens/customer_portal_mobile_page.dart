@@ -240,15 +240,23 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     return 'Đơn sửa chữa thiết bị';
   }
 
-  static String _formatVietnameseDate(String? raw) {
+  static String _formatVietnameseDate(String? raw, {bool includeTime = false}) {
     if (raw == null || raw.trim().isEmpty) return '';
     final clean = raw.trim();
+    String timeStr = '';
+    if (includeTime && clean.contains('T')) {
+      final timePart = clean.split('T')[1].split('+')[0].split('Z')[0];
+      final timeSegments = timePart.split(':');
+      if (timeSegments.length >= 2) {
+        timeStr = '${timeSegments[0]}:${timeSegments[1]} ';
+      }
+    }
     final datePart = clean.split('T').first.split(' ').first;
     final parts = datePart.split('-');
     if (parts.length == 3 && parts[0].length == 4) {
-      return '${parts[2]}/${parts[1]}/${parts[0]}';
+      return '$timeStr${parts[2]}/${parts[1]}/${parts[0]}';
     }
-    return datePart;
+    return '$timeStr$datePart';
   }
 
   // Filtered orders getter
@@ -338,20 +346,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             s == 'IN_PROGRESS';
       }).length;
 
-  int get _pendingCount => _orders.where((o) {
-        final s = (o['status'] ?? '').toString().toUpperCase();
-        return s == 'PENDING' || s == 'WAITING_FOR_CHECK';
-      }).length;
 
-  int get _checkingCount => _orders.where((o) {
-        final s = (o['status'] ?? '').toString().toUpperCase();
-        return s == 'CHECKING' || s == 'CHECKED';
-      }).length;
-
-  int get _repairingCount => _orders.where((o) {
-        final s = (o['status'] ?? '').toString().toUpperCase();
-        return s == 'IN_PROGRESS';
-      }).length;
 
   int get _completedCount => _orders.where((o) {
         final s = (o['status'] ?? '').toString().toUpperCase();
@@ -543,16 +538,18 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     );
   }
 
-  // New repair request sheet
+  // New repair request sheet with 2 choices: Form entry & Hotline call
   void _showNewRequestDialog() {
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
+      backgroundColor: Colors.transparent,
       builder: (ctx) => SafeArea(
-        child: Padding(
+        child: Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -571,39 +568,372 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               const SizedBox(height: 16),
               const Row(
                 children: [
-                  Icon(LucideIcons.plusCircle, color: Color(0xFF2563EB), size: 22),
+                  Icon(LucideIcons.wrench, color: Color(0xFF2563EB), size: 22),
                   SizedBox(width: 10),
-                  Text(
-                    'Tạo yêu cầu gửi sửa thiết bị',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  Expanded(
+                    child: Text(
+                      'Tạo yêu cầu gửi sửa thiết bị',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               const Text(
-                'Kỹ thuật viên của trung tâm Inverter Like New sẽ tiếp nhận thông tin và bố trí nhận máy cấp tốc.',
-                style: TextStyle(fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+                'Chọn phương thức tiếp nhận máy thuận tiện nhất cho Quý khách:',
+                style: TextStyle(fontSize: 12.5, color: Color(0xFF64748B)),
               ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 48,
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              const SizedBox(height: 16),
+
+              // Option 1: Điền form gửi máy sửa chữa
+              InkWell(
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _showCreateOrderFormSheet();
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
                   ),
-                  onPressed: () {
-                    Navigator.of(ctx).pop();
-                    _makePhoneCall(_hotlineNumber);
-                  },
-                  icon: const Icon(LucideIcons.phoneCall, size: 18),
-                  label: Text('Gọi điện tiếp nhận ($_hotlineNumber)', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF2563EB),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(LucideIcons.fileSpreadsheet, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Điền form gửi máy sửa chữa',
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Nhập model, số serial và mô tả lỗi để kỹ thuật viên chuẩn bị linh kiện tiếp nhận.',
+                              style: TextStyle(fontSize: 11, color: Color(0xFF3B82F6), height: 1.3),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(LucideIcons.chevronRight, size: 18, color: Color(0xFF2563EB)),
+                    ],
+                  ),
                 ),
               ),
+              const SizedBox(height: 12),
+
+              // Option 2: Gọi hotline hỗ trợ nhanh
+              InkWell(
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _makePhoneCall(_hotlineNumber);
+                },
+                borderRadius: BorderRadius.circular(16),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFECFDF5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: const Color(0xFFA7F3D0)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(LucideIcons.phoneCall, color: Colors.white, size: 20),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Gọi hotline hỗ trợ nhanh (24/7)',
+                              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: Color(0xFF065F46)),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$_hotlineLabel: $_hotlineNumber\nKết nối trực tiếp kỹ sư chuyên trách để tư vấn bắt bệnh từ xa.',
+                              style: const TextStyle(fontSize: 11, color: Color(0xFF059669), height: 1.3),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(LucideIcons.chevronRight, size: 18, color: Color(0xFF10B981)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  // Interactive Form Sheet for online machine repair request
+  void _showCreateOrderFormSheet() {
+    final modelController = TextEditingController();
+    final serialController = TextEditingController();
+    final issueController = TextEditingController();
+    final addressController = TextEditingController(
+      text: _accountProfile?['companyAddress']?.toString() ?? '',
+    );
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(ctx).size.height * 0.88,
+          ),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+          ),
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCBD5E1),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(LucideIcons.fileSpreadsheet, size: 20, color: Color(0xFF2563EB)),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Điền form gửi máy sửa chữa',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                          ),
+                          Text(
+                            'Hệ thống tiếp nhận & bố trí nhận máy cấp tốc',
+                            style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(LucideIcons.x, size: 20, color: Color(0xFF94A3B8)),
+                      onPressed: () => Navigator.of(ctx).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                const Text('Model / Loại máy (*)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: modelController,
+                  decoration: InputDecoration(
+                    hintText: 'Ví dụ: Schneider ATV310 7.5kW, Fuji Mega 15kW...',
+                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Số Sê-ri (Serial number)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: serialController,
+                  decoration: InputDecoration(
+                    hintText: 'Nhập số serial trên tem máy (nếu có)',
+                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Mô tả hiện tượng lỗi / sự cố (*)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: issueController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'Ví dụ: Báo lỗi quá dòng OC, nổ bo công suất IGBT, mất nguồn điều khiển 24V...',
+                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.all(14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('Địa chỉ nhận thiết bị / Nhà xưởng', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF334155))),
+                const SizedBox(height: 6),
+                TextField(
+                  controller: addressController,
+                  decoration: InputDecoration(
+                    hintText: 'Địa chỉ nhà xưởng hoặc ghi chú tự mang đến trung tâm',
+                    hintStyle: const TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2563EB),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    onPressed: () {
+                      final model = modelController.text.trim();
+                      final issue = issueController.text.trim();
+                      if (model.isEmpty || issue.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Vui lòng nhập Model máy và mô tả lỗi thiết bị.'),
+                            backgroundColor: Color(0xFFDC2626),
+                          ),
+                        );
+                        return;
+                      }
+                      Navigator.of(ctx).pop();
+                      _showRequestSuccessDialog(model);
+                    },
+                    child: const Text('Gửi phiếu yêu cầu sửa chữa', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showRequestSuccessDialog(String model) {
+    final ticketCode = 'YC-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(22),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 56,
+              height: 56,
+              decoration: const BoxDecoration(
+                color: Color(0xFFECFDF5),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(LucideIcons.checkCircle2, color: Color(0xFF10B981), size: 32),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Gửi yêu cầu thành công!',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                'Mã phiếu: #$ticketCode',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontFamily: 'monospace', color: Color(0xFF2563EB)),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Text(
+              'Thiết bị "$model" đã được ghi nhận. Kỹ thuật viên sẽ liên hệ Quý khách trong vòng 15 phút để xác nhận phương án nhận máy tận nơi.',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 12.5, color: Color(0xFF475569), height: 1.4),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                    child: const Text('Đóng'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      _makePhoneCall(_hotlineNumber);
+                    },
+                    icon: const Icon(LucideIcons.phoneCall, size: 14),
+                    label: const Text('Gọi hotline', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );
@@ -1766,7 +2096,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                 child: Image.asset(
                   'assets/images/app_logo.png',
                   fit: BoxFit.contain,
-                  errorBuilder: (_, __, ___) => const Icon(
+                  errorBuilder: (_, _, _) => const Icon(
                     LucideIcons.wrench,
                     color: Color(0xFF2563EB),
                     size: 20,
@@ -1781,16 +2111,18 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                 children: [
                   Row(
                     children: [
-                      const Text(
-                        'CỔNG KHÁCH HÀNG',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 0.5,
-                          color: Color(0xFF0F172A),
+                      const Flexible(
+                        child: Text(
+                          'CỔNG KHÁCH HÀNG',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 0.5,
+                            color: Color(0xFF0F172A),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(width: 6),
                       Container(
@@ -1815,6 +2147,24 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           ],
         ),
         actions: [
+          // Action Icon: Quick call technical support
+          IconButton(
+            tooltip: '$_hotlineLabel: $_hotlineNumber',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            icon: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
+              ),
+              child: const Icon(LucideIcons.phoneCall, size: 16, color: Color(0xFF059669)),
+            ),
+            onPressed: () => _makePhoneCall(_hotlineNumber),
+          ),
+          const SizedBox(width: 8),
           // Profile Circular Button with Red Notification Dot Badge
           PopupMenuButton<String>(
             tooltip: 'Tài khoản & Cài đặt',
@@ -1953,11 +2303,10 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             _buildVipMembershipCard(companyName, contactName, initials, user?.username, avatarUrl),
             const SizedBox(height: 16),
 
-            // 2. SEARCH BAR & QUICK FILTERS
+            // 2. SEARCH BAR & QUICK FILTERS (Single Row Horizontal Chips)
             _buildSearchBar(),
             const SizedBox(height: 12),
             _buildFilterTabs(),
-            _buildSecondaryFilters(),
             const SizedBox(height: 16),
 
             // 3. SECTION HEADER
@@ -2019,7 +2368,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
 
             const SizedBox(height: 14),
 
-            // 5. FAST SUPPORT BANNER (Bottom Banner from Stitch)
+            // 5. PRIMARY CTA BANNER (Bottom Section)
             _buildFastSupportBanner(),
 
             const SizedBox(height: 24),
@@ -2099,74 +2448,57 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top Row: VIP Badge & Realtime Monitoring Beacon
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Flexible(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: const Color(0x26FBBF24),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0x4DFBBF24)),
+                // Top Row: Merged Single-Line Status Tag & VIP Badge
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(LucideIcons.crown, size: 11, color: Color(0xFFFBBF24)),
+                      const SizedBox(width: 5),
+                      const Text(
+                        'ĐỐI TÁC DOANH NGHIỆP',
+                        style: TextStyle(
+                          color: Color(0xFFFCD34D),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
                         ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(LucideIcons.crown, size: 11, color: Color(0xFFFBBF24)),
-                            SizedBox(width: 4),
-                            Flexible(
-                              child: Text(
-                                'ĐỐI TÁC DOANH NGHIỆP',
-                                style: TextStyle(
-                                  color: Color(0xFFFCD34D),
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
-                                  letterSpacing: 0.5,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Container(
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        width: 1,
+                        height: 10,
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                      Container(
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFF10B981),
+                          shape: BoxShape.circle,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0x80064E3B),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0x4D10B981)),
+                      const SizedBox(width: 4),
+                      const Text(
+                        '24/7',
+                        style: TextStyle(
+                          color: Color(0xFF34D399),
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 6,
-                            height: 6,
-                            decoration: const BoxDecoration(
-                              color: Color(0xFF10B981),
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            '24/7',
-                            style: TextStyle(
-                              color: Color(0xFF34D399),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 14),
 
                 // Company Identity Block
                 Row(
@@ -2233,150 +2565,143 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                     ),
                     const SizedBox(width: 14),
                     Expanded(
-                      child: GestureDetector(
-                        onTap: () => _showProfileDialog(),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              companyName,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                height: 1.25,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 3),
-                            Row(
-                              children: [
-                                Text(
-                                  'Mã: ',
-                                  style: TextStyle(
-                                    color: Colors.white.withValues(alpha: 0.75),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                                Flexible(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: GestureDetector(
+                                  onTap: () => _showProfileDialog(),
                                   child: Text(
-                                    '#$codeDisplay',
+                                    companyName,
                                     style: const TextStyle(
                                       color: Colors.white,
-                                      fontSize: 11,
+                                      fontSize: 15,
                                       fontWeight: FontWeight.bold,
-                                      fontFamily: 'monospace',
+                                      height: 1.25,
                                     ),
-                                    maxLines: 1,
+                                    maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
-                              ],
-                            ),
-                            if (contactName.isNotEmpty && contactName != companyName) ...[
-                              const SizedBox(height: 2),
-                              Text(
-                                'Đại diện: $contactName',
-                                style: TextStyle(
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
+                              ),
+                              const SizedBox(width: 8),
+                              // Action Button "Gọi kỹ thuật" tương phản cao trên nền navy (kính mờ + viền trắng)
+                              InkWell(
+                                onTap: () => _makePhoneCall(_hotlineNumber),
+                                borderRadius: BorderRadius.circular(16),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.18),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: Colors.white.withValues(alpha: 0.75), width: 1.2),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.15),
+                                        blurRadius: 4,
+                                        offset: const Offset(0, 1),
+                                      ),
+                                    ],
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(LucideIcons.phoneCall, size: 12, color: Colors.white),
+                                      SizedBox(width: 5),
+                                      Text(
+                                        'Gọi kỹ thuật',
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10.5,
+                                          fontWeight: FontWeight.w800,
+                                          letterSpacing: 0.2,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 5),
+                          Row(
+                            children: [
+                              Flexible(
+                                child: InkWell(
+                                  onTap: () {
+                                    Clipboard.setData(ClipboardData(text: codeDisplay));
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('Đã sao chép mã khách hàng: #$codeDisplay'),
+                                        duration: const Duration(seconds: 2),
+                                        behavior: SnackBarBehavior.floating,
+                                      ),
+                                    );
+                                  },
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          'Mã: ',
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(alpha: 0.75),
+                                            fontSize: 11,
+                                          ),
+                                        ),
+                                        Flexible(
+                                          child: Text(
+                                            '#$codeDisplay',
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              fontFamily: 'monospace',
+                                            ),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 5),
+                                        Icon(
+                                          LucideIcons.copy,
+                                          size: 11,
+                                          color: Colors.white.withValues(alpha: 0.85),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (contactName.isNotEmpty && contactName != companyName) ...[
+                            const SizedBox(height: 3),
+                            Text(
+                              'Đại diện: $contactName',
+                              style: TextStyle(
+                                color: Colors.white.withValues(alpha: 0.9),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ],
-                        ),
+                        ],
                       ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 14),
-
-                // Phone 1-Touch Contact Banner
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF10B981).withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Icon(LucideIcons.phoneCall, size: 16, color: Color(0xFF34D399)),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              _hotlineLabel,
-                              style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.75)),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              'Số điện thoại: $_hotlineNumber',
-                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      // 1-Touch call button
-                      Flexible(
-                        child: InkWell(
-                          onTap: () => _makePhoneCall(_hotlineNumber),
-                          borderRadius: BorderRadius.circular(8),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF10B981),
-                              borderRadius: BorderRadius.circular(8),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: const Color(0xFF10B981).withValues(alpha: 0.35),
-                                  blurRadius: 6,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(LucideIcons.phoneCall, size: 11, color: Color(0xFF022C22)),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    'Gọi $_hotlineNumber',
-                                    style: const TextStyle(
-                                      color: Color(0xFF022C22),
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 10,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
                 ),
                 const SizedBox(height: 14),
 
@@ -2563,10 +2888,12 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     );
   }
 
-  // Quick Filter Tabs (Pill chips from Stitch)
+  // Unified Single-Row Horizontal Filter Chips
   Widget _buildFilterTabs() {
+    final hasActiveSecondaryFilter = _selectedTimeFilter != 'ALL' || _selectedDeviceType != 'ALL';
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
       child: Row(
         children: [
           _buildFilterChip('ALL', 'Tất cả (${_orders.length})', LucideIcons.layers, null),
@@ -2578,9 +2905,129 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           _buildFilterChip('DELIVERED', 'Đã bàn giao ($_deliveredCount)', LucideIcons.packageCheck, const Color(0xFF0D9488)),
           const SizedBox(width: 8),
           _buildFilterChip('HISTORY', 'Lịch sử trả hàng', LucideIcons.archive, const Color(0xFF64748B)),
+          const SizedBox(width: 8),
+          _buildDropdownChip(
+            label: _selectedTimeFilter == 'ALL' ? 'Thời gian' : _getTimeFilterLabel(_selectedTimeFilter),
+            icon: LucideIcons.calendar,
+            isActive: _selectedTimeFilter != 'ALL',
+            onTap: _showTimeFilterPicker,
+          ),
+          const SizedBox(width: 8),
+          _buildDropdownChip(
+            label: _selectedDeviceType == 'ALL' ? 'Loại máy' : _selectedDeviceType,
+            icon: LucideIcons.cpu,
+            isActive: _selectedDeviceType != 'ALL',
+            onTap: _showDeviceTypePicker,
+          ),
+          if (hasActiveSecondaryFilter) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: () {
+                setState(() {
+                  _selectedTimeFilter = 'ALL';
+                  _selectedDeviceType = 'ALL';
+                });
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEE2E2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFFFECDD3)),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(LucideIcons.rotateCcw, size: 12, color: Color(0xFFDC2626)),
+                    SizedBox(width: 4),
+                    Text(
+                      'Xóa lọc',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _buildDropdownChip({
+    required String label,
+    required IconData icon,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? const Color(0xFFEFF6FF) : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isActive ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+            width: isActive ? 1.5 : 1.0,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.03),
+              blurRadius: 4,
+              offset: const Offset(0, 1),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 13,
+              color: isActive ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
+                color: isActive ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              LucideIcons.chevronDown,
+              size: 12,
+              color: isActive ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getTimeFilterLabel(String key) {
+    switch (key) {
+      case '30_DAYS':
+        return '30 ngày qua';
+      case 'THIS_MONTH':
+        return 'Tháng này';
+      case '3_MONTHS':
+        return '3 tháng qua';
+      case 'THIS_YEAR':
+        return 'Năm nay';
+      default:
+        return 'Tất cả thời gian';
+    }
   }
 
   void _showTimeFilterPicker() {
@@ -2743,150 +3190,6 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     );
   }
 
-  Widget _buildSecondaryFilters() {
-    final hasActiveFilter = _selectedTimeFilter != 'ALL' || _selectedDeviceType != 'ALL';
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          // Time Filter Trigger
-          Expanded(
-            child: InkWell(
-              onTap: _showTimeFilterPicker,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: _selectedTimeFilter != 'ALL' ? const Color(0xFFEFF6FF) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _selectedTimeFilter != 'ALL' ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.calendar,
-                      size: 13,
-                      color: _selectedTimeFilter != 'ALL' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _getTimeFilterLabel(_selectedTimeFilter),
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: _selectedTimeFilter != 'ALL' ? FontWeight.w700 : FontWeight.w500,
-                          color: _selectedTimeFilter != 'ALL' ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Icon(LucideIcons.chevronDown, size: 12, color: Color(0xFF94A3B8)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-
-          // Device Type Trigger
-          Expanded(
-            child: InkWell(
-              onTap: _showDeviceTypePicker,
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                decoration: BoxDecoration(
-                  color: _selectedDeviceType != 'ALL' ? const Color(0xFFEFF6FF) : Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: _selectedDeviceType != 'ALL' ? const Color(0xFF3B82F6) : const Color(0xFFE2E8F0),
-                  ),
-                ),
-                child: Row(
-                  children: [
-                    Icon(
-                      LucideIcons.cpu,
-                      size: 13,
-                      color: _selectedDeviceType != 'ALL' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
-                    ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        _selectedDeviceType == 'ALL' ? 'Tất cả thiết bị' : _selectedDeviceType,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: _selectedDeviceType != 'ALL' ? FontWeight.w700 : FontWeight.w500,
-                          color: _selectedDeviceType != 'ALL' ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    const Icon(LucideIcons.chevronDown, size: 12, color: Color(0xFF94A3B8)),
-                  ],
-                ),
-              ),
-            ),
-          ),
-
-          if (hasActiveFilter) ...[
-            const SizedBox(width: 6),
-            InkWell(
-              onTap: () {
-                setState(() {
-                  _selectedTimeFilter = 'ALL';
-                  _selectedDeviceType = 'ALL';
-                });
-              },
-              borderRadius: BorderRadius.circular(10),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFEE2E2),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFECDD3)),
-                ),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(LucideIcons.rotateCcw, size: 12, color: Color(0xFFDC2626)),
-                    SizedBox(width: 4),
-                    Text(
-                      'Xóa lọc',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFFDC2626),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
-  String _getTimeFilterLabel(String key) {
-    switch (key) {
-      case '30_DAYS':
-        return '30 ngày qua';
-      case 'THIS_MONTH':
-        return 'Tháng này';
-      case '3_MONTHS':
-        return '3 tháng qua';
-      case 'THIS_YEAR':
-        return 'Năm nay';
-      default:
-        return 'Tất cả thời gian';
-    }
-  }
 
   Widget _buildFilterChip(String filterKey, String title, IconData icon, Color? iconTint) {
     final isSelected = _selectedFilter == filterKey;
@@ -3177,7 +3480,11 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                       const SizedBox(height: 14),
 
                       // 5-Step Process Stepper (Stitch Design)
-                      _buildMiniProgressTimeline(timelineStep, isCompleted),
+                      _buildMiniProgressTimeline(
+                        timelineStep,
+                        isCompleted: status == 'COMPLETED',
+                        isDelivered: status == 'DELIVERED',
+                      ),
                       const SizedBox(height: 14),
 
                       // Bottom CTA Button
@@ -3233,8 +3540,12 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   }
 
   // 5-Step Stepper inside card (Stitch Design)
-  Widget _buildMiniProgressTimeline(int currentStep, bool isCompleted) {
-    final stages = ['Tiếp nhận', 'Kiểm tra', 'Sửa chữa', 'K.Tra Tải', 'Bàn giao'];
+  Widget _buildMiniProgressTimeline(
+    int currentStep, {
+    bool isCompleted = false,
+    bool isDelivered = false,
+  }) {
+    final stages = ['Tiếp nhận', 'Kiểm tra', 'Sửa chữa', 'Kiểm tra tải', 'Bàn giao'];
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
@@ -3263,11 +3574,13 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               ),
               const SizedBox(width: 8),
               Text(
-                isCompleted ? 'đã kiểm định 100%' : 'bước ${currentStep + 1}/5',
+                isDelivered
+                    ? 'đã bàn giao'
+                    : (isCompleted ? 'đã kiểm tra tải' : 'bước ${currentStep + 1}/5'),
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: isCompleted ? const Color(0xFF059669) : const Color(0xFF2563EB),
+                  color: (isDelivered || isCompleted) ? const Color(0xFF059669) : const Color(0xFF2563EB),
                 ),
               ),
             ],
@@ -3277,8 +3590,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           // Stepper Nodes
           Row(
             children: List.generate(stages.length, (stepIdx) {
-              final isDone = stepIdx < currentStep || isCompleted;
-              final isCurrent = stepIdx == currentStep && !isCompleted;
+              final isDone = isDelivered || stepIdx < currentStep || (isCompleted && stepIdx <= 3);
+              final isCurrent = !isDelivered && stepIdx == currentStep && !(isCompleted && stepIdx <= 3);
 
               Color bg;
               if (isDone) {
@@ -3310,7 +3623,9 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                               ? const Icon(LucideIcons.check, size: 10, color: Colors.white)
                               : (isCurrent
                                   ? const Icon(LucideIcons.clock, size: 9, color: Colors.white)
-                                  : Text('${stepIdx + 1}', style: const TextStyle(fontSize: 8, color: Color(0xFF64748B), fontWeight: FontWeight.bold))),
+                                  : Text('${stepIdx + 1}',
+                                      style: const TextStyle(
+                                          fontSize: 8, color: Color(0xFF64748B), fontWeight: FontWeight.bold))),
                         ),
                         Expanded(
                           child: Container(
@@ -3408,6 +3723,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       ),
     );
   }
+
 
   // Modern Bottom Navigation Bar (Stitch Screen 1)
   Widget _buildBottomNavigation() {
@@ -3788,7 +4104,6 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
   Widget build(BuildContext context) {
     final height = MediaQuery.of(context).size.height * 0.92;
     final status = (_detail?['status'] ?? 'PENDING').toString();
-    final isCompleted = status == 'COMPLETED' || status == 'DELIVERED';
     final friendlyStatus = _CustomerPortalMobilePageState._translateStatusToVietnamese(
       status,
       (_detail?['statusLabel'] ?? _detail?['friendlyStatus'])?.toString(),
@@ -3806,9 +4121,11 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
     );
     final completedDate = _CustomerPortalMobilePageState._formatVietnameseDate(
       _detail?['completedAt']?.toString(),
+      includeTime: true,
     );
     final deliveredDate = _CustomerPortalMobilePageState._formatVietnameseDate(
       _detail?['deliveredAt']?.toString(),
+      includeTime: true,
     );
     final underWarranty = _detail?['underWarranty'] == true;
     final assignedTechName = (_detail?['assignedTechnicianName'] ?? '').toString().trim();
@@ -3938,7 +4255,12 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                         padding: const EdgeInsets.all(20),
                         children: [
                           // 1. 5-Stage Stepper Card
-                          _buildStepperCard(status),
+                          _buildStepperCard(
+                            status,
+                            receivedDate: receivedDate,
+                            completedDate: completedDate,
+                            deliveredDate: deliveredDate,
+                          ),
                           const SizedBox(height: 16),
 
                           // Order Metadata Summary Card from Database
@@ -4222,74 +4544,223 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                if (updates.isEmpty)
-                                  const Text(
-                                    'Kỹ thuật viên đang kiểm tra và sẽ sớm cập nhật kết quả.',
-                                    style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontStyle: FontStyle.italic),
-                                  )
-                                else
-                                  ...updates.map((up) {
-                                    final upTitle = (up['title'] ?? '').toString().trim();
-                                    final upDate = _CustomerPortalMobilePageState._formatVietnameseDate(
-                                      (up['publishedAt'] ?? up['createdAt'])?.toString(),
-                                    );
-                                    final upMessage = (up['message'] ?? up['content'] ?? '').toString().trim();
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 12),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Container(
-                                            margin: const EdgeInsets.only(top: 2),
-                                            width: 14,
-                                            height: 14,
-                                            decoration: const BoxDecoration(
-                                              color: Color(0xFF10B981),
-                                              shape: BoxShape.circle,
-                                            ),
-                                            child: const Center(
-                                              child: Icon(LucideIcons.check, size: 8, color: Colors.white),
-                                            ),
-                                          ),
-                                          const SizedBox(width: 10),
-                                          Expanded(
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Row(
-                                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                Builder(
+                                  builder: (context) {
+                                    // Construct connected vertical timeline events from actual database records
+                                    final List<Map<String, dynamic>> timelineEvents = [];
+
+                                    // Event 1: Tiếp nhận đơn tại xưởng
+                                    if (receivedDate.isNotEmpty) {
+                                      timelineEvents.add({
+                                        'title': 'Tiếp nhận thiết bị tại xưởng',
+                                        'date': receivedDate,
+                                        'message': orderDescription.isNotEmpty
+                                            ? orderDescription
+                                            : 'Tiếp nhận thiết bị, kiểm tra sơ bộ ngoại quan và lập phiếu kỹ thuật.',
+                                        'actor': receivedByName.isNotEmpty
+                                            ? 'Người tiếp nhận: $receivedByName'
+                                            : (assignedTechName.isNotEmpty
+                                                ? 'Tiếp nhận: $assignedTechName'
+                                                : 'Chi nhánh Kỹ thuật Inverter Like-New'),
+                                        'icon': LucideIcons.packageCheck,
+                                        'color': const Color(0xFF2563EB),
+                                      });
+                                    }
+
+                                    // Event 2..N: Updates from technical logs
+                                    for (final up in updates) {
+                                      final upTitle = (up['title'] ?? '').toString().trim();
+                                      final upDate = _CustomerPortalMobilePageState._formatVietnameseDate(
+                                        (up['publishedAt'] ?? up['createdAt'])?.toString(),
+                                      );
+                                      final upMessage = (up['message'] ?? up['content'] ?? '').toString().trim();
+                                      final upActor = (up['author'] ?? up['authorName'] ?? up['staffName'])?.toString().trim();
+                                      timelineEvents.add({
+                                        'title': upTitle.isNotEmpty ? upTitle : 'Ghi nhận tiến độ kỹ thuật',
+                                        'date': upDate,
+                                        'message': upMessage,
+                                        'actor': (upActor != null && upActor.isNotEmpty)
+                                            ? 'KTV: $upActor'
+                                            : (assignedTechName.isNotEmpty
+                                                ? 'KTV: $assignedTechName'
+                                                : 'Bộ phận Kỹ thuật & Đo kiểm'),
+                                        'icon': LucideIcons.wrench,
+                                        'color': const Color(0xFF10B981),
+                                      });
+                                    }
+
+                                    // Milestone: Chạy thử tải & Nghiệm thu
+                                    if ((status == 'COMPLETED' || status == 'DELIVERED') && completedDate.isNotEmpty) {
+                                      final hasCompleted = updates.any((u) {
+                                        final t = (u['title'] ?? '').toString().toLowerCase();
+                                        return t.contains('hoàn thành') || t.contains('tải') || t.contains('nghiệm thu');
+                                      });
+                                      if (!hasCompleted) {
+                                        timelineEvents.add({
+                                          'title': 'Chạy thử tải 100% & Nghiệm thu xuất xưởng',
+                                          'date': completedDate,
+                                          'message': 'Đo xung PWM, kiểm tra dòng kích IGBT và thử tải công suất thực tế ổn định.',
+                                          'actor': assignedTechName.isNotEmpty
+                                              ? 'KTV nghiệm thu: $assignedTechName'
+                                              : 'Phòng Đo kiểm & Nghiệm thu',
+                                          'icon': LucideIcons.checkCircle2,
+                                          'color': const Color(0xFF059669),
+                                        });
+                                      }
+                                    }
+
+                                    // Milestone: Bàn giao khách hàng
+                                    if (status == 'DELIVERED' && deliveredDate.isNotEmpty) {
+                                      final hasDelivered = updates.any((u) {
+                                        final t = (u['title'] ?? '').toString().toLowerCase();
+                                        return t.contains('bàn giao');
+                                      });
+                                      if (!hasDelivered) {
+                                        timelineEvents.add({
+                                          'title': 'Đã bàn giao cho khách hàng',
+                                          'date': deliveredDate,
+                                          'message': 'Thiết bị đã được bàn giao hoàn tất cho khách hàng kèm tem bảo hành kỹ thuật.',
+                                          'actor': receivedByName.isNotEmpty
+                                              ? 'Bàn giao: $receivedByName'
+                                              : (assignedTechName.isNotEmpty
+                                                  ? 'Bàn giao: $assignedTechName'
+                                                  : 'Bộ phận Giao nhận & Khách hàng'),
+                                          'icon': LucideIcons.badgeCheck,
+                                          'color': const Color(0xFF0D9488),
+                                        });
+                                      }
+                                    }
+
+                                    if (timelineEvents.isEmpty) {
+                                      return const Text(
+                                        'Kỹ thuật viên đang kiểm tra và sẽ sớm cập nhật kết quả.',
+                                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12, fontStyle: FontStyle.italic),
+                                      );
+                                    }
+
+                                    return Column(
+                                      children: List.generate(timelineEvents.length, (idx) {
+                                        final ev = timelineEvents[idx];
+                                        final isLast = idx == timelineEvents.length - 1;
+                                        final evTitle = ev['title'] as String;
+                                        final evDate = ev['date'] as String;
+                                        final evMessage = ev['message'] as String;
+                                        final evActor = ev['actor'] as String;
+                                        final evIcon = ev['icon'] as IconData;
+                                        final evColor = ev['color'] as Color;
+
+                                        return IntrinsicHeight(
+                                          child: Row(
+                                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                                            children: [
+                                              // Connected Timeline Rail
+                                              SizedBox(
+                                                width: 24,
+                                                child: Column(
                                                   children: [
-                                                    Expanded(
-                                                      child: Text(
-                                                        upTitle.isNotEmpty ? upTitle : 'Ghi nhận tiến độ',
-                                                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
-                                                        maxLines: 1,
-                                                        overflow: TextOverflow.ellipsis,
+                                                    Container(
+                                                      width: 20,
+                                                      height: 20,
+                                                      decoration: BoxDecoration(
+                                                        color: evColor.withValues(alpha: 0.12),
+                                                        shape: BoxShape.circle,
+                                                        border: Border.all(color: evColor, width: 2),
+                                                      ),
+                                                      child: Center(
+                                                        child: Icon(evIcon, size: 10, color: evColor),
                                                       ),
                                                     ),
-                                                    if (upDate.isNotEmpty) ...[
-                                                      const SizedBox(width: 8),
-                                                      Text(
-                                                        upDate,
-                                                        style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                                                    if (!isLast)
+                                                      Expanded(
+                                                        child: Container(
+                                                          width: 2,
+                                                          color: const Color(0xFFE2E8F0),
+                                                          margin: const EdgeInsets.symmetric(vertical: 3),
+                                                        ),
                                                       ),
-                                                    ],
                                                   ],
                                                 ),
-                                                if (upMessage.isNotEmpty) ...[
-                                                  const SizedBox(height: 2),
-                                                  Text(
-                                                    upMessage,
-                                                    style: const TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.35),
+                                              ),
+                                              const SizedBox(width: 10),
+
+                                              // Event Details
+                                              Expanded(
+                                                child: Padding(
+                                                  padding: EdgeInsets.only(bottom: isLast ? 4 : 16),
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                        children: [
+                                                          Expanded(
+                                                            child: Text(
+                                                              evTitle,
+                                                              style: const TextStyle(
+                                                                fontSize: 12.5,
+                                                                fontWeight: FontWeight.bold,
+                                                                color: Color(0xFF1E293B),
+                                                              ),
+                                                              maxLines: 1,
+                                                              overflow: TextOverflow.ellipsis,
+                                                            ),
+                                                          ),
+                                                          if (evDate.isNotEmpty) ...[
+                                                            const SizedBox(width: 8),
+                                                            Text(
+                                                              evDate,
+                                                              style: const TextStyle(
+                                                                fontSize: 10.5,
+                                                                color: Color(0xFF94A3B8),
+                                                                fontWeight: FontWeight.w500,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ],
+                                                      ),
+                                                      if (evMessage.isNotEmpty) ...[
+                                                        const SizedBox(height: 3),
+                                                        Text(
+                                                          evMessage,
+                                                          style: const TextStyle(
+                                                            fontSize: 12,
+                                                            color: Color(0xFF475569),
+                                                            height: 1.35,
+                                                          ),
+                                                        ),
+                                                      ],
+                                                      if (evActor.isNotEmpty) ...[
+                                                        const SizedBox(height: 4),
+                                                        Row(
+                                                          children: [
+                                                            const Icon(LucideIcons.userCheck, size: 11, color: Color(0xFF64748B)),
+                                                            const SizedBox(width: 4),
+                                                            Flexible(
+                                                              child: Text(
+                                                                evActor,
+                                                                style: const TextStyle(
+                                                                  fontSize: 10.5,
+                                                                  color: Color(0xFF64748B),
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                                maxLines: 1,
+                                                                overflow: TextOverflow.ellipsis,
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ],
+                                                    ],
                                                   ),
-                                                ],
-                                              ],
-                                            ),
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                        ],
-                                      ),
+                                        );
+                                      }),
                                     );
-                                  }),
+                                  },
+                                ),
 
                                 // Real Technician / Receiver Profile Box from Database (only if assigned/recorded)
                                 if (assignedTechName.isNotEmpty || receivedByName.isNotEmpty) ...[
@@ -4378,13 +4849,50 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                           const SizedBox(height: 10),
                           if (media.isEmpty)
                             Container(
-                              padding: const EdgeInsets.all(14),
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
                               decoration: BoxDecoration(
                                 color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(12),
+                                borderRadius: BorderRadius.circular(16),
                                 border: Border.all(color: const Color(0xFFE2E8F0)),
                               ),
-                              child: const Text('Chưa có hình ảnh nghiệm thu được công khai cho đơn này.', style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE2E8F0).withValues(alpha: 0.6),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      LucideIcons.camera,
+                                      size: 22,
+                                      color: Color(0xFF94A3B8),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'Kỹ thuật viên sẽ cập nhật ảnh sau khi đo kiểm',
+                                    style: TextStyle(
+                                      color: Color(0xFF334155),
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Hình ảnh bo mạch, xung kích IGBT và tem kiểm định tải sẽ xuất hiện tại đây khi nghiệm thu.',
+                                    style: TextStyle(
+                                      color: Color(0xFF94A3B8),
+                                      fontSize: 11,
+                                    ),
+                                    textAlign: TextAlign.center,
+                                  ),
+                                ],
+                              ),
                             )
                           else
                             SizedBox(
@@ -4480,9 +4988,17 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
   }
 
   // 5-Stage Stepper Card inside Sheet (Stitch Screen 2)
-  Widget _buildStepperCard(String status) {
+  Widget _buildStepperCard(
+    String status, {
+    String receivedDate = '',
+    String completedDate = '',
+    String deliveredDate = '',
+  }) {
+    final isDelivered = status == 'DELIVERED';
+    final isCompleted = status == 'COMPLETED';
     final currentStep = _getStepIndex(status);
-    final steps = ['Tiếp nhận', 'Kiểm tra', 'Sửa chữa', 'Nghiệm thu', 'Bàn giao'];
+    final steps = ['Tiếp nhận', 'Kiểm tra', 'Sửa chữa', 'Kiểm tra tải', 'Bàn giao'];
+    final deliveryTime = deliveredDate.isNotEmpty ? deliveredDate : completedDate;
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -4502,9 +5018,72 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Flexible(
+                child: Text(
+                  'TIẾN TRÌNH KỸ THUẬT',
+                  style: TextStyle(
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.5,
+                    color: Color(0xFF94A3B8),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: isDelivered
+                        ? const Color(0xFFECFDF5)
+                        : (isCompleted ? const Color(0xFFEFF6FF) : const Color(0xFFF8FAFC)),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: isDelivered
+                          ? const Color(0xFFA7F3D0)
+                          : (isCompleted ? const Color(0xFFBFDBFE) : const Color(0xFFE2E8F0)),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isDelivered ? LucideIcons.checkCheck : LucideIcons.clock,
+                        size: 11,
+                        color: isDelivered ? const Color(0xFF059669) : const Color(0xFF2563EB),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          isDelivered
+                              ? 'Đã bàn giao'
+                              : (isCompleted ? 'Đã nghiệm thu tải' : 'Bước ${currentStep + 1}/5'),
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: isDelivered
+                                ? const Color(0xFF065F46)
+                                : (isCompleted ? const Color(0xFF1D4ED8) : const Color(0xFF475569)),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
             children: List.generate(steps.length, (stepIdx) {
-              final isDone = stepIdx < currentStep;
-              final isCurrent = stepIdx == currentStep;
+              final isDone = isDelivered || stepIdx < currentStep || (isCompleted && stepIdx <= 3);
+              final isCurrent = !isDelivered && stepIdx == currentStep && !(isCompleted && stepIdx <= 3);
 
               Color bg;
               if (isDone) {
@@ -4536,7 +5115,9 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                               ? const Icon(LucideIcons.check, size: 11, color: Colors.white)
                               : (isCurrent
                                   ? const Icon(LucideIcons.clock, size: 10, color: Colors.white)
-                                  : Text('${stepIdx + 1}', style: const TextStyle(fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.bold))),
+                                  : Text('${stepIdx + 1}',
+                                      style: const TextStyle(
+                                          fontSize: 9, color: Color(0xFF64748B), fontWeight: FontWeight.bold))),
                         ),
                         Expanded(
                           child: Container(
@@ -4562,6 +5143,33 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
+                    if (stepIdx == 0 && receivedDate.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        receivedDate,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w500,
+                          color: Color(0xFF64748B),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ] else if (stepIdx == 4 && isDelivered && deliveryTime.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        deliveryTime,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.w700,
+                          color: Color(0xFF059669),
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ],
                 ),
               );

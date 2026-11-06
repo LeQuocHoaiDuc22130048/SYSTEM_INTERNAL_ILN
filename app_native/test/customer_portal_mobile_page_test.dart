@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:system_inverter_likenew/screens/customer_portal_mobile_page.dart';
 import 'package:system_inverter_likenew/utils/api_client.dart';
@@ -102,10 +103,11 @@ void main() {
 
     // Verify VIP Membership Card
     expect(find.text('ĐỐI TÁC DOANH NGHIỆP'), findsOneWidget);
+    expect(find.text('24/7'), findsOneWidget);
     expect(find.text('Cong Ty Tnhh Tu Dong Hoa Bien Tany'), findsOneWidget);
-    expect(find.text('Liên hệ kỹ thuật'), findsOneWidget);
-    expect(find.text('Số điện thoại: 0964 266 771'), findsOneWidget);
-    expect(find.text('Gọi 0964 266 771'), findsOneWidget);
+    expect(find.text('Gọi kỹ thuật'), findsWidgets);
+    expect(find.byIcon(LucideIcons.phoneCall), findsWidgets);
+    expect(find.byIcon(LucideIcons.copy), findsOneWidget);
     expect(find.text('Chat Zalo Tiếp Nhận'), findsNothing);
 
     // Verify Search Bar & Quick Filters
@@ -326,8 +328,7 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify dynamic Vietnamese label and single phone contact rendered
-    expect(find.text('Tổng đài kỹ thuật 24/7'), findsOneWidget);
-    expect(find.text('Số điện thoại: 0964 266 771'), findsOneWidget);
+    expect(find.byTooltip('Tổng đài kỹ thuật 24/7: 0964 266 771'), findsOneWidget);
   });
 
   testWidgets('CustomerPortalMobilePage loads and displays account profile in VIP card and opens profile dialog', (tester) async {
@@ -562,7 +563,9 @@ void main() {
     expect(find.text('Đã bàn giao (1)'), findsOneWidget);
 
     // 4. Test device type filtering
-    await tester.tap(find.text('Tất cả thiết bị'));
+    await tester.ensureVisible(find.text('Loại máy'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Loại máy'));
     await tester.pumpAndSettle();
     expect(find.text('Lọc theo thiết bị'), findsOneWidget);
     await tester.tap(find.text('PLC').last);
@@ -575,6 +578,8 @@ void main() {
 
     // 5. Reset filter
     expect(find.text('Xóa lọc'), findsOneWidget);
+    await tester.ensureVisible(find.text('Xóa lọc'));
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Xóa lọc'));
     await tester.pumpAndSettle();
 
@@ -582,5 +587,200 @@ void main() {
     expect(find.text('SC-2026-001'), findsOneWidget);
     expect(find.text('SC-2026-002'), findsOneWidget);
     expect(find.text('SC-2026-003'), findsOneWidget);
+  });
+
+  testWidgets('CustomerPortalMobilePage truncates long customer code and copies full code to clipboard', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': 'khachhangtest',
+              'fullName': 'Cong Ty Tnhh Dien Cong Nghiep',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({'content': [], 'totalElements': 0}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/account-profile') {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'userId': '10',
+              'username': 'khachhangtest',
+              'contactName': 'Kỹ sư trưởng',
+              'phone': '0988776655',
+              'customerId': 'cust-10',
+              'customerCode': 'KH-0667c50aa720',
+              'customerName': 'Cong Ty Tnhh Dien Cong Nghiep',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: 'khachhangtest', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify full customer code format (#KH-0667c50aa720) is rendered
+    expect(find.text('#KH-0667c50aa720'), findsOneWidget);
+
+    // Tap copy button on customer code
+    await tester.tap(find.text('#KH-0667c50aa720'));
+    await tester.pumpAndSettle();
+
+    // Verify copy feedback snackbar shows full customer code
+    expect(find.text('Đã sao chép mã khách hàng: #KH-0667c50aa720'), findsOneWidget);
+  });
+
+  testWidgets('CustomerPortalMobilePage stepper consistency, delivered completion time, and vertical timeline', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': 'khachhangtest',
+              'fullName': 'Cong Ty Tnhh Tu Dong Hoa Bien Tany',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({
+            'content': [
+              {
+                'id': 'ord-delivered-1',
+                'orderCode': 'SC-2026-999',
+                'deviceName': 'Biến tần Delta VFD-C2000',
+                'deviceType': 'Biến tần',
+                'status': 'DELIVERED',
+                'receivedAt': '2026-10-10T08:00:00',
+                'completedAt': '2026-10-12T14:00:00',
+                'deliveredAt': '2026-10-13T16:30:00',
+              },
+            ],
+            'totalElements': 1,
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-delivered-1') {
+        return http.Response(
+          jsonEncode({
+            'id': 'ord-delivered-1',
+            'orderCode': 'SC-2026-999',
+            'orderTitle': 'Biến tần Delta VFD-C2000',
+            'status': 'DELIVERED',
+            'receivedAt': '2026-10-10T08:00:00',
+            'completedAt': '2026-10-12T14:00:00',
+            'deliveredAt': '2026-10-13T16:30:00',
+            'receivedByName': 'Nguyễn Thị Thu',
+            'assignedTechnicianName': 'Trần Văn Hưng',
+            'devices': [],
+            'updates': [],
+            'media': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: 'khachhangtest', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Verify 5-step stages on order card
+    expect(find.text('Tiếp nhận'), findsWidgets);
+    expect(find.text('Kiểm tra'), findsWidgets);
+    expect(find.text('Sửa chữa'), findsWidgets);
+    expect(find.text('Kiểm tra tải'), findsWidgets);
+    expect(find.text('Bàn giao'), findsWidgets);
+    expect(find.text('đã bàn giao'), findsOneWidget);
+
+    // Tap order to open detail sheet
+    await tester.tap(find.text('SC-2026-999'));
+    await tester.pumpAndSettle();
+
+    // Verify detail sheet 5-step stepper and delivery timestamp under 'Bàn giao'
+    expect(find.text('Đã bàn giao cho khách'), findsWidgets);
+    expect(find.text('16:30 13/10/2026'), findsWidgets);
+
+    // Scroll to see technical timeline and empty media section
+    await tester.ensureVisible(find.text('Tiếp nhận thiết bị tại xưởng'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tiếp nhận thiết bị tại xưởng'), findsOneWidget);
+    expect(find.text('Người tiếp nhận: Nguyễn Thị Thu'), findsOneWidget);
+
+    await tester.ensureVisible(find.text('Kỹ thuật viên sẽ cập nhật ảnh sau khi đo kiểm'));
+    await tester.pumpAndSettle();
+    expect(find.text('Kỹ thuật viên sẽ cập nhật ảnh sau khi đo kiểm'), findsOneWidget);
+    expect(find.text('Hình ảnh bo mạch, xung kích IGBT và tem kiểm định tải sẽ xuất hiện tại đây khi nghiệm thu.'), findsOneWidget);
   });
 }
