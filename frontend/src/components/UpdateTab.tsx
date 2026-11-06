@@ -1,5 +1,5 @@
 import { usePermissionCheck } from '../utils/permissionContext';
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Plus,
   Rocket,
@@ -19,7 +19,10 @@ import {
   RotateCcw,
   Hash,
   HardDrive,
-  Filter
+  Filter,
+  UploadCloud,
+  Eye,
+  X
 } from 'lucide-react';
 import { getAuthHeaders } from '../utils/auth';
 import './UpdateTab.css';
@@ -90,6 +93,9 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
   const [status, setStatus] = useState<'DRAFT' | 'RELEASED'>('DRAFT');
   const [uploadType, setUploadType] = useState<'file' | 'url'>('file');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [previewUpdate, setPreviewUpdate] = useState<AppUpdate | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch all updates
   const fetchUpdates = useCallback(async (isRefresh = false) => {
@@ -196,26 +202,64 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
     setDownloadUrl(computeDefaultUrl(val, platform, uploadType));
   };
 
+  const handleFileSelection = (file: File) => {
+    const lowerName = file.name.toLowerCase();
+
+    if (platform === 'ANDROID' && !lowerName.endsWith('.apk')) {
+      showToast('Tệp đã chọn không hợp lệ! Vui lòng chọn tệp có đuôi .apk cho Android.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedFile(null);
+      return;
+    }
+    if (platform === 'IOS' && !lowerName.endsWith('.ipa')) {
+      showToast('Tệp đã chọn không hợp lệ! Vui lòng chọn tệp có đuôi .ipa cho iOS.');
+      if (fileInputRef.current) fileInputRef.current.value = '';
+      setSelectedFile(null);
+      return;
+    }
+
+    setSelectedFile(file);
+
+    // Tự động nhận diện số phiên bản từ tên tệp nếu người dùng chưa nhập (ví dụ: app_v1.2.0.apk -> 1.2.0)
+    if (!version.trim()) {
+      const match = file.name.match(/[vV]?(\d+\.\d+(\.\d+)?)/);
+      if (match && match[1]) {
+        handleVersionChange(match[1]);
+      }
+    }
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0];
-      const lowerName = file.name.toLowerCase();
-
-      if (platform === 'ANDROID' && !lowerName.endsWith('.apk')) {
-        showToast('Tệp đã chọn không hợp lệ! Vui lòng chọn tệp có đuôi .apk cho Android.');
-        e.target.value = '';
-        setSelectedFile(null);
-        return;
-      }
-      if (platform === 'IOS' && !lowerName.endsWith('.ipa')) {
-        showToast('Tệp đã chọn không hợp lệ! Vui lòng chọn tệp có đuôi .ipa cho iOS.');
-        e.target.value = '';
-        setSelectedFile(null);
-        return;
-      }
-      setSelectedFile(file);
+      handleFileSelection(e.target.files[0]);
     } else {
       setSelectedFile(null);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!submitting) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    if (submitting) return;
+
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      handleFileSelection(files[0]);
     }
   };
 
@@ -452,6 +496,8 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
     setStatus('DRAFT');
     setUploadType('file');
     setSelectedFile(null);
+    setIsDragging(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const openCreateModal = (targetPlatform?: 'ANDROID' | 'IOS') => {
@@ -704,10 +750,19 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
                         <span className="version-tag">v{update.version}</span>
                       </td>
                       <td className="col-changelog">
-                        <div className="changelog-text" title={update.changelog}>
-                          {update.changelog.split('\n').map((line, i) => (
-                            <div key={i}>{line}</div>
-                          ))}
+                        <div className="changelog-cell-wrapper">
+                          <div className="changelog-text-clamped" title={update.changelog}>
+                            {update.changelog}
+                          </div>
+                          <button
+                            type="button"
+                            className="btn-quick-preview"
+                            onClick={() => setPreviewUpdate(update)}
+                            title="Xem nhanh chi tiết toàn bộ nhật ký cập nhật"
+                          >
+                            <Eye size={12} />
+                            <span>Xem nhanh</span>
+                          </button>
                         </div>
                       </td>
                       <td className="col-integrity">
@@ -1149,249 +1204,484 @@ export const UpdateTab: React.FC<UpdateTabProps> = ({ showToast, refreshTrigger 
         </div>
       )}
 
-      {/* Creation Modal Dialog */}
+      {/* Creation Drawer (Sidebar trượt phải) */}
       {showModal && (
-        <div className="update-modal-overlay">
-          <div className="update-modal-box">
-            <div className="update-modal-header">
-              <h3>Tạo Bản cập nhật Ứng dụng mới</h3>
-              <button className="close-modal-btn" onClick={() => setShowModal(false)} disabled={submitting}>
-                &times;
+        <div
+          className="update-drawer-overlay"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !submitting) {
+              setShowModal(false);
+            }
+          }}
+        >
+          <div className="update-drawer-container">
+            {/* Drawer Header (Cố định ở trên) */}
+            <div className="update-drawer-header">
+              <div className="drawer-header-left">
+                <div className="drawer-title-row">
+                  <h3>Tạo Bản cập nhật Ứng dụng mới</h3>
+                  <span className={`drawer-platform-pill ${platform === 'IOS' ? 'pill-ios' : 'pill-android'}`}>
+                    {platform === 'IOS' ? <AppleIcon size={14} /> : <AndroidIcon size={14} />}
+                    <span>{platform === 'IOS' ? 'iOS' : 'Android'}</span>
+                  </span>
+                  <span className="drawer-channel-pill">{channel}</span>
+                </div>
+                <p className="drawer-subtitle">
+                  Cấu hình bản dựng OTA, phân phối kênh phát hành và chữ ký toàn vẹn.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="drawer-close-btn"
+                onClick={() => setShowModal(false)}
+                disabled={submitting}
+                title="Đóng cửa sổ"
+                aria-label="Đóng"
+              >
+                <X size={20} />
               </button>
             </div>
+
             {canAction('APP_UPDATE_UPLOAD') && (
-              <form onSubmit={handleSubmit} className="update-modal-form">
-                {/* Target Platform Selector */}
-                <div className="form-group">
-                  <label>Hệ điều hành mục tiêu (OS)*</label>
-                  <div className="platform-selector-grid">
-                    <div
-                      className={`platform-select-card card-android ${platform === 'ANDROID' ? 'selected' : ''}`}
-                      onClick={() => !submitting && handlePlatformChange('ANDROID')}
-                    >
-                      <div className="platform-card-header">
-                        <div className="platform-card-icon icon-android">
-                          <AndroidIcon size={22} />
-                        </div>
-                        <div className="platform-card-title">
-                          <strong>Android</strong>
-                          <span className="file-hint">Tệp cài đặt .apk</span>
-                        </div>
-                      </div>
-                      <div className="platform-card-desc">
-                        Tải lên tệp APK kèm kiểm tra mã băm SHA-256 toàn vẹn chống lỗi cài đặt.
+              <form onSubmit={handleSubmit} className="update-drawer-form">
+                {/* Drawer Body (Cuộn nội dung) */}
+                <div className="update-drawer-body">
+                  {/* Khối 1: Mục tiêu & Kênh */}
+                  <div className="drawer-section-card">
+                    <div className="section-card-header">
+                      <div className="section-step-num">1</div>
+                      <div className="section-card-titles">
+                        <h4>Mục tiêu & Kênh phát hành</h4>
+                        <p>Chọn hệ điều hành và môi trường phân phối bản dựng</p>
                       </div>
                     </div>
 
-                    <div
-                      className={`platform-select-card card-ios ${platform === 'IOS' ? 'selected' : ''}`}
-                      onClick={() => !submitting && handlePlatformChange('IOS')}
-                    >
-                      <div className="platform-card-header">
-                        <div className="platform-card-icon icon-ios">
-                          <AppleIcon size={22} />
-                        </div>
-                        <div className="platform-card-title">
-                          <strong>iOS</strong>
-                          <span className="file-hint">Tệp .ipa / App Store</span>
+                    <div className="drawer-section-content">
+                      <div className="form-group">
+                        <label>Hệ điều hành mục tiêu (OS)*</label>
+                        <div className="platform-selector-grid">
+                          <div
+                            className={`platform-select-card card-android ${platform === 'ANDROID' ? 'selected' : ''}`}
+                            onClick={() => !submitting && handlePlatformChange('ANDROID')}
+                          >
+                            <div className="platform-card-header">
+                              <div className="platform-card-icon icon-android">
+                                <AndroidIcon size={22} />
+                              </div>
+                              <div className="platform-card-title">
+                                <strong>Android</strong>
+                                <span className="file-hint">Tệp cài đặt .apk</span>
+                              </div>
+                            </div>
+                            <div className="platform-card-desc">
+                              Tải lên tệp APK kèm kiểm tra mã băm SHA-256 toàn vẹn chống lỗi cài đặt.
+                            </div>
+                          </div>
+
+                          <div
+                            className={`platform-select-card card-ios ${platform === 'IOS' ? 'selected' : ''}`}
+                            onClick={() => !submitting && handlePlatformChange('IOS')}
+                          >
+                            <div className="platform-card-header">
+                              <div className="platform-card-icon icon-ios">
+                                <AppleIcon size={22} />
+                              </div>
+                              <div className="platform-card-title">
+                                <strong>iOS</strong>
+                                <span className="file-hint">Tệp .ipa / App Store</span>
+                              </div>
+                            </div>
+                            <div className="platform-card-desc">
+                              Liên kết App Store, TestFlight hoặc tệp IPA ad-hoc nội bộ cho iOS.
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="platform-card-desc">
-                        Liên kết App Store, TestFlight hoặc tệp IPA ad-hoc nội bộ cho iOS.
+
+                      <div className="form-group" style={{ marginTop: '14px' }}>
+                        <label htmlFor="input-channel">Kênh phát hành (Release Channel)*</label>
+                        <select
+                          id="input-channel"
+                          value={channel}
+                          onChange={(e) => setChannel(e.target.value as any)}
+                          disabled={submitting}
+                        >
+                          <option value="PRODUCTION">Chính thức (PRODUCTION) - Cập nhật cho toàn thể nhân viên</option>
+                          <option value="BETA">Thử nghiệm (BETA) - Dành cho nhóm trải nghiệm sớm</option>
+                          <option value="INTERNAL">Nội bộ (INTERNAL) - Dành riêng cho nhóm kỹ thuật kiểm thử</option>
+                        </select>
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Khối 2: Phiên bản & Kiểm soát tương thích */}
+                  <div className="drawer-section-card">
+                    <div className="section-card-header">
+                      <div className="section-step-num">2</div>
+                      <div className="section-card-titles">
+                        <h4>Phiên bản & Tương thích</h4>
+                        <p>Khai báo số phiên bản SemVer và ngưỡng hỗ trợ tối thiểu</p>
+                      </div>
+                    </div>
+
+                    <div className="drawer-section-content">
+                      <div className="form-row-grid">
+                        <div className="form-group">
+                          <label htmlFor="input-version">Số phiên bản mới (Version)*</label>
+                          <input
+                            id="input-version"
+                            type="text"
+                            placeholder={platform === 'IOS' ? 'Ví dụ: 1.1.30 hoặc 1.2.0' : 'Ví dụ: 1.1.30'}
+                            value={version}
+                            onChange={(e) => handleVersionChange(e.target.value)}
+                            disabled={submitting}
+                            required
+                          />
+                          <span className="input-helper-text">Khớp với số version trong pubspec.yaml của ứng dụng.</span>
+                        </div>
+
+                        <div className="form-group">
+                          <label htmlFor="input-min-version">
+                            Phiên bản tối thiểu bắt buộc (Tùy chọn)
+                          </label>
+                          <input
+                            id="input-min-version"
+                            type="text"
+                            placeholder="Ví dụ: 1.0.0"
+                            value={minSupportedVersion}
+                            onChange={(e) => setMinSupportedVersion(e.target.value)}
+                            disabled={submitting}
+                          />
+                          <span className="input-helper-text">Các client dưới phiên bản này sẽ bị chặn sử dụng đến khi cập nhật.</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Khối 3: Tệp cài đặt & Tải lên */}
+                  <div className="drawer-section-card">
+                    <div className="section-card-header">
+                      <div className="section-step-num">3</div>
+                      <div className="section-card-titles">
+                        <h4>Bản dựng & Phương thức phân phối</h4>
+                        <p>Kéo thả tệp cài đặt OTA hoặc liên kết kho ứng dụng</p>
+                      </div>
+                    </div>
+
+                    <div className="drawer-section-content">
+                      <div className="form-group">
+                        <label>Phương thức cung cấp tệp cài đặt*</label>
+                        <div className="upload-type-toggle-group">
+                          <button
+                            type="button"
+                            className={`toggle-option-btn ${uploadType === 'file' ? 'active' : ''}`}
+                            onClick={() => handleUploadTypeChange('file')}
+                            disabled={submitting}
+                          >
+                            <UploadCloud size={16} />
+                            <span>{platform === 'IOS' ? 'Tải lên tệp IPA (.ipa)' : 'Tải lên tệp APK (.apk)'}</span>
+                          </button>
+                          <button
+                            type="button"
+                            className={`toggle-option-btn ${uploadType === 'url' ? 'active' : ''}`}
+                            onClick={() => handleUploadTypeChange('url')}
+                            disabled={submitting}
+                          >
+                            <ExternalLink size={16} />
+                            <span>{platform === 'IOS' ? 'Đường dẫn App Store' : 'Đường dẫn URL tải trực tiếp'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {uploadType === 'file' ? (
+                        <div className="form-group">
+                          <input
+                            ref={fileInputRef}
+                            id="input-file"
+                            type="file"
+                            accept={platform === 'IOS' ? '.ipa' : '.apk'}
+                            onChange={handleFileChange}
+                            disabled={submitting}
+                            style={{ display: 'none' }}
+                          />
+
+                          {selectedFile ? (
+                            <div className="file-selected-card">
+                              <div className="file-selected-left">
+                                <div className={`file-badge-icon ${platform === 'IOS' ? 'badge-ipa' : 'badge-apk'}`}>
+                                  {platform === 'IOS' ? 'IPA' : 'APK'}
+                                </div>
+                                <div className="file-info-col">
+                                  <span className="file-name-text" title={selectedFile.name}>
+                                    {selectedFile.name}
+                                  </span>
+                                  <div className="file-meta-row">
+                                    <span className="file-size-badge">
+                                      <HardDrive size={11} /> {(selectedFile.size / (1024 * 1024)).toFixed(2)} MB
+                                    </span>
+                                    <span className="file-valid-badge">
+                                      <CheckCircle2 size={12} /> Định dạng .{platform === 'IOS' ? 'ipa' : 'apk'} hợp lệ
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="file-selected-actions">
+                                <button
+                                  type="button"
+                                  className="btn-change-file"
+                                  onClick={() => fileInputRef.current?.click()}
+                                  disabled={submitting}
+                                >
+                                  Đổi tệp khác
+                                </button>
+                                <button
+                                  type="button"
+                                  className="btn-remove-file"
+                                  onClick={() => {
+                                    setSelectedFile(null);
+                                    if (fileInputRef.current) fileInputRef.current.value = '';
+                                  }}
+                                  disabled={submitting}
+                                  title="Xóa tệp đã chọn"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className={`update-dropzone ${isDragging ? 'dragging' : ''}`}
+                              onDragOver={handleDragOver}
+                              onDragLeave={handleDragLeave}
+                              onDrop={handleDrop}
+                              onClick={() => fileInputRef.current?.click()}
+                            >
+                              <div className="dropzone-icon-circle">
+                                <UploadCloud size={30} />
+                              </div>
+                              <div className="dropzone-text-group">
+                                <strong>Kéo & thả tệp .{platform === 'IOS' ? 'ipa' : 'apk'} vào đây</strong>
+                                <span>hoặc bấm để chọn tệp từ máy tính của bạn</span>
+                              </div>
+                              <div className="dropzone-meta-pill">
+                                <span>Tự động tính mã băm SHA-256 toàn vẹn & dung lượng tệp</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="form-group">
+                          <label htmlFor="input-url">
+                            {platform === 'IOS' ? 'Đường dẫn App Store hoặc Link tải iOS (Download URL)*' : 'Đường dẫn tải tệp APK (Download URL)*'}
+                          </label>
+                          <input
+                            id="input-url"
+                            type="text"
+                            placeholder={platform === 'IOS' ? 'https://apps.apple.com/us/app/inverter-like-new-system/id6809314317' : 'Nhập đường dẫn URL tải file APK'}
+                            value={downloadUrl}
+                            onChange={(e) => setDownloadUrl(e.target.value)}
+                            disabled={submitting}
+                            required={uploadType === 'url'}
+                          />
+                        </div>
+                      )}
+
+                      {platform === 'IOS' && uploadType === 'url' && (
+                        <div className="ios-guidance-note" style={{ marginTop: '10px' }}>
+                          <AlertCircle size={16} className="ios-guidance-icon" />
+                          <span>
+                            <strong>Gợi ý cho iOS:</strong> Nếu đã xuất bản lên App Store, hãy dán liên kết <code>https://apps.apple.com/...</code>. Khi người dùng bấm Cập nhật trên iOS, máy sẽ tự động chuyển tiếp mở ứng dụng trong App Store.
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Khối 4: Nội dung & Tùy chọn phát hành */}
+                  <div className="drawer-section-card">
+                    <div className="section-card-header">
+                      <div className="section-step-num">4</div>
+                      <div className="section-card-titles">
+                        <h4>Nhật ký thay đổi & Tùy chọn phát hành</h4>
+                        <p>Thông tin ghi chú người dùng và chính sách áp dụng</p>
+                      </div>
+                    </div>
+
+                    <div className="drawer-section-content">
+                      <div className="form-group">
+                        <label htmlFor="input-changelog">Chi tiết cập nhật (Changelog)*</label>
+                        <textarea
+                          id="input-changelog"
+                          rows={4}
+                          placeholder={`Ghi nhận các cải tiến và sửa lỗi trong phiên bản này&#10;- Sửa lỗi giao diện ${platform === 'IOS' ? 'trên iOS' : 'trên Android'}&#10;- Cải thiện hiệu năng và bảo mật hệ thống`}
+                          value={changelog}
+                          onChange={(e) => setChangelog(e.target.value)}
+                          disabled={submitting}
+                          required
+                        />
+                      </div>
+
+                      <div className="mandatory-callout-card">
+                        <label className="checkbox-label" htmlFor="input-mandatory">
+                          <input
+                            id="input-mandatory"
+                            type="checkbox"
+                            checked={mandatory}
+                            onChange={(e) => setMandatory(e.target.checked)}
+                            disabled={submitting}
+                          />
+                          <div className="checkbox-text-group">
+                            <strong>Bắt buộc cập nhật toàn bộ (Mandatory Update)</strong>
+                            <p>Mọi thiết bị chưa lên phiên bản này đều bị chặn sử dụng ứng dụng cho tới khi cập nhật thành công.</p>
+                          </div>
+                        </label>
+                      </div>
+
+                      <div className="form-group" style={{ marginTop: '14px' }}>
+                        <label htmlFor="select-status">Hành động khi tạo</label>
+                        <select
+                          id="select-status"
+                          value={status}
+                          onChange={(e) => setStatus(e.target.value as 'DRAFT' | 'RELEASED')}
+                          disabled={submitting}
+                        >
+                          <option value="DRAFT">Chỉ lưu Bản nháp (Lưu trữ và phát hành sau)</option>
+                          <option value="RELEASED">Phát hành ngay (Đẩy cập nhật tới client trên kênh đã chọn)</option>
+                        </select>
+                      </div>
+
+                      {status === 'RELEASED' && (
+                        <div className="release-warning" style={{ marginTop: '10px' }}>
+                          <AlertCircle size={16} className="warning-icon" />
+                          <span>
+                            <strong>Chú ý:</strong> Bản cập nhật <strong>{platform === 'IOS' ? 'iOS' : 'Android'}</strong> trên kênh <strong>{channel}</strong> sẽ có hiệu lực ngay lập tức.
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                {/* Release Channel Selector */}
-                <div className="form-group">
-                  <label htmlFor="input-channel">Kênh phát hành (Release Channel)*</label>
-                  <select
-                    id="input-channel"
-                    value={channel}
-                    onChange={(e) => setChannel(e.target.value as any)}
-                    disabled={submitting}
-                  >
-                    <option value="PRODUCTION">Chính thức (PRODUCTION) - Cập nhật cho toàn thể nhân viên</option>
-                    <option value="BETA">Thử nghiệm (BETA) - Dành cho nhóm trải nghiệm sớm</option>
-                    <option value="INTERNAL">Nội bộ (INTERNAL) - Dành riêng cho nhóm kỹ thuật kiểm thử</option>
-                  </select>
-                </div>
+                {/* Drawer Footer (Sticky Action Bar cố định ở đáy) */}
+                <div className="update-drawer-footer">
+                  <div className="drawer-footer-status">
+                    {status === 'RELEASED' ? (
+                      <span className="footer-status-tag tag-release">
+                        <Rocket size={13} /> Sẵn sàng phát hành ngay
+                      </span>
+                    ) : (
+                      <span className="footer-status-tag tag-draft">
+                        <FileText size={13} /> Sẽ lưu thành bản nháp
+                      </span>
+                    )}
+                  </div>
 
-                {/* Version Inputs Grid */}
-                <div className="form-row-grid">
-                  <div className="form-group">
-                    <label htmlFor="input-version">Số phiên bản mới (Version)*</label>
-                    <input
-                      id="input-version"
-                      type="text"
-                      placeholder={platform === 'IOS' ? 'Ví dụ: 1.1.6 hoặc 1.2.0' : 'Ví dụ: 1.1.7'}
-                      value={version}
-                      onChange={(e) => handleVersionChange(e.target.value)}
+                  <div className="drawer-footer-actions">
+                    <button
+                      type="button"
+                      className="btn-drawer-cancel"
+                      onClick={() => setShowModal(false)}
                       disabled={submitting}
-                      required
-                    />
-                  </div>
-
-                  <div className="form-group">
-                    <label htmlFor="input-min-version">
-                      Phiên bản tối thiểu bắt buộc (Tùy chọn)
-                    </label>
-                    <input
-                      id="input-min-version"
-                      type="text"
-                      placeholder="Ví dụ: 1.0.0 (Nếu máy client < bản này sẽ bị ép cập nhật)"
-                      value={minSupportedVersion}
-                      onChange={(e) => setMinSupportedVersion(e.target.value)}
+                    >
+                      Hủy bỏ
+                    </button>
+                    <button
+                      type="submit"
+                      className="btn-drawer-submit"
                       disabled={submitting}
-                    />
-                  </div>
-                </div>
-
-                {/* Upload Type Switch */}
-                <div className="form-group">
-                  <label>Phương thức cung cấp tệp cài đặt*</label>
-                  <div style={{ display: 'flex', gap: '20px', margin: '4px 0 8px 0', flexWrap: 'wrap' }}>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="uploadType"
-                        checked={uploadType === 'file'}
-                        onChange={() => handleUploadTypeChange('file')}
-                        disabled={submitting}
-                      />
-                      <span>{platform === 'IOS' ? 'Tải lên tệp IPA (.ipa)' : 'Tải lên tệp APK (.apk) (Tự động băm SHA-256)'}</span>
-                    </label>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem', cursor: 'pointer' }}>
-                      <input
-                        type="radio"
-                        name="uploadType"
-                        checked={uploadType === 'url'}
-                        onChange={() => handleUploadTypeChange('url')}
-                        disabled={submitting}
-                      />
-                      <span>{platform === 'IOS' ? 'Đường dẫn liên kết (App Store / TestFlight URL)' : 'Đường dẫn tải xuống trực tiếp (URL)'}</span>
-                    </label>
-                  </div>
-                </div>
-
-                {uploadType === 'file' ? (
-                  <div className="form-group">
-                    <label htmlFor="input-file">Chọn tệp cài đặt ({platform === 'IOS' ? '.ipa' : '.apk'})*</label>
-                    <input
-                      id="input-file"
-                      type="file"
-                      accept={platform === 'IOS' ? '.ipa' : '.apk'}
-                      onChange={handleFileChange}
-                      disabled={submitting}
-                      required={uploadType === 'file'}
-                    />
-                    <span className="input-helper-text">
-                      {platform === 'IOS'
-                        ? 'Lưu ý: Chỉ chấp nhận định dạng .ipa dành cho iOS. Hệ thống tự động tính dung lượng và mã băm SHA-256.'
-                        : 'Lưu ý: Chỉ chấp nhận định dạng .apk dành cho Android. Hệ thống tự động tính dung lượng và mã băm SHA-256.'}
-                    </span>
-                  </div>
-                ) : (
-                  <div className="form-group">
-                    <label htmlFor="input-url">
-                      {platform === 'IOS' ? 'Đường dẫn App Store hoặc Link tải iOS (Download URL)*' : 'Đường dẫn tải tệp APK (Download URL)*'}
-                    </label>
-                    <input
-                      id="input-url"
-                      type="text"
-                      placeholder={platform === 'IOS' ? 'https://apps.apple.com/us/app/inverter-like-new-system/id6809314317' : 'Nhập đường dẫn URL tải file APK'}
-                      value={downloadUrl}
-                      onChange={(e) => setDownloadUrl(e.target.value)}
-                      disabled={submitting}
-                      required={uploadType === 'url'}
-                    />
-                  </div>
-                )}
-
-                {platform === 'IOS' && uploadType === 'url' && (
-                  <div className="ios-guidance-note">
-                    <AlertCircle size={16} className="ios-guidance-icon" />
-                    <span>
-                      <strong>Gợi ý cho iOS:</strong> Nếu đã xuất bản lên App Store, hãy dán liên kết <code>https://apps.apple.com/...</code>. Khi người dùng bấm Cập nhật trên iOS, máy sẽ tự động chuyển tiếp mở ứng dụng trong App Store.
-                    </span>
-                  </div>
-                )}
-
-                <div className="form-group">
-                  <label htmlFor="input-changelog">Chi tiết cập nhật (Changelog)*</label>
-                  <textarea
-                    id="input-changelog"
-                    rows={4}
-                    placeholder={`Ghi nhận các cải tiến và sửa lỗi trong phiên bản này&#10;- Sửa lỗi giao diện ${platform === 'IOS' ? 'trên iOS' : 'trên Android'}&#10;- Cải thiện hiệu năng và bảo mật hệ thống`}
-                    value={changelog}
-                    onChange={(e) => setChangelog(e.target.value)}
-                    disabled={submitting}
-                    required
-                  />
-                </div>
-
-                <div className="form-row-checkbox">
-                  <label className="checkbox-label" htmlFor="input-mandatory">
-                    <input
-                      id="input-mandatory"
-                      type="checkbox"
-                      checked={mandatory}
-                      onChange={(e) => setMandatory(e.target.checked)}
-                      disabled={submitting}
-                    />
-                    <span className="checkbox-text">
-                      <strong>Bắt buộc cập nhật toàn bộ:</strong> Mọi thiết bị chưa lên phiên bản này đều bị chặn sử dụng ứng dụng cho tới khi cập nhật thành công.
-                    </span>
-                  </label>
-                </div>
-
-                <div className="form-group">
-                  <label htmlFor="select-status">Hành động khi tạo</label>
-                  <select
-                    id="select-status"
-                    value={status}
-                    onChange={(e) => setStatus(e.target.value as 'DRAFT' | 'RELEASED')}
-                    disabled={submitting}
-                  >
-                    <option value="DRAFT">Chỉ lưu Bản nháp (Lưu trữ và phát hành sau)</option>
-                    <option value="RELEASED">Phát hành ngay (Đẩy cập nhật tới client trên kênh đã chọn)</option>
-                  </select>
-                </div>
-
-                {status === 'RELEASED' && (
-                  <div className="release-warning">
-                    <AlertCircle size={16} className="warning-icon" />
-                    <span>
-                      <strong>Chú ý:</strong> Bản cập nhật <strong>{platform === 'IOS' ? 'iOS' : 'Android'}</strong> trên kênh <strong>{channel}</strong> sẽ có hiệu lực ngay lập tức.
-                    </span>
-                  </div>
-                )}
-
-                <div className="update-modal-footer">
-                  <button
-                    type="button"
-                    className="btn-cancel"
-                    onClick={() => setShowModal(false)}
-                    disabled={submitting}
-                  >
-                    Hủy bỏ
-                  </button>
-                  {canAction('APP_UPDATE_UPLOAD') && (
-                    <button type="submit" className="btn-submit" disabled={submitting}>
+                    >
                       {submitting ? (
                         <>
                           <Loader2 size={16} className="spin" />
                           <span>Đang xử lý...</span>
                         </>
+                      ) : status === 'RELEASED' ? (
+                        <>
+                          <Rocket size={16} />
+                          <span>Xác nhận & Phát hành</span>
+                        </>
                       ) : (
-                        <span>Xác nhận</span>
+                        <>
+                          <CheckCircle2 size={16} />
+                          <span>Lưu Bản nháp</span>
+                        </>
                       )}
                     </button>
-                  )}
+                  </div>
                 </div>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Quick Preview Modal for Changelog */}
+      {previewUpdate && (
+        <div className="update-preview-overlay" onClick={() => setPreviewUpdate(null)}>
+          <div className="update-preview-box" onClick={(e) => e.stopPropagation()}>
+            <div className="preview-box-header">
+              <div className="preview-box-title">
+                <div className="preview-icon-wrapper">
+                  <FileText size={18} />
+                </div>
+                <div>
+                  <h4>Nhật ký Cập nhật v{previewUpdate.version}</h4>
+                  <div className="preview-meta-row">
+                    <span className={`platform-badge ${previewUpdate.platform === 'IOS' ? 'platform-ios' : 'platform-android'}`} style={{ display: 'inline-flex' }}>
+                      {previewUpdate.platform === 'IOS' ? <AppleIcon size={12} /> : <AndroidIcon size={12} />}
+                      <span>{previewUpdate.platform === 'IOS' ? 'iOS' : 'Android'}</span>
+                    </span>
+                    {renderChannelBadge(previewUpdate.channel)}
+                    <span className="preview-date-str">
+                      {previewUpdate.releasedAt ? `Phát hành: ${new Date(previewUpdate.releasedAt).toLocaleDateString('vi-VN')}` : `Tạo: ${new Date(previewUpdate.createdAt).toLocaleDateString('vi-VN')}`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="close-preview-btn"
+                onClick={() => setPreviewUpdate(null)}
+                title="Đóng"
+                aria-label="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="preview-box-body">
+              <div className="preview-changelog-list">
+                {previewUpdate.changelog.split('\n').map((line, idx) => (
+                  <div key={idx} className="preview-changelog-line">
+                    {line.trim().startsWith('-') || line.trim().startsWith('*') ? (
+                      <span className="preview-bullet">•</span>
+                    ) : null}
+                    <span className="preview-text-line">{line.replace(/^[-*]\s*/, '')}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="preview-box-footer">
+              <button
+                type="button"
+                className="btn-preview-copy"
+                onClick={() => {
+                  navigator.clipboard.writeText(previewUpdate.changelog);
+                  showToast('Đã sao chép nội dung nhật ký!');
+                }}
+              >
+                <Copy size={13} />
+                <span>Sao chép nội dung</span>
+              </button>
+              <button
+                type="button"
+                className="btn-preview-close"
+                onClick={() => setPreviewUpdate(null)}
+              >
+                Đóng
+              </button>
+            </div>
           </div>
         </div>
       )}
