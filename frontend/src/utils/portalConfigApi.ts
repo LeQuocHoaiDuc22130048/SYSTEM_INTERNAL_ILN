@@ -7,6 +7,10 @@ export interface PortalSupportConfig {
   zaloLabel: string;
   workingHours: string;
   workshopAddress: string;
+  mapUrl?: string;
+  latitude?: number;
+  longitude?: number;
+  mapImageUrl?: string;
   updatedAt?: string;
 }
 
@@ -17,6 +21,10 @@ export interface UpdatePortalSupportConfigRequest {
   zaloLabel?: string;
   workingHours?: string;
   workshopAddress?: string;
+  mapUrl?: string;
+  latitude?: number;
+  longitude?: number;
+  mapImageUrl?: string;
 }
 
 const API_BASE = '/api/v1';

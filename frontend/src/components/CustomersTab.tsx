@@ -22,7 +22,9 @@ import {
   MapPin,
   AlertCircle,
   Wrench,
+  MessageSquare,
 } from 'lucide-react';
+import { CustomerFeedbackSection } from './CustomerFeedbackSection';
 import type { UserInfo } from '../mockData';
 import { hasPermission } from '../utils/permissions';
 import type {
@@ -73,6 +75,7 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Modals state
+  const [activeCustomerSubTab, setActiveCustomerSubTab] = useState<'DIRECTORY' | 'FEEDBACK'>('DIRECTORY');
   const [isFormModalOpen, setIsFormModalOpen] = useState<boolean>(false);
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState<boolean>(false);
@@ -361,7 +364,60 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
         </div>
       </div>
 
-      {/* Toolbar / Filters */}
+      {/* Sub-tab Navigation */}
+      <div className="customers-subtab-bar" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+        <button
+          type="button"
+          onClick={() => setActiveCustomerSubTab('DIRECTORY')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '9px 18px',
+            borderRadius: '12px',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            border: activeCustomerSubTab === 'DIRECTORY' ? 'none' : '1px solid #cbd5e1',
+            cursor: 'pointer',
+            background: activeCustomerSubTab === 'DIRECTORY' ? '#2563eb' : '#ffffff',
+            color: activeCustomerSubTab === 'DIRECTORY' ? '#ffffff' : '#64748b',
+            boxShadow: activeCustomerSubTab === 'DIRECTORY' ? '0 4px 12px rgba(37,99,235,0.25)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <Users size={16} />
+          Danh sách khách hàng ({customerPage?.totalElements || 0})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveCustomerSubTab('FEEDBACK')}
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '8px',
+            padding: '9px 18px',
+            borderRadius: '12px',
+            fontWeight: 700,
+            fontSize: '0.875rem',
+            border: activeCustomerSubTab === 'FEEDBACK' ? 'none' : '1px solid #cbd5e1',
+            cursor: 'pointer',
+            background: activeCustomerSubTab === 'FEEDBACK' ? '#2563eb' : '#ffffff',
+            color: activeCustomerSubTab === 'FEEDBACK' ? '#ffffff' : '#64748b',
+            boxShadow: activeCustomerSubTab === 'FEEDBACK' ? '0 4px 12px rgba(37,99,235,0.25)' : 'none',
+            transition: 'all 0.15s ease',
+          }}
+        >
+          <MessageSquare size={16} />
+          Phản hồi & Đánh giá CSKH
+        </button>
+      </div>
+
+      {activeCustomerSubTab === 'FEEDBACK' ? (
+        <CustomerFeedbackSection showToast={showToast} currentUser={currentUser} />
+      ) : (
+        <>
+          {/* Toolbar / Filters */}
       <div className="customers-toolbar-card">
         <div className="customers-filters-row">
           <div className="customer-search-wrap">
@@ -561,6 +617,8 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
           </div>
         )}
       </div>
+        </>
+      )}
 
       {/* Modal: Thêm / Sửa khách hàng */}
       {isFormModalOpen && (

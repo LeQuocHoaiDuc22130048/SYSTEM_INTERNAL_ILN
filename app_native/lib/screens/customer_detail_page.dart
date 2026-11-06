@@ -17,6 +17,7 @@ import '../widgets/status_badge.dart';
 import 'customer_form_sheet.dart';
 import 'customer_order_link_dialog.dart';
 import 'repair_orders_page.dart';
+import '../widgets/customer_feedback_sheet.dart';
 
 class CustomerDetailPage extends StatefulWidget {
   final Customer customer;
@@ -328,6 +329,15 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
         leading: const AppBackButton(),
         title: const Text('Hồ sơ khách hàng'),
         actions: [
+          IconButton(
+            icon: const Icon(LucideIcons.messageSquareQuote, size: 20),
+            tooltip: 'Phản hồi & CSKH của khách',
+            onPressed: () => CustomerFeedbackSheet.show(
+              context,
+              filterCustomerCode: _customer.customerCode,
+              filterCustomerName: _customer.customerName,
+            ),
+          ),
           if (canManage)
             PermissionGate(
               permission: AppPermission.updateCustomers,
@@ -689,6 +699,55 @@ class _CustomerDetailPageState extends State<CustomerDetailPage> {
                   icon: const Icon(Icons.add_link),
                   label: const Text('Gán đơn đã có'),
                 ),
+
+              // Customer Feedback & Rating Quick Card
+              InkWell(
+                onTap: () => CustomerFeedbackSheet.show(
+                  context,
+                  filterCustomerCode: _customer.customerCode,
+                  filterCustomerName: _customer.customerName,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF3C7),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD97706),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(LucideIcons.messageSquareQuote, color: Colors.white, size: 18),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Ý kiến đánh giá & Khiếu nại bảo hành',
+                              style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF92400E)),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              'Xem đánh giá chất lượng sửa chữa hoặc xử lý sự cố thiết bị',
+                              style: TextStyle(fontSize: 11, color: Color(0xFFB45309)),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const Icon(LucideIcons.chevronRight, size: 18, color: Color(0xFF92400E)),
+                    ],
+                  ),
+                ),
+              ),
 
               // Linked Repair Orders Section
               PermissionGate(

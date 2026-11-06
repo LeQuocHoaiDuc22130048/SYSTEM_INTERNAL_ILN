@@ -38,6 +38,18 @@ public class PortalSupportConfig {
     @Column(name = "workshop_address", nullable = false, length = 500)
     private String workshopAddress;
 
+    @Column(name = "map_url", length = 1000)
+    private String mapUrl;
+
+    @Column(name = "latitude")
+    private Double latitude;
+
+    @Column(name = "longitude")
+    private Double longitude;
+
+    @Column(name = "map_image_url", length = 1000)
+    private String mapImageUrl;
+
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;

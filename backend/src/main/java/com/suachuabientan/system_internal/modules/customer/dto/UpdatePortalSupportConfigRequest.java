@@ -25,4 +25,12 @@ public class UpdatePortalSupportConfigRequest {
     private String workingHours;
 
     private String workshopAddress;
+
+    private String mapUrl;
+
+    private Double latitude;
+
+    private Double longitude;
+
+    private String mapImageUrl;
 }

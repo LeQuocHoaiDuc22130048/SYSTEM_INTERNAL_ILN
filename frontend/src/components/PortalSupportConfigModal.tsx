@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PhoneCall, MessageSquare, Clock, MapPin, X, Save, AlertCircle } from 'lucide-react';
+import { PhoneCall, MessageSquare, Clock, MapPin, X, Save, AlertCircle, Navigation, Globe } from 'lucide-react';
 import {
   getPortalSupportConfig,
   updatePortalSupportConfig,
@@ -28,8 +28,14 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
   const [zaloLabel, setZaloLabel] = useState<string>('Chat Zalo Tiếp Nhận');
   const [workingHours, setWorkingHours] = useState<string>('08:00 - 17:30 (Thứ 2 - Thứ 7)');
   const [workshopAddress, setWorkshopAddress] = useState<string>(
-    'Trung tâm kỹ thuật sửa chữa thiết bị công nghiệp'
+    '243 Quốc Lộ 1A, Khu phố 4, Phường Tam Bình, TP. Hồ Chí Minh, Việt Nam'
   );
+  const [mapUrl, setMapUrl] = useState<string>(
+    'https://www.google.com/maps/search/?api=1&query=243+Quốc+Lộ+1A,+Tam+Bình,+TP+Hồ+Chí+Minh'
+  );
+  const [latitude, setLatitude] = useState<string>('10.854611');
+  const [longitude, setLongitude] = useState<string>('106.703212');
+  const [mapImageUrl, setMapImageUrl] = useState<string>('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -44,6 +50,10 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
           setZaloLabel(cfg.zaloLabel || '');
           setWorkingHours(cfg.workingHours || '');
           setWorkshopAddress(cfg.workshopAddress || '');
+          setMapUrl(cfg.mapUrl || '');
+          setLatitude(cfg.latitude !== undefined && cfg.latitude !== null ? String(cfg.latitude) : '10.854611');
+          setLongitude(cfg.longitude !== undefined && cfg.longitude !== null ? String(cfg.longitude) : '106.703212');
+          setMapImageUrl(cfg.mapImageUrl || '');
         }
       })
       .catch((err) => {
@@ -73,6 +83,10 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
         zaloLabel: zaloLabel.trim(),
         workingHours: workingHours.trim(),
         workshopAddress: workshopAddress.trim(),
+        mapUrl: mapUrl.trim(),
+        latitude: latitude ? parseFloat(latitude) : undefined,
+        longitude: longitude ? parseFloat(longitude) : undefined,
+        mapImageUrl: mapImageUrl.trim(),
       });
       showToast('Cập nhật kênh hỗ trợ Cổng Khách Hàng thành công!');
       onClose();
@@ -194,10 +208,64 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
                 </label>
                 <input
                   type="text"
-                  placeholder="VD: Trung tâm kỹ thuật sửa chữa thiết bị công nghiệp"
+                  placeholder="VD: 243 Quốc Lộ 1A, Khu phố 4, Phường Tam Bình, TP. Hồ Chí Minh"
                   value={workshopAddress}
                   onChange={(e) => setWorkshopAddress(e.target.value)}
                 />
+              </div>
+
+              <div className="config-section-title" style={{ marginTop: 14 }}>
+                <Navigation size={16} />
+                <span>Bản Đồ Google Maps & Tọa Độ Dẫn Đường</span>
+              </div>
+              <div className="form-group">
+                <label>
+                  <Globe size={14} style={{ display: 'inline', marginRight: 4, verticalAlign: 'text-bottom' }} />
+                  Đường dẫn Google Maps (Share link hoặc vị trí)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://maps.google.com/?q=..."
+                  value={mapUrl}
+                  onChange={(e) => setMapUrl(e.target.value)}
+                />
+                <span className="field-hint" style={{ fontSize: 11, color: '#64748b', marginTop: 3, display: 'block' }}>
+                  * Khách hàng bấm "Chỉ đường" hoặc "Mở bản đồ" sẽ chuyển thẳng tới liên kết này.
+                </span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                <div className="form-group">
+                  <label>Vĩ độ (Latitude)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="10.854611"
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Kinh độ (Longitude)</label>
+                  <input
+                    type="number"
+                    step="any"
+                    placeholder="106.703212"
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="form-group" style={{ marginTop: 8 }}>
+                <label>Ảnh bản đồ / Sơ đồ đường đi (URL tùy chọn)</label>
+                <input
+                  type="url"
+                  placeholder="https://... hoặc để trống để sử dụng bản đồ vector mặc định"
+                  value={mapImageUrl}
+                  onChange={(e) => setMapImageUrl(e.target.value)}
+                />
+                <span className="field-hint" style={{ fontSize: 11, color: '#64748b', marginTop: 3, display: 'block' }}>
+                  * Nếu cung cấp URL ảnh sơ đồ, app sẽ ưu tiên hiển thị ảnh này cho khách hàng.
+                </span>
               </div>
             </div>
 

@@ -18,5 +18,9 @@ public class PortalSupportConfigResponse {
     private String zaloLabel;
     private String workingHours;
     private String workshopAddress;
+    private String mapUrl;
+    private Double latitude;
+    private Double longitude;
+    private String mapImageUrl;
     private LocalDateTime updatedAt;
 }

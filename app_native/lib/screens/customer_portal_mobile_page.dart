@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -34,10 +35,32 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   final TextEditingController _searchController = TextEditingController();
   int _currentNavIndex = 0;
 
+  // Feedback System States
+  String _feedbackViewMode = 'CREATE'; // 'CREATE' or 'HISTORY'
+  String? _feedbackSelectedOrderCode;
+  int _feedbackRating = 5;
+  String _feedbackType = 'SERVICE_QUALITY'; // 'SERVICE_QUALITY', 'WARRANTY_ISSUE', 'SUGGESTION'
+  bool _feedbackIsUrgent = false;
+  final Set<String> _feedbackSelectedTags = {};
+  final TextEditingController _feedbackContentController = TextEditingController();
+  final List<XFile> _feedbackImages = [];
+  bool _isSubmittingFeedback = false;
+
+  List<Map<String, dynamic>> _myFeedbacks = [];
+
   static const String defaultHotlinePhone = '0964 266 771'; // Số điện thoại hỗ trợ kỹ thuật
+  static const String defaultWorkshopAddress =
+      '243 Quốc Lộ 1A, Khu phố 4, Phường Tam Bình, TP. Hồ Chí Minh, Việt Nam';
+  static const double workshopLatitude = 10.854611;
+  static const double workshopLongitude = 106.703212;
 
   String _hotlineNumber = defaultHotlinePhone;
   String _hotlineLabel = 'Liên hệ kỹ thuật';
+  String _workshopAddress = defaultWorkshopAddress;
+  String? _workshopMapUrl;
+  double _workshopLat = workshopLatitude;
+  double _workshopLng = workshopLongitude;
+  String? _workshopMapImageUrl;
 
   @override
   void initState() {
@@ -45,11 +68,13 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     _fetchOrders();
     _fetchSupportConfig();
     _fetchAccountProfile();
+    _fetchMyFeedbacks();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _feedbackContentController.dispose();
     super.dispose();
   }
 
@@ -111,6 +136,32 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           } else {
             _hotlineLabel = 'Liên hệ kỹ thuật';
           }
+          final addr = res['workshopAddress']?.toString().trim();
+          if (addr != null &&
+              addr.isNotEmpty &&
+              !addr.contains('Trung tâm kỹ thuật sửa chữa thiết bị công nghiệp') &&
+              !addr.contains('Văn Khê')) {
+            _workshopAddress = addr;
+          } else {
+            _workshopAddress = defaultWorkshopAddress;
+          }
+
+          final mUrl = res['mapUrl']?.toString().trim();
+          if (mUrl != null && mUrl.isNotEmpty) {
+            _workshopMapUrl = mUrl;
+          }
+          final latVal = res['latitude'];
+          if (latVal is num) {
+            _workshopLat = latVal.toDouble();
+          }
+          final lngVal = res['longitude'];
+          if (lngVal is num) {
+            _workshopLng = lngVal.toDouble();
+          }
+          final mImg = res['mapImageUrl']?.toString().trim();
+          if (mImg != null && mImg.isNotEmpty) {
+            _workshopMapImageUrl = mImg;
+          }
         });
       }
     } catch (_) {
@@ -157,6 +208,82 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         );
       }
     }
+  }
+
+  // Google Maps Navigation & Directions
+  Future<void> _openGoogleMaps({bool directions = true}) async {
+    // If admin configured a direct mapUrl and user wants to view map:
+    if (!directions && _workshopMapUrl != null && _workshopMapUrl!.isNotEmpty) {
+      final customUri = Uri.parse(_workshopMapUrl!);
+      try {
+        if (await canLaunchUrl(customUri)) {
+          await launchUrl(customUri, mode: LaunchMode.externalApplication);
+          return;
+        }
+      } catch (_) {}
+    }
+
+    final destination = Uri.encodeComponent(_workshopAddress);
+    final urlString = directions
+        ? 'https://www.google.com/maps/dir/?api=1&destination=$_workshopLat,$_workshopLng'
+        : (_workshopMapUrl != null && _workshopMapUrl!.isNotEmpty
+            ? _workshopMapUrl!
+            : 'https://www.google.com/maps/search/?api=1&query=$destination');
+    final uri = Uri.parse(urlString);
+
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        final geoUri = Uri.parse('geo:$_workshopLat,$_workshopLng?q=$destination');
+        if (await canLaunchUrl(geoUri)) {
+          await launchUrl(geoUri, mode: LaunchMode.externalApplication);
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Không thể mở ứng dụng bản đồ.')),
+          );
+        }
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lỗi khi mở bản đồ dẫn đường.')),
+        );
+      }
+    }
+  }
+
+  // Google Street View Panorama
+  Future<void> _openStreetView() async {
+    final uri = Uri.parse('https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=$_workshopLat,$_workshopLng');
+    try {
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _openGoogleMaps(directions: false);
+      }
+    } catch (_) {
+      _openGoogleMaps(directions: false);
+    }
+  }
+
+  // Copy Workshop Address
+  void _copyWorkshopAddress() {
+    Clipboard.setData(ClipboardData(text: _workshopAddress));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Row(
+          children: [
+            Icon(LucideIcons.checkCheck, color: Colors.white, size: 18),
+            SizedBox(width: 8),
+            Expanded(child: Text('Đã sao chép địa chỉ xưởng vào bộ nhớ tạm')),
+          ],
+        ),
+        duration: Duration(seconds: 2),
+        backgroundColor: Color(0xFF0F172A),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   static String _translateStatusToVietnamese(String status, [String? rawLabel]) {
@@ -2287,94 +2414,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           const SizedBox(width: 10),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await Future.wait([
-            _fetchOrders(),
-            _fetchSupportConfig(),
-            _fetchAccountProfile(),
-          ]);
-        },
-        color: const Color(0xFF2563EB),
-        child: ListView(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          children: [
-            // 1. VIP MEMBERSHIP CARD (Gradient Enterprise Hero Card from Stitch)
-            _buildVipMembershipCard(companyName, contactName, initials, user?.username, avatarUrl),
-            const SizedBox(height: 16),
-
-            // 2. SEARCH BAR & QUICK FILTERS (Single Row Horizontal Chips)
-            _buildSearchBar(),
-            const SizedBox(height: 12),
-            _buildFilterTabs(),
-            const SizedBox(height: 16),
-
-            // 3. SECTION HEADER
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Row(
-                    children: [
-                      const Flexible(
-                        child: Text(
-                          'Đơn hàng sửa chữa',
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFDBEAFE),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${_filteredOrders.length}',
-                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: const Color(0xFF2563EB),
-                  ),
-                  onPressed: _fetchOrders,
-                  icon: const Icon(LucideIcons.refreshCw, size: 13),
-                  label: const Text('Làm mới', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-
-            // 4. ORDER LIST / EMPTY STATE / LOADING
-            if (_isLoading)
-              const Center(
-                child: Padding(
-                  padding: EdgeInsets.symmetric(vertical: 60),
-                  child: CircularProgressIndicator(color: Color(0xFF2563EB)),
-                ),
-              )
-            else if (_error != null)
-              _buildErrorCard()
-            else if (_filteredOrders.isEmpty)
-              _buildEmptyState()
-            else
-              ..._filteredOrders.map(_buildOrderCard),
-
-            const SizedBox(height: 14),
-
-            // 5. PRIMARY CTA BANNER (Bottom Section)
-            _buildFastSupportBanner(),
-
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
+      body: _buildCurrentBody(companyName, contactName, initials, user?.username, avatarUrl),
       bottomNavigationBar: _buildBottomNavigation(),
     );
   }
@@ -3528,6 +3568,42 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                           ],
                         ),
                       ),
+                      if (isCompleted) ...[
+                        const SizedBox(height: 8),
+                        GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _currentNavIndex = 1;
+                              _feedbackSelectedOrderCode = orderCode;
+                              _feedbackType = 'SERVICE_QUALITY';
+                              _feedbackViewMode = 'CREATE';
+                            });
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFFEF3C7),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFFDE68A)),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(LucideIcons.star, size: 13, color: Color(0xFFD97706)),
+                                SizedBox(width: 6),
+                                Text(
+                                  'Gửi phản hồi / Đánh giá chất lượng đơn này',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -3750,13 +3826,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   _selectedFilter = 'ALL';
                 });
               }),
-              _buildNavItem(1, LucideIcons.cpu, 'Thiết bị', () {
+              _buildNavItem(1, LucideIcons.messageSquare, 'Phản hồi', () {
                 setState(() => _currentNavIndex = 1);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Tổng cộng ${_orders.fold<int>(0, (acc, o) => acc + (o['deviceCount'] as int? ?? 1))} thiết bị đang được giám sát tại xưởng.'),
-                  ),
-                );
               }),
               // Center Action Button "+ Yêu cầu mới"
               Expanded(
@@ -3797,15 +3868,11 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   ),
                 ),
               ),
-              _buildNavItem(3, LucideIcons.history, 'Lịch sử', () {
-                setState(() {
-                  _currentNavIndex = 3;
-                  _selectedFilter = 'HISTORY';
-                });
+              _buildNavItem(2, LucideIcons.shieldCheck, 'Bảo hành', () {
+                setState(() => _currentNavIndex = 2);
               }),
-              _buildNavItem(4, LucideIcons.circleHelp, 'Hỗ trợ', () {
-                setState(() => _currentNavIndex = 4);
-                _showSupportInfoSheet();
+              _buildNavItem(3, LucideIcons.circleHelp, 'Hỗ trợ', () {
+                setState(() => _currentNavIndex = 3);
               }),
             ],
           ),
@@ -3970,6 +4037,1745 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       ),
     );
   }
+
+
+  // ==========================================================================
+  // BODY SWITCHER & SUB-SCREENS (Orders, Feedback, Warranty, Support)
+  // ==========================================================================
+
+  Widget _buildCurrentBody(
+    String companyName,
+    String contactName,
+    String initials,
+    String? username,
+    String? avatarUrl,
+  ) {
+    if (_currentNavIndex == 1) {
+      return _buildFeedbackBody();
+    }
+    if (_currentNavIndex == 2) {
+      return _buildWarrantyBody();
+    }
+    if (_currentNavIndex == 3) {
+      return _buildSupportBody();
+    }
+    return _buildOrdersBody(companyName, contactName, initials, username, avatarUrl);
+  }
+
+  // 1. Orders Body
+  Widget _buildOrdersBody(
+    String companyName,
+    String contactName,
+    String initials,
+    String? username,
+    String? avatarUrl,
+  ) {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future.wait([
+          _fetchOrders(),
+          _fetchSupportConfig(),
+          _fetchAccountProfile(),
+        ]);
+      },
+      color: const Color(0xFF2563EB),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        children: [
+          // VIP MEMBERSHIP CARD
+          _buildVipMembershipCard(companyName, contactName, initials, username, avatarUrl),
+          const SizedBox(height: 16),
+
+          // SEARCH BAR & QUICK FILTERS
+          _buildSearchBar(),
+          const SizedBox(height: 12),
+          _buildFilterTabs(),
+          const SizedBox(height: 16),
+
+          // SECTION HEADER
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Row(
+                  children: [
+                    const Flexible(
+                      child: Text(
+                        'Đơn hàng sửa chữa',
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFDBEAFE),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${_filteredOrders.length}',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF1D4ED8)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  foregroundColor: const Color(0xFF2563EB),
+                ),
+                onPressed: _fetchOrders,
+                icon: const Icon(LucideIcons.refreshCw, size: 13),
+                label: const Text('Làm mới', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // ORDER LIST / EMPTY STATE / LOADING
+          if (_isLoading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 60),
+                child: CircularProgressIndicator(color: Color(0xFF2563EB)),
+              ),
+            )
+          else if (_error != null)
+            _buildErrorCard()
+          else if (_filteredOrders.isEmpty)
+            _buildEmptyState()
+          else
+            ..._filteredOrders.map(_buildOrderCard),
+
+          const SizedBox(height: 14),
+
+          // PRIMARY CTA BANNER
+          _buildFastSupportBanner(),
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  // 2. Feedback Body
+  Widget _buildFeedbackBody() {
+    return RefreshIndicator(
+      onRefresh: () async {
+        await Future.wait([
+          _fetchOrders(),
+          _fetchMyFeedbacks(),
+        ]);
+      },
+      color: const Color(0xFF2563EB),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        children: [
+          _buildFeedbackHeaderBanner(),
+          const SizedBox(height: 16),
+          _buildFeedbackTabSwitcher(),
+          const SizedBox(height: 16),
+          if (_feedbackViewMode == 'CREATE')
+            _buildFeedbackCreateForm()
+          else
+            _buildFeedbackHistoryList(),
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackHeaderBanner() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+            ),
+            child: const Icon(LucideIcons.messageSquare, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Phản hồi & Đánh giá dịch vụ',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Ý kiến của Quý khách là kim chỉ nam để LikeNew không ngừng nâng cao chất lượng.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0), height: 1.3),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackTabSwitcher() {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE2E8F0),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _feedbackViewMode = 'CREATE'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _feedbackViewMode == 'CREATE' ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: _feedbackViewMode == 'CREATE'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.messageSquarePlus,
+                      size: 16,
+                      color: _feedbackViewMode == 'CREATE' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Gửi phản hồi mới',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: _feedbackViewMode == 'CREATE' ? FontWeight.bold : FontWeight.w600,
+                        color: _feedbackViewMode == 'CREATE' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _feedbackViewMode = 'HISTORY'),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(
+                  color: _feedbackViewMode == 'HISTORY' ? Colors.white : Colors.transparent,
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: _feedbackViewMode == 'HISTORY'
+                      ? [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.06),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      LucideIcons.history,
+                      size: 16,
+                      color: _feedbackViewMode == 'HISTORY' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      'Lịch sử phản hồi (${_myFeedbacks.length})',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: _feedbackViewMode == 'HISTORY' ? FontWeight.bold : FontWeight.w600,
+                        color: _feedbackViewMode == 'HISTORY' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFeedbackCreateForm() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 1. Phân loại phản hồi
+        const Text(
+          '1. Mục đích phản hồi*',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            _buildFeedbackTypeCard(
+              type: 'SERVICE_QUALITY',
+              title: 'Đánh giá',
+              subtitle: 'Chất lượng đơn',
+              icon: LucideIcons.star,
+              activeColor: const Color(0xFFEAB308),
+            ),
+            const SizedBox(width: 8),
+            _buildFeedbackTypeCard(
+              type: 'WARRANTY_ISSUE',
+              title: 'Khiếu nại',
+              subtitle: 'Bảo hành / Lỗi lại',
+              icon: LucideIcons.alertTriangle,
+              activeColor: const Color(0xFFEF4444),
+            ),
+            const SizedBox(width: 8),
+            _buildFeedbackTypeCard(
+              type: 'SUGGESTION',
+              title: 'Góp ý',
+              subtitle: 'Cải tiến dịch vụ',
+              icon: LucideIcons.lightbulb,
+              activeColor: const Color(0xFF3B82F6),
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+
+        // 2. Chọn đơn hàng liên quan
+        const Text(
+          '2. Chọn đơn hàng sửa chữa liên quan',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<String>(
+              isExpanded: true,
+              value: _feedbackSelectedOrderCode,
+              hint: const Text('Chọn đơn hàng (hoặc ý kiến chung)', style: TextStyle(fontSize: 13, color: Color(0xFF94A3B8))),
+              items: [
+                const DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('Ý kiến chung (Không thuộc đơn cụ thể)', style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                ),
+                ..._orders.map((o) {
+                  final code = (o['orderCode'] ?? '').toString();
+                  final title = _resolveOrderTitle(o);
+                  return DropdownMenuItem<String>(
+                    value: code,
+                    child: Text(
+                      '$code - $title',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0F172A)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  );
+                }),
+              ],
+              onChanged: (val) {
+                setState(() => _feedbackSelectedOrderCode = val);
+              },
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+
+        // 3. Đánh giá số sao (Nếu không phải Góp ý thuần)
+        if (_feedbackType != 'SUGGESTION') ...[
+          const Text(
+            '3. Mức độ hài lòng của Quý khách*',
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final star = index + 1;
+                    return GestureDetector(
+                      onTap: () => setState(() => _feedbackRating = star),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: Icon(
+                          LucideIcons.star,
+                          size: 36,
+                          color: star <= _feedbackRating ? const Color(0xFFEAB308) : const Color(0xFFCBD5E1),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  _getRatingLabel(_feedbackRating),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: _getRatingColor(_feedbackRating),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+        ],
+
+        // 4. Thẻ đánh giá nhanh
+        Text(
+          _feedbackType == 'SERVICE_QUALITY'
+              ? '4. Điểm Quý khách ấn tượng nhất'
+              : (_feedbackType == 'WARRANTY_ISSUE'
+                  ? '4. Vấn đề thiết bị đang gặp phải*'
+                  : '3. Chủ đề đóng góp ý kiến*'),
+          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _getTagsForFeedbackType(_feedbackType).map((tag) {
+            final isSelected = _feedbackSelectedTags.contains(tag);
+            return FilterChip(
+              label: Text(tag),
+              labelStyle: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+              ),
+              selected: isSelected,
+              onSelected: (selected) {
+                setState(() {
+                  if (selected) {
+                    _feedbackSelectedTags.add(tag);
+                  } else {
+                    _feedbackSelectedTags.remove(tag);
+                  }
+                });
+              },
+              backgroundColor: Colors.white,
+              selectedColor: const Color(0xFFDBEAFE),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+                side: BorderSide(
+                  color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFCBD5E1),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 18),
+
+        // 5. Nội dung phản hồi chi tiết
+        const Text(
+          '5. Nội dung phản hồi / góp ý chi tiết*',
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFCBD5E1)),
+          ),
+          child: TextFormField(
+            controller: _feedbackContentController,
+            maxLines: 4,
+            decoration: InputDecoration(
+              hintText: _feedbackType == 'SERVICE_QUALITY'
+                  ? 'Chia sẻ trải nghiệm sửa chữa và vận hành thiết bị của Quý khách...'
+                  : (_feedbackType == 'WARRANTY_ISSUE'
+                      ? 'Mô tả chi tiết lỗi phát sinh, mã lỗi trên màn hình hoặc yêu cầu hỗ trợ...'
+                      : 'Ý kiến đóng góp giúp cải tiến dịch vụ, quy trình hoặc phần mềm...'),
+              hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.all(14),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        // 6. Đính kèm hình ảnh
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              '6. Đính kèm hình ảnh hiện trường (Tùy chọn)',
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            Row(
+              children: [
+                IconButton(
+                  tooltip: 'Chụp ảnh',
+                  icon: const Icon(LucideIcons.camera, size: 20, color: Color(0xFF2563EB)),
+                  onPressed: () => _pickFeedbackImage(ImageSource.camera),
+                ),
+                IconButton(
+                  tooltip: 'Chọn từ thư viện',
+                  icon: const Icon(LucideIcons.image, size: 20, color: Color(0xFF2563EB)),
+                  onPressed: () => _pickFeedbackImage(ImageSource.gallery),
+                ),
+              ],
+            ),
+          ],
+        ),
+        if (_feedbackImages.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          SizedBox(
+            height: 80,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              itemCount: _feedbackImages.length,
+              separatorBuilder: (_, index) => const SizedBox(width: 10),
+              itemBuilder: (ctx, i) {
+                final file = _feedbackImages[i];
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.file(
+                        File(file.path),
+                        width: 80,
+                        height: 80,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    Positioned(
+                      top: -6,
+                      right: -6,
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() => _feedbackImages.removeAt(i));
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFEF4444),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(LucideIcons.x, size: 12, color: Colors.white),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+        const SizedBox(height: 16),
+
+        // 7. Yêu cầu khẩn cấp
+        if (_feedbackType == 'WARRANTY_ISSUE') ...[
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFEF2F2),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFFECACA)),
+            ),
+            child: Row(
+              children: [
+                Checkbox(
+                  value: _feedbackIsUrgent,
+                  activeColor: const Color(0xFFDC2626),
+                  onChanged: (v) => setState(() => _feedbackIsUrgent = v ?? false),
+                ),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Yêu cầu kỹ sư gọi lại khẩn cấp',
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF991B1B)),
+                      ),
+                      Text(
+                        'Đánh dấu nếu dây chuyền nhà máy đang ngừng trệ do thiết bị gặp sự cố.',
+                        style: TextStyle(fontSize: 11, color: Color(0xFFB91C1C)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ] else ...[
+          const SizedBox(height: 10),
+        ],
+
+        // 8. Nút Gửi phản hồi
+        SizedBox(
+          width: double.infinity,
+          height: 50,
+          child: ElevatedButton.icon(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2563EB),
+              foregroundColor: Colors.white,
+              elevation: 2,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            onPressed: _isSubmittingFeedback ? null : _submitFeedback,
+            icon: _isSubmittingFeedback
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(LucideIcons.send, size: 18),
+            label: Text(
+              _isSubmittingFeedback ? 'Đang gửi phản hồi...' : 'Gửi phản hồi ngay',
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFeedbackTypeCard({
+    required String type,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Color activeColor,
+  }) {
+    final isSelected = _feedbackType == type;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () {
+          setState(() {
+            _feedbackType = type;
+            _feedbackSelectedTags.clear();
+          });
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor.withValues(alpha: 0.1) : Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? activeColor : const Color(0xFFE2E8F0),
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(icon, size: 22, color: isSelected ? activeColor : const Color(0xFF64748B)),
+              const SizedBox(height: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: isSelected ? activeColor : const Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 10,
+                  color: isSelected ? activeColor.withValues(alpha: 0.8) : const Color(0xFF94A3B8),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getRatingLabel(int rating) {
+    switch (rating) {
+      case 5:
+        return '🌟 Xuất sắc! Rất hài lòng';
+      case 4:
+        return '😊 Hài lòng, chất lượng tốt';
+      case 3:
+        return '😐 Bình thường / Tạm ổn';
+      case 2:
+        return '🙁 Chưa đạt kỳ vọng';
+      case 1:
+        return '😞 Rất không hài lòng';
+      default:
+        return 'Hài lòng';
+    }
+  }
+
+  Color _getRatingColor(int rating) {
+    if (rating >= 4) return const Color(0xFF16A34A);
+    if (rating == 3) return const Color(0xFFD97706);
+    return const Color(0xFFDC2626);
+  }
+
+  List<String> _getTagsForFeedbackType(String type) {
+    if (type == 'SERVICE_QUALITY') {
+      return [
+        'Sửa chữa nhanh chóng',
+        'Máy chạy rất êm & ổn định',
+        'Kỹ thuật nhiệt tình',
+        'Đóng gói & Giao nhận chu đáo',
+        'Báo giá minh bạch',
+        'Tư vấn kỹ thuật chuẩn xác',
+      ];
+    }
+    if (type == 'WARRANTY_ISSUE') {
+      return [
+        'Máy bị báo lỗi lại',
+        'Quạt tản nhiệt kêu to',
+        'Cần kỹ sư gọi lại gấp',
+        'Cần căn chỉnh lại thông số',
+        'Hư hại vỏ trong lúc vận chuyển',
+        'Tem niêm phong có vấn đề',
+      ];
+    }
+    return [
+      'Thời gian báo giá nhanh hơn',
+      'Đề xuất thêm tính năng app',
+      'Quy trình giao nhận máy',
+      'Chính sách giá linh kiện',
+      'Bổ sung hướng dẫn cài đặt mã lỗi',
+    ];
+  }
+
+  Future<void> _pickFeedbackImage(ImageSource source) async {
+    try {
+      final img = await _imagePicker.pickImage(
+        source: source,
+        imageQuality: 75,
+        maxWidth: 1200,
+        maxHeight: 1200,
+      );
+      if (img != null) {
+        setState(() {
+          _feedbackImages.add(img);
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể chọn ảnh: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _fetchMyFeedbacks() async {
+    final api = context.read<AuthProvider>().api;
+    try {
+      final res = await api.get('/api/v1/customer/feedbacks');
+      if (!mounted) return;
+      if (res is Map<String, dynamic> && res['content'] is List) {
+        setState(() {
+          _myFeedbacks = List<Map<String, dynamic>>.from(res['content'] as List);
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _submitFeedback() async {
+    final content = _feedbackContentController.text.trim();
+    if (content.isEmpty && _feedbackSelectedTags.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFFDC2626),
+          content: Text('Vui lòng chọn đánh giá nhanh hoặc nhập nội dung phản hồi.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isSubmittingFeedback = true);
+
+    final selectedOrderModel = _feedbackSelectedOrderCode != null
+        ? _orders
+            .firstWhere(
+              (o) => o['orderCode']?.toString() == _feedbackSelectedOrderCode,
+              orElse: () => {},
+            )['deviceName']
+            ?.toString()
+        : null;
+
+    final api = context.read<AuthProvider>().api;
+    try {
+      final payload = {
+        'orderCode': _feedbackSelectedOrderCode ?? 'Ý kiến chung',
+        'deviceModel': selectedOrderModel,
+        'rating': _feedbackRating,
+        'type': _feedbackType,
+        'typeName': _feedbackType == 'SERVICE_QUALITY'
+            ? 'Đánh giá chất lượng'
+            : (_feedbackType == 'WARRANTY_ISSUE' ? 'Khiếu nại / Bảo hành' : 'Đóng góp ý kiến'),
+        'tags': _feedbackSelectedTags.toList(),
+        'content': content,
+        'isUrgent': _feedbackIsUrgent,
+      };
+
+      final res = await api.post('/api/v1/customer/feedbacks', body: payload);
+      if (!mounted) return;
+
+      if (res is Map<String, dynamic>) {
+        setState(() {
+          _myFeedbacks.insert(0, res);
+        });
+      } else {
+        await _fetchMyFeedbacks();
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isSubmittingFeedback = false;
+        _feedbackContentController.clear();
+        _feedbackSelectedTags.clear();
+        _feedbackImages.clear();
+        _feedbackViewMode = 'HISTORY';
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: Color(0xFF10B981),
+          content: Text('Gửi phản hồi thành công! Kỹ thuật LikeNew sẽ xử lý và liên hệ lại sớm nhất.'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isSubmittingFeedback = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: const Color(0xFFDC2626),
+          content: Text('Không thể gửi phản hồi: $e'),
+        ),
+      );
+    }
+  }
+
+  Widget _buildFeedbackHistoryList() {
+    if (_myFeedbacks.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Column(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: const BoxDecoration(
+                color: Color(0xFFEFF6FF),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(LucideIcons.messageSquare, size: 28, color: Color(0xFF2563EB)),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'Chưa có phản hồi nào',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Các phản hồi, đánh giá và giải đáp của kỹ thuật viên sẽ được lưu trữ tại đây.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2563EB),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              onPressed: () => setState(() => _feedbackViewMode = 'CREATE'),
+              icon: const Icon(LucideIcons.plus, size: 16),
+              label: const Text('Gửi phản hồi đầu tiên'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: _myFeedbacks.map((fb) => _buildFeedbackHistoryCard(fb)).toList(),
+    );
+  }
+
+  Widget _buildFeedbackHistoryCard(Map<String, dynamic> fb) {
+    final status = (fb['status'] ?? 'PENDING').toString();
+    final isResolved = status == 'RESOLVED';
+    final isInProgress = status == 'IN_PROGRESS';
+    final reply = fb['reply']?.toString();
+    final rating = fb['rating'] as int? ?? 5;
+    final tags = (fb['tags'] as List?)?.map((e) => e.toString()).toList() ?? [];
+
+    Color statusBg = const Color(0xFFFEF3C7);
+    Color statusColor = const Color(0xFFB45309);
+    String statusText = 'Đã tiếp nhận';
+
+    if (isResolved) {
+      statusBg = const Color(0xFFDCFCE7);
+      statusColor = const Color(0xFF15803D);
+      statusText = 'Đã giải quyết';
+    } else if (isInProgress) {
+      statusBg = const Color(0xFFDBEAFE);
+      statusColor = const Color(0xFF1D4ED8);
+      statusText = 'Đang xử lý';
+    }
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F5F9),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      fb['typeName'] ?? 'Phản hồi',
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF334155)),
+                    ),
+                  ),
+                  if (fb['isUrgent'] == true) ...[
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEE2E2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text('KHẨN CẤP', style: TextStyle(fontSize: 9, fontWeight: FontWeight.w800, color: Color(0xFFDC2626))),
+                    ),
+                  ],
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: statusBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  statusText,
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: statusColor),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(LucideIcons.receipt, size: 14, color: Color(0xFF64748B)),
+                  const SizedBox(width: 4),
+                  Text(
+                    fb['orderCode'] ?? '',
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              Text(
+                fb['createdAt'] ?? '',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8)),
+              ),
+            ],
+          ),
+
+          if (fb['type'] != 'SUGGESTION') ...[
+            const SizedBox(height: 6),
+            Row(
+              children: List.generate(5, (index) {
+                return Icon(
+                  LucideIcons.star,
+                  size: 16,
+                  color: index < rating ? const Color(0xFFEAB308) : const Color(0xFFE2E8F0),
+                );
+              }),
+            ),
+          ],
+
+          if (tags.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: tags.map((t) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: const Color(0xFFBFDBFE)),
+                ),
+                child: Text(t, style: const TextStyle(fontSize: 11, color: Color(0xFF1D4ED8), fontWeight: FontWeight.w500)),
+              )).toList(),
+            ),
+          ],
+
+          if ((fb['content'] ?? '').toString().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              fb['content'] ?? '',
+              style: const TextStyle(fontSize: 13, color: Color(0xFF334155), height: 1.4),
+            ),
+          ],
+
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: reply != null ? const Color(0xFF93C5FD) : const Color(0xFFE2E8F0),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      reply != null ? LucideIcons.messageSquareCheck : LucideIcons.clock,
+                      size: 14,
+                      color: reply != null ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      reply != null ? 'Bộ phận Kỹ thuật / CSKH LikeNew phản hồi:' : 'Đang chờ bộ phận kỹ thuật tiếp nhận...',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: reply != null ? const Color(0xFF1E40AF) : const Color(0xFF64748B),
+                      ),
+                    ),
+                  ],
+                ),
+                if (reply != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    reply,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFF1E293B), height: 1.35),
+                  ),
+                  if (fb['replyAt'] != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      fb['replyAt'],
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8)),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 3. Warranty Body
+  Widget _buildWarrantyBody() {
+    final underWarrantyOrders = _orders.where((o) {
+      final isWarranty = o['underWarranty'] == true;
+      final st = (o['status'] ?? '').toString().toUpperCase();
+      return isWarranty || st == 'COMPLETED' || st == 'DELIVERED';
+    }).toList();
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _fetchOrders();
+      },
+      color: const Color(0xFF10B981),
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF065F46), Color(0xFF10B981)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3)),
+                  ),
+                  child: const Icon(LucideIcons.shieldCheck, color: Colors.white, size: 26),
+                ),
+                const SizedBox(width: 14),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Sổ bảo hành điện tử',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                      ),
+                      SizedBox(height: 4),
+                      Text(
+                        'Tra cứu thời hạn bảo hành linh kiện và thiết bị sửa chữa tại LikeNew.',
+                        style: TextStyle(fontSize: 12, color: Color(0xFFE2E8F0), height: 1.3),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(LucideIcons.info, size: 16, color: Color(0xFF10B981)),
+                    SizedBox(width: 8),
+                    Text(
+                      'Chính sách bảo hành tiêu chuẩn',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  '• Thời hạn bảo hành: 03 đến 06 tháng đối với linh kiện thay thế và bo mạch sửa chữa.\n'
+                  '• Điều kiện: Tem niêm phong bảo hành của LikeNew còn nguyên vẹn, không bị rách vỡ.\n'
+                  '• Hỗ trợ kỹ thuật: 24/7 qua Hotline kỹ thuật viên trưởng khi gặp sự cố tại nhà máy.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF475569), height: 1.45),
+                ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF10B981),
+                      side: const BorderSide(color: Color(0xFF10B981)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _currentNavIndex = 1;
+                        _feedbackType = 'WARRANTY_ISSUE';
+                        _feedbackViewMode = 'CREATE';
+                      });
+                    },
+                    icon: const Icon(LucideIcons.alertTriangle, size: 15),
+                    label: const Text('Báo sự cố bảo hành ngay', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Thiết bị trong thời hạn bảo hành (${underWarrantyOrders.length})',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          if (underWarrantyOrders.isEmpty)
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Center(
+                child: Text(
+                  'Hiện chưa có thiết bị nào trong danh sách bảo hành.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF64748B)),
+                ),
+              ),
+            )
+          else
+            ...underWarrantyOrders.map((o) => _buildWarrantyOrderCard(o)),
+
+          const SizedBox(height: 24),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWarrantyOrderCard(Map<String, dynamic> ord) {
+    final orderCode = ord['orderCode']?.toString() ?? '';
+    final orderTitle = _resolveOrderTitle(ord);
+    final serialNumber = (ord['serialNumber'] ?? '').toString().trim();
+    final deliveredRaw = (ord['deliveredAt'] ?? ord['completedAt'] ?? ord['receivedAt'] ?? '').toString();
+    final deliveredDate = _formatVietnameseDate(deliveredRaw);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDCFCE7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(LucideIcons.shieldCheck, size: 16, color: Color(0xFF16A34A)),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    orderCode,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                ],
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDCFCE7),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  'Đang bảo hành',
+                  style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            orderTitle,
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B)),
+          ),
+          if (serialNumber.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              'Số Serial: $serialNumber',
+              style: const TextStyle(fontSize: 11, color: Color(0xFF64748B), fontFamily: 'monospace'),
+            ),
+          ],
+          const SizedBox(height: 6),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Bàn giao: $deliveredDate',
+                style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+              ),
+              TextButton(
+                style: TextButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  foregroundColor: const Color(0xFFEF4444),
+                ),
+                onPressed: () {
+                  setState(() {
+                    _currentNavIndex = 1;
+                    _feedbackSelectedOrderCode = orderCode;
+                    _feedbackType = 'WARRANTY_ISSUE';
+                    _feedbackViewMode = 'CREATE';
+                  });
+                },
+                child: const Text('Báo sự cố thiết bị', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 4. Support Body
+  Widget _buildSupportBody() {
+    return ListView(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0F172A), Color(0xFF334155)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(LucideIcons.phoneCall, color: Colors.white, size: 24),
+              ),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Hỗ trợ Kỹ thuật & Tiếp nhận',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Đội ngũ kỹ sư LikeNew sẵn sàng hỗ trợ xử lý sự cố thiết bị 24/7.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFFCBD5E1), height: 1.3),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        _hotlineLabel,
+                        style: const TextStyle(fontSize: 12, color: Color(0xFF64748B), fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _hotlineNumber,
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+                      ),
+                    ],
+                  ),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    ),
+                    onPressed: () => _makePhoneCall(_hotlineNumber),
+                    icon: const Icon(LucideIcons.phoneCall, size: 16),
+                    label: const Text('Gọi ngay', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ],
+              ),
+              const Divider(height: 24),
+              const Row(
+                children: [
+                  Icon(LucideIcons.clock, size: 15, color: Color(0xFF64748B)),
+                  SizedBox(width: 8),
+                  Text('Giờ làm việc xưởng: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF0F172A))),
+                  Text('08:00 - 18:00 (Thứ 2 - Thứ 7)', style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF2563EB),
+                    side: const BorderSide(color: Color(0xFFBFDBFE)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: _showSupportInfoSheet,
+                  icon: const Icon(LucideIcons.circleHelp, size: 15),
+                  label: const Text('Xem danh sách kênh liên hệ chi tiết', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(LucideIcons.mapPin, size: 16, color: Color(0xFF2563EB)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Địa chỉ trung tâm kỹ thuật LikeNew',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFECFDF5),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFA7F3D0)),
+                    ),
+                    child: const Text(
+                      'Cơ sở TP.HCM',
+                      style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: Color(0xFF059669)),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _workshopAddress,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1E293B), height: 1.4),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '• Tiếp nhận máy trực tiếp tại xưởng hoặc qua các dịch vụ chuyển phát nhanh (Viettel Post, GHTK, xe khách liên tỉnh).',
+                style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        _buildWorkshopMapCard(),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  Widget _buildWorkshopMapCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header bar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            child: Row(
+              children: [
+                const Icon(LucideIcons.map, size: 16, color: Color(0xFF2563EB)),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Bản đồ vị trí xưởng (Google Maps)',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF0F172A)),
+                  ),
+                ),
+                InkWell(
+                  onTap: () => _openGoogleMaps(directions: false),
+                  borderRadius: BorderRadius.circular(6),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('Mở toàn màn hình', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Color(0xFF2563EB))),
+                        SizedBox(width: 4),
+                        Icon(LucideIcons.externalLink, size: 12, color: Color(0xFF2563EB)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Map interactive preview (Dark Google Maps aesthetic matching user screenshot)
+          Material(
+            color: const Color(0xFF171F2C),
+            child: InkWell(
+              onTap: () => _openGoogleMaps(directions: false),
+              child: SizedBox(
+                height: 220,
+                width: double.infinity,
+                child: Stack(
+                  children: [
+                    // Map Background Canvas or Custom Admin Map Image
+                    if (_workshopMapImageUrl != null && _workshopMapImageUrl!.isNotEmpty)
+                      Positioned.fill(
+                        child: Image.network(
+                          _workshopMapImageUrl!,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => CustomPaint(
+                            painter: _WorkshopMapPainter(),
+                          ),
+                        ),
+                      )
+                    else
+                      Positioned.fill(
+                        child: CustomPaint(
+                          painter: _WorkshopMapPainter(),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          // Details & Actions row
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            '243 QL1A',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          const Text(
+                            'Khu phố 4, P. Tam Bình (giáp An Phú Đông), TP. Hồ Chí Minh',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF64748B),
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Circular Directions button
+                    Material(
+                      color: const Color(0xFF2563EB),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: () => _openGoogleMaps(directions: true),
+                        customBorder: const CircleBorder(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: Icon(LucideIcons.navigation, color: Colors.white, size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    // Circular Copy button
+                    Material(
+                      color: const Color(0xFFF1F5F9),
+                      shape: const CircleBorder(),
+                      child: InkWell(
+                        onTap: _copyWorkshopAddress,
+                        customBorder: const CircleBorder(),
+                        child: const Padding(
+                          padding: EdgeInsets.all(10),
+                          child: Icon(LucideIcons.copy, color: Color(0xFF475569), size: 20),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                // Action Buttons Row
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 6,
+                      child: ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF1D4ED8),
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () => _openGoogleMaps(directions: true),
+                        icon: const Icon(LucideIcons.navigation, size: 16),
+                        label: const Text(
+                          'Chỉ đường',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 5,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF334155),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: _openStreetView,
+                        icon: const Icon(LucideIcons.camera, size: 16),
+                        label: const Text(
+                          'Xem phố',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 }
 
 // Order Detail Bottom Sheet - Redesigned per Stitch Screen 2
@@ -5179,4 +6985,116 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
       ),
     );
   }
+}
+
+class _WorkshopMapPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final bgPaint = Paint()..color = const Color(0xFF171F2C);
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), bgPaint);
+
+    // River (Sông Sài Gòn) on top-right corner
+    final riverPaint = Paint()
+      ..color = const Color(0xFF133854)
+      ..style = PaintingStyle.fill;
+    final riverPath = Path()
+      ..moveTo(size.width * 0.72, 0)
+      ..cubicTo(
+        size.width * 0.80,
+        size.height * 0.25,
+        size.width * 0.85,
+        size.height * 0.45,
+        size.width,
+        size.height * 0.55,
+      )
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(riverPath, riverPaint);
+
+    // Sông Sài Gòn label
+    final textPainter = TextPainter(
+      text: TextSpan(
+        text: 'Sông Sài Gòn',
+        style: TextStyle(
+          color: const Color(0xFF38BDF8).withValues(alpha: 0.6),
+          fontSize: 9.5,
+          fontStyle: FontStyle.italic,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    canvas.save();
+    canvas.translate(size.width * 0.81, 14);
+    canvas.rotate(0.35);
+    textPainter.paint(canvas, Offset.zero);
+    canvas.restore();
+
+    // Local road lines (Dark grey-blue)
+    final minorRoadPaint = Paint()
+      ..color = const Color(0xFF26354A)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke;
+
+    // Cross roads
+    // 1. Vo Thi Thua
+    canvas.drawLine(
+      Offset(size.width * 0.60, 0),
+      Offset(size.width * 0.56, size.height * 0.44),
+      minorRoadPaint,
+    );
+    // 2. An Phu Dong 3
+    canvas.drawLine(
+      Offset(size.width * 0.78, size.height * 0.43),
+      Offset(size.width * 0.82, size.height),
+      minorRoadPaint,
+    );
+    // 3. To 46 KP3
+    canvas.drawLine(
+      Offset(size.width * 0.65, size.height * 0.43),
+      Offset(size.width * 0.72, size.height * 0.30),
+      minorRoadPaint,
+    );
+    // 4. Đường nội QL1
+    canvas.drawLine(
+      Offset(size.width * 0.28, 0),
+      Offset(size.width * 0.35, size.height * 0.44),
+      minorRoadPaint,
+    );
+    // 5. Vuon Lai / internal road
+    canvas.drawLine(
+      Offset(size.width * 0.12, size.height * 0.45),
+      Offset(size.width * 0.10, size.height),
+      minorRoadPaint,
+    );
+    // 6. Secondary horizontal connecting roads
+    canvas.drawLine(
+      Offset(0, size.height * 0.72),
+      Offset(size.width * 0.55, size.height * 0.72),
+      minorRoadPaint,
+    );
+
+    // Main Highway: QL1A (Running slightly angled horizontally across the canvas)
+    final ql1aBasePaint = Paint()
+      ..color = const Color(0xFF1E3A5F)
+      ..strokeWidth = 14
+      ..strokeCap = StrokeCap.square
+      ..style = PaintingStyle.stroke;
+
+    final ql1aCenterPaint = Paint()
+      ..color = const Color(0xFF38BDF8)
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.square
+      ..style = PaintingStyle.stroke;
+
+    final ql1aStart = Offset(0, size.height * 0.43);
+    final ql1aEnd = Offset(size.width, size.height * 0.37);
+
+    canvas.drawLine(ql1aStart, ql1aEnd, ql1aBasePaint);
+    canvas.drawLine(ql1aStart, ql1aEnd, ql1aCenterPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

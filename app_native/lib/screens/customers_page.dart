@@ -11,6 +11,7 @@ import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
 import 'customer_detail_page.dart';
 import 'customer_form_sheet.dart';
+import '../widgets/customer_feedback_sheet.dart';
 
 class CustomersPage extends StatefulWidget {
   const CustomersPage({super.key});
@@ -193,6 +194,28 @@ class _CustomersPageState extends State<CustomersPage> {
           ],
         ),
         actions: [
+          IconButton(
+            icon: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                const Icon(LucideIcons.messageSquareQuote, size: 20),
+                Positioned(
+                  top: -2,
+                  right: -2,
+                  child: Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFDC2626),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            tooltip: 'Phản hồi & CSKH',
+            onPressed: () => CustomerFeedbackSheet.show(context),
+          ),
           if (canManage)
             IconButton(
               icon: const Icon(LucideIcons.userPlus, size: 20),

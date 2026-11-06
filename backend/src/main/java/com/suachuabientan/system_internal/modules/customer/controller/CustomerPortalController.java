@@ -26,6 +26,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import com.suachuabientan.system_internal.modules.customer.dto.CreateCustomerFeedbackRequest;
+import com.suachuabientan.system_internal.modules.customer.dto.CustomerFeedbackResponse;
+import com.suachuabientan.system_internal.modules.customer.service.CustomerFeedbackService;
 
 @Tag(name = "Customer Portal", description = "Các API dành riêng cho khách hàng theo dõi đơn hàng")
 @RestController
@@ -100,6 +103,29 @@ public class CustomerPortalController {
     }
 
     private final PortalSupportConfigService supportConfigService;
+    private final CustomerFeedbackService feedbackService;
+
+    @Operation(summary = "Khách hàng gửi đánh giá hoặc khiếu nại bảo hành")
+    @PostMapping("/feedbacks")
+    @PreAuthorize("hasAuthority('CUSTOMER_PORTAL_VIEW') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<CustomerFeedbackResponse>> createFeedback(
+            @Valid @RequestBody CreateCustomerFeedbackRequest request,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.status(201).body(ApiResponse.created(
+                feedbackService.createFeedback(userDetails.getUserId(), request)
+        ));
+    }
+
+    @Operation(summary = "Khách hàng xem lịch sử phản hồi đã gửi")
+    @GetMapping("/feedbacks")
+    @PreAuthorize("hasAuthority('CUSTOMER_PORTAL_VIEW') or hasRole('SUPER_ADMIN')")
+    public ResponseEntity<ApiResponse<Page<CustomerFeedbackResponse>>> getMyFeedbacks(
+            @PageableDefault(size = 20) Pageable pageable,
+            @AuthenticationPrincipal CustomUserDetails userDetails) {
+        return ResponseEntity.ok(ApiResponse.success(
+                feedbackService.getMyFeedbacks(userDetails.getUserId(), pageable)
+        ));
+    }
 
     @Operation(summary = "Xem thông tin kênh hỗ trợ kỹ thuật (Hotline, Zalo)")
     @GetMapping("/support-info")
