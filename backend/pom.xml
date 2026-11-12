@@ -27,6 +27,7 @@
         <google-auth.version>1.23.0</google-auth.version>
         <minio.version>8.5.17</minio.version>
         <logstash-logback-encoder.version>7.4</logstash-logback-encoder.version>
+        <shedlock.version>5.13.0</shedlock.version>
     </properties>
 
     <dependencies>
@@ -126,6 +127,16 @@
             <groupId>net.logstash.logback</groupId>
             <artifactId>logstash-logback-encoder</artifactId>
             <version>${logstash-logback-encoder.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-spring</artifactId>
+            <version>${shedlock.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>net.javacrumbs.shedlock</groupId>
+            <artifactId>shedlock-provider-jdbc-template</artifactId>
+            <version>${shedlock.version}</version>
         </dependency>
 
         <dependency>

@@ -1,6 +1,8 @@
 package com.suachuabientan.system_internal.modules.repair.service;
 
 import com.suachuabientan.system_internal.common.exception.BusinessException;
+import com.suachuabientan.system_internal.modules.mediacleanup.enums.MediaModuleSource;
+import com.suachuabientan.system_internal.modules.mediacleanup.service.MediaLifecycleService;
 import com.suachuabientan.system_internal.modules.repair.enums.RepairMediaType;
 import io.minio.BucketExistsArgs;
 import io.minio.GetObjectArgs;
@@ -11,6 +13,7 @@ import io.minio.PutObjectArgs;
 import io.minio.StatObjectArgs;
 import io.minio.StatObjectResponse;
 import io.minio.errors.ErrorResponseException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -30,6 +33,7 @@ public class RepairMediaStorageService {
     private final MinioClient minioClient;
     private final String bucket;
     private final long maxFileSize;
+    private MediaLifecycleService mediaLifecycleService;
 
     public RepairMediaStorageService(
             MinioClient minioClient,
@@ -38,6 +42,11 @@ public class RepairMediaStorageService {
         this.minioClient = minioClient;
         this.bucket = bucket;
         this.maxFileSize = maxFileSize;
+    }
+
+    @Autowired(required = false)
+    public void setMediaLifecycleService(MediaLifecycleService mediaLifecycleService) {
+        this.mediaLifecycleService = mediaLifecycleService;
     }
 
     public StoredMedia store(MultipartFile file, RepairMediaType mediaType) {
@@ -75,13 +84,29 @@ public class RepairMediaStorageService {
         } catch (Exception exception) {
             throw new BusinessException("Khong the luu tep dinh kem cua don");
         }
-        return new StoredMedia("/api/v1/repair-media/" + storedName, originalName);
+        String storageUrl = "/api/v1/repair-media/" + storedName;
+        if (mediaLifecycleService != null) {
+            mediaLifecycleService.registerUploadedMedia(
+                    bucket,
+                    storedName,
+                    storageUrl,
+                    originalName,
+                    contentType,
+                    file.getSize(),
+                    MediaModuleSource.REPAIR,
+                    null,
+                    null);
+        }
+        return new StoredMedia(storageUrl, originalName);
     }
 
     public DownloadedMedia load(String storedName) {
         if (!StringUtils.hasText(storedName) || storedName.contains("..")
                 || storedName.contains("/") || storedName.contains("\\")) {
             throw new BusinessException("Duong dan tep khong hop le");
+        }
+        if (mediaLifecycleService != null && mediaLifecycleService.isSoftDeleted(bucket, storedName)) {
+            throw new BusinessException("Tệp đính kèm đã hết thời hạn lưu trữ", 410);
         }
         try {
             StatObjectResponse metadata = minioClient.statObject(StatObjectArgs.builder()

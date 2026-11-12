@@ -12,9 +12,12 @@ import com.suachuabientan.system_internal.modules.customer.entity.CustomerFeedba
 import com.suachuabientan.system_internal.modules.customer.repository.CustomerAccountRepository;
 import com.suachuabientan.system_internal.modules.customer.repository.CustomerFeedbackRepository;
 import com.suachuabientan.system_internal.modules.customer.repository.CustomerRepository;
+import com.suachuabientan.system_internal.modules.mediacleanup.enums.MediaReferenceType;
+import com.suachuabientan.system_internal.modules.mediacleanup.service.MediaLifecycleService;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -34,6 +37,12 @@ public class CustomerFeedbackService {
     private final CustomerAccountRepository customerAccountRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private MediaLifecycleService mediaLifecycleService;
+
+    @Autowired(required = false)
+    public void setMediaLifecycleService(MediaLifecycleService mediaLifecycleService) {
+        this.mediaLifecycleService = mediaLifecycleService;
+    }
 
     @Transactional
     public CustomerFeedbackResponse createFeedback(UUID userId, CreateCustomerFeedbackRequest request) {
@@ -92,6 +101,16 @@ public class CustomerFeedbackService {
         }
 
         CustomerFeedback saved = feedbackRepository.save(feedback);
+        if (mediaLifecycleService != null && request.getImages() != null) {
+            for (String imageUrl : request.getImages()) {
+                if (imageUrl != null && !imageUrl.isBlank()) {
+                    mediaLifecycleService.attachReferenceByUrl(
+                            imageUrl.trim(),
+                            MediaReferenceType.CUSTOMER_FEEDBACK,
+                            saved.getId().toString());
+                }
+            }
+        }
         return mapToResponse(saved);
     }
 

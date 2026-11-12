@@ -28,11 +28,14 @@ import com.suachuabientan.system_internal.modules.repair.repository.RepairDevice
 import com.suachuabientan.system_internal.modules.repair.repository.RepairImageRepository;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairOrderRepository;
 import com.suachuabientan.system_internal.modules.repair.repository.RepairTimelineRepository;
+import com.suachuabientan.system_internal.modules.mediacleanup.enums.MediaReferenceType;
+import com.suachuabientan.system_internal.modules.mediacleanup.service.MediaLifecycleService;
 import com.suachuabientan.system_internal.modules.notification.enums.NotificationType;
 import com.suachuabientan.system_internal.modules.notification.service.NotificationService;
 import com.suachuabientan.system_internal.security.model.CustomUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -61,6 +64,12 @@ public class RepairService {
     private final NotificationService notificationService;
     private final RepairMediaStorageService repairMediaStorageService;
     private final CustomerService customerService;
+    private MediaLifecycleService mediaLifecycleService;
+
+    @Autowired(required = false)
+    public void setMediaLifecycleService(MediaLifecycleService mediaLifecycleService) {
+        this.mediaLifecycleService = mediaLifecycleService;
+    }
 
     // ── Tạo đơn ──────────────────────────────────────────────
 
@@ -401,6 +410,12 @@ public class RepairService {
                 .build();
 
         RepairImage saved = repairImageRepository.save(image);
+        if (mediaLifecycleService != null) {
+            mediaLifecycleService.attachReferenceByUrl(
+                    saved.getImageUrl(),
+                    MediaReferenceType.REPAIR_IMAGE,
+                    saved.getId().toString());
+        }
         addTimeline(orderId, "Upload ảnh",
                 caption != null ? caption : "Đính kèm ảnh mới", uploadedBy);
 
@@ -432,6 +447,12 @@ public class RepairService {
                 .build();
 
         RepairImage saved = repairImageRepository.save(media);
+        if (mediaLifecycleService != null) {
+            mediaLifecycleService.attachReferenceByUrl(
+                    saved.getImageUrl(),
+                    MediaReferenceType.REPAIR_IMAGE,
+                    saved.getId().toString());
+        }
         String action = mediaType == RepairMediaType.VIDEO ? "Upload video" : mediaType == RepairMediaType.DOCUMENT ? "Upload tài liệu" : "Upload ảnh";
         addTimeline(orderId, action, caption != null ? caption : storedMedia.originalFileName(), uploadedBy);
 
@@ -457,6 +478,12 @@ public class RepairService {
 
         image.softDelete(userId);
         repairImageRepository.save(image);
+        if (mediaLifecycleService != null) {
+            mediaLifecycleService.releaseReferenceByUrl(
+                    image.getImageUrl(),
+                    MediaReferenceType.REPAIR_IMAGE,
+                    image.getId().toString());
+        }
         
         String mediaLabel = image.getMediaType() == RepairMediaType.VIDEO ? "video" : image.getMediaType() == RepairMediaType.DOCUMENT ? "tài liệu" : "ảnh";
         addTimeline(order.getId(), STR."Xóa \{mediaLabel}", image.getCaption(), userId);

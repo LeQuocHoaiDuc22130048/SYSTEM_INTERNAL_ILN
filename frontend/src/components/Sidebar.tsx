@@ -20,6 +20,7 @@ import {
   PanelLeftOpen,
   MapPin,
   Terminal as TerminalIcon,
+  HardDrive,
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { hasPermission, getRoleLabel } from '../utils/permissions';
@@ -38,7 +39,8 @@ export type SidebarTab =
   | 'warehouse'
   | 'locations'
   | 'accounts'
-  | 'terminal';
+  | 'terminal'
+  | 'media-cleanup';
 
 type GroupKey = 'attendance' | 'device' | 'business' | 'accounts';
 
@@ -65,7 +67,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onToggleCollapse,
   dataSource = 'api',
 }) => {
-  const showAccountsTab = useMemo(() => canAccessTab(currentUser, 'accounts') || canAccessTab(currentUser, 'terminal'), [currentUser]);
+  const showAccountsTab = useMemo(() => canAccessTab(currentUser, 'accounts') || canAccessTab(currentUser, 'terminal') || canAccessTab(currentUser, 'media-cleanup'), [currentUser]);
   const canViewCustomers = useMemo(() => hasPermission(currentUser, 'CUSTOMER_VIEW'), [currentUser]);
 
   // Xác định nhóm cha tương ứng với tab
@@ -73,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     if (tab === 'monthly' || tab === 'daily') return 'attendance';
     if (tab === 'devices' || tab === 'updates' || tab === 'banners') return 'device';
     if (tab === 'orders' || tab === 'customers' || tab === 'warehouse' || tab === 'locations') return 'business';
-    if (tab === 'accounts' || tab === 'terminal') return 'accounts';
+    if (tab === 'accounts' || tab === 'terminal' || tab === 'media-cleanup') return 'accounts';
     return null;
   };
 
@@ -113,7 +115,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const isAttendanceActive = activeTab === 'monthly' || activeTab === 'daily';
   const isDeviceActive = activeTab === 'devices' || activeTab === 'updates' || activeTab === 'banners';
   const isBusinessActive = activeTab === 'orders' || activeTab === 'customers' || activeTab === 'warehouse' || activeTab === 'locations';
-  const isAccountsActive = activeTab === 'accounts' || activeTab === 'terminal';
+  const isAccountsActive = activeTab === 'accounts' || activeTab === 'terminal' || activeTab === 'media-cleanup';
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''} ${isCollapsed ? 'collapsed' : ''}`}>
@@ -520,6 +522,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     <span>Terminal & Hoạt động</span>
                   </button>
                 )}
+                {canAccessTab(currentUser, 'media-cleanup') && (
+                  <button
+                    className={`menu-item ${activeTab === 'media-cleanup' ? 'active' : ''}`}
+                    onClick={() => handleTabClick('media-cleanup')}
+                  >
+                    <HardDrive size={16} className="item-icon" />
+                    <span>Media Cleanup Engine</span>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -547,6 +558,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     >
                       <TerminalIcon size={15} />
                       <span>Terminal & Hoạt động</span>
+                    </button>
+                  )}
+                  {canAccessTab(currentUser, 'media-cleanup') && (
+                    <button
+                      className={`flyout-item ${activeTab === 'media-cleanup' ? 'active' : ''}`}
+                      onClick={() => handleTabClick('media-cleanup')}
+                    >
+                      <HardDrive size={15} />
+                      <span>Media Cleanup Engine</span>
                     </button>
                   )}
                 </div>

@@ -114,6 +114,18 @@ app:
     max-file-size: ${REPAIR_MEDIA_MAX_FILE_SIZE:52428800}
     minio:
       bucket: ${MINIO_REPAIR_BUCKET:repair-media}
+  media-cleanup:
+    enabled: ${MEDIA_CLEANUP_ENABLED:true}
+    cron: ${MEDIA_CLEANUP_CRON:0 0 2 * * *}
+    batch-size: ${MEDIA_CLEANUP_BATCH_SIZE:100}
+    max-batches-per-run: ${MEDIA_CLEANUP_MAX_BATCHES_PER_RUN:100}
+    max-retries: ${MEDIA_CLEANUP_MAX_RETRIES:5}
+    base-backoff-minutes: ${MEDIA_CLEANUP_BASE_BACKOFF_MINUTES:5}
+    max-backoff-minutes: ${MEDIA_CLEANUP_MAX_BACKOFF_MINUTES:360}
+    stuck-timeout-minutes: ${MEDIA_CLEANUP_STUCK_TIMEOUT_MINUTES:15}
+    unreferenced-upload-ttl-hours: ${MEDIA_CLEANUP_UNREFERENCED_TTL_HOURS:24}
+    deleted-message-media-ttl-days: ${MEDIA_CLEANUP_DELETED_MESSAGE_TTL_DAYS:7}
+    closed-repair-media-ttl-days: ${MEDIA_CLEANUP_CLOSED_REPAIR_TTL_DAYS:180}
   update:
     latest-version: ${APP_UPDATE_LATEST_VERSION:1.1.6}
     changelog: ${APP_UPDATE_CHANGELOG:- Cập nhật phiên bản mới nhất v1.1.6\n- Sửa lỗi kẹt phiên bản trên thiết bị di động}

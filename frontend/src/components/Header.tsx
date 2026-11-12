@@ -12,7 +12,7 @@ import { NotificationBell } from './NotificationBell';
 import type { UserInfo } from '../mockData';
 
 interface HeaderProps {
-  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts' | 'terminal';
+  activeTab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts' | 'terminal' | 'media-cleanup';
   currentMonth: number;
   currentYear: number;
   prevMonth: () => void;
@@ -123,6 +123,8 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'Quản lý tài khoản'
                 : activeTab === 'terminal'
                 ? 'Quản trị Terminal & Hoạt động'
+                : activeTab === 'media-cleanup'
+                ? 'Media Cleanup Engine (S3 & PostgreSQL)'
                 : 'Kho bo mạch & Linh kiện'}
             </h1>
             <span className="header-date">

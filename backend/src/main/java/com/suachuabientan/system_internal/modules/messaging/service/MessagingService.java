@@ -28,8 +28,11 @@ import com.suachuabientan.system_internal.modules.messaging.repository.MessageDe
 import com.suachuabientan.system_internal.modules.messaging.repository.MessageMentionRepository;
 import com.suachuabientan.system_internal.modules.messaging.repository.MessageReadRepository;
 import com.suachuabientan.system_internal.modules.messaging.repository.MessageReactionRepository;
+import com.suachuabientan.system_internal.modules.mediacleanup.enums.MediaReferenceType;
+import com.suachuabientan.system_internal.modules.mediacleanup.service.MediaLifecycleService;
 import com.suachuabientan.system_internal.modules.messaging.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -56,6 +59,12 @@ public class MessagingService {
     private final MessagingPermissionPolicy permissionPolicy;
     private final MessagingRealtimePublisher realtimePublisher;
     private final MessagingResponseMapper responseMapper;
+    private MediaLifecycleService mediaLifecycleService;
+
+    @Autowired(required = false)
+    public void setMediaLifecycleService(MediaLifecycleService mediaLifecycleService) {
+        this.mediaLifecycleService = mediaLifecycleService;
+    }
 
     @Transactional(readOnly = true)
     public List<ConversationResponse> getMyConversations(UUID userId) {
@@ -182,6 +191,12 @@ public class MessagingService {
                 .build();
 
         Message saved = messageRepository.save(message);
+        if (mediaLifecycleService != null && StringUtils.hasText(saved.getMediaUrl())) {
+            mediaLifecycleService.attachReferenceByUrl(
+                    saved.getMediaUrl(),
+                    MediaReferenceType.MESSAGE,
+                    saved.getId().toString());
+        }
         saveMentions(saved.getId(), conversationId, request.mentionUserIds());
         markMessageRead(saved.getId(), senderId);
         conversationRepository.findByIdAndIsDeletedFalse(conversationId)
@@ -250,6 +265,12 @@ public class MessagingService {
         message.setContent(request.content().trim());
         message.setEditedAt(Instant.now());
         Message saved = messageRepository.save(message);
+        if (mediaLifecycleService != null && StringUtils.hasText(saved.getMediaUrl())) {
+            mediaLifecycleService.attachReferenceByUrl(
+                    saved.getMediaUrl(),
+                    MediaReferenceType.MESSAGE,
+                    saved.getId().toString());
+        }
         saveMentions(saved.getId(), conversationId, request.mentionUserIds());
         MessageResponse response = responseMapper.toMessageResponse(saved);
         realtimePublisher.publishConversationEvent(conversationId, "MESSAGE_UPDATED", response);
@@ -285,6 +306,12 @@ public class MessagingService {
         message.setDeletedForEveryoneAt(Instant.now());
         message.setDeletedByUserId(requesterId);
         Message saved = messageRepository.save(message);
+        if (mediaLifecycleService != null && StringUtils.hasText(saved.getMediaUrl())) {
+            mediaLifecycleService.releaseReferenceByUrl(
+                    saved.getMediaUrl(),
+                    MediaReferenceType.MESSAGE,
+                    saved.getId().toString());
+        }
         MessageResponse response = responseMapper.toMessageResponse(saved);
         realtimePublisher.publishConversationEvent(conversationId, "MESSAGE_DELETED", response);
         return response;

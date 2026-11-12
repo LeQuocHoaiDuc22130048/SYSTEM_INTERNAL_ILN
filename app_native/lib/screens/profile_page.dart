@@ -15,6 +15,7 @@ import '../widgets/navigation/app_back_button.dart';
 import '../widgets/navigation/mobile_navigation_bar.dart';
 import '../widgets/app_quick_actions.dart';
 import 'package:image_picker/image_picker.dart';
+import 'media_cleanup_admin_page.dart';
 import 'privacy_policy_page.dart';
 
 /// Profile Page designed faithfully according to Stitch Home Service Marketplace
@@ -541,6 +542,25 @@ class _ProfilePageState extends State<ProfilePage> {
               },
             ),
             _buildDivider(isDark),
+            if (user?.role == UserRole.superAdmin ||
+                user?.role == UserRole.admin) ...[
+              _buildActionRow(
+                icon: LucideIcons.hardDrive,
+                iconBg: const Color(0xFFECFEFF),
+                iconColor: const Color(0xFF0891B2),
+                title: 'Media Cleanup Engine (S3)',
+                subtitle: 'Giám sát, Audit Log & dọn dẹp dữ liệu S3/PostgreSQL',
+                isDark: isDark,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const MediaCleanupAdminPage(),
+                    ),
+                  );
+                },
+              ),
+              _buildDivider(isDark),
+            ],
             _buildActionRow(
               icon: LucideIcons.shieldCheck,
               iconBg: const Color(0xFFFAF5FF),
