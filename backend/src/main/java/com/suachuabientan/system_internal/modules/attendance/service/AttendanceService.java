@@ -657,6 +657,9 @@ public class AttendanceService {
         boolean isFieldWork = fieldDay != null
                 && !Boolean.TRUE.equals(fieldDay.getIsDeleted())
                 && !"REJECTED".equalsIgnoreCase(fieldDay.getStatus());
+        boolean isApprovedFieldWork = fieldDay != null
+                && !Boolean.TRUE.equals(fieldDay.getIsDeleted())
+                && "APPROVED".equalsIgnoreCase(fieldDay.getStatus());
 
         return new DailyAttendanceResponse(
                 date,
@@ -670,7 +673,7 @@ public class AttendanceService {
                 records.stream().map(record -> toAttendanceResponse(record, null)).toList(),
                 employeeId,
                 fieldDay != null ? FieldWorkService.toResponse(fieldDay) : null,
-                isFieldWork ? 1.0 : 0.0
+                isApprovedFieldWork ? 1.0 : 0.0
         );
     }
 

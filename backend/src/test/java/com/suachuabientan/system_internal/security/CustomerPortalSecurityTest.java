@@ -62,6 +62,9 @@ class CustomerPortalSecurityTest {
     private com.suachuabientan.system_internal.modules.customer.service.PortalSupportConfigService supportConfigService;
 
     @MockBean
+    private com.suachuabientan.system_internal.modules.customer.service.CustomerFeedbackService customerFeedbackService;
+
+    @MockBean
     private JwtAuthFilter jwtAuthFilter;
 
     @MockBean
