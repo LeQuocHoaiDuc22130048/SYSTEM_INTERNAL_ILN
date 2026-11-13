@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 import 'package:system_inverter_likenew/screens/customer_portal_mobile_page.dart';
@@ -112,6 +113,7 @@ void main() {
 
     // Verify Search Bar & Quick Filters
     expect(find.byType(TextField), findsOneWidget);
+    expect(find.byIcon(LucideIcons.qrCode), findsNothing);
     expect(find.text('Tất cả (0)'), findsOneWidget);
     expect(find.text('Đang xử lý (0)'), findsOneWidget);
     expect(find.text('Sẵn sàng nhận (0)'), findsOneWidget);
@@ -448,19 +450,29 @@ void main() {
     expect(find.text('0312345678'), findsOneWidget);
     expect(find.text('123 Đường ABC, TP.HCM'), findsOneWidget);
 
-    // Edit contact name
-    final nameField = find.widgetWithText(TextField, 'Nguyễn Văn Tuấn');
-    expect(nameField, findsOneWidget);
-    await tester.enterText(nameField, 'Trần Minh Đức');
+    // Contact name and phone editing fields are hidden; shown read-only in info card
+    expect(find.text('Tên người liên hệ *'), findsNothing);
+    expect(find.text('Số điện thoại liên hệ'), findsNothing);
+    expect(find.text('Địa chỉ thư điện tử'), findsNothing);
+    expect(find.text('Đã xác minh'), findsNothing);
+    expect(find.text('Email'), findsOneWidget);
+    expect(find.widgetWithText(TextField, 'Nguyễn Văn Tuấn'), findsNothing);
+    expect(find.text('Nguyễn Văn Tuấn'), findsWidgets);
+    expect(find.text('0987 654 321'), findsWidgets);
+
+    // Edit email only
+    final emailField = find.widgetWithText(TextField, 'tuan@bientan.vn');
+    expect(emailField, findsOneWidget);
+    await tester.enterText(emailField, 'contact@bientan.vn');
     await tester.pumpAndSettle();
 
     // Save changes
     await tester.tap(find.widgetWithText(ElevatedButton, 'Lưu thay đổi'));
     await tester.pumpAndSettle();
 
-    // Verify SnackBar and updated representation on card
+    // Verify SnackBar and preserved contact name on card
     expect(find.text('Cập nhật thông tin tài khoản thành công!'), findsOneWidget);
-    expect(find.text('Đại diện: Trần Minh Đức'), findsOneWidget);
+    expect(find.text('Đại diện: Nguyễn Văn Tuấn'), findsOneWidget);
   });
 
   testWidgets('CustomerPortalMobilePage displays application logo, distinct status badges, and supports time/device filtering', (tester) async {
@@ -783,4 +795,742 @@ void main() {
     expect(find.text('Kỹ thuật viên sẽ cập nhật ảnh sau khi đo kiểm'), findsOneWidget);
     expect(find.text('Hình ảnh bo mạch, xung kích IGBT và tem kiểm định tải sẽ xuất hiện tại đây khi nghiệm thu.'), findsOneWidget);
   });
+
+  testWidgets('CustomerPortalMobilePage profile menu uses modern layout, formatted phone, dividers, and synced notification dot', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': '0964384499',
+              'fullName': 'Anh Long Nha Trang',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({'content': [], 'totalElements': 0}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: '0964384499', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    // Avatar notification dot is shown
+    expect(find.byKey(const ValueKey('avatar_notification_dot')), findsOneWidget);
+
+    // Open profile popup menu
+    final popupBtn = find.byType(PopupMenuButton<String>);
+    final popupWidget = tester.widget<PopupMenuButton<String>>(popupBtn);
+    final shape = popupWidget.shape as RoundedRectangleBorder;
+    expect(shape.borderRadius, BorderRadius.circular(12));
+    expect(shape.side.color, const Color(0xFFF1F5F9));
+    expect(shape.side.width, 1);
+    expect(popupWidget.color, Colors.white);
+
+    await tester.tap(popupBtn);
+    await tester.pumpAndSettle();
+
+    // Formatted phone & header typography
+    final phoneFinder = find.text('0964 384 499');
+    expect(phoneFinder, findsOneWidget);
+    final phoneText = tester.widget<Text>(phoneFinder);
+    expect(phoneText.style?.fontSize, 13);
+    expect(phoneText.style?.fontWeight, FontWeight.w400);
+    expect(phoneText.style?.color, const Color(0xFF6B7280));
+
+    final menuNameText = tester.widget<Text>(find.text('Anh Long Nha Trang').last);
+    expect(menuNameText.style?.fontSize, 15);
+    expect(menuNameText.style?.fontWeight, FontWeight.w600);
+    expect(menuNameText.style?.color, const Color(0xFF111827));
+
+    // Synced 6px red dot next to 'Hồ sơ cá nhân'
+    final menuDotFinder = find.byKey(const ValueKey('profile_menu_notification_dot'));
+    expect(menuDotFinder, findsOneWidget);
+    final menuDotSize = tester.getSize(menuDotFinder);
+    expect(menuDotSize, const Size(6, 6));
+
+    // Menu item typography and icons
+    final profileItemText = tester.widget<Text>(find.text('Hồ sơ cá nhân'));
+    expect(profileItemText.style?.fontSize, 14);
+    expect(profileItemText.style?.fontWeight, FontWeight.w500);
+
+    final logoutItemText = tester.widget<Text>(find.text('Đăng xuất'));
+    expect(logoutItemText.style?.fontSize, 14);
+    expect(logoutItemText.style?.fontWeight, FontWeight.w500);
+    expect(logoutItemText.style?.color, const Color(0xFFDC2626));
+
+    // Two light-gray dividers (under phone and above logout)
+    final dividerBoxes = find.byWidgetPredicate(
+      (w) => w is ColoredBox && w.color == const Color(0xFFF1F5F9),
+    );
+    expect(dividerBoxes, findsNWidgets(2));
+
+    // Hover/highlight block styling for normal & logout items
+    final profileInkWell = tester.widget<InkWell>(
+      find.ancestor(of: find.text('Hồ sơ cá nhân'), matching: find.byType(InkWell)).first,
+    );
+    final changePwdInkWell = tester.widget<InkWell>(
+      find.ancestor(of: find.text('Đổi mật khẩu'), matching: find.byType(InkWell)).first,
+    );
+    final logoutInkWell = tester.widget<InkWell>(
+      find.ancestor(of: find.text('Đăng xuất'), matching: find.byType(InkWell)).first,
+    );
+    expect(profileInkWell.borderRadius, BorderRadius.circular(8));
+    expect(profileInkWell.hoverColor, const Color(0xFFF8FAFC));
+    expect(changePwdInkWell.borderRadius, BorderRadius.circular(8));
+    expect(changePwdInkWell.hoverColor, const Color(0xFFF8FAFC));
+    expect(logoutInkWell.borderRadius, BorderRadius.circular(8));
+    expect(logoutInkWell.hoverColor, const Color(0xFFFEF2F2));
+  });
+
+  testWidgets('CustomerPortalMobilePage profile email uses backend email and never falls back to username', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': '0964384499',
+              'fullName': 'Anh Long Nha Trang',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({'content': [], 'totalElements': 0}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/account-profile') {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'userId': '10',
+              'username': '0964384499',
+              'contactName': 'Anh Long Nha Trang',
+              'phone': '0964384499',
+              'email': null,
+              'avatarUrl': '',
+              'customerId': 'cust-1',
+              'customerCode': 'KH-001',
+              'customerName': 'Anh Long Nha Trang',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: '0964384499', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hồ sơ cá nhân'));
+    await tester.pumpAndSettle();
+
+    // Email TextField must be empty when backend returns null (not username '0964384499')
+    expect(find.widgetWithText(TextField, '0964384499'), findsNothing);
+    final emailField = tester.widget<TextField>(find.widgetWithText(TextField, 'Email'));
+    expect(emailField.controller?.text, isEmpty);
+  });
+
+  testWidgets('CustomerPortalMobilePage detail stepper nodes stay horizontally aligned when receivedDate is shown', (tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': '0964384499',
+              'fullName': 'Anh Long Nha Trang',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({
+            'content': [
+              {
+                'id': 'ord-align-1',
+                'orderCode': 'RO-20261106-005',
+                'deviceName': 'Huawei 110ktl-m0',
+                'deviceType': 'Biến tần',
+                'serialNumber': '6T19B9071495',
+                'status': 'CHECKING',
+                'deviceCount': 1,
+                'receivedAt': '2026-11-06T08:30:00',
+              }
+            ],
+            'totalElements': 1,
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-align-1') {
+        return http.Response(
+          jsonEncode({
+            'id': 'ord-align-1',
+            'orderCode': 'RO-20261106-005',
+            'deviceName': 'Huawei 110ktl-m0',
+            'deviceType': 'Biến tần',
+            'status': 'CHECKING',
+            'receivedAt': '2026-11-06T08:30:00',
+            'devices': [],
+            'updates': [],
+            'media': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: '0964384499', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('RO-20261106-005'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bước 2/5'), findsOneWidget);
+
+    final stepperColumn = find.ancestor(of: find.text('Bước 2/5'), matching: find.byType(Column)).first;
+    expect(find.descendant(of: stepperColumn, matching: find.text('06/11/2026')), findsOneWidget);
+    final avatarFinders = find.descendant(of: stepperColumn, matching: find.byType(CircleAvatar));
+    expect(avatarFinders, findsNWidgets(5));
+
+    final ys = List.generate(5, (i) => tester.getCenter(avatarFinders.at(i)).dy);
+    for (var i = 1; i < ys.length; i++) {
+      expect(ys[i], closeTo(ys[0], 0.01));
+    }
+  });
+
+  testWidgets('Order detail places confirm button above contact and completes approve + payment proof flow', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    String? confirmedAction;
+    int? confirmedWarranty;
+    bool uploadedProof = false;
+    final List<String> clipboardWrites = [];
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, (MethodCall call) async {
+      if (call.method == 'Clipboard.setData') {
+        final args = call.arguments as Map?;
+        final text = args?['text']?.toString();
+        if (text != null) {
+          clipboardWrites.add(text);
+        }
+      }
+      return null;
+    });
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'fake-jwt-token',
+            'refreshToken': 'fake-refresh-token',
+            'userInfo': {
+              'id': 'u1',
+              'username': '0964384499',
+              'fullName': 'A. Quang',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/account-profile' ||
+          request.url.path == '/api/v1/customer/me') {
+        return http.Response(
+          jsonEncode({
+            'fullName': 'A. Quang',
+            'contactName': 'A. Quang',
+            'phone': '0964384499',
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/support-info') {
+        return http.Response(
+          jsonEncode({'hotlineNumber': '0964266771'}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({
+            'content': [
+              {
+                'id': 'ord-confirm-1',
+                'orderCode': 'RO-20261106-005',
+                'deviceName': 'Huawei 110ktl-m0',
+                'deviceType': 'Biến tần',
+                'serialNumber': '6T19B9071495',
+                'status': 'CHECKED',
+                'receivedAt': '2026-11-06T08:30:00',
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-confirm-1') {
+        return http.Response(
+          jsonEncode({
+            'id': 'ord-confirm-1',
+            'orderCode': 'RO-20261106-005',
+            'deviceName': 'Huawei 110ktl-m0',
+            'deviceType': 'Biến tần',
+            'serialNumber': '6T19B9071495',
+            'customerName': 'A. Quang',
+            'status': 'CHECKED',
+            'receivedAt': '2026-11-06T08:30:00',
+            'devices': [],
+            'updates': [],
+            'media': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-confirm-1/confirmation') {
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'orderId': 'ord-confirm-1',
+              'confirmationStatus': 'PENDING_CUSTOMER',
+              'warrantyMonths': 6,
+              'warrantyExtraFee': 0,
+              'baseAmount': 4850000,
+              'totalAmount': 4850000,
+              'diagnosisTags': ['Hỏng công suất vào/ra', 'Cháy relay đóng ngắt'],
+              'quoteItems': [
+                {'label': 'Thay thế Module Công suất (IGBT x2)', 'amount': 3200000},
+                {'label': 'Cụm Relay cao tần + Phục hồi mạch DC', 'amount': 950000},
+                {'label': 'Công kỹ thuật & Kiểm tra tải xưởng', 'amount': 700000},
+              ],
+              'bankName': 'MB Bank (Quân Đội)',
+              'bankCode': 'MB',
+              'accountNumber': '9964266771',
+              'accountHolder': 'CONG TY TNHH KY THUAT CONG NGHE',
+              'transferContent': 'RO-20261106-005 - 6T19B9071495',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-confirm-1/confirm') {
+        final payload = jsonDecode(request.body) as Map<String, dynamic>;
+        confirmedAction = payload['action']?.toString();
+        confirmedWarranty = payload['warrantyMonths'] as int?;
+        final extra = confirmedWarranty == 12 ? 500000 : 0;
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'orderId': 'ord-confirm-1',
+              'confirmationStatus': 'APPROVED',
+              'warrantyMonths': confirmedWarranty ?? 6,
+              'warrantyExtraFee': extra,
+              'baseAmount': 4850000,
+              'totalAmount': 4850000 + extra,
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-confirm-1/payment-proof') {
+        uploadedProof = true;
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'orderId': 'ord-confirm-1',
+              'confirmationStatus': 'PAYMENT_SUBMITTED',
+              'warrantyMonths': 12,
+              'warrantyExtraFee': 500000,
+              'baseAmount': 4850000,
+              'totalAmount': 5350000,
+              'paymentProofFileName': 'Bien-lai-MB.png',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final fakePicker = _FakeProofImagePicker();
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: '0964384499', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(
+            onLogout: () async {},
+            imagePicker: fakePicker,
+          ),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RO-20261106-005'));
+    await tester.pumpAndSettle();
+
+    final confirmBtnFinder = find.byKey(const ValueKey('order_confirm_button'));
+    final contactBtnFinder = find.byKey(const ValueKey('order_contact_button'));
+    expect(confirmBtnFinder, findsOneWidget);
+    expect(contactBtnFinder, findsOneWidget);
+
+    // Button "Xác nhận đơn hàng" must be positioned above "Liên hệ kỹ thuật"
+    final confirmRect = tester.getRect(confirmBtnFinder);
+    final contactRect = tester.getRect(contactBtnFinder);
+    expect(confirmRect.bottom, lessThan(contactRect.top));
+
+    await tester.tap(confirmBtnFinder);
+    await tester.pumpAndSettle();
+
+    // Screen 1: Báo giá & Xác nhận dịch vụ
+    expect(find.text('Báo giá & Xác nhận dịch vụ'), findsOneWidget);
+    expect(find.text('Hỏng công suất vào/ra'), findsOneWidget);
+    expect(find.byKey(const ValueKey('quote_final_total_text')), findsOneWidget);
+    expect(find.text('4.850.000 đ'), findsNWidgets(2)); // subtotal + final total
+
+    // Switch warranty to 1 year (+500.000 đ) and verify live total update
+    final warranty12Finder = find.byKey(const ValueKey('warranty_option_12m'));
+    await tester.ensureVisible(warranty12Finder);
+    await tester.pumpAndSettle();
+    await tester.tap(warranty12Finder);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const ValueKey('quote_final_total_text')));
+    await tester.pumpAndSettle();
+    expect(find.text('5.350.000 đ'), findsOneWidget);
+
+    // Approve & proceed to Screen 2
+    await tester.tap(find.byKey(const ValueKey('quote_approve_btn')));
+    await tester.pumpAndSettle();
+
+    expect(confirmedAction, 'APPROVE');
+    expect(confirmedWarranty, 12);
+    expect(find.text('Xác nhận & Thanh toán đơn hàng'), findsOneWidget);
+    expect(find.text('5.350.000'), findsOneWidget);
+    expect(find.text('MB Bank (Quân Đội)'), findsOneWidget);
+
+    // Copy bank account number
+    await tester.ensureVisible(find.byKey(const ValueKey('copy_account_number_btn')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('copy_account_number_btn')));
+    await tester.pump();
+    expect(clipboardWrites, contains('9964266771'));
+
+    // Attempting submit without selecting proof shows validation error
+    await tester.tap(find.byKey(const ValueKey('submit_payment_proof_btn')));
+    await tester.pumpAndSettle();
+    expect(uploadedProof, isFalse);
+    expect(find.textContaining('chứng từ'), findsWidgets);
+
+    // Pick receipt image, verify preview & remove toggle, then pick again and submit
+    final pickBtn = find.byKey(const ValueKey('pick_proof_gallery_btn'));
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+    expect(find.text('Bien-lai-MB.png'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const ValueKey('remove_proof_btn')));
+    await tester.tap(find.byKey(const ValueKey('remove_proof_btn')));
+    await tester.pumpAndSettle();
+    expect(find.text('Bien-lai-MB.png'), findsNothing);
+
+    await tester.ensureVisible(pickBtn);
+    await tester.tap(pickBtn);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('submit_payment_proof_btn')));
+    await tester.pumpAndSettle();
+    expect(uploadedProof, isTrue);
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(SystemChannels.platform, null);
+  });
+
+  testWidgets('Order confirmation modal supports rejecting quotation with reason', (WidgetTester tester) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    String? rejectedAction;
+    String? rejectedReason;
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'fake-jwt-token',
+            'refreshToken': 'fake-refresh-token',
+            'userInfo': {
+              'id': 'u1',
+              'username': '0964384499',
+              'fullName': 'A. Quang',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/account-profile' ||
+          request.url.path == '/api/v1/customer/me') {
+        return http.Response(
+          jsonEncode({'fullName': 'A. Quang', 'contactName': 'A. Quang', 'phone': '0964384499'}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/support-info') {
+        return http.Response(
+          jsonEncode({'hotlineNumber': '0964266771'}),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({
+            'content': [
+              {
+                'id': 'ord-rej-1',
+                'orderCode': 'RO-20261106-009',
+                'deviceName': 'ABB ACS580',
+                'status': 'CHECKED',
+              },
+            ],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-rej-1') {
+        return http.Response(
+          jsonEncode({
+            'id': 'ord-rej-1',
+            'orderCode': 'RO-20261106-009',
+            'deviceName': 'ABB ACS580',
+            'status': 'CHECKED',
+            'devices': [],
+            'updates': [],
+            'media': [],
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-rej-1/confirmation') {
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'orderId': 'ord-rej-1',
+              'confirmationStatus': 'PENDING_CUSTOMER',
+              'warrantyMonths': 6,
+              'baseAmount': 2100000,
+              'totalAmount': 2100000,
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders/ord-rej-1/confirm') {
+        final payload = jsonDecode(request.body) as Map<String, dynamic>;
+        rejectedAction = payload['action']?.toString();
+        rejectedReason = payload['rejectionReason']?.toString();
+        return http.Response(
+          jsonEncode({
+            'data': {
+              'orderId': 'ord-rej-1',
+              'confirmationStatus': 'REJECTED',
+              'rejectionReason': rejectedReason,
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: '0964384499', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(onLogout: () async {}),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('RO-20261106-009'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('order_confirm_button')));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('quote_reject_btn')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Từ chối báo giá sửa chữa?'), findsOneWidget);
+    await tester.enterText(find.byType(TextField).last, 'Chi phí chưa phù hợp');
+    await tester.tap(find.text('Xác nhận từ chối'));
+    await tester.pumpAndSettle();
+
+    expect(rejectedAction, 'REJECT');
+    expect(rejectedReason, 'Chi phí chưa phù hợp');
+  });
+}
+
+class _MemoryXFile extends XFile {
+  _MemoryXFile(this._data, {required String fileName})
+      : _fileName = fileName,
+        super.fromData(_data, name: fileName, mimeType: 'image/png');
+
+  final Uint8List _data;
+  final String _fileName;
+
+  @override
+  String get name => _fileName;
+
+  @override
+  Future<Uint8List> readAsBytes() async => _data;
+}
+
+class _FakeProofImagePicker extends ImagePicker {
+  static final Uint8List _valid1x1Png = base64Decode(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  );
+
+  @override
+  Future<XFile?> pickImage({
+    required ImageSource source,
+    double? maxWidth,
+    double? maxHeight,
+    int? imageQuality,
+    CameraDevice preferredCameraDevice = CameraDevice.rear,
+    bool requestFullMetadata = true,
+  }) async {
+    return _MemoryXFile(_valid1x1Png, fileName: 'Bien-lai-MB.png');
+  }
 }

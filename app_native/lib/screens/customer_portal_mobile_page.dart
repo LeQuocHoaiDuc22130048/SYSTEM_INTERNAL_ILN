@@ -7,14 +7,17 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
+import '../widgets/customer/order_confirmation_sheet.dart';
 
 class CustomerPortalMobilePage extends StatefulWidget {
   const CustomerPortalMobilePage({
     super.key,
     required this.onLogout,
+    this.imagePicker,
   });
 
   final Future<void> Function() onLogout;
+  final ImagePicker? imagePicker;
 
   @override
   State<CustomerPortalMobilePage> createState() => _CustomerPortalMobilePageState();
@@ -25,7 +28,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   String? _error;
   List<Map<String, dynamic>> _orders = [];
   Map<String, dynamic>? _accountProfile;
-  final ImagePicker _imagePicker = ImagePicker();
+  late final ImagePicker _imagePicker = widget.imagePicker ?? ImagePicker();
 
   // Filter & Search states
   String _searchQuery = '';
@@ -619,52 +622,6 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     );
   }
 
-  // QR Code scan dialog
-  void _showQrScannerDialog() {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Row(
-          children: [
-            Icon(LucideIcons.qrCode, color: Color(0xFF2563EB)),
-            SizedBox(width: 10),
-            Text('Quét mã QR', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFCBD5E1), width: 2),
-              ),
-              child: const Center(
-                child: Icon(LucideIcons.scanLine, size: 64, color: Color(0xFF2563EB)),
-              ),
-            ),
-            const SizedBox(height: 14),
-            const Text(
-              'Hướng camera về phía mã QR trên tem bảo hành hoặc biên bản tiếp nhận để tra cứu nhanh.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
-    );
-  }
-
   // New repair request sheet with 2 choices: Form entry & Hotline call
   void _showNewRequestDialog() {
     showModalBottomSheet<void>(
@@ -1136,21 +1093,28 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     final auth = context.read<AuthProvider>();
     final api = auth.api;
 
-    if (_accountProfile == null) {
-      await _fetchAccountProfile();
-    }
+    await _fetchAccountProfile();
     if (!mounted) return;
 
     final user = auth.currentUser;
-    final contactNameController = TextEditingController(
-      text: _accountProfile?['contactName']?.toString() ?? user?.name ?? '',
-    );
-    final phoneController = TextEditingController(
-      text: _accountProfile?['phone']?.toString() ?? user?.phone ?? '',
-    );
-    final emailController = TextEditingController(
-      text: _accountProfile?['email']?.toString() ?? user?.email ?? '',
-    );
+    final contactName = (_accountProfile?['contactName']?.toString() ?? user?.name ?? '').trim();
+    final contactPhone = (_accountProfile?['phone']?.toString() ?? user?.phone ?? '').trim();
+    String backendEmail = (_accountProfile?['email']?.toString() ?? '').trim();
+    if (backendEmail.isEmpty) {
+      try {
+        final meRes = await api.get('/api/v1/customer/me');
+        if (!mounted) return;
+        if (meRes is Map<String, dynamic>) {
+          final meData = meRes.containsKey('data') && meRes['data'] is Map<String, dynamic>
+              ? meRes['data'] as Map<String, dynamic>
+              : meRes;
+          backendEmail = (meData['email']?.toString() ?? '').trim();
+        }
+      } catch (_) {
+        // Không ghi đè bằng username nếu backend chưa có email
+      }
+    }
+    final emailController = TextEditingController(text: backendEmail);
 
     String? currentAvatarUrl = _accountProfile?['avatarUrl']?.toString() ?? user?.avatar;
     final customerName = _accountProfile?['customerName']?.toString() ?? user?.name ?? 'Khách hàng';
@@ -1172,9 +1136,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) {
           final initials = _getInitials(
-            contactNameController.text.trim().isNotEmpty
-                ? contactNameController.text.trim()
-                : customerName,
+            contactName.isNotEmpty ? contactName : customerName,
           );
 
           Future<void> pickAndUploadAvatar(ImageSource source) async {
@@ -1547,93 +1509,25 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Contact info section
-                      const Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Expanded(
-                            child: Text(
-                              'THÔNG TIN LIÊN HỆ TRỰC TIẾP',
-                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Text(
-                            '* Bắt buộc',
-                            style: TextStyle(fontSize: 10, fontStyle: FontStyle.italic, color: Color(0xFF94A3B8)),
-                          ),
-                        ],
+                      // Contact info section (only email is editable; name & phone are managed by Admin)
+                      const Text(
+                        'THÔNG TIN LIÊN HỆ TRỰC TIẾP',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF64748B), letterSpacing: 0.5),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 10),
 
-                      // Field 1: Contact name
-                      TextField(
-                        controller: contactNameController,
-                        decoration: InputDecoration(
-                          labelText: 'Tên người liên hệ *',
-                          labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-                          prefixIcon: const Icon(LucideIcons.user, size: 18, color: Color(0xFF64748B)),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Field 2: Phone with VN flag
-                      TextField(
-                        controller: phoneController,
-                        keyboardType: TextInputType.phone,
-                        decoration: InputDecoration(
-                          labelText: 'Số điện thoại liên hệ',
-                          labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
-                          prefixIcon: Container(
-                            margin: const EdgeInsets.only(right: 8),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            decoration: const BoxDecoration(
-                              border: Border(right: BorderSide(color: Color(0xFFE2E8F0))),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text('🇻🇳', style: TextStyle(fontSize: 14)),
-                                SizedBox(width: 4),
-                                Text('+84', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF475569))),
-                              ],
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF8FAFC),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      // Field 3: Email
+                      // Field: Email
                       TextField(
                         controller: emailController,
                         keyboardType: TextInputType.emailAddress,
                         decoration: InputDecoration(
-                          labelText: 'Địa chỉ thư điện tử',
+                          labelText: 'Email',
+                          hintText: 'Nhập địa chỉ email',
+                          hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
                           labelStyle: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
                           prefixIcon: const Icon(LucideIcons.mail, size: 18, color: Color(0xFF64748B)),
-                          suffixIcon: Container(
-                            margin: const EdgeInsets.all(10),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFECFDF5),
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Text('Đã xác minh', style: TextStyle(fontSize: 10, color: Color(0xFF059669), fontWeight: FontWeight.bold)),
-                          ),
                           filled: true,
                           fillColor: const Color(0xFFF8FAFC),
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
@@ -1673,6 +1567,10 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                             ),
                             const SizedBox(height: 10),
                             _buildProfileInfoRow('Doanh nghiệp:', customerName),
+                            if (contactName.isNotEmpty)
+                              _buildProfileInfoRow('Người liên hệ:', contactName),
+                            if (contactPhone.isNotEmpty)
+                              _buildProfileInfoRow('Số điện thoại:', _formatProfilePhone(contactPhone)),
                             if (customerCode.isNotEmpty)
                               _buildProfileInfoRow('Mã khách hàng:', customerCode),
                             if (companyTaxCode.isNotEmpty)
@@ -1681,7 +1579,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                               _buildProfileInfoRow('Địa chỉ:', companyAddress),
                             const SizedBox(height: 6),
                             Text(
-                              '* Thông tin doanh nghiệp do Quản trị viên quản lý. Để thay đổi vui lòng liên hệ số điện thoại $_hotlineNumber.',
+                              '* Thông tin khách hàng, số điện thoại và doanh nghiệp do Quản trị viên quản lý. Để thay đổi vui lòng liên hệ số điện thoại $_hotlineNumber.',
                               style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), fontStyle: FontStyle.italic),
                             ),
                           ],
@@ -1767,26 +1665,22 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                           onPressed: isSaving || isUploadingAvatar
                               ? null
                               : () async {
-                                  final contactName = contactNameController.text.trim();
-                                  final phone = phoneController.text.trim();
                                   final email = emailController.text.trim();
 
-                                  if (contactName.isEmpty) {
-                                    setDialogState(() => dialogError = 'Tên người liên hệ không được để trống.');
-                                    return;
-                                  }
-                                  if (contactName.length > 100) {
-                                    setDialogState(() => dialogError = 'Tên người liên hệ tối đa 100 ký tự.');
-                                    return;
-                                  }
-                                  if (phone.isNotEmpty && !RegExp(r'^(0|\+84)[0-9]{9,10}$').hasMatch(phone)) {
-                                    setDialogState(() => dialogError = 'Số điện thoại không hợp lệ (9-10 chữ số).');
-                                    return;
-                                  }
                                   if (email.isNotEmpty && !RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(email)) {
                                     setDialogState(() => dialogError = 'Email không hợp lệ.');
                                     return;
                                   }
+
+                                  final effectiveContactName =
+                                      (contactName.isNotEmpty ? contactName : customerName).trim();
+                                  final safeContactName = effectiveContactName.length > 100
+                                      ? effectiveContactName.substring(0, 100)
+                                      : effectiveContactName;
+                                  final rawPhone = contactPhone.replaceAll(RegExp(r'\s+'), '');
+                                  final safePhone = RegExp(r'^(0|\+84)[0-9]{9,10}$').hasMatch(rawPhone)
+                                      ? rawPhone
+                                      : '';
 
                                   setDialogState(() {
                                     isSaving = true;
@@ -1798,8 +1692,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                                     final res = await api.put(
                                       '/api/v1/customer/account-profile',
                                       body: {
-                                        'contactName': contactName,
-                                        'phone': phone,
+                                        'contactName': safeContactName,
+                                        'phone': safePhone,
                                         'email': email,
                                       },
                                     );
@@ -2069,6 +1963,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         orderId: orderId,
         hotlineNumber: _hotlineNumber,
         onMakeCall: _makePhoneCall,
+        imagePicker: widget.imagePicker,
       ),
     );
   }
@@ -2191,6 +2086,13 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     final contactName = _accountProfile?['contactName']?.toString() ?? '';
     final avatarUrl = _accountProfile?['avatarUrl']?.toString() ?? user?.avatar;
     final initials = _getInitials(contactName.isNotEmpty ? contactName : companyName);
+    final rawPhone = (_accountProfile?['phone']?.toString() ?? '').trim().isNotEmpty
+        ? _accountProfile!['phone'].toString().trim()
+        : ((user?.phone?.trim().isNotEmpty == true)
+            ? user!.phone!.trim()
+            : (user?.username ?? '').trim());
+    final formattedPhone = _formatProfilePhone(rawPhone);
+    const hasAvatarNotification = true;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
@@ -2296,7 +2198,16 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           PopupMenuButton<String>(
             tooltip: 'Tài khoản & Cài đặt',
             offset: const Offset(0, 48),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            color: Colors.white,
+            surfaceTintColor: Colors.transparent,
+            elevation: 16,
+            shadowColor: Colors.black.withValues(alpha: 0.25),
+            menuPadding: const EdgeInsets.symmetric(vertical: 6),
+            constraints: const BoxConstraints(minWidth: 224, maxWidth: 268),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: const BorderSide(color: Color(0xFFF1F5F9), width: 1),
+            ),
             icon: Stack(
               clipBehavior: Clip.none,
               children: [
@@ -2328,19 +2239,21 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                           ),
                   ),
                 ),
-                Positioned(
-                  top: -1,
-                  right: -1,
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEF4444),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                if (hasAvatarNotification)
+                  Positioned(
+                    top: -1,
+                    right: -1,
+                    child: Container(
+                      key: const ValueKey('avatar_notification_dot'),
+                      width: 10,
+                      height: 10,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEF4444),
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 2),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             onSelected: (value) {
@@ -2355,59 +2268,33 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               }
             },
             itemBuilder: (ctx) => [
-              PopupMenuItem(
-                enabled: false,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      companyName,
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF0F172A)),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    if (contactName.isNotEmpty && contactName != companyName)
-                      Text(
-                        contactName,
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
-                      ),
-                    Text(
-                      user?.username ?? '',
-                      style: const TextStyle(fontSize: 11, color: Color(0xFF94A3B8), fontFamily: 'monospace'),
-                    ),
-                    const Divider(),
-                  ],
-                ),
+              _ProfileMenuHeader(
+                displayName: companyName,
+                contactName: contactName,
+                phone: formattedPhone,
               ),
-              const PopupMenuItem(
+              const _ProfileMenuDivider(),
+              const _ProfileMenuActionItem(
                 value: 'profile',
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.userCog, size: 18, color: Color(0xFF2563EB)),
-                    SizedBox(width: 10),
-                    Text('Hồ sơ cá nhân', style: TextStyle(fontSize: 14)),
-                  ],
-                ),
+                icon: LucideIcons.userCog300,
+                iconColor: Color(0xFF2563EB),
+                label: 'Hồ sơ cá nhân',
+                showDot: hasAvatarNotification,
               ),
-              const PopupMenuItem(
+              const _ProfileMenuActionItem(
                 value: 'change_pwd',
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.keyRound, size: 18, color: Color(0xFF2563EB)),
-                    SizedBox(width: 10),
-                    Text('Đổi mật khẩu', style: TextStyle(fontSize: 14)),
-                  ],
-                ),
+                icon: LucideIcons.keyRound300,
+                iconColor: Color(0xFF2563EB),
+                label: 'Đổi mật khẩu',
               ),
-              const PopupMenuItem(
+              const _ProfileMenuDivider(),
+              const _ProfileMenuActionItem(
                 value: 'logout',
-                child: Row(
-                  children: [
-                    Icon(LucideIcons.logOut, size: 18, color: Color(0xFFDC2626)),
-                    SizedBox(width: 10),
-                    Text('Đăng xuất', style: TextStyle(fontSize: 14, color: Color(0xFFDC2626), fontWeight: FontWeight.w600)),
-                  ],
-                ),
+                icon: LucideIcons.logOut300,
+                iconColor: Color(0xFFDC2626),
+                label: 'Đăng xuất',
+                textColor: Color(0xFFDC2626),
+                hoverColor: Color(0xFFFEF2F2),
               ),
             ],
           ),
@@ -2896,31 +2783,15 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           hintText: 'Tìm kiếm mã đơn, tên thiết bị hoặc số sê-ri...',
           hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
           prefixIcon: const Icon(LucideIcons.search, size: 18, color: Color(0xFF64748B)),
-          suffixIcon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_searchQuery.isNotEmpty)
-                IconButton(
+          suffixIcon: _searchQuery.isNotEmpty
+              ? IconButton(
                   icon: const Icon(LucideIcons.x, size: 16, color: Color(0xFF64748B)),
                   onPressed: () {
                     _searchController.clear();
                     setState(() => _searchQuery = '');
                   },
-                ),
-              GestureDetector(
-                onTap: _showQrScannerDialog,
-                child: Container(
-                  margin: const EdgeInsets.only(right: 8),
-                  padding: const EdgeInsets.all(7),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(LucideIcons.qrCode, size: 16, color: Color(0xFF475569)),
-                ),
-              ),
-            ],
-          ),
+                )
+              : null,
           border: InputBorder.none,
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         ),
@@ -3665,6 +3536,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
 
           // Stepper Nodes
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: List.generate(stages.length, (stepIdx) {
               final isDone = isDelivered || stepIdx < currentStep || (isCompleted && stepIdx <= 3);
               final isCurrent = !isDelivered && stepIdx == currentStep && !(isCompleted && stepIdx <= 3);
@@ -5784,11 +5656,13 @@ class _OrderDetailSheet extends StatefulWidget {
     required this.orderId,
     required this.hotlineNumber,
     required this.onMakeCall,
+    this.imagePicker,
   });
 
   final String orderId;
   final String hotlineNumber;
   final Future<void> Function(String) onMakeCall;
+  final ImagePicker? imagePicker;
 
   @override
   State<_OrderDetailSheet> createState() => _OrderDetailSheetState();
@@ -5895,6 +5769,26 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
         duration: const Duration(seconds: 2),
       ),
     );
+  }
+
+  Future<void> _openOrderConfirmationSheet() async {
+    final detail = _detail;
+    if (detail == null) return;
+    final updated = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => OrderConfirmationSheet(
+        orderId: widget.orderId,
+        orderDetail: detail,
+        hotlineNumber: widget.hotlineNumber,
+        onMakeCall: widget.onMakeCall,
+        imagePicker: widget.imagePicker,
+      ),
+    );
+    if (updated == true && mounted) {
+      await _loadDetail();
+    }
   }
 
   String _getStaffInitials(String name) {
@@ -6762,30 +6656,58 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                       ),
           ),
 
-          // Sticky Footer Actions (1 Contact Method: Phone Call)
+          // Sticky Footer Actions (Order Confirmation + Phone Call)
           Container(
             padding: const EdgeInsets.all(16),
             decoration: const BoxDecoration(
               color: Colors.white,
               border: Border(top: BorderSide(color: Color(0xFFE2E8F0))),
             ),
-            child: SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF10B981),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    key: const ValueKey('order_confirm_button'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25437A),
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: const Color(0xFF94A3B8),
+                      disabledForegroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: _detail == null ? null : _openOrderConfirmationSheet,
+                    icon: const Icon(LucideIcons.circleCheckBig, size: 16),
+                    label: const Text(
+                      'Xác nhận đơn hàng',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
-                onPressed: () => widget.onMakeCall(widget.hotlineNumber),
-                icon: const Icon(LucideIcons.phoneCall, size: 16),
-                label: Text(
-                  'Liên hệ kỹ thuật (${widget.hotlineNumber})',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: ElevatedButton.icon(
+                    key: const ValueKey('order_contact_button'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    onPressed: () => widget.onMakeCall(widget.hotlineNumber),
+                    icon: const Icon(LucideIcons.phoneCall, size: 16),
+                    label: Text(
+                      'Liên hệ kỹ thuật (${widget.hotlineNumber})',
+                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
@@ -6887,6 +6809,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
           ),
           const SizedBox(height: 14),
           Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: List.generate(steps.length, (stepIdx) {
               final isDone = isDelivered || stepIdx < currentStep || (isCompleted && stepIdx <= 3);
               final isCurrent = !isDelivered && stepIdx == currentStep && !(isCompleted && stepIdx <= 3);
@@ -7097,4 +7020,213 @@ class _WorkshopMapPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+String _formatProfilePhone(String raw) {
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return '';
+  if (!RegExp(r'^[+\d\s().-]+$').hasMatch(trimmed)) {
+    return trimmed;
+  }
+  final digits = trimmed.replaceAll(RegExp(r'\D'), '');
+  if (digits.length == 10 && digits.startsWith('0')) {
+    return '${digits.substring(0, 4)} ${digits.substring(4, 7)} ${digits.substring(7)}';
+  }
+  if (digits.length == 11 && digits.startsWith('0')) {
+    return '${digits.substring(0, 4)} ${digits.substring(4, 7)} ${digits.substring(7)}';
+  }
+  if (digits.length == 11 && digits.startsWith('84')) {
+    final local = '0${digits.substring(2)}';
+    return '${local.substring(0, 4)} ${local.substring(4, 7)} ${local.substring(7)}';
+  }
+  return trimmed;
+}
+
+class _ProfileMenuHeader extends PopupMenuEntry<String> {
+  const _ProfileMenuHeader({
+    required this.displayName,
+    required this.contactName,
+    required this.phone,
+  });
+
+  final String displayName;
+  final String contactName;
+  final String phone;
+
+  @override
+  double get height => 52;
+
+  @override
+  bool represents(String? value) => false;
+
+  @override
+  State<_ProfileMenuHeader> createState() => _ProfileMenuHeaderState();
+}
+
+class _ProfileMenuHeaderState extends State<_ProfileMenuHeader> {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            widget.displayName,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF111827),
+              height: 1.3,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          if (widget.contactName.isNotEmpty && widget.contactName != widget.displayName) ...[
+            const SizedBox(height: 2),
+            Text(
+              widget.contactName,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF2563EB),
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+          if (widget.phone.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              widget.phone,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w400,
+                color: Color(0xFF6B7280),
+                height: 1.3,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileMenuDivider extends PopupMenuEntry<String> {
+  const _ProfileMenuDivider();
+
+  @override
+  double get height => 9;
+
+  @override
+  bool represents(String? value) => false;
+
+  @override
+  State<_ProfileMenuDivider> createState() => _ProfileMenuDividerState();
+}
+
+class _ProfileMenuDividerState extends State<_ProfileMenuDivider> {
+  @override
+  Widget build(BuildContext context) {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 4),
+      child: SizedBox(
+        height: 1,
+        width: double.infinity,
+        child: ColoredBox(color: Color(0xFFF1F5F9)),
+      ),
+    );
+  }
+}
+
+class _ProfileMenuActionItem extends PopupMenuEntry<String> {
+  const _ProfileMenuActionItem({
+    required this.value,
+    required this.icon,
+    required this.iconColor,
+    required this.label,
+    this.textColor = const Color(0xFF1E293B),
+    this.hoverColor = const Color(0xFFF8FAFC),
+    this.showDot = false,
+  });
+
+  final String value;
+  final IconData icon;
+  final Color iconColor;
+  final String label;
+  final Color textColor;
+  final Color hoverColor;
+  final bool showDot;
+
+  @override
+  double get height => 44;
+
+  @override
+  bool represents(String? value) => value == this.value;
+
+  @override
+  State<_ProfileMenuActionItem> createState() => _ProfileMenuActionItemState();
+}
+
+class _ProfileMenuActionItemState extends State<_ProfileMenuActionItem> {
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+      child: MergeSemantics(
+        child: Semantics(
+          button: true,
+          child: Material(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(8),
+              hoverColor: widget.hoverColor,
+              highlightColor: widget.hoverColor,
+              splashColor: widget.hoverColor,
+              onTap: () => Navigator.pop<String>(context, widget.value),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                child: Row(
+                  children: [
+                    Icon(widget.icon, size: 18, color: widget.iconColor),
+                    const SizedBox(width: 10),
+                    Flexible(
+                      child: Text(
+                        widget.label,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: widget.textColor,
+                          height: 1.3,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    if (widget.showDot) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        key: const ValueKey('profile_menu_notification_dot'),
+                        width: 6,
+                        height: 6,
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFEF4444),
+                          shape: BoxShape.circle,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
