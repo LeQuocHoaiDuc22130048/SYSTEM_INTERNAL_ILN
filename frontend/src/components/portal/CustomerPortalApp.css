@@ -1914,3 +1914,182 @@
 }
 
 
+
+/* ============================================
+   QUOTATIONS BANNER & CARD/DETAIL TRIGGERS
+   ============================================ */
+.portal-quotations-banner-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.portal-quotation-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.05);
+}
+
+.portal-quotation-banner.is-pending {
+  background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+  border-color: #fcd34d;
+}
+
+.portal-quotation-banner.is-payment {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #93c5fd;
+}
+
+.pq-banner-left {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pq-banner-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #d97706;
+  color: #ffffff;
+  flex-shrink: 0;
+}
+
+.pq-banner-icon.payment {
+  background: #1d4ed8;
+}
+
+.pq-banner-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pq-banner-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 0.94rem;
+  color: #0f172a;
+}
+
+.pq-banner-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: #fef08a;
+  color: #92400e;
+  border: 1px solid #f59e0b;
+}
+
+.pq-banner-badge.payment {
+  background: #dbeafe;
+  color: #1e40af;
+  border-color: #60a5fa;
+}
+
+.pq-banner-meta {
+  font-size: 0.8rem;
+  color: #475569;
+}
+
+.pq-banner-sub {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #334155;
+  line-height: 1.4;
+}
+
+.pq-banner-cta {
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: none;
+  background: #143266;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.84rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.pq-banner-cta:hover {
+  background: #0f254b;
+  transform: translateY(-1px);
+}
+
+.pq-banner-cta.secondary {
+  background: #2563eb;
+}
+
+.pq-banner-cta.secondary:hover {
+  background: #1d4ed8;
+}
+
+.portal-card-quote-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 5px 10px;
+  border-radius: 999px;
+  border: 1px solid #f59e0b;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.portal-card-quote-pill:hover {
+  background: #fde68a;
+}
+
+.portal-quote-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.portal-quote-open-btn.is-pending {
+  border-color: #143266;
+  background: #143266;
+  color: #ffffff;
+}
+
+@media (max-width: 720px) {
+  .portal-quotation-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pq-banner-cta {
+    width: 100%;
+    text-align: center;
+  }
+}

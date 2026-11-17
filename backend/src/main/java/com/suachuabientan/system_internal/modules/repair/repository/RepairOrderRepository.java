@@ -113,4 +113,7 @@ public interface RepairOrderRepository extends JpaRepository<RepairOrder, UUID> 
             ORDER BY r.priority ASC
             """)
     List<RepairOrder> findActiveByAssignedTo(@Param("userId") UUID userId);
+
+    List<RepairOrder> findByCustomerIdAndStatusInAndIsDeletedFalseOrderByReceivedAtDesc(
+            UUID customerId, List<RepairStatus> statuses);
 }

@@ -36,6 +36,10 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
   const [latitude, setLatitude] = useState<string>('10.854611');
   const [longitude, setLongitude] = useState<string>('106.703212');
   const [mapImageUrl, setMapImageUrl] = useState<string>('');
+  const [bankName, setBankName] = useState<string>('MB Bank (Quân Đội)');
+  const [bankBin, setBankBin] = useState<string>('970422');
+  const [bankAccountNumber, setBankAccountNumber] = useState<string>('9964266771');
+  const [bankAccountHolder, setBankAccountHolder] = useState<string>('CONG TY TNHH KY THUAT CONG NGHE');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -54,6 +58,10 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
           setLatitude(cfg.latitude !== undefined && cfg.latitude !== null ? String(cfg.latitude) : '10.854611');
           setLongitude(cfg.longitude !== undefined && cfg.longitude !== null ? String(cfg.longitude) : '106.703212');
           setMapImageUrl(cfg.mapImageUrl || '');
+          setBankName(cfg.bankName || 'MB Bank (Quân Đội)');
+          setBankBin(cfg.bankBin || '970422');
+          setBankAccountNumber(cfg.bankAccountNumber || '9964266771');
+          setBankAccountHolder(cfg.bankAccountHolder || 'CONG TY TNHH KY THUAT CONG NGHE');
         }
       })
       .catch((err) => {
@@ -87,6 +95,10 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
         latitude: latitude ? parseFloat(latitude) : undefined,
         longitude: longitude ? parseFloat(longitude) : undefined,
         mapImageUrl: mapImageUrl.trim(),
+        bankName: bankName.trim() || undefined,
+        bankBin: bankBin.trim() || undefined,
+        bankAccountNumber: bankAccountNumber.trim() || undefined,
+        bankAccountHolder: bankAccountHolder.trim() || undefined,
       });
       showToast('Cập nhật kênh hỗ trợ Cổng Khách Hàng thành công!');
       onClose();
@@ -266,6 +278,50 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
                 <span className="field-hint" style={{ fontSize: 11, color: '#64748b', marginTop: 3, display: 'block' }}>
                   * Nếu cung cấp URL ảnh sơ đồ, app sẽ ưu tiên hiển thị ảnh này cho khách hàng.
                 </span>
+              </div>
+
+              <div className="config-section-title" style={{ marginTop: 14 }}>
+                <span>Tài Khoản Ngân Hàng & VietQR (Báo giá)</span>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 10 }}>
+                <div className="form-group">
+                  <label>Tên ngân hàng</label>
+                  <input
+                    type="text"
+                    placeholder="MB Bank (Quân Đội)"
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Mã BIN VietQR</label>
+                  <input
+                    type="text"
+                    placeholder="970422"
+                    value={bankBin}
+                    onChange={(e) => setBankBin(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 8 }}>
+                <div className="form-group">
+                  <label>Số tài khoản</label>
+                  <input
+                    type="text"
+                    placeholder="9964266771"
+                    value={bankAccountNumber}
+                    onChange={(e) => setBankAccountNumber(e.target.value)}
+                  />
+                </div>
+                <div className="form-group">
+                  <label>Chủ tài khoản</label>
+                  <input
+                    type="text"
+                    placeholder="CONG TY TNHH KY THUAT CONG NGHE"
+                    value={bankAccountHolder}
+                    onChange={(e) => setBankAccountHolder(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
 

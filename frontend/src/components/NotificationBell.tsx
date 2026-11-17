@@ -168,6 +168,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     if (item.type.startsWith('ATTENDANCE_') || item.refType === 'ATTENDANCE_TABLET') {
       onNavigateToTab?.('devices');
       setIsOpen(false);
+    } else if (
+      item.type.startsWith('QUOTATION_') ||
+      item.type.startsWith('PAYMENT_PROOF_') ||
+      item.refType === 'REPAIR_QUOTATION'
+    ) {
+      onNavigateToTab?.('quotations');
+      setIsOpen(false);
     }
   };
 

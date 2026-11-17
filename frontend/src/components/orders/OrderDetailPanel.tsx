@@ -20,6 +20,7 @@ import type { Customer } from '../../types/customer';
 import { hasPermission } from '../../utils/permissions';
 import { getCustomers, linkRepairOrderCustomer } from '../../utils/customerApi';
 import { OrderCustomerPublishSection } from './OrderCustomerPublishSection';
+import { OrderQuotationSection } from './OrderQuotationSection';
 
 interface OrderDetailPanelProps {
   selectedOrder: RepairOrder;
@@ -369,6 +370,24 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
           )}
         </div>
       </div>
+
+      {/* Báo giá sửa chữa gom nhóm theo khách hàng */}
+      <OrderQuotationSection
+        orderId={selectedOrder.id}
+        orderCode={selectedOrder.orderCode}
+        deviceName={selectedOrder.deviceName}
+        serialNumber={selectedOrder.serialNumber}
+        customerId={selectedOrder.customerId}
+        customerName={selectedOrder.customerName}
+        orderStatus={selectedOrder.status}
+        canManage={
+          canAction('REPAIR_QUOTATION_MANAGE') ||
+          canAction('REPAIR_CUSTOMER_PUBLISH') ||
+          canAction('REPAIR_UPDATE')
+        }
+        onRefreshOrder={onRefreshOrder}
+        showToast={showToast}
+      />
 
       {/* Customer Portal Published Updates & Media */}
       <OrderCustomerPublishSection

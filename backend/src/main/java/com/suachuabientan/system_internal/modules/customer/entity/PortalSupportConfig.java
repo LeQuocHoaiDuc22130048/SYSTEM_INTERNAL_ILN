@@ -50,6 +50,18 @@ public class PortalSupportConfig {
     @Column(name = "map_image_url", length = 1000)
     private String mapImageUrl;
 
+    @Column(name = "bank_name", length = 150)
+    private String bankName;
+
+    @Column(name = "bank_bin", length = 20)
+    private String bankBin;
+
+    @Column(name = "bank_account_number", length = 50)
+    private String bankAccountNumber;
+
+    @Column(name = "bank_account_holder", length = 200)
+    private String bankAccountHolder;
+
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;

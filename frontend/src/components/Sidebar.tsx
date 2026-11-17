@@ -10,6 +10,7 @@ import {
   LogOut,
   Wrench,
   ClipboardList,
+  FileText,
   Boxes,
   Users,
   ShieldCheck,
@@ -35,6 +36,7 @@ export type SidebarTab =
   | 'updates'
   | 'banners'
   | 'orders'
+  | 'quotations'
   | 'customers'
   | 'warehouse'
   | 'locations'
@@ -74,7 +76,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const getGroupByTab = (tab: SidebarTab): GroupKey | null => {
     if (tab === 'monthly' || tab === 'daily') return 'attendance';
     if (tab === 'devices' || tab === 'updates' || tab === 'banners') return 'device';
-    if (tab === 'orders' || tab === 'customers' || tab === 'warehouse' || tab === 'locations') return 'business';
+    if (tab === 'orders' || tab === 'quotations' || tab === 'customers' || tab === 'warehouse' || tab === 'locations') return 'business';
     if (tab === 'accounts' || tab === 'terminal' || tab === 'media-cleanup') return 'accounts';
     return null;
   };
@@ -114,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   // Kiểm tra nhóm nào có chứa tab đang active
   const isAttendanceActive = activeTab === 'monthly' || activeTab === 'daily';
   const isDeviceActive = activeTab === 'devices' || activeTab === 'updates' || activeTab === 'banners';
-  const isBusinessActive = activeTab === 'orders' || activeTab === 'customers' || activeTab === 'warehouse' || activeTab === 'locations';
+  const isBusinessActive = activeTab === 'orders' || activeTab === 'quotations' || activeTab === 'customers' || activeTab === 'warehouse' || activeTab === 'locations';
   const isAccountsActive = activeTab === 'accounts' || activeTab === 'terminal' || activeTab === 'media-cleanup';
 
   return (
@@ -397,6 +399,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <ClipboardList size={16} className="item-icon" />
                 <span>Đơn sửa chữa</span>
               </button>
+              <button
+                className={`menu-item ${activeTab === 'quotations' ? 'active' : ''}`}
+                onClick={() => handleTabClick('quotations')}
+                style={{ display: canAccessTab(currentUser, 'quotations') ? undefined : 'none' }}
+              >
+                <FileText size={16} className="item-icon" />
+                <span>Quản lý báo giá</span>
+              </button>
               {canViewCustomers && (
                 <button
                   className={`menu-item ${activeTab === 'customers' ? 'active' : ''}`}
@@ -441,6 +451,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 >
                   <ClipboardList size={15} />
                   <span>Đơn sửa chữa</span>
+                </button>
+                <button
+                  className={`flyout-item ${activeTab === 'quotations' ? 'active' : ''}`}
+                  onClick={() => handleTabClick('quotations')}
+                  style={{ display: canAccessTab(currentUser, 'quotations') ? undefined : 'none' }}
+                >
+                  <FileText size={15} />
+                  <span>Quản lý báo giá</span>
                 </button>
                 {canViewCustomers && (
                   <button
