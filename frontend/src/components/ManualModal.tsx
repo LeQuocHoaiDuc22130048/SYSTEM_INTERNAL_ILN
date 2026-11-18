@@ -1,10 +1,11 @@
 import { usePermissionCheck } from '../utils/permissionContext';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X } from 'lucide-react';
 import type { AttendanceCheckType } from '../mockData';
 import { getAvatarLetters } from '../utils/employee';
 import { getJsonAuthHeaders } from '../utils/auth';
 import { TimePicker24h } from './TimePicker24h';
+import { useDialogA11y } from '../hooks/useMotion';
 
 
 interface ManualModalProps {
@@ -23,6 +24,8 @@ export const ManualModal: React.FC<ManualModalProps> = ({
   onSaveSuccess,
 }) => {
   const canAction = usePermissionCheck();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(true, onClose, dialogRef);
   const [manualType, setManualType] = useState<AttendanceCheckType>('IN');
   const [manualTime, setManualTime] = useState<string>('08:30');
   const [manualNote, setManualNote] = useState<string>('');
@@ -65,8 +68,16 @@ export const ManualModal: React.FC<ManualModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content modal-content--narrow">
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        className="modal-content modal-content--narrow"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Chấm công thủ công"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h3 className="modal-title">Chấm công thủ công</h3>
           <button className="modal-close" onClick={onClose}>

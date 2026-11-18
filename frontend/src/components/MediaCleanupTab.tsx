@@ -513,7 +513,7 @@ export const MediaCleanupTab: React.FC<MediaCleanupTabProps> = ({ showToast, ref
       <div className="mc-schedule-card">
         <div className="mc-schedule-header">
           <h3 className="mc-schedule-title">
-            <Calendar size={18} color="#2563eb" />
+            <Calendar size={18} color="var(--brand-blue)" />
             Hẹn thời gian xác định chạy Media Cleanup (Không xóa liên tục)
           </h3>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>

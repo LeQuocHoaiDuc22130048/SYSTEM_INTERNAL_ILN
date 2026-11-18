@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Wrench, Activity, CheckCircle2, Cpu, Users, UserPlus,
-  AlertTriangle, RefreshCw, ArrowRight, UserCheck,
+  AlertTriangle, ArrowRight, UserCheck,
   CalendarCheck, Clock, LogIn, LogOut, Briefcase,
-  Calendar, Zap, CalendarDays, CalendarRange, SlidersHorizontal, Inbox
+  Calendar, BarChart3, PieChart, Inbox
 } from 'lucide-react';
 import type { UserInfo } from '../mockData';
 import { getAuthHeaders } from '../utils/auth';
@@ -11,34 +11,18 @@ import { getAvatarLetters } from '../utils/employee';
 import { hasPermission } from '../utils/permissions';
 import { FieldWorkRequests } from './FieldWorkRequests';
 import { FieldWorkModal } from './FieldWorkModal';
+import { AnimatedNumber } from './AnimatedNumber';
+import {
+  type TimeRangePreset,
+  toLocalDateStr,
+  getCurvedPath,
+  computeDashboardDateRange,
+  formatFilterSummaryText,
+  getComboChartHeading,
+} from './dashboardUtils';
 import './DashboardTab.css';
 
-export type TimeRangePreset = 'today' | '7days' | 'month' | 'custom';
-
-// Helper chuyển Date sang YYYY-MM-DD theo giờ địa phương (local timezone)
-const toLocalDateStr = (date: Date): string => {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, '0');
-  const d = String(date.getDate()).padStart(2, '0');
-  return `${y}-${m}-${d}`;
-};
-
-// Helper tạo đường cong Bezier SVG mượt mà qua các điểm tọa độ
-const getCurvedPath = (points: { x: number; y: number }[]): string => {
-  if (points.length === 0) return '';
-  if (points.length === 1) return `M ${points[0].x} ${points[0].y}`;
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i];
-    const p1 = points[i + 1];
-    const cx1 = Math.round(p0.x + (p1.x - p0.x) / 3);
-    const cy1 = Math.round(p0.y);
-    const cx2 = Math.round(p0.x + (2 * (p1.x - p0.x)) / 3);
-    const cy2 = Math.round(p1.y);
-    d += ` C ${cx1} ${cy1}, ${cx2} ${cy2}, ${p1.x} ${p1.y}`;
-  }
-  return d;
-};
+export type { TimeRangePreset };
 
 interface DashboardTabProps {
   setActiveTab: (tab: 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'orders' | 'warehouse' | 'accounts') => void;
@@ -48,6 +32,7 @@ interface DashboardTabProps {
   currentMonth?: number;
   currentYear?: number;
   refreshTrigger?: number;
+  rangeType?: TimeRangePreset;
 }
 
 interface OrderRecord {
@@ -139,6 +124,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   currentMonth,
   currentYear,
   refreshTrigger,
+  rangeType = '7days',
 }) => {
   const [fieldWorkRefresh, setFieldWorkRefresh] = useState(0);
   const [orders, setOrders] = useState<OrderRecord[]>([]);
@@ -150,9 +136,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const [personalDays, setPersonalDays] = useState<PersonalHistoryDay[]>([]);
   const [personalSummary, setPersonalSummary] = useState<PersonalSummary | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Bộ lọc khoảng thời gian Dashboard
-  const [rangeType, setRangeType] = useState<TimeRangePreset>('7days');
   const [customStartDate, setCustomStartDate] = useState<string>(() => {
     const d = new Date();
     d.setDate(d.getDate() - 6);
@@ -345,63 +328,16 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   }, []);
 
   // ── Tính toán Date Range từ bộ lọc khoảng thời gian ──────────────────────
-  const dateRange = useMemo(() => {
-    const today = new Date();
-    const todayStr = toLocalDateStr(today);
-    let startDateStr = todayStr;
-    let endDateStr = todayStr;
-
-    if (rangeType === 'today') {
-      startDateStr = todayStr;
-      endDateStr = todayStr;
-    } else if (rangeType === '7days') {
-      const start = new Date(today);
-      start.setDate(today.getDate() - 6);
-      startDateStr = toLocalDateStr(start);
-      endDateStr = todayStr;
-    } else if (rangeType === 'month') {
-      const y = currentYear || today.getFullYear();
-      const m = currentMonth || (today.getMonth() + 1);
-      startDateStr = `${y}-${String(m).padStart(2, '0')}-01`;
-      const lastDay = new Date(y, m, 0).getDate();
-      endDateStr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
-    } else if (rangeType === 'custom') {
-      let s = customStartDate || todayStr;
-      let e = customEndDate || todayStr;
-      if (s > e) {
-        const tmp = s;
-        s = e;
-        e = tmp;
-      }
-      startDateStr = s;
-      endDateStr = e;
-    }
-
-    const start = new Date(startDateStr + 'T00:00:00');
-    const end = new Date(endDateStr + 'T23:59:59.999');
-
-    return {
-      startDateStr,
-      endDateStr,
-      start,
-      end
-    };
-  }, [rangeType, customStartDate, customEndDate, currentYear, currentMonth]);
+  const dateRange = useMemo(
+    () => computeDashboardDateRange(rangeType, customStartDate, customEndDate, currentYear, currentMonth),
+    [rangeType, customStartDate, customEndDate, currentYear, currentMonth]
+  );
 
   // Nhãn tóm tắt khoảng thời gian đang lọc
-  const filterSummaryText = useMemo(() => {
-    const { startDateStr, endDateStr, start, end } = dateRange;
-    const formatVi = (s: string) => {
-      const parts = s.split('-');
-      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
-      return s;
-    };
-    if (rangeType === 'today') {
-      return `Hôm nay: ${formatVi(startDateStr)}`;
-    }
-    const diffDays = Math.max(1, Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)));
-    return `${formatVi(startDateStr)} - ${formatVi(endDateStr)} (${diffDays} ngày)`;
-  }, [dateRange, rangeType]);
+  const filterSummaryText = useMemo(
+    () => formatFilterSummaryText(dateRange, rangeType),
+    [dateRange, rangeType]
+  );
 
   // Danh sách đơn hàng đã được lọc theo khoảng thời gian
   const filteredOrders = useMemo(() => {
@@ -532,13 +468,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       isZero: boolean;
     }
     let rawSlots: RawSlot[];
-    let chartTitle: string;
-    let chartSubtitle: string;
+    const { title: chartTitle, subtitle: chartSubtitle } = getComboChartHeading(
+      rangeType,
+      dateRange,
+      currentYear,
+      currentMonth,
+      today
+    );
 
     if (rangeType === 'today') {
-      chartTitle = 'Thống kê đơn hôm nay theo khung giờ (Cột & Đường)';
-      chartSubtitle = 'Phân bố đơn phát sinh trong các khung giờ làm việc hôm nay';
-
       const timeSlots = [
         { label: '07h-09h', fullLabel: 'Đầu sáng (07:00 - 09:30)', startH: 7, startM: 0, endH: 9, endM: 30 },
         { label: '09h-12h', fullLabel: 'Giữa sáng (09:30 - 12:00)', startH: 9, startM: 30, endH: 12, endM: 0 },
@@ -581,8 +519,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     } else {
       const dayList: Date[] = [];
       if (rangeType === '7days') {
-        chartTitle = 'Thống kê đơn 7 ngày qua (Cột & Đường)';
-        chartSubtitle = 'Theo dõi tồn đọng, đang xử lý và sản lượng hoàn thành mỗi ngày';
         for (let i = 6; i >= 0; i--) {
           const d = new Date(today);
           d.setDate(today.getDate() - i);
@@ -591,8 +527,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       } else if (rangeType === 'month') {
         const y = currentYear || today.getFullYear();
         const m = currentMonth || (today.getMonth() + 1);
-        chartTitle = `Thống kê đơn Tháng ${m}/${y} (Cột & Đường)`;
-        chartSubtitle = 'Tiến độ xử lý đơn sửa chữa theo từng ngày trong tháng';
         const totalDays = new Date(y, m, 0).getDate();
         for (let d = 1; d <= totalDays; d++) {
           dayList.push(new Date(y, m - 1, d));
@@ -603,8 +537,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         const end = new Date(dateRange.endDateStr + 'T00:00:00');
         const diffTime = end.getTime() - start.getTime();
         const diffDays = Math.min(31, Math.max(1, Math.round(diffTime / 86400000) + 1));
-        chartTitle = `Thống kê đơn tùy chỉnh (${dateRange.startDateStr} → ${dateRange.endDateStr})`;
-        chartSubtitle = 'Biểu đồ phân tích đơn sửa chữa theo khoảng thời gian đã chọn';
         for (let i = 0; i < diffDays; i++) {
           const d = new Date(start);
           d.setDate(start.getDate() + i);
@@ -862,8 +794,41 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     ? comboChartData.slots[hoveredSlotIndex]
     : null;
 
+  // Replay chart entrance only on initial load or explicit range filter change (Section 5.9)
+  const hasPlayedChartRevealRef = useRef<boolean>(false);
+  const [chartAnimKey, setChartAnimKey] = useState<number>(1);
+  useEffect(() => {
+    if (loading) return;
+    if (!hasPlayedChartRevealRef.current) {
+      hasPlayedChartRevealRef.current = true;
+      return;
+    }
+    setChartAnimKey((k) => k + 1);
+  }, [rangeType, customStartDate, customEndDate, loading]);
+
   if (loading) {
-    return <div className="dashboard-loading"><RefreshCw size={24} className="spin" /> Đang tải số liệu...</div>;
+    return (
+      <div className="dashboard-tab" role="status" aria-live="polite" aria-label="Đang tải dữ liệu Dashboard">
+        <div className="crm-skeleton-grid">
+          {Array.from({ length: 8 }).map((_, idx) => (
+            <div key={idx} className="crm-skeleton-card">
+              <div className="crm-skeleton crm-skeleton-line" />
+              <div className="crm-skeleton crm-skeleton-value" />
+            </div>
+          ))}
+        </div>
+        <div className="dashboard-content-split">
+          <div className="crm-skeleton-panel">
+            <div className="crm-skeleton crm-skeleton-line" />
+            <div className="crm-skeleton crm-skeleton-chart" />
+          </div>
+          <div className="crm-skeleton-panel">
+            <div className="crm-skeleton crm-skeleton-line" />
+            <div className="crm-skeleton crm-skeleton-chart" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   // Calculate donut slices parameters
@@ -882,93 +847,49 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   return (
     <div className="dashboard-tab">
       {(hasPermission(currentUser, 'FIELD_WORK_SAVE') || ['ADMIN', 'SUPER_ADMIN'].includes(currentUser?.role || '')) && <FieldWorkRequests admin={['ADMIN', 'SUPER_ADMIN'].includes(currentUser?.role || '')} refresh={fieldWorkRefresh} onChanged={() => { setFieldWorkRefresh(v => v + 1); void fetchDashboardData(); }} />}
-      {/* ── Bộ lọc linh hoạt (Filters) ── */}
-      <div className="dashboard-filter-bar">
-        <div className="filter-left-section">
-          <div className="filter-label">
-            <Calendar size={15} />
-            <span>Khoảng thời gian:</span>
-          </div>
-
-          <div className="preset-buttons" role="tablist" aria-label="Bộ lọc thời gian">
-            <button
-              type="button"
-              className={`filter-preset-btn ${rangeType === 'today' ? 'active' : ''}`}
-              onClick={() => setRangeType('today')}
-            >
-              <Zap size={14} />
-              <span>Hôm nay</span>
-            </button>
-            <button
-              type="button"
-              className={`filter-preset-btn ${rangeType === '7days' ? 'active' : ''}`}
-              onClick={() => setRangeType('7days')}
-            >
-              <CalendarDays size={14} />
-              <span>7 ngày qua</span>
-            </button>
-            <button
-              type="button"
-              className={`filter-preset-btn ${rangeType === 'month' ? 'active' : ''}`}
-              onClick={() => setRangeType('month')}
-            >
-              <CalendarRange size={14} />
-              <span>Tháng này</span>
-            </button>
-            <button
-              type="button"
-              className={`filter-preset-btn ${rangeType === 'custom' ? 'active' : ''}`}
-              onClick={() => setRangeType('custom')}
-            >
-              <SlidersHorizontal size={14} />
-              <span>Tùy chỉnh</span>
-            </button>
-          </div>
-
-          {rangeType === 'custom' && (
-            <div className="custom-range-inputs">
-              <div className="custom-input-group">
-                <span className="custom-input-label">Từ:</span>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  max={customEndDate || toLocalDateStr(new Date())}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="custom-date-field"
-                  aria-label="Từ ngày"
-                />
-              </div>
-              <span className="range-arrow">→</span>
-              <div className="custom-input-group">
-                <span className="custom-input-label">Đến:</span>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  min={customStartDate}
-                  max={toLocalDateStr(new Date())}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="custom-date-field"
-                  aria-label="Đến ngày"
-                />
-              </div>
+      {/* Chỉ hiện thanh chọn ngày khi người dùng chọn chế độ "Tùy chỉnh" trên Header */}
+      {rangeType === 'custom' && (
+        <div className="dashboard-custom-range-bar">
+          <div className="custom-range-inputs">
+            <div className="custom-input-group">
+              <span className="custom-input-label">Từ:</span>
+              <input
+                type="date"
+                value={customStartDate}
+                max={customEndDate || toLocalDateStr(new Date())}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+                className="custom-date-field"
+                aria-label="Từ ngày"
+              />
             </div>
-          )}
+            <span className="range-arrow">→</span>
+            <div className="custom-input-group">
+              <span className="custom-input-label">Đến:</span>
+              <input
+                type="date"
+                value={customEndDate}
+                min={customStartDate}
+                max={toLocalDateStr(new Date())}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+                className="custom-date-field"
+                aria-label="Đến ngày"
+              />
+            </div>
+          </div>
+          <div className="filter-summary-pill" title="Khoảng thời gian đang áp dụng cho toàn bộ widget">
+            <Clock size={13} />
+            <span>{filterSummaryText}</span>
+          </div>
         </div>
+      )}
 
-        <div className="filter-summary-pill" title="Khoảng thời gian đang áp dụng cho toàn bộ widget">
-          <Clock size={13} />
-          <span>{filterSummaryText}</span>
-        </div>
-      </div>
-
-      {/* Grid containing 8 stats card */}
+      {/* Grid containing 8 stats card (2 rows x 4 columns) */}
       <div className="dashboard-stats-grid">
         {/* Card 1: Tổng đơn */}
         <div className="stat-card border-blue">
           <div className="stat-info">
             <span className="stat-label">Tổng đơn</span>
-            <span className="stat-value">{stats.totalOrders}</span>
-            <span className="stat-sub">Tổng số đơn trong khoảng lọc</span>
+            <span className="stat-value"><AnimatedNumber value={stats.totalOrders} /></span>
           </div>
           <div className="stat-icon-wrapper bg-blue">
             <Wrench size={20} className="icon-blue" />
@@ -979,8 +900,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="stat-card border-orange">
           <div className="stat-info">
             <span className="stat-label">Đang xử lý</span>
-            <span className="stat-value">{stats.inProgressOrders}</span>
-            <span className="stat-sub">Đơn cần theo dõi</span>
+            <span className="stat-value"><AnimatedNumber value={stats.inProgressOrders} /></span>
+            <span className="stat-sub">Đang sửa chữa</span>
           </div>
           <div className="stat-icon-wrapper bg-orange">
             <Activity size={20} className="icon-orange" />
@@ -991,8 +912,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="stat-card border-green">
           <div className="stat-info">
             <span className="stat-label">Hoàn thành</span>
-            <span className="stat-value">{stats.completedOrders}</span>
-            <span className="stat-sub">Đơn đã sửa xong</span>
+            <span className="stat-value"><AnimatedNumber value={stats.completedOrders} /></span>
           </div>
           <div className="stat-icon-wrapper bg-green">
             <CheckCircle2 size={20} className="icon-green" />
@@ -1003,8 +923,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div className="stat-card border-purple">
           <div className="stat-info">
             <span className="stat-label">Bo mạch sẵn sàng</span>
-            <span className="stat-value">{stats.availableBoards}/{stats.totalBoards}</span>
-            <span className="stat-sub">Bo mạch có sẵn trong kho</span>
+            <span className="stat-value">
+              <AnimatedNumber value={stats.availableBoards} />/{stats.totalBoards}
+            </span>
+            <span className="stat-sub">Trong kho</span>
           </div>
           <div className="stat-icon-wrapper bg-purple">
             <Cpu size={20} className="icon-purple" />
@@ -1016,8 +938,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="stat-card border-teal">
             <div className="stat-info">
               <span className="stat-label">Nhân viên có mặt</span>
-              <span className="stat-value">{stats.checkedInEmployees}/{stats.totalEmployees}</span>
-              <span className="stat-sub">Đã check-in hệ thống</span>
+              <span className="stat-value">
+                <AnimatedNumber value={stats.checkedInEmployees} />/{stats.totalEmployees}
+              </span>
+              <span className="stat-sub">Đã check-in</span>
             </div>
             <div className="stat-icon-wrapper bg-teal">
               <Users size={20} className="icon-teal" />
@@ -1027,9 +951,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="stat-card border-teal">
             <div className="stat-info">
               <span className="stat-label">{rangeType === 'month' ? 'Công tháng này' : 'Ngày công'}</span>
-              <span className="stat-value">{filteredPersonalSummary ? filteredPersonalSummary.workDays : 0} công</span>
+              <span className="stat-value">
+                <AnimatedNumber value={filteredPersonalSummary ? filteredPersonalSummary.workDays : 0} /> công
+              </span>
               <span className="stat-sub">
-                {filteredPersonalSummary ? `Tổng giờ làm: ${filteredPersonalSummary.totalHours}h` : filterSummaryText}
+                {filteredPersonalSummary ? `Tổng giờ: ${filteredPersonalSummary.totalHours}h` : filterSummaryText}
               </span>
             </div>
             <div className="stat-icon-wrapper bg-teal">
@@ -1039,11 +965,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         )}
 
         {/* Card 6: Đơn chờ phân công */}
-        <div className="stat-card border-pink">
+        <div className={`stat-card border-pink ${stats.unassignedOrders > 0 ? 'stat-card--attention' : ''}`}>
           <div className="stat-info">
             <span className="stat-label">Chờ phân công</span>
-            <span className="stat-value">{stats.unassignedOrders}</span>
-            <span className="stat-sub">Đơn chưa sửa & chưa gán KTV</span>
+            <span className="stat-value"><AnimatedNumber value={stats.unassignedOrders} /></span>
+            <span className="stat-sub">Chưa gán KTV</span>
           </div>
           <div className="stat-icon-wrapper bg-pink">
             <UserPlus size={20} className="icon-pink" />
@@ -1051,10 +977,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         {/* Card 7: Bo mạch bảo trì */}
-        <div className="stat-card border-red">
+        <div className={`stat-card border-red ${stats.maintenanceBoards > 0 ? 'stat-card--attention' : ''}`}>
           <div className="stat-info">
             <span className="stat-label">Bo mạch bảo trì</span>
-            <span className="stat-value">{stats.maintenanceBoards}</span>
+            <span className="stat-value"><AnimatedNumber value={stats.maintenanceBoards} /></span>
             <span className="stat-sub">Đang sửa chữa/bảo trì</span>
           </div>
           <div className="stat-icon-wrapper bg-red">
@@ -1064,26 +990,28 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
         {/* Card 8: Tài khoản chờ duyệt (Admin) HOẶC Đi muộn / Tăng ca (Non-admin) */}
         {canViewTeamAttendance ? (
-          <div className="stat-card border-amber">
+          <div className={`stat-card border-amber ${stats.pendingCount > 0 ? 'stat-card--attention' : ''}`}>
             <div className="stat-info">
               <span className="stat-label">Tài khoản chờ duyệt</span>
-              <span className="stat-value">{stats.pendingCount}</span>
-              <span className="stat-sub">Chờ xét duyệt hệ thống</span>
+              <span className="stat-value"><AnimatedNumber value={stats.pendingCount} /></span>
+              <span className="stat-sub">Chờ xét duyệt</span>
             </div>
             <div className="stat-icon-wrapper bg-amber">
               <UserCheck size={20} className="icon-amber" />
             </div>
           </div>
         ) : (
-          <div className="stat-card border-amber">
+          <div className={`stat-card border-amber ${(filteredPersonalSummary?.lateCount ?? 0) > 0 ? 'stat-card--attention' : ''}`}>
             <div className="stat-info">
               <span className="stat-label">Đi muộn / Về sớm</span>
-              <span className="stat-value">{filteredPersonalSummary ? filteredPersonalSummary.lateCount : 0} lần</span>
+              <span className="stat-value">
+                <AnimatedNumber value={filteredPersonalSummary ? filteredPersonalSummary.lateCount : 0} /> lần
+              </span>
               <span className="stat-sub">
                 {filteredPersonalSummary && filteredPersonalSummary.overtimeHours > 0
                   ? `Tăng ca: ${filteredPersonalSummary.overtimeHours}h`
                   : filteredPersonalSummary?.lateCount === 0
-                    ? 'Chuyên cần đúng giờ'
+                    ? 'Đúng giờ'
                     : 'Cần chú ý giờ giấc'}
               </span>
             </div>
@@ -1113,11 +1041,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
 
             <div className="chart-container weekly-chart-container">
-              <svg
-                viewBox="0 0 680 260"
-                className="combo-svg"
-                onMouseLeave={() => setHoveredSlotIndex(null)}
-              >
+              {comboChartData.activeDaysCount === 0 ? (
+                <div className="empty-state empty-state--chart">
+                  <div className="empty-state-icon" aria-hidden="true">
+                    <BarChart3 size={22} />
+                  </div>
+                  <span className="empty-state-title">Chưa có dữ liệu đơn hàng</span>
+                  <span className="empty-state-desc">
+                    Không có đơn sửa chữa phát sinh trong khoảng thời gian đã chọn
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <svg
+                    key={chartAnimKey}
+                    viewBox="0 0 680 260"
+                    preserveAspectRatio="xMidYMid meet"
+                    className="combo-svg combo-svg--reveal"
+                    onMouseLeave={() => setHoveredSlotIndex(null)}
+                  >
                 <defs>
                   {/* Gradient đổ bóng nhẹ dưới đường Line Hoàn thành */}
                   <linearGradient id="completedAreaGrad" x1="0" y1="0" x2="0" y2="1">
@@ -1353,45 +1295,52 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                   )}
                 </div>
               )}
+                </>
+              )}
             </div>
 
             {/* Chú giải biểu đồ (Legend) */}
-            <div className="chart-legend">
-              <div className="legend-items-group">
-                <span className="legend-item">
-                  <span className="legend-bar bg-amber" />
-                  <span>Chờ xử lý (Cột)</span>
-                </span>
-                <span className="legend-item">
-                  <span className="legend-bar bg-blue" />
-                  <span>Đang sửa (Cột)</span>
-                </span>
-                <span className="legend-item">
-                  <span className="legend-line-sample">
-                    <span className="line-line" />
-                    <span className="line-node" />
+            {comboChartData.activeDaysCount > 0 && (
+              <div className="chart-legend">
+                <div className="legend-items-group">
+                  <span className="legend-item">
+                    <span className="legend-bar bg-amber" />
+                    <span>Chờ xử lý (Cột)</span>
                   </span>
-                  <span>Hoàn thành (Đường)</span>
+                  <span className="legend-item">
+                    <span className="legend-bar bg-blue" />
+                    <span>Đang sửa (Cột)</span>
+                  </span>
+                  <span className="legend-item">
+                    <span className="legend-line-sample">
+                      <span className="line-line" />
+                      <span className="line-node" />
+                    </span>
+                    <span>Hoàn thành (Đường)</span>
+                  </span>
+                </div>
+                <span className="legend-activity-tag">
+                  {rangeType === 'today' ? 'Phân bố theo ca làm việc' : 'Dữ liệu cập nhật theo bộ lọc'}
                 </span>
               </div>
-              <span className="legend-activity-tag">
-                {rangeType === 'today' ? 'Phân bố theo ca làm việc' : 'Dữ liệu cập nhật theo bộ lọc'}
-              </span>
-            </div>
+            )}
           </div>
 
           {/* Status Ratio Pie/Donut Chart */}
           <div className="dashboard-panel">
             <h3 className="panel-title">Tỷ lệ trạng thái đơn</h3>
+            {pieChartData.total === 0 ? (
+              <div className="empty-state empty-state--chart">
+                <div className="empty-state-icon" aria-hidden="true">
+                  <PieChart size={22} />
+                </div>
+                <span className="empty-state-title">Chưa có dữ liệu trạng thái đơn</span>
+                <span className="empty-state-desc">Không có đơn hàng nào trong khoảng thời gian này</span>
+              </div>
+            ) : (
             <div className="status-ratio-wrapper">
               <div className="pie-chart-container">
-                {pieChartData.total === 0 ? (
-                  <svg width="140" height="140" viewBox="0 0 120 120">
-                    <circle cx="60" cy="60" r={donutR} stroke="#e2e8f0" strokeWidth="15" fill="transparent" />
-                    <text x="60" y="65" textAnchor="middle" fill="#94a3b8" fontSize="12" fontWeight="bold">0%</text>
-                  </svg>
-                ) : (
-                  <svg width="140" height="140" viewBox="0 0 120 120">
+                <svg width="140" height="140" viewBox="0 0 120 120">
                     <g transform="rotate(-90 60 60)">
                       {(() => {
                         let currentOffset = 0;
@@ -1422,7 +1371,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       {pieChartData.total} đơn
                     </text>
                   </svg>
-                )}
               </div>
               <div className="pie-stats-list">
                 {[
@@ -1443,6 +1391,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 })}
               </div>
             </div>
+            )}
           </div>
         </div>
 
@@ -1457,7 +1406,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               </div>
               <div className="list-container attendance-list">
                 {attendance.length === 0 ? (
-                  <div className="empty-state">Không có nhân viên nào check-in hôm nay</div>
+                  <div className="empty-state">
+                    <div className="empty-state-icon" aria-hidden="true">
+                      <Users size={20} />
+                    </div>
+                    <span className="empty-state-title">Chưa có nhân viên check-in hôm nay</span>
+                  </div>
                 ) : (
                   attendance.map((rec, index) => {
                     const empName = rec.records && rec.records.length > 0
@@ -1615,7 +1569,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               {/* Danh sách các ngày chấm công trong khoảng lọc */}
               <div className="list-container personal-attendance-list">
                 {filteredPersonalDays.length === 0 ? (
-                  <div className="empty-state">Chưa có bản ghi chấm công nào trong khoảng thời gian này</div>
+                  <div className="empty-state">
+                    <div className="empty-state-icon" aria-hidden="true">
+                      <Calendar size={20} />
+                    </div>
+                    <span className="empty-state-title">Chưa có bản ghi chấm công trong khoảng thời gian này</span>
+                  </div>
                 ) : (
                   [...filteredPersonalDays]
                     .filter(d => d.status !== 'FUTURE')
@@ -1682,7 +1641,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
             <div className="list-container orders-list">
               {filteredOrders.length === 0 ? (
-                <div className="empty-state">Không có đơn hàng nào trong khoảng thời gian này</div>
+                <div className="empty-state">
+                  <div className="empty-state-icon" aria-hidden="true">
+                    <Wrench size={20} />
+                  </div>
+                  <span className="empty-state-title">Không có đơn hàng nào trong khoảng thời gian này</span>
+                </div>
               ) : (
                 filteredOrders.slice(0, 10).map((order) => {
                   const statusInfo = getOrderStatusLabel(order.status);

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../models/app_permission.dart';
 import '../../navigation/main_tabs.dart';
 import '../../theme/app_colors.dart';
+import '../../theme/app_motion.dart';
 import '../../utils/auth_provider.dart';
 import '../../utils/chat_provider.dart';
 
@@ -32,7 +33,7 @@ class SideNavigation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bgColor = isDark ? const Color(0xFF111C2E) : const Color(0xFF111C2E);
+    const bgColor = AppColors.sidebarBg;
 
     final unreadChats = context.watch<ChatProvider>().totalUnreadCount;
     final auth = context.watch<AuthProvider>();
@@ -41,30 +42,32 @@ class SideNavigation extends StatelessWidget {
         : null;
 
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
+      duration: AppMotion.resolveDuration(context, AppMotion.normal),
+      curve: AppMotion.easeStandard,
       width: isExpanded ? 240 : 80,
       color: bgColor,
       child: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 24),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 20),
+            decoration: BoxDecoration(
+              color: AppColors.brandNavy,
+              border: Border(
+                bottom: BorderSide(
+                  color: Colors.white.withValues(alpha: 0.14),
+                ),
+              ),
+            ),
             child: Row(
               children: [
-                Container(
-                  padding: const EdgeInsets.all(4),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Image.asset(
-                    'assets/images/app_logo.png',
-                    width: 50,
-                    height: 50,
-                    fit: BoxFit.contain,
-                  ),
+                Image.asset(
+                  'assets/images/app_logo.png',
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.contain,
                 ),
                 if (isExpanded) ...[
-                  const SizedBox(width: 8),
+                  const SizedBox(width: 10),
                   const Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -83,7 +86,7 @@ class SideNavigation extends StatelessWidget {
                           'Service Management',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: Colors.white54, fontSize: 10),
+                          style: TextStyle(color: Colors.white70, fontSize: 10),
                         ),
                       ],
                     ),
@@ -266,8 +269,8 @@ class _SideNavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final activeColor = AppColors.primary;
-    final inactiveColor = Colors.white.withValues(alpha: 0.6);
+    const activeColor = AppColors.sidebarActive;
+    final inactiveColor = Colors.white.withValues(alpha: 0.65);
     final visibleBadge = badge != null && badge != '0';
 
     return Padding(

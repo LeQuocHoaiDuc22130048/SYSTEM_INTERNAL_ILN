@@ -28,8 +28,10 @@ import {
   RotateCcw,
   Inbox,
   ArrowUpDown,
+  AlertTriangle,
 } from 'lucide-react';
 import type { UserInfo } from '../../mockData';
+import { isOrderAwaitingCustomerConfirmation } from '../../types/orders';
 import type {
   Customer,
   CustomerOrderResponse,
@@ -959,6 +961,16 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
             </div>
 
             {/* STEPPER PROGRESS */}
+            {isOrderAwaitingCustomerConfirmation(selectedOrder) && (
+              <div className="portal-confirm-warning-banner" role="status">
+                <AlertTriangle size={16} />
+                <div>
+                  <strong>Cảnh báo: Chờ xác nhận</strong>
+                  <span>Đơn hàng này chưa được Quý khách xác nhận phương án sửa chữa hoặc báo giá.</span>
+                </div>
+              </div>
+            )}
+
             {selectedOrder.status !== 'CANCELLED' ? (
               <div className="portal-stepper">
                 {[
@@ -1441,6 +1453,12 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                           <span className="order-code-badge">{ord.orderCode}</span>
                           {renderStatusBadge(ord.status, ord.statusLabel || ord.friendlyStatus)}
                         </div>
+                        {isOrderAwaitingCustomerConfirmation(ord) && (
+                          <div className="portal-confirm-warning-pill" role="status">
+                            <AlertTriangle size={12} />
+                            <span>Chờ xác nhận</span>
+                          </div>
+                        )}
                         <h4 className="order-title">
                           {ord.orderTitle || ord.deviceName || ord.deviceType || 'Đơn sửa chữa thiết bị'}
                         </h4>

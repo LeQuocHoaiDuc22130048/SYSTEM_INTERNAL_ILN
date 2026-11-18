@@ -1,4 +1,5 @@
 import React from 'react';
+import { AnimatedNumber } from './AnimatedNumber';
 
 interface DailyStatsGridProps {
   total: number;
@@ -18,28 +19,28 @@ export const DailyStatsGrid: React.FC<DailyStatsGridProps> = ({
       <div className="stats-card">
         <span className="stats-label">Tổng số nhân sự</span>
         <div className="stats-value-row">
-          <span className="stats-value">{total}</span>
+          <span className="stats-value"><AnimatedNumber value={total} /></span>
           <span className="stats-badge success">nhân viên</span>
         </div>
       </div>
       <div className="stats-card">
         <span className="stats-label">Đúng giờ / Có mặt</span>
         <div className="stats-value-row">
-          <span className="stats-value">{onTime}</span>
+          <span className="stats-value"><AnimatedNumber value={onTime} /></span>
           <span className="stats-badge success">đang làm việc</span>
         </div>
       </div>
       <div className="stats-card">
         <span className="stats-label">Đi muộn / Về sớm</span>
         <div className="stats-value-row">
-          <span className="stats-value">{lateEarly}</span>
+          <span className="stats-value"><AnimatedNumber value={lateEarly} /></span>
           <span className="stats-badge late">trường hợp</span>
         </div>
       </div>
       <div className="stats-card">
         <span className="stats-label">Vắng mặt / Nghỉ phép</span>
         <div className="stats-value-row">
-          <span className="stats-value">{absent}</span>
+          <span className="stats-value"><AnimatedNumber value={absent} /></span>
           <span className="stats-badge absent">vắng</span>
         </div>
       </div>

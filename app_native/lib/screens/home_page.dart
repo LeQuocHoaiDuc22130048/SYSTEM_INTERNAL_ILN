@@ -767,8 +767,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                       }
                     },
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 250),
-                      curve: Curves.easeOutCubic,
+                      duration: AppMotion.resolveDuration(
+                        context,
+                        AppMotion.normal,
+                      ),
+                      curve: AppMotion.easeStandard,
                       margin: const EdgeInsets.only(right: 4),
                       width: isDotActive ? 14 : 4.5,
                       height: 4.5,

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../theme/app_motion.dart';
 
-/// A touch-optimized widget providing immediate spring-scale feedback
-/// (<16ms zero-latency response via Listener) and tactile haptic response on press.
+/// A touch-optimized widget providing calm press-scale feedback
+/// (`scale = 0.97` by default, `100–150ms`) and tactile haptic response on press.
 ///
-/// Performance optimizations:
+/// Performance & Accessibility:
 /// - Uses `ScaleTransition` directly to update the transform matrix at the RenderObject level
-/// - Uses `RepaintBoundary` to isolate the repainting layer from sibling/parent widgets
-/// - Zero widget rebuilds during animation frames
-/// - Syncs with gesture arena (`onTapCancel`) to instantly bounce back when user scrolls
+/// - Uses `RepaintBoundary` to isolate repainting from sibling/parent widgets
+/// - Respects `MediaQuery.disableAnimationsOf(context)` by skipping scale animation
+/// - Syncs with gesture arena (`onTapCancel`) to return smoothly when user scrolls
 class InteractiveBounce extends StatefulWidget {
   final Widget child;
   final VoidCallback? onTap;
@@ -26,11 +27,11 @@ class InteractiveBounce extends StatefulWidget {
     required this.child,
     this.onTap,
     this.onLongPress,
-    this.scaleDown = 0.95,
-    this.duration = const Duration(milliseconds: 100),
-    this.reverseDuration = const Duration(milliseconds: 180),
-    this.curve = Curves.easeInOutCubic,
-    this.reverseCurve = Curves.easeOutBack,
+    this.scaleDown = AppMotion.scalePressed,
+    this.duration = AppMotion.instant,
+    this.reverseDuration = AppMotion.fast,
+    this.curve = AppMotion.easeStandard,
+    this.reverseCurve = AppMotion.easeEnter,
     this.enableHaptic = true,
     this.behavior = HitTestBehavior.opaque,
   });
@@ -74,7 +75,9 @@ class _InteractiveBounceState extends State<InteractiveBounce>
   void _onPointerDown(PointerDownEvent event) {
     if (widget.onTap == null && widget.onLongPress == null) return;
     _isPressed = true;
-    _controller.forward();
+    if (!AppMotion.isReduced(context)) {
+      _controller.forward();
+    }
     if (widget.enableHaptic) {
       try {
         HapticFeedback.lightImpact();
@@ -85,27 +88,36 @@ class _InteractiveBounceState extends State<InteractiveBounce>
   void _onPointerUp(PointerUpEvent event) {
     if (!_isPressed) return;
     _isPressed = false;
-    _controller.reverse();
+    if (_controller.value > 0) {
+      _controller.reverse();
+    }
   }
 
   void _onPointerCancel(PointerCancelEvent event) {
     if (!_isPressed) return;
     _isPressed = false;
-    _controller.reverse();
+    if (_controller.value > 0) {
+      _controller.reverse();
+    }
   }
 
   void _handleTapCancel() {
     if (!_isPressed) return;
     _isPressed = false;
-    _controller.reverse();
+    if (_controller.value > 0) {
+      _controller.reverse();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isInteractive = widget.onTap != null || widget.onLongPress != null;
+    final bool isInteractive =
+        widget.onTap != null || widget.onLongPress != null;
     if (!isInteractive) {
       return widget.child;
     }
+
+    final bool reduceMotion = AppMotion.isReduced(context);
 
     return Listener(
       behavior: widget.behavior,
@@ -117,13 +129,15 @@ class _InteractiveBounceState extends State<InteractiveBounce>
         onTapCancel: _handleTapCancel,
         onTap: widget.onTap,
         onLongPress: widget.onLongPress,
-        child: ScaleTransition(
-          scale: _scaleAnimation,
-          alignment: Alignment.center,
-          child: RepaintBoundary(
-            child: widget.child,
-          ),
-        ),
+        child: reduceMotion
+            ? widget.child
+            : ScaleTransition(
+                scale: _scaleAnimation,
+                alignment: Alignment.center,
+                child: RepaintBoundary(
+                  child: widget.child,
+                ),
+              ),
       ),
     );
   }

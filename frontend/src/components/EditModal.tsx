@@ -1,9 +1,10 @@
 import { usePermissionCheck } from '../utils/permissionContext';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { getAvatarLetters } from '../utils/employee';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import { TimePicker24h } from './TimePicker24h';
+import { useDialogA11y } from '../hooks/useMotion';
 
 
 interface EditModalProps {
@@ -24,6 +25,8 @@ export const EditModal: React.FC<EditModalProps> = ({
   onSaveSuccess,
 }) => {
   const canAction = usePermissionCheck();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(true, onClose, dialogRef);
   const [hasEditCheckIn, setHasEditCheckIn] = useState<boolean>(false);
   const [editCheckInTime, setEditCheckInTime] = useState<string>('08:30');
   const [editCheckInRecordId, setEditCheckInRecordId] = useState<string | null>(null);
@@ -105,8 +108,16 @@ export const EditModal: React.FC<EditModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content modal-content--narrow">
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        className="modal-content modal-content--narrow"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Chỉnh sửa bảng công"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <h3 className="modal-title">Chỉnh sửa bảng công</h3>
           <button className="modal-close" onClick={onClose}>

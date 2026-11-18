@@ -17,6 +17,7 @@ import '../services/embedding_service.dart';
 import '../services/face_detector_service.dart';
 import '../services/liveness_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_motion.dart';
 import '../utils/api_client.dart';
 import '../widgets/navigation/app_back_button.dart';
 import '../utils/auth_provider.dart';
@@ -1505,9 +1506,12 @@ class _AttendanceScreenState extends State<AttendanceScreen> {
       ),
       child: Center(
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          switchInCurve: Curves.easeOutBack,
-          switchOutCurve: Curves.easeIn,
+          duration: AppMotion.resolveDuration(
+            context,
+            const Duration(milliseconds: 180),
+          ),
+          switchInCurve: AppMotion.easeEnter,
+          switchOutCurve: AppMotion.easeExit,
           child: _showEnrollmentSampleSuccess
               ? Container(
                   key: const ValueKey('enrollment-sample-success'),

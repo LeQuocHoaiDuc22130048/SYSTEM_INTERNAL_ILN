@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../app/app_routes.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_motion.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
@@ -637,24 +638,31 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ],
                 ),
-              )
-                  .animate(onPlay: (c) => c.repeat(reverse: true))
-                  .scale(
-                    begin: const Offset(0.85, 0.85),
-                    end: const Offset(1.25, 1.25),
-                    duration: 900.ms,
-                  )
-                  .fade(begin: 0.5, end: 1.0, duration: 900.ms),
+              ),
             ],
           ),
         )
-            .animate(target: 1)
-            .fadeIn(duration: 500.ms)
-            .slideY(begin: -0.3, end: 0, duration: 500.ms),
+            .animate(
+              target: 1,
+              effects: AppMotion.isReduced(context)
+                  ? const []
+                  : [
+                      FadeEffect(
+                        duration: AppMotion.normal,
+                        curve: AppMotion.easeEnter,
+                      ),
+                      SlideEffect(
+                        begin: const Offset(0, -0.06),
+                        end: Offset.zero,
+                        duration: AppMotion.normal,
+                        curve: AppMotion.easeEnter,
+                      ),
+                    ],
+            ),
 
         SizedBox(height: isShort ? 10 : 20 * scale),
 
-        // Hero Stage with 3D Logo Levitation, Breathing Halo Glow and Floating Badges
+        // Hero Stage with Halo Glow and Badges (no decorative infinite loops)
         SizedBox(
           width: 320 * scale,
           height: 280 * scale,
@@ -662,7 +670,7 @@ class _LoginPageState extends State<LoginPage> {
             alignment: Alignment.center,
             clipBehavior: Clip.none,
             children: [
-              // Breathing glowing halo behind the logo (matching Stitch @keyframes logoGlow)
+              // Subtle halo behind the logo
               Container(
                 width: 220 * scale,
                 height: 220 * scale,
@@ -670,37 +678,22 @@ class _LoginPageState extends State<LoginPage> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      const Color(0xFF38BDF8).withValues(alpha: 0.50),
-                      const Color(0xFF2563EB).withValues(alpha: 0.28),
+                      AppColors.brandCyan.withValues(alpha: 0.42),
+                      AppColors.brandBlue.withValues(alpha: 0.24),
                       Colors.transparent,
                     ],
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: const Color(0xFF00F2FE).withValues(alpha: 0.40),
-                      blurRadius: 55 * scale,
-                      spreadRadius: 20 * scale,
+                      color: AppColors.brandCyan.withValues(alpha: 0.30),
+                      blurRadius: 48 * scale,
+                      spreadRadius: 14 * scale,
                     ),
                   ],
                 ),
-              )
-                  .animate(
-                    onPlay: (controller) => controller.repeat(reverse: true),
-                  )
-                  .scale(
-                    begin: const Offset(0.92, 0.92),
-                    end: const Offset(1.10, 1.10),
-                    duration: 2500.ms,
-                    curve: Curves.easeInOut,
-                  )
-                  .fade(
-                    begin: 0.40,
-                    end: 0.85,
-                    duration: 2500.ms,
-                    curve: Curves.easeInOut,
-                  ),
+              ),
 
-              // 3D Logo with levitation & subtle tilt (matching Stitch @keyframes logoLevitate)
+              // 3D Logo
               SizedBox(
                 width: 270 * scale,
                 height: 270 * scale,
@@ -708,76 +701,33 @@ class _LoginPageState extends State<LoginPage> {
                   'assets/images/app_logo.png',
                   fit: BoxFit.contain,
                 ),
-              )
-                  .animate(
-                    onPlay: (controller) => controller.repeat(reverse: true),
-                  )
-                  .moveY(
-                    begin: 0,
-                    end: -8 * scale,
-                    duration: 2200.ms,
-                    curve: Curves.easeInOut,
-                  )
-                  .rotate(
-                    begin: 0,
-                    end: 0.012,
-                    duration: 2200.ms,
-                    curve: Curves.easeInOut,
-                  ),
+              ),
 
               if (!isShort) ...[
-                // Floating Badge 1 (Top-Right): 100% Bảo mật (matching Stitch badgeFloatA)
+                // Floating Badge 1 (Top-Right): 100% Bảo mật
                 Positioned(
                   top: -4 * scale,
                   right: -10 * scale,
-                  child:
-                      _buildFloatingBadge(
-                            icon: LucideIcons.shieldCheck,
-                            iconColor: const Color(0xFF2563EB),
-                            iconBg: const Color(0xFFDBEAFE),
-                            text: '100% Bảo mật',
-                            scale: scale,
-                          )
-                          .animate(onPlay: (c) => c.repeat(reverse: true))
-                          .moveY(
-                            begin: 0,
-                            end: -6 * scale,
-                            duration: 2400.ms,
-                            curve: Curves.easeInOut,
-                          )
-                          .scale(
-                            begin: const Offset(1.0, 1.0),
-                            end: const Offset(1.03, 1.03),
-                            duration: 2400.ms,
-                            curve: Curves.easeInOut,
-                          ),
+                  child: _buildFloatingBadge(
+                    icon: LucideIcons.shieldCheck,
+                    iconColor: AppColors.brandBlue,
+                    iconBg: AppColors.infoLight,
+                    text: '100% Bảo mật',
+                    scale: scale,
+                  ),
                 ),
 
-                // Floating Badge 2 (Bottom-Left): Truy cập nhanh (matching Stitch badgeFloatB)
+                // Floating Badge 2 (Bottom-Left): Truy cập nhanh
                 Positioned(
                   bottom: 4 * scale,
                   left: -14 * scale,
-                  child:
-                      _buildFloatingBadge(
-                            icon: LucideIcons.zap,
-                            iconColor: const Color(0xFFD97706),
-                            iconBg: const Color(0xFFFEF3C7),
-                            text: 'Truy cập nhanh',
-                            scale: scale,
-                          )
-                          .animate(onPlay: (c) => c.repeat(reverse: true))
-                          .moveY(
-                            begin: 0,
-                            end: 6 * scale,
-                            duration: 2700.ms,
-                            curve: Curves.easeInOut,
-                          )
-                          .scale(
-                            begin: const Offset(1.0, 1.0),
-                            end: const Offset(0.97, 0.97),
-                            duration: 2700.ms,
-                            curve: Curves.easeInOut,
-                          ),
+                  child: _buildFloatingBadge(
+                    icon: LucideIcons.zap,
+                    iconColor: const Color(0xFFD97706),
+                    iconBg: const Color(0xFFFEF3C7),
+                    text: 'Truy cập nhanh',
+                    scale: scale,
+                  ),
                 ),
               ],
             ],
@@ -872,7 +822,10 @@ class _LoginPageState extends State<LoginPage> {
                           crossFadeState: _showAuthModal
                               ? CrossFadeState.showSecond
                               : CrossFadeState.showFirst,
-                          duration: const Duration(milliseconds: 280),
+                          duration: AppMotion.resolveDuration(
+                            context,
+                            AppMotion.normal,
+                          ),
                           firstChild: _buildDesktopWelcomeCard(),
                           secondChild: _buildDesktopFormCard(),
                         ),
@@ -900,8 +853,8 @@ class _LoginPageState extends State<LoginPage> {
       children: [
         // Hero Logo Section: smoothly animates from full screen center to compact top frame above modal
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.resolveDuration(context, AppMotion.normal),
+          curve: AppMotion.easeEnter,
           top: 0,
           left: 0,
           right: 0,
@@ -918,8 +871,11 @@ class _LoginPageState extends State<LoginPage> {
                   fit: BoxFit.scaleDown,
                   child: AnimatedScale(
                     scale: _showAuthModal ? 0.75 : 1.0,
-                    duration: const Duration(milliseconds: 320),
-                    curve: Curves.easeOutCubic,
+                    duration: AppMotion.resolveDuration(
+                      context,
+                      AppMotion.normal,
+                    ),
+                    curve: AppMotion.easeStandard,
                     child: _buildBrandingSection(
                       scale: brandingScale,
                       isMobile: true,
@@ -934,13 +890,13 @@ class _LoginPageState extends State<LoginPage> {
 
         // Bottom Action Section with Login and Sign Up buttons (slides down & fades out when modal opens)
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.resolveDuration(context, AppMotion.normal),
+          curve: AppMotion.easeEnter,
           left: 24,
           right: 24,
           bottom: _showAuthModal ? -220 : 16,
           child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 220),
+            duration: AppMotion.resolveDuration(context, AppMotion.fast),
             opacity: _showAuthModal ? 0.0 : 1.0,
             child: IgnorePointer(
               ignoring: _showAuthModal,
@@ -951,8 +907,8 @@ class _LoginPageState extends State<LoginPage> {
 
         // Bottom Sheet Auth Modal (sliding from bottom, capped so logo remains visible above)
         AnimatedPositioned(
-          duration: const Duration(milliseconds: 320),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.resolveDuration(context, AppMotion.normal),
+          curve: AppMotion.easeEnter,
           left: 0,
           right: 0,
           bottom: _showAuthModal ? 0 : -availableHeight,
@@ -1367,8 +1323,8 @@ class _LoginPageState extends State<LoginPage> {
         const SizedBox(height: 22),
 
         AnimatedSize(
-          duration: const Duration(milliseconds: 280),
-          curve: Curves.easeInOut,
+          duration: AppMotion.resolveDuration(context, AppMotion.normal),
+          curve: AppMotion.easeStandard,
           alignment: Alignment.topCenter,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1379,10 +1335,22 @@ class _LoginPageState extends State<LoginPage> {
                   hint: 'Nhập họ và tên...',
                   controller: _fullNameController,
                   icon: LucideIcons.user,
-                )
-                    .animate()
-                    .fadeIn(duration: 220.ms)
-                    .slideY(begin: -0.08, end: 0),
+                ).animate(
+                  effects: AppMotion.isReduced(context)
+                      ? const []
+                      : [
+                          FadeEffect(
+                            duration: AppMotion.fast,
+                            curve: AppMotion.easeEnter,
+                          ),
+                          SlideEffect(
+                            begin: const Offset(0, -0.04),
+                            end: Offset.zero,
+                            duration: AppMotion.fast,
+                            curve: AppMotion.easeEnter,
+                          ),
+                        ],
+                ),
                 const SizedBox(height: 16),
                 _buildInputField(
                   label: 'Số điện thoại',
@@ -1390,10 +1358,22 @@ class _LoginPageState extends State<LoginPage> {
                   controller: _phoneController,
                   icon: LucideIcons.phone,
                   keyboardType: TextInputType.phone,
-                )
-                    .animate()
-                    .fadeIn(duration: 220.ms)
-                    .slideY(begin: -0.08, end: 0),
+                ).animate(
+                  effects: AppMotion.isReduced(context)
+                      ? const []
+                      : [
+                          FadeEffect(
+                            duration: AppMotion.fast,
+                            curve: AppMotion.easeEnter,
+                          ),
+                          SlideEffect(
+                            begin: const Offset(0, -0.04),
+                            end: Offset.zero,
+                            duration: AppMotion.fast,
+                            curve: AppMotion.easeEnter,
+                          ),
+                        ],
+                ),
                 const SizedBox(height: 16),
               ],
 
@@ -1452,7 +1432,23 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ],
             ),
-          ).animate(target: 1).fadeIn().shake(),
+          ).animate(
+            target: 1,
+            effects: AppMotion.isReduced(context)
+                ? const []
+                : [
+                    FadeEffect(
+                      duration: AppMotion.fast,
+                      curve: AppMotion.easeEnter,
+                    ),
+                    MoveEffect(
+                      begin: const Offset(-AppMotion.distanceXs, 0),
+                      end: Offset.zero,
+                      duration: AppMotion.fast,
+                      curve: AppMotion.easeEnter,
+                    ),
+                  ],
+          ),
           const SizedBox(height: 20),
         ],
 
@@ -1763,29 +1759,16 @@ class LoginBackground extends StatelessWidget {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: AppColors.brandBlue.withValues(alpha: 0.12),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.12),
+                    color: AppColors.brandBlue.withValues(alpha: 0.14),
                     blurRadius: 120,
                     spreadRadius: 40,
                   ),
                 ],
               ),
-            )
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .scale(
-                  begin: const Offset(0.95, 0.95),
-                  end: const Offset(1.12, 1.12),
-                  duration: 5000.ms,
-                  curve: Curves.easeInOut,
-                )
-                .fade(
-                  begin: 0.7,
-                  end: 1.0,
-                  duration: 5000.ms,
-                  curve: Curves.easeInOut,
-                ),
+            ),
           ),
           Positioned(
             bottom: -size.height * 0.2,
@@ -1795,29 +1778,16 @@ class LoginBackground extends StatelessWidget {
               height: 400,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.indigo.withValues(alpha: 0.1),
+                color: AppColors.brandNavy.withValues(alpha: 0.16),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.indigo.withValues(alpha: 0.12),
+                    color: AppColors.brandNavy.withValues(alpha: 0.18),
                     blurRadius: 120,
                     spreadRadius: 40,
                   ),
                 ],
               ),
-            )
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .scale(
-                  begin: const Offset(1.12, 1.12),
-                  end: const Offset(0.95, 0.95),
-                  duration: 5500.ms,
-                  curve: Curves.easeInOut,
-                )
-                .fade(
-                  begin: 0.6,
-                  end: 1.0,
-                  duration: 5500.ms,
-                  curve: Curves.easeInOut,
-                ),
+            ),
           ),
           Positioned(
             top: size.height / 2 - 250,
@@ -1827,29 +1797,16 @@ class LoginBackground extends StatelessWidget {
               height: 500,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.blue.withValues(alpha: 0.15),
+                color: AppColors.brandCyan.withValues(alpha: 0.10),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.blue.withValues(alpha: 0.15),
+                    color: AppColors.brandCyan.withValues(alpha: 0.12),
                     blurRadius: 150,
                     spreadRadius: 50,
                   ),
                 ],
               ),
-            )
-                .animate(onPlay: (c) => c.repeat(reverse: true))
-                .scale(
-                  begin: const Offset(0.95, 0.95),
-                  end: const Offset(1.08, 1.08),
-                  duration: 4000.ms,
-                  curve: Curves.easeInOut,
-                )
-                .fade(
-                  begin: 0.8,
-                  end: 1.0,
-                  duration: 4000.ms,
-                  curve: Curves.easeInOut,
-                ),
+            ),
           ),
           Positioned.fill(child: CustomPaint(painter: GridPainter())),
         ],

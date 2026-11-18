@@ -3,7 +3,7 @@
 .upm-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 23, 42, 0.65);
+  background-color: var(--color-backdrop);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
   display: flex;
@@ -11,7 +11,7 @@
   justify-content: center;
   z-index: 10000;
   padding: 1.25rem;
-  animation: upmFadeIn 0.2s ease-out;
+  animation: upmFadeIn var(--motion-fast) var(--motion-ease-enter);
 }
 
 @keyframes upmFadeIn {
@@ -24,26 +24,26 @@
 }
 
 .upm-modal {
-  background: var(--color-card, #ffffff);
-  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-card);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-lg, 16px);
   width: 100%;
   max-width: 540px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.25), 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--color-shadow-lg);
   overflow: hidden;
-  animation: upmScaleUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: upmScaleUp var(--motion-normal) var(--motion-ease-enter);
 }
 
 @keyframes upmScaleUp {
   from {
-    transform: scale(0.96) translateY(8px);
+    transform: scale(var(--motion-scale-enter));
     opacity: 0;
   }
   to {
-    transform: scale(1) translateY(0);
+    transform: scale(1);
     opacity: 1;
   }
 }

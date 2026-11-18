@@ -5,6 +5,8 @@ import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import '../theme/app_colors.dart';
+import '../theme/app_motion.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
 import '../widgets/customer/order_confirmation_sheet.dart';
@@ -1964,6 +1966,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         hotlineNumber: _hotlineNumber,
         onMakeCall: _makePhoneCall,
         imagePicker: widget.imagePicker,
+        onConfirmationUpdated: _fetchOrders,
       ),
     );
   }
@@ -2095,42 +2098,26 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     const hasAvatarNotification = true;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.backgroundLight,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.brandNavy,
+        foregroundColor: Colors.white,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         surfaceTintColor: Colors.transparent,
         titleSpacing: 16,
         title: Row(
           children: [
-            // App Brand Logo
-            Container(
-              width: 38,
-              height: 38,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
+            // App Brand Logo directly on Brand Navy header
+            Image.asset(
+              'assets/images/app_logo.png',
+              width: 34,
+              height: 34,
+              fit: BoxFit.contain,
+              errorBuilder: (_, _, _) => const Icon(
+                LucideIcons.wrench,
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 6,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: Image.asset(
-                  'assets/images/app_logo.png',
-                  fit: BoxFit.contain,
-                  errorBuilder: (_, _, _) => const Icon(
-                    LucideIcons.wrench,
-                    color: Color(0xFF2563EB),
-                    size: 20,
-                  ),
-                ),
+                size: 22,
               ),
             ),
             const SizedBox(width: 10),
@@ -2147,7 +2134,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                             fontSize: 15,
                             fontWeight: FontWeight.w900,
                             letterSpacing: 0.5,
-                            color: Color(0xFF0F172A),
+                            color: Colors.white,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -2158,15 +2145,19 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         width: 7,
                         height: 7,
                         decoration: const BoxDecoration(
-                          color: Color(0xFF10B981),
+                          color: AppColors.brandCyan,
                           shape: BoxShape.circle,
                         ),
                       ),
                     ],
                   ),
-                  const Text(
+                  Text(
                     'Theo dõi tiến độ sửa chữa thiết bị',
-                    style: TextStyle(fontSize: 11, color: Color(0xFF64748B), fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white.withValues(alpha: 0.78),
+                      fontWeight: FontWeight.w500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -2185,11 +2176,11 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withValues(alpha: 0.15),
+                color: Colors.white.withValues(alpha: 0.14),
                 shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF10B981).withValues(alpha: 0.35)),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.24)),
               ),
-              child: const Icon(LucideIcons.phoneCall, size: 16, color: Color(0xFF059669)),
+              child: const Icon(LucideIcons.phoneCall, size: 16, color: Colors.white),
             ),
             onPressed: () => _makePhoneCall(_hotlineNumber),
           ),
@@ -2215,9 +2206,9 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   width: 36,
                   height: 36,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: Colors.white.withValues(alpha: 0.14),
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFE2E8F0)),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.28)),
                   ),
                   child: ClipOval(
                     child: (avatarUrl != null && avatarUrl.isNotEmpty)
@@ -2229,13 +2220,13 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                             errorBuilder: (ctx, err, stack) => const Icon(
                               LucideIcons.userRound,
                               size: 18,
-                              color: Color(0xFF334155),
+                              color: Colors.white,
                             ),
                           )
                         : const Icon(
                             LucideIcons.userRound,
                             size: 18,
-                            color: Color(0xFF334155),
+                            color: Colors.white,
                           ),
                   ),
                 ),
@@ -2250,7 +2241,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                       decoration: BoxDecoration(
                         color: const Color(0xFFEF4444),
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: AppColors.brandNavy, width: 2),
                       ),
                     ),
                   ),
@@ -2277,14 +2268,14 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               const _ProfileMenuActionItem(
                 value: 'profile',
                 icon: LucideIcons.userCog300,
-                iconColor: Color(0xFF2563EB),
+                iconColor: AppColors.brandBlue,
                 label: 'Hồ sơ cá nhân',
                 showDot: hasAvatarNotification,
               ),
               const _ProfileMenuActionItem(
                 value: 'change_pwd',
                 icon: LucideIcons.keyRound300,
-                iconColor: Color(0xFF2563EB),
+                iconColor: AppColors.brandBlue,
                 label: 'Đổi mật khẩu',
               ),
               const _ProfileMenuDivider(),
@@ -2326,21 +2317,21 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         borderRadius: BorderRadius.circular(24),
         gradient: const LinearGradient(
           colors: [
-            Color(0xFF0F172A), // Slate 900
-            Color(0xFF172554), // Blue 950
-            Color(0xFF1E1B4B), // Indigo 950
+            Color(0xFF182944), // Deep Navy
+            AppColors.brandNavy,
+            AppColors.brandBlue,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF1E3A8A).withValues(alpha: 0.35),
+            color: AppColors.brandNavy.withValues(alpha: 0.35),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
         ],
-        border: Border.all(color: const Color(0xFF1E40AF).withValues(alpha: 0.4)),
+        border: Border.all(color: AppColors.brandBlue.withValues(alpha: 0.45)),
       ),
       child: Stack(
         children: [
@@ -2353,7 +2344,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               height: 140,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF3B82F6).withValues(alpha: 0.12),
+                color: AppColors.brandCyan.withValues(alpha: 0.14),
               ),
             ),
           ),
@@ -2365,7 +2356,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               height: 130,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF6366F1).withValues(alpha: 0.15),
+                color: AppColors.brandBlue.withValues(alpha: 0.22),
               ),
             ),
           ),
@@ -2439,7 +2430,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         padding: const EdgeInsets.all(2),
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF2563EB), Color(0xFF6366F1)],
+                            colors: [AppColors.brandNavy, AppColors.brandCyan],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                           ),
@@ -2454,7 +2445,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         ),
                         child: Container(
                           decoration: BoxDecoration(
-                            color: const Color(0xFF0F172A),
+                            color: const Color(0xFF182944),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: ClipRRect(
@@ -2467,7 +2458,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                                       child: Text(
                                         initials,
                                         style: const TextStyle(
-                                          color: Color(0xFF60A5FA),
+                                          color: AppColors.brandCyan,
                                           fontSize: 17,
                                           fontWeight: FontWeight.w900,
                                           fontFamily: 'monospace',
@@ -2479,7 +2470,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                                     child: Text(
                                       initials,
                                       style: const TextStyle(
-                                        color: Color(0xFF60A5FA),
+                                        color: AppColors.brandCyan,
                                         fontSize: 17,
                                         fontWeight: FontWeight.w900,
                                         fontFamily: 'monospace',
@@ -2880,13 +2871,14 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: AppMotion.resolveDuration(context, AppMotion.fast),
+        curve: AppMotion.easeStandard,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFEFF6FF) : Colors.white,
+          color: isActive ? const Color(0xFFE8EFF8) : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isActive ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+            color: isActive ? AppColors.brandBlue : const Color(0xFFE2E8F0),
             width: isActive ? 1.5 : 1.0,
           ),
           boxShadow: [
@@ -2903,7 +2895,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             Icon(
               icon,
               size: 13,
-              color: isActive ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+              color: isActive ? AppColors.brandBlue : const Color(0xFF64748B),
             ),
             const SizedBox(width: 6),
             Text(
@@ -2911,14 +2903,14 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: isActive ? FontWeight.w700 : FontWeight.w600,
-                color: isActive ? const Color(0xFF1D4ED8) : const Color(0xFF334155),
+                color: isActive ? AppColors.brandNavy : const Color(0xFF334155),
               ),
             ),
             const SizedBox(width: 4),
             Icon(
               LucideIcons.chevronDown,
               size: 12,
-              color: isActive ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+              color: isActive ? AppColors.brandBlue : const Color(0xFF94A3B8),
             ),
           ],
         ),
@@ -3108,18 +3100,19 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       onTap: () => setState(() => _selectedFilter = filterKey),
       borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: AppMotion.resolveDuration(context, AppMotion.fast),
+        curve: AppMotion.easeStandard,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF2563EB) : Colors.white,
+          color: isSelected ? AppColors.brandNavy : Colors.white,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
-            color: isSelected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+            color: isSelected ? AppColors.brandNavy : const Color(0xFFE2E8F0),
           ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: const Color(0xFF2563EB).withValues(alpha: 0.3),
+                    color: AppColors.brandNavy.withValues(alpha: 0.28),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -3287,6 +3280,36 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         ],
                       ),
                       const SizedBox(height: 12),
+                      if (_isAwaitingCustomerConfirmation(ord)) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFEF3C7),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: const Color(0xFFFDE68A)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(LucideIcons.triangleAlert, size: 13, color: Color(0xFFD97706)),
+                              SizedBox(width: 6),
+                              Flexible(
+                                child: Text(
+                                  'Cảnh báo: Chờ xác nhận',
+                                  style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFF92400E),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
 
                       // Order Title
                       Text(
@@ -3484,6 +3507,18 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         ),
       ),
     );
+  }
+
+  static bool _isAwaitingCustomerConfirmation(Map<String, dynamic> ord) {
+    final status = (ord['status'] ?? '').toString().trim().toUpperCase();
+    if (status == 'DELIVERED' || status == 'CANCELLED') {
+      return false;
+    }
+    final confirmStatus = (ord['confirmationStatus'] ?? 'PENDING_CUSTOMER')
+        .toString()
+        .trim()
+        .toUpperCase();
+    return confirmStatus.isEmpty || confirmStatus == 'PENDING_CUSTOMER';
   }
 
   // 5-Step Stepper inside card (Stitch Design)
@@ -3713,14 +3748,14 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         height: 40,
                         decoration: BoxDecoration(
                           gradient: const LinearGradient(
-                            colors: [Color(0xFF1D4ED8), Color(0xFF4F46E5)],
+                            colors: [AppColors.brandNavy, AppColors.brandBlue],
                             begin: Alignment.bottomLeft,
                             end: Alignment.topRight,
                           ),
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF2563EB).withValues(alpha: 0.4),
+                              color: AppColors.brandNavy.withValues(alpha: 0.35),
                               blurRadius: 10,
                               offset: const Offset(0, 4),
                             ),
@@ -3770,7 +3805,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   Icon(
                     icon,
                     size: 20,
-                    color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF94A3B8),
+                    color: isSelected ? AppColors.brandBlue : const Color(0xFF94A3B8),
                   ),
                   if (isSelected)
                     Positioned(
@@ -3780,7 +3815,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         width: 5,
                         height: 5,
                         decoration: const BoxDecoration(
-                          color: Color(0xFF2563EB),
+                          color: AppColors.brandCyan,
                           shape: BoxShape.circle,
                         ),
                       ),
@@ -3793,7 +3828,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
-                  color: isSelected ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                  color: isSelected ? AppColors.brandNavy : const Color(0xFF64748B),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -4064,14 +4099,14 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+          colors: [AppColors.brandNavy, AppColors.brandBlue],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFF2563EB).withValues(alpha: 0.25),
+            color: AppColors.brandNavy.withValues(alpha: 0.25),
             blurRadius: 14,
             offset: const Offset(0, 4),
           ),
@@ -4144,7 +4179,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                     Icon(
                       LucideIcons.messageSquarePlus,
                       size: 16,
-                      color: _feedbackViewMode == 'CREATE' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                      color: _feedbackViewMode == 'CREATE' ? AppColors.brandNavy : const Color(0xFF64748B),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -4152,7 +4187,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: _feedbackViewMode == 'CREATE' ? FontWeight.bold : FontWeight.w600,
-                        color: _feedbackViewMode == 'CREATE' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                        color: _feedbackViewMode == 'CREATE' ? AppColors.brandNavy : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -4184,7 +4219,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                     Icon(
                       LucideIcons.history,
                       size: 16,
-                      color: _feedbackViewMode == 'HISTORY' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                      color: _feedbackViewMode == 'HISTORY' ? AppColors.brandNavy : const Color(0xFF64748B),
                     ),
                     const SizedBox(width: 6),
                     Text(
@@ -4192,7 +4227,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: _feedbackViewMode == 'HISTORY' ? FontWeight.bold : FontWeight.w600,
-                        color: _feedbackViewMode == 'HISTORY' ? const Color(0xFF2563EB) : const Color(0xFF64748B),
+                        color: _feedbackViewMode == 'HISTORY' ? AppColors.brandNavy : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -5029,7 +5064,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       onRefresh: () async {
         await _fetchOrders();
       },
-      color: const Color(0xFF10B981),
+      color: AppColors.brandBlue,
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
@@ -5037,14 +5072,14 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF065F46), Color(0xFF10B981)],
+                colors: [AppColors.brandNavy, AppColors.brandBlue],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF10B981).withValues(alpha: 0.25),
+                  color: AppColors.brandNavy.withValues(alpha: 0.25),
                   blurRadius: 14,
                   offset: const Offset(0, 4),
                 ),
@@ -5096,7 +5131,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
               children: [
                 const Row(
                   children: [
-                    Icon(LucideIcons.info, size: 16, color: Color(0xFF10B981)),
+                    Icon(LucideIcons.info, size: 16, color: AppColors.brandBlue),
                     SizedBox(width: 8),
                     Text(
                       'Chính sách bảo hành tiêu chuẩn',
@@ -5116,8 +5151,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   width: double.infinity,
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFF10B981),
-                      side: const BorderSide(color: Color(0xFF10B981)),
+                      foregroundColor: AppColors.brandNavy,
+                      side: const BorderSide(color: AppColors.brandBlue),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                     onPressed: () {
@@ -5204,10 +5239,10 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFDCFCE7),
+                      color: const Color(0xFFE8EFF8),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(LucideIcons.shieldCheck, size: 16, color: Color(0xFF16A34A)),
+                    child: const Icon(LucideIcons.shieldCheck, size: 16, color: AppColors.brandBlue),
                   ),
                   const SizedBox(width: 8),
                   Text(
@@ -5281,7 +5316,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [Color(0xFF0F172A), Color(0xFF334155)],
+              colors: [AppColors.brandNavy, AppColors.brandBlue],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -5343,13 +5378,13 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                       const SizedBox(height: 4),
                       Text(
                         _hotlineNumber,
-                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Color(0xFF059669)),
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.brandNavy),
                       ),
                     ],
                   ),
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF10B981),
+                      backgroundColor: AppColors.brandNavy,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -5374,8 +5409,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF2563EB),
-                    side: const BorderSide(color: Color(0xFFBFDBFE)),
+                    foregroundColor: AppColors.brandNavy,
+                    side: BorderSide(color: AppColors.brandBlue.withValues(alpha: 0.4)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   onPressed: _showSupportInfoSheet,
@@ -5403,10 +5438,10 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                   Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: const Color(0xFFE8EFF8),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Icon(LucideIcons.mapPin, size: 16, color: Color(0xFF2563EB)),
+                    child: const Icon(LucideIcons.mapPin, size: 16, color: AppColors.brandBlue),
                   ),
                   const SizedBox(width: 8),
                   const Expanded(
@@ -5657,12 +5692,14 @@ class _OrderDetailSheet extends StatefulWidget {
     required this.hotlineNumber,
     required this.onMakeCall,
     this.imagePicker,
+    this.onConfirmationUpdated,
   });
 
   final String orderId;
   final String hotlineNumber;
   final Future<void> Function(String) onMakeCall;
   final ImagePicker? imagePicker;
+  final Future<void> Function()? onConfirmationUpdated;
 
   @override
   State<_OrderDetailSheet> createState() => _OrderDetailSheetState();
@@ -5788,6 +5825,7 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
     );
     if (updated == true && mounted) {
       await _loadDetail();
+      await widget.onConfirmationUpdated?.call();
     }
   }
 
@@ -6666,13 +6704,42 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                if (_detail != null &&
+                    _CustomerPortalMobilePageState._isAwaitingCustomerConfirmation(_detail!)) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: const Color(0xFFFDE68A)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(LucideIcons.triangleAlert, size: 15, color: Color(0xFFD97706)),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Cảnh báo: Đơn hàng đang chờ bạn xác nhận phương án / báo giá.',
+                            style: TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF92400E),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 SizedBox(
                   width: double.infinity,
                   height: 46,
                   child: ElevatedButton.icon(
                     key: const ValueKey('order_confirm_button'),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF25437A),
+                      backgroundColor: AppColors.brandNavy,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: const Color(0xFF94A3B8),
                       disabledForegroundColor: Colors.white,

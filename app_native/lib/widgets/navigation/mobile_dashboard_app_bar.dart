@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/app_routes.dart';
 import '../../theme/app_colors.dart';
@@ -39,7 +40,11 @@ class DashboardMobileAppBar extends StatelessWidget
       toolbarHeight: 58,
       elevation: 0,
       scrolledUnderElevation: 0,
-      backgroundColor: isDark ? AppColors.surfaceDark : Colors.white,
+      backgroundColor: AppColors.brandNavy,
+      foregroundColor: Colors.white,
+      iconTheme: const IconThemeData(color: Colors.white),
+      actionsIconTheme: const IconThemeData(color: Colors.white),
+      systemOverlayStyle: SystemUiOverlayStyle.light,
       surfaceTintColor: Colors.transparent,
       centerTitle: true,
       titleSpacing: 0,
@@ -52,6 +57,9 @@ class DashboardMobileAppBar extends StatelessWidget
                 child: AppBackButton(
                   isDark: isDark,
                   tooltip: 'Quay lại Trang chủ',
+                  backgroundColor: Colors.white.withValues(alpha: 0.12),
+                  borderColor: Colors.white.withValues(alpha: 0.24),
+                  iconColor: Colors.white,
                   onPressed:
                       onBack ??
                       () {
@@ -83,6 +91,7 @@ class DashboardMobileAppBar extends StatelessWidget
           child: Center(
             child: IconButton(
               icon: Icon(isDark ? Icons.light_mode : Icons.dark_mode, size: 22),
+              color: Colors.white,
               onPressed: onToggleTheme,
               tooltip: 'Giao diện',
               visualDensity: VisualDensity.compact,
@@ -107,7 +116,7 @@ class DashboardMobileAppBar extends StatelessWidget
         preferredSize: const Size.fromHeight(1),
         child: Container(
           height: 1,
-          color: isDark ? AppColors.borderDark : AppColors.borderLight,
+          color: Colors.white.withValues(alpha: 0.14),
         ),
       ),
     );

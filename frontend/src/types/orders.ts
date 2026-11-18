@@ -31,6 +31,7 @@ export interface RepairOrder {
   customerPhone?: string;
   serialNumber?: string;
   status: string;
+  confirmationStatus?: string | null;
   createdAt: string;
   updatedAt?: string;
   description?: string;
@@ -68,4 +69,19 @@ export interface TimelineEvent {
 export interface OrdersTabProps {
   showToast: (msg: string) => void;
   currentUser?: UserInfo | null;
+}
+
+/** Trả về true nếu đơn sửa chữa chưa được khách hàng xác nhận và chưa kết thúc/hủy. */
+export function isOrderAwaitingCustomerConfirmation(order: {
+  status?: string | null;
+  confirmationStatus?: string | null;
+}): boolean {
+  const status = (order.status || '').trim().toUpperCase();
+  if (status === 'DELIVERED' || status === 'CANCELLED') {
+    return false;
+  }
+  const confirmationStatus = (order.confirmationStatus || 'PENDING_CUSTOMER')
+    .trim()
+    .toUpperCase();
+  return confirmationStatus === '' || confirmationStatus === 'PENDING_CUSTOMER';
 }

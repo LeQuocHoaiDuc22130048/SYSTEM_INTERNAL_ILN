@@ -67,3 +67,17 @@ test('save verification rejects missing, stale and malformed server design', () 
   assert.equal(savedDesignMatches('{', design), false);
   assert.equal(savedDesignMatches(JSON.stringify(defaultDesign()), design), false);
 });
+
+test('BannerTab mobile layout avoids horizontal overflow and uses preview modal', () => {
+  const tsx = readFileSync(new URL('./BannerTab.tsx', import.meta.url), 'utf8');
+  const css = readFileSync(new URL('./BannerTab.css', import.meta.url), 'utf8');
+
+  assert.ok(tsx.includes('mobilePreviewOpen'));
+  assert.ok(tsx.includes('createPortal('));
+  assert.ok(tsx.includes('btn-mobile-preview'));
+  assert.ok(tsx.includes('meta-chip--font'));
+  assert.match(css, /\.banner-toolbar\s+\.btn-create\s*\{[^}]*width:\s*100%/s);
+  assert.match(css, /\.banner-mobile-preview-overlay\s*\{[^}]*align-items:\s*center;\s*justify-content:\s*center;/s);
+  assert.match(css, /\.preview-mobile-close-btn\s*\{[^}]*position:\s*absolute;\s*top:\s*12px;\s*right:\s*12px;/s);
+  assert.match(css, /\.meta-chip--font\s*\{\s*display:\s*none;/);
+});

@@ -14,7 +14,7 @@ import {
   Link2,
   RefreshCw,
 } from 'lucide-react';
-import type { RepairOrder, TimelineEvent } from '../../types/orders';
+import { isOrderAwaitingCustomerConfirmation, type RepairOrder, type TimelineEvent } from '../../types/orders';
 import type { UserInfo } from '../../mockData';
 import type { Customer } from '../../types/customer';
 import { hasPermission } from '../../utils/permissions';
@@ -177,6 +177,16 @@ export const OrderDetailPanel: React.FC<OrderDetailPanelProps> = ({
           </button>) }
         </div>
       </div>
+
+      {isOrderAwaitingCustomerConfirmation(selectedOrder) && (
+        <div className="order-confirm-warning-banner" role="status">
+          <AlertTriangle size={16} />
+          <div>
+            <strong>Cảnh báo: Chờ xác nhận từ khách hàng</strong>
+            <span>Đơn sửa chữa này chưa được khách hàng xác nhận phương án hoặc báo giá.</span>
+          </div>
+        </div>
+      )}
 
       <div className="detail-content-section">
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>

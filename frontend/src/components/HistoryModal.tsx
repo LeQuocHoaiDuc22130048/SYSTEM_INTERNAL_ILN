@@ -1,10 +1,11 @@
 import { usePermissionCheck } from '../utils/permissionContext';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, LogIn, LogOut, ChevronDown, ChevronUp, Download } from 'lucide-react';
 import type { EmployeeHistoryResponse } from '../mockData';
 import { getAvatarLetters, normalizeHistoryResponse } from '../utils/employee';
 import { getAuthHeaders, createTimeoutController, LATE_GRACE_MINUTES } from '../utils/auth';
 import { exportEmployeeHistoryExcel } from '../utils/excel';
+import { useDialogA11y } from '../hooks/useMotion';
 
 
 interface HistoryModalProps {
@@ -36,6 +37,8 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   showToast,
 }) => {
   const canAction = usePermissionCheck();
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(true, onClose, dialogRef);
   const [historyData, setHistoryData] = useState<EmployeeHistoryResponse | null>(null);
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('ALL');
   const [historyLoading, setHistoryLoading] = useState<boolean>(false);
@@ -168,8 +171,16 @@ export const HistoryModal: React.FC<HistoryModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content">
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        className="modal-content"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Lịch sử chấm công của ${employee.name}`}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <div className="modal-employee-header">
             <div className="modal-avatar">{getAvatarLetters(employee.name)}</div>

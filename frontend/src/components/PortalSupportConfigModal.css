@@ -1,14 +1,14 @@
 .portal-config-modal-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 23, 42, 0.6);
+  background-color: var(--color-backdrop);
   backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1050;
+  z-index: 1100;
   padding: 16px;
-  animation: portalModalFadeIn 0.2s ease-out;
+  animation: portalModalFadeIn var(--motion-fast) var(--motion-ease-enter);
 }
 
 @keyframes portalModalFadeIn {
@@ -20,23 +20,35 @@
   }
 }
 
+@keyframes portalModalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(var(--motion-scale-enter));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .portal-config-modal-card {
-  background-color: #ffffff;
+  background-color: var(--color-card);
   border-radius: 16px;
   width: 100%;
   max-width: 580px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  box-shadow: var(--color-shadow-lg);
   overflow: hidden;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--color-border);
+  animation: portalModalScaleIn var(--motion-normal) var(--motion-ease-enter);
 }
 
 .portal-config-modal-header {
   padding: 18px 24px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background-color: #f8fafc;
+  background-color: var(--color-surface-subtle);
 }
 
 .header-title-wrap {

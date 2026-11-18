@@ -7,13 +7,14 @@
 /* --------------------------------------------------------------------------
    1. Table Row Highlighting when Active / Selected
    -------------------------------------------------------------------------- */
-.attendance-table tbody tr.table-row.selected-row {
-  background-color: #f0f7ff !important;
+.attendance-table tbody tr.table-row.selected-row td {
+  background-color: var(--color-primary-light) !important;
+  border-color: var(--color-primary-accent);
 }
 
 .attendance-table tbody tr.table-row.selected-row td:first-child {
-  background-color: #e0f2fe !important;
-  border-left: 3px solid var(--color-primary, #0284c7) !important;
+  background-color: var(--color-primary-light) !important;
+  border-left: 3px solid var(--color-primary) !important;
   font-weight: 600;
 }
 
@@ -211,104 +212,34 @@
   outline-offset: -1px;
 }
 
-/* Tooltip khi hover từng ô */
+/* Tooltip khi hover từng ô (render qua Portal để không bị cắt bởi overflow của bảng) */
 .mini-day-tooltip {
-  visibility: hidden;
-  opacity: 0;
-  position: absolute;
-  bottom: calc(100% + 8px);
+  position: fixed;
   background-color: #0f172a;
   color: #ffffff;
-  padding: 8px 12px;
+  padding: 10px 12px;
   border-radius: 8px;
-  font-size: 11px;
-  white-space: nowrap;
-  z-index: 1000;
+  font-size: 11.5px;
+  white-space: normal;
+  z-index: 1200;
   pointer-events: none;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.45), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
-  transition: opacity 0.15s ease, transform 0.15s ease;
-  min-width: 170px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 12px 28px -5px rgba(0, 0, 0, 0.45), 0 8px 12px -6px rgba(0, 0, 0, 0.3);
+  min-width: 210px;
+  max-width: min(340px, calc(100vw - 24px));
+  width: max-content;
+  border: 1px solid rgba(255, 255, 255, 0.16);
 }
 
-.mini-day-tooltip.tip-center {
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-}
-
-.mini-day-tooltip.tip-left {
-  left: 0;
-  transform: translateY(4px);
-}
-
-.mini-day-tooltip.tip-right {
-  right: 0;
-  left: auto;
-  transform: translateY(4px);
-}
-
-.mini-day:hover .mini-day-tooltip {
-  visibility: visible;
-  opacity: 1;
-  transform: translateY(0);
-}
-
-.mini-day:hover .mini-day-tooltip.tip-center {
-  transform: translateX(-50%) translateY(0);
-}
-
-/* Lật tooltip xuống dưới cho các hàng đầu tiên sát mép bảng (tránh cấn mép trên / header) */
-.mini-day-tooltip.tip-bottom {
-  bottom: auto;
-  top: calc(100% + 8px);
-  transform: translateY(-4px);
-}
-
-.mini-day-tooltip.tip-bottom.tip-center {
-  left: 50%;
-  transform: translateX(-50%) translateY(-4px);
-}
-
-.mini-day-tooltip.tip-bottom.tip-left {
-  left: 0;
-  transform: translateY(-4px);
-}
-
-.mini-day-tooltip.tip-bottom.tip-right {
-  right: 0;
-  left: auto;
-  transform: translateY(-4px);
-}
-
-.mini-day:hover .mini-day-tooltip.tip-bottom {
-  transform: translateY(0);
-}
-
-.mini-day:hover .mini-day-tooltip.tip-bottom.tip-center {
-  transform: translateX(-50%) translateY(0);
-}
-
-/* Mũi tên chỉ tooltip (mặc định trỏ xuống) */
+/* Mũi tên chỉ tooltip (mặc định trỏ xuống khi tooltip nằm phía trên ô) */
 .mini-day-tooltip::after {
   content: "";
   position: absolute;
   top: 100%;
-  border-width: 5px;
+  left: var(--tip-arrow-left, 50%);
+  transform: translateX(-50%);
+  border-width: 6px;
   border-style: solid;
   border-color: #0f172a transparent transparent transparent;
-}
-
-.mini-day-tooltip.tip-center::after {
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-.mini-day-tooltip.tip-left::after {
-  left: 6px;
-}
-
-.mini-day-tooltip.tip-right::after {
-  right: 6px;
 }
 
 /* Mũi tên chỉ tooltip khi lật xuống dưới (trỏ lên trên) */
@@ -363,14 +294,17 @@
   background: rgba(56, 189, 248, 0.12);
   border: 1px solid rgba(56, 189, 248, 0.28);
   border-radius: 5px;
-  padding: 4px 8px;
+  padding: 5px 8px;
   margin: 5px 0 4px 0;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .tooltip-detail-row.time-row .tooltip-label {
   color: #94a3b8;
   font-size: 10.5px;
   font-weight: 500;
+  flex-shrink: 0;
 }
 
 .tooltip-detail-row.time-row .tooltip-time-val {
@@ -379,11 +313,24 @@
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   letter-spacing: -0.2px;
+  overflow-wrap: anywhere;
 }
 
 .tooltip-detail-row.reason {
   color: #fde047;
   font-style: italic;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.tooltip-detail-row.reason span {
+  flex-shrink: 0;
+}
+
+.tooltip-detail-row.reason em {
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
 
 .tooltip-footer-hint {
@@ -401,12 +348,12 @@
 .monthly-drawer-backdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(15, 23, 42, 0.45);
+  background-color: var(--color-backdrop);
   backdrop-filter: blur(3px);
-  z-index: 1000;
+  z-index: 1100;
   display: flex;
   justify-content: flex-end;
-  animation: monthlyDrawerFadeIn 0.2s ease-out;
+  animation: monthlyDrawerFadeIn var(--motion-fast) var(--motion-ease-enter);
 }
 
 @keyframes monthlyDrawerFadeIn {
@@ -419,12 +366,12 @@
   max-width: 92vw;
   height: 100vh;
   max-height: 100vh;
-  background-color: var(--color-card, #ffffff);
-  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.18);
+  background-color: var(--color-card);
+  box-shadow: var(--color-shadow-lg);
   display: flex;
   flex-direction: column;
-  animation: monthlyDrawerSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  border-left: 1px solid var(--color-border, #e2e8f0);
+  animation: monthlyDrawerSlideIn var(--motion-normal) var(--motion-ease-enter);
+  border-left: 1px solid var(--color-border);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -436,11 +383,11 @@
 
 .monthly-drawer-header {
   padding: 18px 24px;
-  border-bottom: 1px solid var(--color-border, #e2e8f0);
+  border-bottom: 1px solid var(--color-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: linear-gradient(to bottom, #ffffff, #f8fafc);
+  background: var(--color-surface-subtle);
   flex-shrink: 0;
 }
 

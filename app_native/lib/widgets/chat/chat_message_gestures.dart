@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import '../../theme/app_motion.dart';
 
 class ChatMessageGestures extends StatefulWidget {
   const ChatMessageGestures({
@@ -69,7 +70,11 @@ class _ChatMessageGesturesState extends State<ChatMessageGestures>
     _returnFrom = _visualOffset;
     _dragging = false;
     _dragOffset = 0;
-    _returnController.forward(from: 0);
+    if (AppMotion.isReduced(context)) {
+      _returnController.value = 1.0;
+    } else {
+      _returnController.forward(from: 0);
+    }
   }
 
   double get _visualOffset => _dragging
@@ -77,7 +82,7 @@ class _ChatMessageGesturesState extends State<ChatMessageGestures>
             (math.min(_dragOffset.abs(), 50) +
                 math.max(0, _dragOffset.abs() - 50) * 0.25)
       : _returnFrom *
-            (1 - Curves.easeOutBack.transform(_returnController.value));
+            (1 - AppMotion.easeEnter.transform(_returnController.value));
 
   @override
   void dispose() {

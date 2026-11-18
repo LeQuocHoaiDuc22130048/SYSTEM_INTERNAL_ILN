@@ -1500,6 +1500,83 @@ void main() {
     expect(rejectedAction, 'REJECT');
     expect(rejectedReason, 'Chi phí chưa phù hợp');
   });
+
+  testWidgets('CustomerPortalMobilePage shows pending confirmation warning only on unconfirmed active orders', (tester) async {
+    tester.view.physicalSize = const Size(600, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(() => tester.view.resetPhysicalSize());
+
+    final mockClient = MockClient((request) async {
+      if (request.url.path == '/api/v1/auth/login') {
+        return http.Response(
+          jsonEncode({
+            'accessToken': 'test-token',
+            'refreshToken': 'test-refresh-token',
+            'userInfo': {
+              'id': '10',
+              'username': '0964384499',
+              'fullName': 'Cong Ty Test',
+              'role': 'CUSTOMER',
+              'status': 'ACTIVE',
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/orders') {
+        return http.Response(
+          jsonEncode({
+            'content': [
+              {
+                'id': 'ord-pending-1',
+                'orderCode': 'RO-WARN-001',
+                'deviceName': 'Biến tần Delta VFD',
+                'status': 'CHECKING',
+                'confirmationStatus': 'PENDING_CUSTOMER',
+              },
+              {
+                'id': 'ord-approved-1',
+                'orderCode': 'RO-OK-002',
+                'deviceName': 'Biến tần Yaskawa A1000',
+                'status': 'IN_PROGRESS',
+                'confirmationStatus': 'APPROVED',
+              },
+              {
+                'id': 'ord-delivered-1',
+                'orderCode': 'RO-DEL-003',
+                'deviceName': 'PLC Siemens S7',
+                'status': 'DELIVERED',
+                'confirmationStatus': 'PENDING_CUSTOMER',
+              },
+            ],
+            'totalElements': 3,
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      return http.Response('Not Found', 404);
+    });
+
+    final apiClient = ApiClient(client: mockClient, baseUrl: 'https://test.api');
+    final auth = AuthProvider(apiClient: apiClient);
+    await auth.login(username: '0964384499', password: 'password');
+
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<AuthProvider>.value(value: auth),
+        ],
+        child: MaterialApp(
+          home: CustomerPortalMobilePage(onLogout: () async {}),
+        ),
+      ),
+    );
+
+    await tester.pumpAndSettle();
+    expect(find.text('Cảnh báo: Chờ xác nhận'), findsOneWidget);
+  });
 }
 
 class _MemoryXFile extends XFile {

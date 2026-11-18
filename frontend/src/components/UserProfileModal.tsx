@@ -15,6 +15,7 @@ import {
 import type { UserInfo } from '../mockData';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
 import { getRoleLabel } from '../utils/permissions';
+import { useDialogA11y } from '../hooks/useMotion';
 import './UserProfileModal.css';
 
 interface UserProfileModalProps {
@@ -48,6 +49,8 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  useDialogA11y(isOpen && Boolean(currentUser), onClose, dialogRef);
 
   // Sync state when currentUser changes or modal opens
   useEffect(() => {
@@ -202,8 +205,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   const displayInitial = (fullName || currentUser.username).charAt(0).toUpperCase();
 
   return (
-    <div className="upm-backdrop" onClick={onClose} role="dialog" aria-modal="true">
-      <div className="upm-modal" onClick={(e) => e.stopPropagation()}>
+    <div className="upm-backdrop" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        className="upm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Hồ sơ cá nhân"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="upm-header">
           <div className="upm-header-title">

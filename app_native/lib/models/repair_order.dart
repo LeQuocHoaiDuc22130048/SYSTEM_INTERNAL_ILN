@@ -44,6 +44,7 @@ class RepairOrder {
   final String customerName;
   final String? customerPhone;
   final RepairOrderStatus status;
+  final String confirmationStatus;
   final String? assignedToId;
   final String? assignedToName;
   final List<String> assigneeIds;
@@ -65,6 +66,7 @@ class RepairOrder {
     required this.customerName,
     this.customerPhone,
     required this.status,
+    this.confirmationStatus = 'PENDING_CUSTOMER',
     this.assignedToId,
     this.assignedToName,
     this.assigneeIds = const [],
@@ -84,6 +86,16 @@ class RepairOrder {
       if (!attachment.isVideo) return attachment.url;
     }
     return null;
+  }
+
+  /// Trả về true nếu đơn sửa chữa chưa được khách hàng xác nhận và chưa kết thúc/hủy.
+  bool get isAwaitingCustomerConfirmation {
+    if (status == RepairOrderStatus.delivered ||
+        status == RepairOrderStatus.cancelled) {
+      return false;
+    }
+    final normalized = confirmationStatus.trim().toUpperCase();
+    return normalized.isEmpty || normalized == 'PENDING_CUSTOMER';
   }
 
   String get statusLabel {
@@ -147,6 +159,10 @@ class RepairOrder {
       customerName: json['customerName']?.toString() ?? '',
       customerPhone: json['customerPhone']?.toString(),
       status: _statusFromBackend(json['status']?.toString()),
+      confirmationStatus:
+          json['confirmationStatus']?.toString().trim().isNotEmpty == true
+          ? json['confirmationStatus'].toString().trim()
+          : 'PENDING_CUSTOMER',
       assignedToId: assignedToId,
       assignedToName: assignedToName,
       assigneeIds: assigneeIds,
