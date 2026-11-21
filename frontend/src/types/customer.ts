@@ -121,6 +121,7 @@ export interface CustomerOrderResponse {
   status: string;
   statusLabel?: string;
   friendlyStatus: string;
+  confirmationStatus?: string | null;
   deviceCount?: number;
   devicesCount: number;
   receivedAt?: string | null;
@@ -144,6 +145,7 @@ export interface CustomerOrderDetailResponse {
   status: string;
   statusLabel?: string;
   friendlyStatus: string;
+  confirmationStatus?: string | null;
   receivedAt?: string | null;
   receivedDate: string;
   estimatedDone?: string | null;

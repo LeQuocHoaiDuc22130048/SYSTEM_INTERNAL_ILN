@@ -4,7 +4,7 @@
   display: flex;
   flex-direction: column;
   height: calc(100vh - 80px); /* Fill screen below header */
-  animation: fadeIn 0.4s ease-out;
+  animation: fadeIn var(--motion-normal) var(--motion-ease-enter);
   padding: 20px;
   overflow: hidden;
 }
@@ -543,7 +543,7 @@
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.01);
 }
 
-.device-card-header {
+.device-detail-card .device-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -552,7 +552,7 @@
   margin-bottom: 8px;
 }
 
-.device-name {
+.device-detail-card .device-name {
   font-weight: 600;
   color: var(--color-text-dark);
   font-size: 0.9rem;
@@ -987,7 +987,7 @@
   width: 800px;
 }
 
-.modal-header {
+.orders-modal-card .modal-header {
   padding: 16px 24px;
   border-bottom: 1px solid var(--color-border);
   display: flex;
@@ -995,14 +995,14 @@
   align-items: center;
 }
 
-.modal-header h3 {
+.orders-modal-card .modal-header h3 {
   margin: 0;
   color: var(--color-text-dark);
   font-size: 1.15rem;
   font-weight: 700;
 }
 
-.close-modal-btn {
+.orders-modal-card .close-modal-btn {
   background: none;
   border: none;
   color: var(--color-text-light);
@@ -1015,7 +1015,7 @@
   transition: background 0.2s;
 }
 
-.close-modal-btn:hover {
+.orders-modal-card .close-modal-btn:hover {
   background: var(--color-bg);
   color: var(--color-text-dark);
 }
@@ -1410,6 +1410,53 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+
+.order-confirm-warning-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 8px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  background: var(--color-late-light);
+  color: var(--color-late);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.order-confirm-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-late-light);
+  color: var(--color-late);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  font-size: 0.82rem;
+}
+
+.order-confirm-warning-banner svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.order-confirm-warning-banner > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.order-confirm-warning-banner strong {
+  font-weight: 700;
+}
+
+.order-confirm-warning-banner span {
+  opacity: 0.92;
+  font-size: 0.78rem;
 }
 
 .customer-badge-linked {

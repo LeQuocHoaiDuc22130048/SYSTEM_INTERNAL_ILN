@@ -14,6 +14,7 @@ class AppTheme {
     colorScheme: const ColorScheme.light(
       primary: AppColors.primary,
       secondary: AppColors.primaryLight,
+      tertiary: AppColors.brandCyan,
       surface: AppColors.surfaceLight,
       error: AppColors.error,
       onPrimary: Colors.white,
@@ -71,6 +72,35 @@ class AppTheme {
       ),
     ),
 
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.surfaceLight,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borderLight),
+      ),
+    ),
+
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: AppColors.surfaceLight,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    ),
+
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.brandNavy,
+      contentTextStyle: const TextStyle(
+        color: Colors.white,
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+    ),
+
     textTheme: const TextTheme(
       displayLarge: TextStyle(
         fontSize: 32,
@@ -112,12 +142,13 @@ class AppTheme {
     useMaterial3: true,
     pageTransitionsTheme: AppMotion.transitions,
     brightness: Brightness.dark,
-    primaryColor: AppColors.primary,
+    primaryColor: AppColors.brandBlue,
     scaffoldBackgroundColor: AppColors.backgroundDark,
 
     colorScheme: const ColorScheme.dark(
-      primary: AppColors.primary,
+      primary: AppColors.brandBlue,
       secondary: AppColors.primaryLight,
+      tertiary: AppColors.brandCyan,
       surface: AppColors.surfaceDark,
       error: AppColors.error,
       onPrimary: Colors.white,
@@ -160,18 +191,50 @@ class AppTheme {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 2),
+        borderSide: const BorderSide(color: AppColors.brandCyan, width: 2),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
     ),
 
     elevatedButtonTheme: ElevatedButtonThemeData(
       style: ElevatedButton.styleFrom(
-        backgroundColor: AppColors.primary,
+        backgroundColor: AppColors.brandBlue,
         foregroundColor: Colors.white,
         elevation: 0,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    ),
+
+    dialogTheme: DialogThemeData(
+      backgroundColor: AppColors.surfaceDark,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: const BorderSide(color: AppColors.borderDark),
+      ),
+    ),
+
+    bottomSheetTheme: const BottomSheetThemeData(
+      backgroundColor: AppColors.surfaceDark,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+    ),
+
+    snackBarTheme: SnackBarThemeData(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.surfaceSubtleDark,
+      contentTextStyle: const TextStyle(
+        color: AppColors.textPrimaryDark,
+        fontSize: 13.5,
+        fontWeight: FontWeight.w600,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: const BorderSide(color: AppColors.borderDark),
       ),
     ),
 

@@ -4,14 +4,14 @@
 .perm-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--color-backdrop);
   backdrop-filter: blur(4px);
-  z-index: 1000;
+  z-index: 1100;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 1rem;
-  animation: overlay-in 0.15s ease;
+  animation: overlay-in var(--motion-fast) var(--motion-ease-enter);
 }
 
 @keyframes overlay-in {
@@ -21,21 +21,21 @@
 
 /* Modal */
 .perm-modal {
-  background: var(--color-card, #ffffff);
-  border: var(--border-style, 1px solid #e2e8f0);
+  background: var(--color-card);
+  border: var(--border-style);
   border-radius: var(--radius-lg, 18px);
   width: 100%;
   max-width: 720px;
   max-height: 90vh;
   display: flex;
   flex-direction: column;
-  animation: modal-in 0.2s ease;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  animation: modal-in var(--motion-normal) var(--motion-ease-enter);
+  box-shadow: var(--color-shadow-lg);
 }
 
 @keyframes modal-in {
-  from { opacity: 0; transform: translateY(16px) scale(0.97); }
-  to   { opacity: 1; transform: none; }
+  from { opacity: 0; transform: scale(var(--motion-scale-enter)); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 /* Header */

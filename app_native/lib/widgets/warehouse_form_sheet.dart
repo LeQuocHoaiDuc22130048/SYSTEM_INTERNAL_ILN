@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_motion.dart';
 
 /// Keeps the form footer above the keyboard while its fields scroll.
 class WarehouseFormSheet extends StatelessWidget {
@@ -10,8 +11,8 @@ class WarehouseFormSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
     return AnimatedPadding(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
+      duration: AppMotion.resolveDuration(context, AppMotion.fast),
+      curve: AppMotion.easeEnter,
       padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
       child: LayoutBuilder(
         builder: (context, constraints) => SizedBox(

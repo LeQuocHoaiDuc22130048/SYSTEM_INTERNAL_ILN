@@ -10,6 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@astryxdesign/core": "^0.7.16",
+    "@astryxdesign/theme-neutral": "^0.7.16",
+    "@stylexjs/stylex": "^0.19.2",
     "exceljs": "^4.4.0",
     "lucide-react": "^1.18.0",
     "qrcode": "^1.5.4",
@@ -17,6 +20,7 @@
     "react-dom": "^19.2.6"
   },
   "devDependencies": {
+    "@astryxdesign/cli": "^0.4.3",
     "@eslint/js": "^10.0.1",
     "@types/node": "^24.12.3",
     "@types/qrcode": "^1.5.6",

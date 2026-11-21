@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../theme/app_colors.dart';
+import 'animated_kpi_value.dart';
 
 class StatCard extends StatelessWidget {
   final String label;
@@ -104,8 +105,8 @@ class StatCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      value,
+                    AnimatedKpiValue(
+                      value: value,
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w600,

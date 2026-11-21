@@ -8,8 +8,11 @@ import '../models/board.dart';
 import '../models/repair_order.dart';
 import '../navigation/main_tabs.dart';
 import '../theme/app_colors.dart';
+import '../theme/app_motion.dart';
 import '../utils/auth_provider.dart';
 import '../utils/backend_data_provider.dart';
+import '../widgets/animated_kpi_value.dart';
+import '../widgets/skeleton_box.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/field_work_requests.dart';
 import '../widgets/field_work_bottom_sheet.dart';
@@ -43,6 +46,12 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final isNonManager = !Provider.of<AuthProvider>(context).isManagerOrAbove;
+    final backend = context.watch<BackendDataProvider>();
+    final isInitialManagerLoading =
+        !isNonManager &&
+        backend.isLoading &&
+        backend.repairOrders.isEmpty &&
+        backend.boards.isEmpty;
     final screenSize = MediaQuery.sizeOf(context);
     final wide = screenSize.width > 760;
     final contentWidth = screenSize.width > 980 ? 980.0 : screenSize.width;
@@ -70,6 +79,15 @@ class _DashboardPageState extends State<DashboardPage> {
                 constraints: BoxConstraints(maxWidth: contentWidth),
                 child: isNonManager
                     ? _buildEmployeeDashboard(context, isDark, wide)
+                    : isInitialManagerLoading
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _DashboardHeader(isDark: isDark, wide: wide),
+                          const SizedBox(height: 24),
+                          DashboardSkeleton(wide: wide),
+                        ],
+                      )
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -424,8 +442,8 @@ class _DashboardStatCard extends StatelessWidget {
                 FittedBox(
                   fit: BoxFit.scaleDown,
                   alignment: Alignment.centerLeft,
-                  child: Text(
-                    stat.value,
+                  child: AnimatedKpiValue(
+                    value: stat.value,
                     style: TextStyle(
                       fontSize: 20,
                       height: 1.1,
@@ -503,6 +521,8 @@ class _WeeklyOrdersChart extends StatelessWidget {
           SizedBox(
             height: 220,
             child: BarChart(
+              duration: AppMotion.resolveDuration(context, AppMotion.slow),
+              curve: AppMotion.easeEnter,
               BarChartData(
                 alignment: BarChartAlignment.spaceAround,
                 maxY: 10,
@@ -688,6 +708,11 @@ class _StatusRatioCard extends StatelessWidget {
                 Expanded(
                   flex: wide ? 3 : 1,
                   child: PieChart(
+                    duration: AppMotion.resolveDuration(
+                      context,
+                      AppMotion.slow,
+                    ),
+                    curve: AppMotion.easeEnter,
                     PieChartData(
                       sectionsSpace: 4,
                       centerSpaceRadius: wide ? 66 : 48,
@@ -1164,13 +1189,16 @@ class _PersonalAttendanceCardState extends State<_PersonalAttendanceCard> {
           ),
           if (backend.isLoadingMyAttendance && history == null)
             const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SkeletonBox(width: 140, height: 14),
+                  SizedBox(height: 12),
+                  SkeletonBox(height: 44),
+                  SizedBox(height: 10),
+                  SkeletonBox(height: 44),
+                ],
               ),
             )
           else if (displayDays.isEmpty)

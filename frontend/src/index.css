@@ -1,56 +1,159 @@
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap');
 
 :root {
   --font-sans: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  
-  /* Color Palette */
-  --color-primary: #25437a;
-  --color-primary-hover: #1b325c;
-  --color-primary-light: #e9eef7;
-  
-  --color-success: #639922;
-  --color-success-light: #f0f7e6;
-  
-  --color-late: #BA7517;
-  --color-late-light: #fdf5e8;
-  
-  --color-absent: #E24B4A;
-  --color-absent-light: #fdeeed;
-  
-  --color-leave: #378ADD;
-  --color-leave-light: #ebf4fc;
-  
-  --color-holiday: #8A94A6;
-  --color-holiday-light: #f3f5f8;
 
-  --color-ot: #8B5CF6;
+  /* Brand Palette (CRM Motion Design System) */
+  --brand-navy: #263F63;
+  --brand-blue: #4778B8;
+  --brand-cyan: #55C7E8;
+
+  /* Light Theme Surface & Semantic Tokens */
+  --color-primary: #263F63;
+  --color-primary-hover: #1c2f4b;
+  --color-primary-accent: #4778B8;
+  --color-primary-cyan: #55C7E8;
+  --color-primary-light: #e8eff8;
+  --color-focus-ring: rgba(71, 120, 184, 0.28);
+
+  --color-success: #2f855a;
+  --color-success-light: #ebf8f1;
+
+  --color-late: #b7791f;
+  --color-late-light: #fef6e7;
+
+  --color-absent: #dc2626;
+  --color-absent-light: #fef2f2;
+
+  --color-leave: #2563eb;
+  --color-leave-light: #eff6ff;
+
+  --color-holiday: #64748b;
+  --color-holiday-light: #f1f5f9;
+
+  --color-ot: #7c3aed;
   --color-ot-light: #f5f3ff;
-  
-  --color-bg: #f5f7fa; /* Tertiary Surface background */
+
+  --color-bg: #f4f7fb;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f8fafc;
+  --color-surface-hover: #f1f5f9;
   --color-card: #ffffff;
   --color-border: #e2e8f0;
-  --border-style: 0.5px solid var(--color-border);
-  
-  --color-text: #475569;
+  --color-border-strong: #cbd5e1;
+  --border-style: 1px solid var(--color-border);
+
+  --color-text: #334155;
   --color-text-dark: #0f172a;
-  --color-text-light: #94a3b8;
-  
+  --color-text-muted: #64748b;
+  --color-text-light: #64748b;
+  --color-backdrop: rgba(15, 23, 42, 0.45);
+  --color-shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.05);
+  --color-shadow-md: 0 8px 20px -4px rgba(15, 23, 42, 0.1);
+  --color-shadow-lg: 0 20px 40px -10px rgba(15, 23, 42, 0.18);
+
+  --color-skeleton-base: #e2e8f0;
+  --color-skeleton-highlight: #f1f5f9;
+
   --radius-sm: 8px;
+  --radius-md: 10px;
   --radius-lg: 12px;
-  
+
+  /* Motion Design Tokens (CRM Motion Design System v1.0) */
+  --motion-instant: 100ms;
+  --motion-fast: 150ms;
+  --motion-normal: 250ms;
+  --motion-medium: 350ms;
+  --motion-slow: 500ms;
+  --motion-data: 800ms;
+
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-enter: cubic-bezier(0, 0, 0.2, 1);
+  --motion-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  --motion-ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+
+  --motion-distance-xs: 4px;
+  --motion-distance-sm: 8px;
+  --motion-distance-md: 16px;
+  --motion-scale-pressed: 0.97;
+  --motion-scale-enter: 0.98;
+
+  color-scheme: light;
   font-family: var(--font-sans);
   background-color: var(--color-bg);
   color: var(--color-text);
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  overscroll-behavior: none;
+}
+
+:root[data-theme='dark'] {
+  --color-primary: #4778B8;
+  --color-primary-hover: #5b8cc9;
+  --color-primary-accent: #55C7E8;
+  --color-primary-cyan: #55C7E8;
+  --color-primary-light: rgba(71, 120, 184, 0.22);
+  --color-focus-ring: rgba(85, 199, 232, 0.36);
+
+  --color-success: #4ade80;
+  --color-success-light: rgba(34, 197, 94, 0.16);
+
+  --color-late: #fbbf24;
+  --color-late-light: rgba(245, 158, 11, 0.18);
+
+  --color-absent: #f87171;
+  --color-absent-light: rgba(239, 68, 68, 0.18);
+
+  --color-leave: #60a5fa;
+  --color-leave-light: rgba(59, 130, 246, 0.18);
+
+  --color-holiday: #94a3b8;
+  --color-holiday-light: rgba(148, 163, 184, 0.16);
+
+  --color-ot: #a78bfa;
+  --color-ot-light: rgba(139, 92, 246, 0.2);
+
+  --color-bg: #0b1320;
+  --color-surface: #111b2c;
+  --color-surface-subtle: #162338;
+  --color-surface-hover: #1d2d47;
+  --color-card: #111b2c;
+  --color-border: #23334d;
+  --color-border-strong: #344a6e;
+  --border-style: 1px solid var(--color-border);
+
+  --color-text: #cbd5e1;
+  --color-text-dark: #f1f5f9;
+  --color-text-muted: #94a3b8;
+  --color-text-light: #94a3b8;
+  --color-backdrop: rgba(4, 9, 18, 0.72);
+  --color-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.28);
+  --color-shadow-md: 0 10px 24px -4px rgba(0, 0, 0, 0.42);
+  --color-shadow-lg: 0 24px 48px -12px rgba(0, 0, 0, 0.6);
+
+  --color-skeleton-base: #1b2a42;
+  --color-skeleton-highlight: #253959;
+
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  overscroll-behavior: none;
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+#root {
+  min-height: 100%;
 }
 
 body {
-  margin: 0;
   font-family: var(--font-sans);
-  background-color: var(--color-bg);
-  color: var(--color-text);
   -webkit-font-smoothing: antialiased;
 }
 
@@ -58,12 +161,16 @@ body {
   box-sizing: border-box;
 }
 
-button {
+button,
+input,
+select,
+textarea {
   font-family: inherit;
 }
 
-input {
-  font-family: inherit;
+:is(button, a, [tabindex], input[type='checkbox'], input[type='radio']):focus-visible {
+  outline: 2px solid var(--color-primary-accent);
+  outline-offset: 2px;
 }
 
 /* Custom Scrollbar for mini-bar and modal list */
@@ -75,9 +182,122 @@ input {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
+  background: var(--color-border-strong);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--color-text-light);
+}
+
+/* Shared Tab Content Transition (Section 5.6: 150-250ms fade, does not animate shell) */
+@keyframes crmTabFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-distance-xs));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.crm-tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: crmTabFadeIn var(--motion-normal) var(--motion-ease-enter);
+}
+
+@media (max-width: 640px) {
+  .crm-tab-panel {
+    gap: 14px;
+  }
+}
+
+/* Shared Skeleton Primitives (Section 5.8) */
+@keyframes crmSkeletonShimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.crm-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-skeleton-base) 25%,
+    var(--color-skeleton-highlight) 50%,
+    var(--color-skeleton-base) 75%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-sm);
+  animation: crmSkeletonShimmer 1.4s ease-in-out infinite;
+}
+
+.crm-skeleton-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  width: 100%;
+}
+
+@media (max-width: 1024px) {
+  .crm-skeleton-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.crm-skeleton-card {
+  background-color: var(--color-card);
+  border: var(--border-style);
+  border-radius: var(--radius-lg);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.crm-skeleton-line {
+  height: 12px;
+  width: 65%;
+}
+
+.crm-skeleton-value {
+  height: 26px;
+  width: 45%;
+}
+
+.crm-skeleton-panel {
+  background-color: var(--color-card);
+  border: var(--border-style);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.crm-skeleton-chart {
+  height: 210px;
+  width: 100%;
+  border-radius: var(--radius-md);
+}
+
+/* Global Reduced-Motion Override (CRM Motion Design System Section 6.1) */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .crm-skeleton {
+    animation: none !important;
+    background: var(--color-skeleton-base);
+  }
 }

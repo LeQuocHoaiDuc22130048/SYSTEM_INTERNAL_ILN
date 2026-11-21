@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 
 import '../../theme/app_colors.dart';
+import '../../theme/app_motion.dart';
 import '../interactive_bounce.dart';
 import 'account_avatar.dart';
 
@@ -218,23 +219,27 @@ class MobileNavigationBar extends StatelessWidget {
       child: Semantics(
         selected: selected,
         button: true,
-        child: Tooltip(
-          message: label,
-          child: InteractiveBounce(
-            key: tabKey,
-            scaleDown: 0.92,
-            onTap: onTap,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeOutCubic,
-                      width: 38,
-                      height: 32,
+        child: Builder(
+          builder: (context) => Tooltip(
+            message: label,
+            child: InteractiveBounce(
+              key: tabKey,
+              scaleDown: AppMotion.scalePressed,
+              onTap: onTap,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedContainer(
+                        duration: AppMotion.resolveDuration(
+                          context,
+                          AppMotion.fast,
+                        ),
+                        curve: AppMotion.easeStandard,
+                        width: 38,
+                        height: 32,
                       decoration: BoxDecoration(
                         color: selected
                             ? const Color(0xFF2563EB).withValues(alpha: 0.12)
@@ -303,6 +308,7 @@ class MobileNavigationBar extends StatelessWidget {
               ],
             ),
           ),
+        ),
         ),
       ),
     );

@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, Briefcase, Calendar, FileText, Trash2, CheckCircle2 } from 'lucide-react';
 import { getJsonAuthHeaders } from '../utils/auth';
+import { useDialogA11y } from '../hooks/useMotion';
 
 interface FieldWorkModalProps {
   initialDate?: string;
@@ -19,6 +20,8 @@ export const FieldWorkModal: React.FC<FieldWorkModalProps> = ({
   showToast,
   onSuccess,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(true, onClose, dialogRef);
   const todayStr = new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD
   const [workDate, setWorkDate] = useState<string>(initialDate || todayStr);
   const [note, setNote] = useState<string>(initialNote);
@@ -94,8 +97,17 @@ export const FieldWorkModal: React.FC<FieldWorkModalProps> = ({
   };
 
   return (
-    <div className="modal-overlay">
-      <div className="modal-content" style={{ maxWidth: '480px' }}>
+    <div className="modal-overlay" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        className="modal-content"
+        style={{ maxWidth: '480px' }}
+        role="dialog"
+        aria-modal="true"
+        aria-label={isExisting ? 'Chỉnh sửa ngày đi công trình' : 'Ghi nhận ngày đi công trình'}
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="modal-header">
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
             <div style={{

@@ -1,6 +1,7 @@
 import { usePermissionCheck } from '../utils/permissionContext';
 import { useBannerHistory } from './useBannerHistory';
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Plus,
   RefreshCw,
@@ -260,6 +261,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
 
   const [previewDevice, setPreviewDevice] = useState("390");
   const [previewDark, setPreviewDark] = useState(false);
+  const [mobilePreviewOpen, setMobilePreviewOpen] = useState(false);
   const editorSnapshot = useMemo(() => ({ formTitle, formBadgeText, formSubtitle, formActionType, formActionValue, bgSource, design, formButtonPosition, formButtonTop, formButtonBottom, formButtonLeft, formButtonRight, formButtons, formFontFamily, bgMode, formGradient, formCustomGradient, colorStop1, colorStop2, colorStop3, formBackgroundImageUrl, selectedBgFile, bgFilePreviewUrl, formDisplayOrder, formIsActive, imageType, formImageUrl, formImagePosition, selectedFile, filePreviewUrl, formDarkenOverlay }), [formTitle, formBadgeText, formSubtitle, formActionType, formActionValue, bgSource, design, formButtonPosition, formButtonTop, formButtonBottom, formButtonLeft, formButtonRight, formButtons, formFontFamily, bgMode, formGradient, formCustomGradient, colorStop1, colorStop2, colorStop3, formBackgroundImageUrl, selectedBgFile, bgFilePreviewUrl, formDisplayOrder, formIsActive, imageType, formImageUrl, formImagePosition, selectedFile, filePreviewUrl, formDarkenOverlay]);
   const history = useBannerHistory(editorSnapshot, showModal, snapshot => {
     setFormTitle(snapshot.formTitle);
@@ -430,6 +432,15 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
       setActivePreviewIndex(activeBanners.length - 1);
     }
   }, [activeBanners.length, activePreviewIndex]);
+
+  useEffect(() => {
+    if (!mobilePreviewOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobilePreviewOpen(false);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [mobilePreviewOpen]);
 
   // Filtered banners for the list
   const filteredBanners = useMemo(() => {
@@ -1123,9 +1134,10 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
             onClick={() => fetchBanners(true)}
             disabled={refreshing}
             title="Làm mới"
+            aria-label="Làm mới danh sách banner"
           >
             <RefreshCw size={15} className={refreshing ? 'animate-spin' : ''} />
-            <span>Làm mới</span>
+            <span className="btn-refresh-text">Làm mới</span>
           </button>
 
           {canAction('BANNER_CREATE') && (<button
@@ -1137,6 +1149,16 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
             <Crop size={16} />
             <span>Tải & Cắt Banner từ Máy</span>
           </button>) }
+
+          <button
+            type="button"
+            className="btn-mobile-preview"
+            onClick={() => setMobilePreviewOpen(true)}
+            title="Xem mô phỏng banner hiển thị trên App"
+          >
+            <Eye size={15} aria-hidden="true" />
+            <span>Xem trước trên App</span>
+          </button>
 
           {canAction('BANNER_CREATE') && (<button type="button" className="btn-create" onClick={handleOpenCreateModal}>
             <Plus size={16} />
@@ -1247,7 +1269,7 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                       <Palette size={11} />
                       <span>{banner.backgroundImageUrl ? 'Ảnh nền' : 'Gradient'}</span>
                     </span>
-                    <span className="meta-chip">
+                    <span className="meta-chip meta-chip--font">
                       <Type size={11} />
                       <span>{banner.fontFamily || 'Be Vietnam Pro'}</span>
                     </span>
@@ -1278,6 +1300,20 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                   </div>) }
 
                   <div className="banner-action-buttons">
+                    {previewIdx >= 0 && (
+                      <button
+                        type="button"
+                        className="btn-card-action mobile-preview-trigger"
+                        onClick={() => {
+                          setActivePreviewIndex(previewIdx);
+                          setMobilePreviewOpen(true);
+                        }}
+                        title="Xem trước trên App"
+                        aria-label="Xem trước trên App"
+                      >
+                        <Eye size={14} />
+                      </button>
+                    )}
                     {canAction('BANNER_REORDER') && (<button
                       type="button"
                       className="btn-card-action"
@@ -2130,26 +2166,40 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
           )}
         </div>
 
-        {/* Right Column (Sticky): Fixed Mobile Simulator */}
-        <div className="banner-right-pane">
-          <div className="banner-preview-section">
-            <div className="preview-header">
-              <div className="preview-title">
-                <Smartphone size={18} />
-                <span>{showModal ? 'Xem trước trực tiếp' : 'Mô phỏng hiển thị trên App'}</span>
-              </div>
-              {showModal ? (
-                <div className="preview-live-badge">
-                  <span className="live-indicator-dot" />
-                  <span>Thời gian thực</span>
-                </div>
-              ) : (
-                <div className="preview-device-toggle">
-                  <CheckCircle2 size={15} color="#10b981" />
-                  <span>Đang hiển thị trên App</span>
-                </div>
+        {/* Right Column (Sticky on Desktop; Portal Modal centered on Mobile when triggered) */}
+        {(() => {
+          const previewSection = (
+            <div className="banner-preview-section" onClick={e => e.stopPropagation()}>
+              {!showModal && mobilePreviewOpen && (
+                <button
+                  type="button"
+                  className="preview-mobile-close-btn"
+                  onClick={() => setMobilePreviewOpen(false)}
+                  aria-label="Đóng xem trước"
+                  title="Đóng"
+                >
+                  <X size={18} />
+                </button>
               )}
-            </div>
+              <div className={`preview-header ${mobilePreviewOpen && !showModal ? 'has-close-btn' : ''}`}>
+                <div className="preview-title">
+                  <Smartphone size={18} />
+                  <span>{showModal ? 'Xem trước trực tiếp' : 'Mô phỏng hiển thị trên App'}</span>
+                </div>
+                <div className="preview-header-right">
+                  {showModal ? (
+                    <div className="preview-live-badge">
+                      <span className="live-indicator-dot" />
+                      <span>Thời gian thực</span>
+                    </div>
+                  ) : (
+                    <div className="preview-device-toggle">
+                      <CheckCircle2 size={15} color="#10b981" />
+                      <span>Đang hiển thị trên App</span>
+                    </div>
+                  )}
+                </div>
+              </div>
 
             {showModal && <div className="preview-canvas-tools">
               <button type="button" disabled={!history.canUndo} onClick={history.undo}>↶ Hoàn tác</button>
@@ -2324,8 +2374,26 @@ export const BannerTab: React.FC<BannerTabProps> = ({ showToast }) => {
                 <p><kbd>← ↑ ↓ →</kbd> dịch 1% · <kbd>Shift + mũi tên</kbd> dịch 5% · <kbd>Alt + kéo</kbd> bỏ snap.</p>
                 <p>Chọn Mascot để chỉnh thanh Kích thước (%) và Lật ảnh ngang.</p>
               </div>}
-          </div>
-        </div>
+            </div>
+          );
+
+          if (mobilePreviewOpen && !showModal && typeof document !== 'undefined') {
+            return createPortal(
+              <div
+                className="banner-mobile-preview-overlay"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Mô phỏng hiển thị trên App"
+                onClick={() => setMobilePreviewOpen(false)}
+              >
+                {previewSection}
+              </div>,
+              document.body
+            );
+          }
+
+          return <div className="banner-right-pane">{previewSection}</div>;
+        })()}
       </div>
 
       {/* Interactive Image Cropper Modal */}

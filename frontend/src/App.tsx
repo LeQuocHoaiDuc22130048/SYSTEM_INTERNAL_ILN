@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import type { EmployeeMonthlyStats, UserInfo } from './mockData';
 import { canAccessTab } from './utils/tabPermissions';
 import { PermissionUserContext } from './utils/permissionContext';
+import { applyThemeMode, getStoredThemeMode, resolveTheme, type ResolvedTheme } from './utils/theme';
 import './App.css';
 import { normalizeMonthlyResponse } from './utils/employee';
 
@@ -24,6 +25,7 @@ import { CustomersTab } from './components/CustomersTab';
 import { WarehouseTab } from './components/WarehouseTab';
 import { AccountsTab } from './components/AccountsTab';
 import { DashboardTab } from './components/DashboardTab';
+import type { TimeRangePreset } from './components/dashboardUtils';
 import { TerminalTab } from './components/TerminalTab';
 import { MediaCleanupTab } from './components/MediaCleanupTab';
 import { CustomerPortalApp } from './components/portal/CustomerPortalApp';
@@ -110,6 +112,7 @@ function App() {
 
   const [currentYear, setCurrentYear] = useState<number>(() => new Date().getFullYear());
   const [currentMonth, setCurrentMonth] = useState<number>(() => new Date().getMonth() + 1);
+  const [dashboardRangeType, setDashboardRangeType] = useState<TimeRangePreset>('7days');
 
   const [employees, setEmployees] = useState<EmployeeMonthlyStats[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -167,6 +170,9 @@ function App() {
   const [editModalTarget, setEditModalTarget] = useState<EditModalTarget | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const toastTimerRef = useRef<number | null>(null);
+  const refreshTimerRef = useRef<number | null>(null);
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>(() => resolveTheme(getStoredThemeMode()));
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(() => {
     try {
@@ -175,6 +181,13 @@ function App() {
       return false;
     }
   });
+
+  const handleToggleTheme = useCallback(() => {
+    setResolvedTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      return applyThemeMode(next);
+    });
+  }, []);
 
   const handleToggleCollapse = useCallback(() => {
     setIsSidebarCollapsed(prev => {
@@ -189,20 +202,41 @@ function App() {
   }, []);
 
   const showToast = useCallback((message: string) => {
+    if (toastTimerRef.current !== null) {
+      window.clearTimeout(toastTimerRef.current);
+    }
     setToastMessage(message);
-    setTimeout(() => setToastMessage(null), 3000);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToastMessage(null);
+      toastTimerRef.current = null;
+    }, 3000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current !== null) {
+        window.clearTimeout(toastTimerRef.current);
+      }
+      if (refreshTimerRef.current !== null) {
+        window.clearTimeout(refreshTimerRef.current);
+      }
+    };
   }, []);
 
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const handleGlobalRefresh = useCallback(() => {
+    if (refreshTimerRef.current !== null) {
+      window.clearTimeout(refreshTimerRef.current);
+    }
     setIsRefreshing(true);
     setRefreshTrigger(prev => prev + 1);
     setRetryCount(prev => prev + 1);
     showToast('Đang làm mới dữ liệu...');
-    setTimeout(() => {
+    refreshTimerRef.current = window.setTimeout(() => {
       setIsRefreshing(false);
+      refreshTimerRef.current = null;
     }, 600);
   }, [showToast]);
 
@@ -557,13 +591,45 @@ function App() {
   }
 
   if (loading && dataSource === 'loading') {
-    return <div className="loading-screen">Đang kết nối hệ thống...</div>;
+    return (
+      <div className="loading-screen" role="status" aria-live="polite" aria-label="Đang kết nối hệ thống">
+        <div className="loading-shell">
+          <div className="crm-skeleton-grid">
+            <div className="crm-skeleton-card">
+              <div className="crm-skeleton crm-skeleton-line" />
+              <div className="crm-skeleton crm-skeleton-value" />
+            </div>
+            <div className="crm-skeleton-card">
+              <div className="crm-skeleton crm-skeleton-line" />
+              <div className="crm-skeleton crm-skeleton-value" />
+            </div>
+            <div className="crm-skeleton-card">
+              <div className="crm-skeleton crm-skeleton-line" />
+              <div className="crm-skeleton crm-skeleton-value" />
+            </div>
+            <div className="crm-skeleton-card">
+              <div className="crm-skeleton crm-skeleton-line" />
+              <div className="crm-skeleton crm-skeleton-value" />
+            </div>
+          </div>
+          <div className="crm-skeleton-panel">
+            <div className="crm-skeleton crm-skeleton-line" />
+            <div className="crm-skeleton crm-skeleton-chart" />
+          </div>
+          <span className="loading-screen-label">Đang kết nối hệ thống...</span>
+        </div>
+      </div>
+    );
   }
 
   return (
     <PermissionUserContext.Provider value={currentUser}>
     <div className="app-layout">
-      {toastMessage && <div className="toast-msg">{toastMessage}</div>}
+      {toastMessage && (
+        <div key={toastMessage} className="toast-msg" role="status" aria-live="polite">
+          {toastMessage}
+        </div>
+      )}
 
       {/* Lớp phủ làm tối màn hình bên phải khi mở Sidebar trên màn hình nhỏ */}
       <div
@@ -603,9 +669,14 @@ function App() {
           currentUser={currentUser}
           showToast={showToast}
           onNavigateToTab={(tab) => setActiveTab(tab as ActiveTab)}
+          theme={resolvedTheme}
+          onToggleTheme={handleToggleTheme}
+          dashboardRangeType={dashboardRangeType}
+          onDashboardRangeChange={setDashboardRangeType}
         />
 
         <div className="main-content-inner">
+          <div key={activeTab} className="crm-tab-panel">
           {!canAccessTab(currentUser, activeTab) ? (
             <div role="alert">Bạn chưa được cấp quyền sử dụng chức năng này. Chọn một mục được cấp quyền trong menu.</div>
           ) : activeTab === 'dashboard' ? (
@@ -617,6 +688,7 @@ function App() {
               currentMonth={currentMonth}
               currentYear={currentYear}
               refreshTrigger={refreshTrigger}
+              rangeType={dashboardRangeType}
             />
           ) : activeTab === 'monthly' ? (
             <>
@@ -715,6 +787,7 @@ function App() {
               showToast={showToast}
             />
           )}
+          </div>
         </div>
       </div>
 

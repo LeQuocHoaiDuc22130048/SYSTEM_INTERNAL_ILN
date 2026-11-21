@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PhoneCall, MessageSquare, Clock, MapPin, X, Save, AlertCircle, Navigation, Globe } from 'lucide-react';
 import {
   getPortalSupportConfig,
   updatePortalSupportConfig,
   type PortalSupportConfig,
 } from '../utils/portalConfigApi';
+import { useDialogA11y } from '../hooks/useMotion';
 import './PortalSupportConfigModal.css';
 
 interface PortalSupportConfigModalProps {
@@ -18,6 +19,8 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
   onClose,
   showToast,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(isOpen, onClose, dialogRef);
   const [loading, setLoading] = useState<boolean>(true);
   const [saving, setSaving] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -111,8 +114,16 @@ export const PortalSupportConfigModal: React.FC<PortalSupportConfigModalProps> =
   };
 
   return (
-    <div className="portal-config-modal-backdrop">
-      <div className="portal-config-modal-card">
+    <div className="portal-config-modal-backdrop" onClick={onClose}>
+      <div
+        ref={dialogRef}
+        className="portal-config-modal-card"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Quản lý Kênh Hỗ Trợ Khách Hàng"
+        tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="portal-config-modal-header">
           <div className="header-title-wrap">
             <div className="header-icon-circle">

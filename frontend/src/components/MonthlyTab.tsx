@@ -1,5 +1,6 @@
 import { usePermissionCheck } from '../utils/permissionContext';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Search, Download, ExternalLink, Edit3, ChevronRight, X, Calendar,
   Clock, Zap, CalendarCheck, AlertTriangle, LayoutGrid, CalendarDays,
@@ -8,6 +9,8 @@ import {
 import type { EmployeeMonthlyStats, EmployeeHistoryResponse } from '../mockData';
 import { getAvatarLetters, normalizeHistoryResponse, DAILY_STATUS_LABEL_MAP } from '../utils/employee';
 import { getAuthHeaders } from '../utils/auth';
+import { useDialogA11y } from '../hooks/useMotion';
+import { computeFloatingTooltipPosition, type TooltipAnchorRect } from './monthlyTooltipUtils';
 import './MonthlyTab.css';
 
 interface MonthlyTabProps {
@@ -20,6 +23,16 @@ interface MonthlyTabProps {
   handleExportExcel: () => void;
   setHistoryEmployee: (emp: { id: string; name: string; dept: string } | null) => void;
   showToast: (message: string) => void;
+}
+
+interface HoveredDayTooltip {
+  dateLabel: string;
+  statusChar: string;
+  statusLabel: string;
+  dayTimes: string | null;
+  workHours: number | string | undefined;
+  updateReason: string | undefined;
+  anchorRect: TooltipAnchorRect;
 }
 
 export const MonthlyTab: React.FC<MonthlyTabProps> = ({
@@ -52,17 +65,62 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
   };
 
   const daysInMonth = new Date(currentYear, currentMonth, 0).getDate();
+  const drawerRef = useRef<HTMLElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [hoveredDayTooltip, setHoveredDayTooltip] = useState<HoveredDayTooltip | null>(null);
+  const [tooltipPos, setTooltipPos] = useState<{
+    top: number;
+    left: number;
+    placement: 'top' | 'bottom';
+    arrowLeft: number;
+  }>({ top: -9999, left: -9999, placement: 'top', arrowLeft: 85 });
 
-  // Đóng Drawer khi nhấn phím Escape
+  const showDayTooltip = useCallback(
+    (el: HTMLElement, payload: Omit<HoveredDayTooltip, 'anchorRect'>) => {
+      const rect = el.getBoundingClientRect();
+      setHoveredDayTooltip({
+        ...payload,
+        anchorRect: { top: rect.top, bottom: rect.bottom, left: rect.left, width: rect.width },
+      });
+    },
+    []
+  );
+
+  const hideDayTooltip = useCallback(() => {
+    setHoveredDayTooltip(null);
+  }, []);
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && expandedEmployeeId) {
-        setExpandedEmployeeId(null);
-      }
+    if (!hoveredDayTooltip) return;
+    const clear = () => setHoveredDayTooltip(null);
+    window.addEventListener('scroll', clear, true);
+    window.addEventListener('resize', clear);
+    return () => {
+      window.removeEventListener('scroll', clear, true);
+      window.removeEventListener('resize', clear);
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [hoveredDayTooltip]);
+
+  useEffect(() => {
+    if (expandedEmployeeId) {
+      setHoveredDayTooltip(null);
+    }
   }, [expandedEmployeeId]);
+
+  useLayoutEffect(() => {
+    if (!hoveredDayTooltip || !tooltipRef.current) return;
+    const tipRect = tooltipRef.current.getBoundingClientRect();
+    setTooltipPos(
+      computeFloatingTooltipPosition(
+        hoveredDayTooltip.anchorRect,
+        { width: tipRect.width, height: tipRect.height },
+        { width: window.innerWidth, height: window.innerHeight }
+      )
+    );
+  }, [hoveredDayTooltip]);
+
+  // Đóng Drawer khi nhấn Escape, giữ focus bên trong và khôi phục focus khi đóng
+  useDialogA11y(Boolean(expandedEmployeeId), () => setExpandedEmployeeId(null), drawerRef);
 
   // Tải chi tiết lịch sử chấm công của nhân viên được chọn
   useEffect(() => {
@@ -196,11 +254,13 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
         onClick={() => setExpandedEmployeeId(null)}
       >
         <aside
+          ref={drawerRef}
           className="monthly-drawer-panel"
           onClick={(e) => e.stopPropagation()}
           role="dialog"
           aria-modal="true"
           aria-label={`Chi tiết chấm công của ${emp.name}`}
+          tabIndex={-1}
         >
           <header className="monthly-drawer-header">
             <div className="drawer-header-left">
@@ -551,9 +611,8 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredEmployees.map((emp, empIndex) => {
+                  {filteredEmployees.map((emp) => {
                     const isSelected = expandedEmployeeId === emp.id;
-                    const isFirstRows = empIndex < 2;
                     return (
                       <tr
                         key={emp.id}
@@ -602,16 +661,39 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                               const statusLabel = DAILY_STATUS_LABEL_MAP[char as keyof typeof DAILY_STATUS_LABEL_MAP] ?? 'Đủ công';
                               const updateReason = emp.updateNotes?.[dayNum] || emp.updateNotes?.[String(dayNum)];
                               const workHours = emp.dailyWorkDays?.[dayNum] || emp.dailyWorkDays?.[String(dayNum)];
-                              const alignClass = dayNum <= 4 ? 'tip-left' : dayNum >= daysInMonth - 4 ? 'tip-right' : 'tip-center';
                               const isDayToday = isCurrentYear && isCurrentMonth && dayNum === todayDate;
                               const dayTimes = getDayTimesDisplay(emp, dayNum, char, isDayToday);
+                              const dateLabel = `${dayOfWeekVi}, ${dayNum.toString().padStart(2, '0')}/${currentMonth.toString().padStart(2, '0')}`;
 
                               return (
                                 <div
                                   key={index}
                                   className={`mini-day ${char} ${isSun ? 'is-sunday' : isSat ? 'is-saturday' : ''}`}
+                                  onMouseEnter={(e) =>
+                                    showDayTooltip(e.currentTarget, {
+                                      dateLabel,
+                                      statusChar: char,
+                                      statusLabel,
+                                      dayTimes,
+                                      workHours,
+                                      updateReason,
+                                    })
+                                  }
+                                  onMouseLeave={hideDayTooltip}
+                                  onFocus={(e) =>
+                                    showDayTooltip(e.currentTarget, {
+                                      dateLabel,
+                                      statusChar: char,
+                                      statusLabel,
+                                      dayTimes,
+                                      workHours,
+                                      updateReason,
+                                    })
+                                  }
+                                  onBlur={hideDayTooltip}
                                   onClick={(e) => {
                                     e.stopPropagation();
+                                    hideDayTooltip();
                                     setExpandedEmployeeId(emp.id);
                                   }}
                                   role="button"
@@ -619,35 +701,6 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                 >
                                   {/* Số ngày trực tiếp trên từng ô nhỏ */}
                                   <span className="mini-day-direct-label">{dayNum}</span>
-
-                                  {/* Tooltip khi hover (lật xuống dưới nếu là 2 hàng đầu tiên để không cấn mép trên) */}
-                                  <div className={`mini-day-tooltip ${alignClass} ${isFirstRows ? 'tip-bottom' : ''}`}>
-                                    <div className="tooltip-header">
-                                      <span className="tooltip-date">
-                                        {dayOfWeekVi}, {dayNum.toString().padStart(2, '0')}/{currentMonth.toString().padStart(2, '0')}
-                                      </span>
-                                      <span className={`tooltip-status-tag ${char}`}>{statusLabel}</span>
-                                    </div>
-                                    {dayTimes && (
-                                      <div className="tooltip-detail-row time-row">
-                                        <span className="tooltip-label">Thời gian:</span>
-                                        <strong className="tooltip-time-val">{dayTimes}</strong>
-                                      </div>
-                                    )}
-                                    {workHours !== undefined && (
-                                      <div className="tooltip-detail-row">
-                                        <span>Giờ công:</span>
-                                        <strong>{workHours} công</strong>
-                                      </div>
-                                    )}
-                                    {updateReason && (
-                                      <div className="tooltip-detail-row reason">
-                                        <span>Ghi chú:</span>
-                                        <em>{updateReason}</em>
-                                      </div>
-                                    )}
-                                    <div className="tooltip-footer-hint">Bấm để mở chi tiết tháng</div>
-                                  </div>
                                 </div>
                               );
                             })}
@@ -815,16 +868,39 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                   const statusLabel = DAILY_STATUS_LABEL_MAP[char as keyof typeof DAILY_STATUS_LABEL_MAP] ?? 'Đủ công';
                                   const updateReason = emp.updateNotes?.[dayNum] || emp.updateNotes?.[String(dayNum)];
                                   const workHours = emp.dailyWorkDays?.[dayNum] || emp.dailyWorkDays?.[String(dayNum)];
-                                  const alignClass = dayNum <= 4 ? 'tip-left' : dayNum >= daysInMonth - 4 ? 'tip-right' : 'tip-center';
                                   const isDayToday = isCurrentYear && isCurrentMonth && dayNum === todayDate;
                                   const dayTimes = getDayTimesDisplay(emp, dayNum, char, isDayToday);
+                                  const dateLabel = `${dayOfWeekVi}, ${dayNum.toString().padStart(2, '0')}/${currentMonth.toString().padStart(2, '0')}`;
 
                                   return (
                                     <div
                                       key={index}
                                       className={`mobile-day-slot mini-day ${char} ${isSun ? 'is-sunday' : isSat ? 'is-saturday' : ''} ${isDayToday ? 'is-today' : ''}`}
+                                      onMouseEnter={(e) =>
+                                        showDayTooltip(e.currentTarget, {
+                                          dateLabel,
+                                          statusChar: char,
+                                          statusLabel,
+                                          dayTimes,
+                                          workHours,
+                                          updateReason,
+                                        })
+                                      }
+                                      onMouseLeave={hideDayTooltip}
+                                      onFocus={(e) =>
+                                        showDayTooltip(e.currentTarget, {
+                                          dateLabel,
+                                          statusChar: char,
+                                          statusLabel,
+                                          dayTimes,
+                                          workHours,
+                                          updateReason,
+                                        })
+                                      }
+                                      onBlur={hideDayTooltip}
                                       onClick={(e) => {
                                         e.stopPropagation();
+                                        hideDayTooltip();
                                         setExpandedEmployeeId(emp.id);
                                       }}
                                       role="button"
@@ -834,34 +910,6 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
                                       <span className="mobile-slot-weekday">{dayOfWeekVi}</span>
                                       <span className="mobile-slot-num">{dayNum}</span>
                                       <span className="mobile-slot-status-dot" />
-
-                                      <div className={`mini-day-tooltip ${alignClass}`}>
-                                        <div className="tooltip-header">
-                                          <span className="tooltip-date">
-                                            {dayOfWeekVi}, {dayNum.toString().padStart(2, '0')}/{currentMonth.toString().padStart(2, '0')}
-                                          </span>
-                                          <span className={`tooltip-status-tag ${char}`}>{statusLabel}</span>
-                                        </div>
-                                        {dayTimes && (
-                                          <div className="tooltip-detail-row time-row">
-                                            <span className="tooltip-label">Thời gian:</span>
-                                            <strong className="tooltip-time-val">{dayTimes}</strong>
-                                          </div>
-                                        )}
-                                        {workHours !== undefined && (
-                                          <div className="tooltip-detail-row">
-                                            <span>Giờ công:</span>
-                                            <strong>{workHours} công</strong>
-                                          </div>
-                                        )}
-                                        {updateReason && (
-                                          <div className="tooltip-detail-row reason">
-                                            <span>Ghi chú:</span>
-                                            <em>{updateReason}</em>
-                                          </div>
-                                        )}
-                                        <div className="tooltip-footer-hint">Bấm để mở chi tiết tháng</div>
-                                      </div>
                                     </div>
                                   );
                                 })}
@@ -900,6 +948,49 @@ export const MonthlyTab: React.FC<MonthlyTabProps> = ({
 
       {/* Side Drawer Chi tiết chấm công (Trượt từ phải sang) */}
       {selectedEmployee && renderDrawer(selectedEmployee)}
+
+      {/* Floating Portal Tooltip: thoát khỏi overflow của bảng để không bị cắt mép */}
+      {hoveredDayTooltip &&
+        typeof document !== 'undefined' &&
+        createPortal(
+          <div
+            ref={tooltipRef}
+            role="tooltip"
+            className={`mini-day-tooltip mini-day-tooltip--portal ${tooltipPos.placement === 'bottom' ? 'tip-bottom' : ''}`}
+            style={{
+              top: `${tooltipPos.top}px`,
+              left: `${tooltipPos.left}px`,
+              ['--tip-arrow-left' as string]: `${tooltipPos.arrowLeft}px`,
+            }}
+          >
+            <div className="tooltip-header">
+              <span className="tooltip-date">{hoveredDayTooltip.dateLabel}</span>
+              <span className={`tooltip-status-tag ${hoveredDayTooltip.statusChar}`}>
+                {hoveredDayTooltip.statusLabel}
+              </span>
+            </div>
+            {hoveredDayTooltip.dayTimes && (
+              <div className="tooltip-detail-row time-row">
+                <span className="tooltip-label">Thời gian:</span>
+                <strong className="tooltip-time-val">{hoveredDayTooltip.dayTimes}</strong>
+              </div>
+            )}
+            {hoveredDayTooltip.workHours !== undefined && (
+              <div className="tooltip-detail-row">
+                <span>Giờ công:</span>
+                <strong>{hoveredDayTooltip.workHours} công</strong>
+              </div>
+            )}
+            {hoveredDayTooltip.updateReason && (
+              <div className="tooltip-detail-row reason">
+                <span>Ghi chú:</span>
+                <em>{hoveredDayTooltip.updateReason}</em>
+              </div>
+            )}
+            <div className="tooltip-footer-hint">Bấm để mở chi tiết tháng</div>
+          </div>,
+          document.body
+        )}
     </>
   );
 };

@@ -28,9 +28,11 @@ import {
   RotateCcw,
   Inbox,
   ArrowUpDown,
+  AlertTriangle,
   FileText,
 } from 'lucide-react';
 import type { UserInfo } from '../../mockData';
+import { isOrderAwaitingCustomerConfirmation } from '../../types/orders';
 import type {
   Customer,
   CustomerOrderResponse,
@@ -1075,6 +1077,16 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
             </div>
 
             {/* STEPPER PROGRESS */}
+            {isOrderAwaitingCustomerConfirmation(selectedOrder) && (
+              <div className="portal-confirm-warning-banner" role="status">
+                <AlertTriangle size={16} />
+                <div>
+                  <strong>Cảnh báo: Chờ xác nhận</strong>
+                  <span>Đơn hàng này chưa được Quý khách xác nhận phương án sửa chữa hoặc báo giá.</span>
+                </div>
+              </div>
+            )}
+
             {selectedOrder.status !== 'CANCELLED' ? (
               <div className="portal-stepper">
                 {[
@@ -1633,23 +1645,33 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                         </div>
                         {(() => {
                           const matchedQ = findQuotationForOrder(ord.id);
-                          if (!matchedQ || matchedQ.status !== 'SENT') return null;
-                          return (
-                            <button
-                              type="button"
-                              className="portal-card-quote-pill"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActiveQuotationModal({
-                                  quotation: matchedQ,
-                                  initialOrderId: ord.id,
-                                });
-                              }}
-                            >
-                              <FileText size={12} />
-                              <span>Có báo giá mới ({matchedQ.quoteCode}) — Nhấn để duyệt</span>
-                            </button>
-                          );
+                          if (matchedQ && matchedQ.status === 'SENT') {
+                            return (
+                              <button
+                                type="button"
+                                className="portal-card-quote-pill"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveQuotationModal({
+                                    quotation: matchedQ,
+                                    initialOrderId: ord.id,
+                                  });
+                                }}
+                              >
+                                <FileText size={12} />
+                                <span>Có báo giá mới ({matchedQ.quoteCode}) — Nhấn để duyệt</span>
+                              </button>
+                            );
+                          }
+                          if (isOrderAwaitingCustomerConfirmation(ord)) {
+                            return (
+                              <div className="portal-confirm-warning-pill" role="status">
+                                <AlertTriangle size={12} />
+                                <span>Chờ xác nhận</span>
+                              </div>
+                            );
+                          }
+                          return null;
                         })()}
                         <h4 className="order-title">
                           {ord.orderTitle || ord.deviceName || ord.deviceType || 'Đơn sửa chữa thiết bị'}

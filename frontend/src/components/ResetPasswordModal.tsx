@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { X, KeyRound, Eye, EyeOff, ShieldCheck, Dices, Check, AlertCircle } from 'lucide-react';
 import { getJsonAuthHeaders } from '../utils/auth';
 import { getRoleLabel } from '../utils/permissions';
+import { useDialogA11y } from '../hooks/useMotion';
 import './ResetPasswordModal.css';
 
 interface ResetPasswordUser {
@@ -26,6 +27,8 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
   onSuccess,
   showToast,
 }) => {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  useDialogA11y(true, onClose, dialogRef);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -116,7 +119,15 @@ export const ResetPasswordModal: React.FC<ResetPasswordModalProps> = ({
 
   return (
     <div className="reset-pwd-backdrop" onClick={onClose}>
-      <div className="reset-pwd-modal" onClick={e => e.stopPropagation()}>
+      <div
+        ref={dialogRef}
+        className="reset-pwd-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Đổi mật khẩu cho ${user.fullName || user.username}`}
+        tabIndex={-1}
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
         <div className="reset-pwd-header">
           <div className="reset-pwd-header-title">

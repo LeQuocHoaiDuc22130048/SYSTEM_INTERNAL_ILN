@@ -3,6 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { X, Shield, RotateCcw, Save, CheckCircle2, XCircle, MinusCircle, Key } from 'lucide-react';
 import { PERMISSION_LABELS } from '../utils/permissions';
 import { getAuthHeaders, getJsonAuthHeaders } from '../utils/auth';
+import { AccessibleDialog } from './AccessibleDialog';
 import './PermissionModal.css';
 
 // ── Types ─────────────────────────────────────────────────────────────────
@@ -209,7 +210,11 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
 
   return (
     <div className="perm-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="perm-modal">
+      <AccessibleDialog
+        className="perm-modal"
+        onClose={onClose}
+        ariaLabel={`Phân quyền: ${userName}`}
+      >
 
         {/* Header */}
         <div className="perm-modal-header">
@@ -403,7 +408,7 @@ export const PermissionModal: React.FC<PermissionModalProps> = ({
             </button>) }
           </div>
         </div>
-      </div>
+      </AccessibleDialog>
     </div>
   );
 };

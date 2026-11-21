@@ -1,7 +1,7 @@
 import { usePermissionCheck } from '../../utils/permissionContext';
 import React from 'react';
-import { Search, Filter, Calendar, Plus, X, User, Phone } from 'lucide-react';
-import type { RepairOrder } from '../../types/orders';
+import { Search, Filter, Calendar, Plus, X, User, Phone, AlertTriangle } from 'lucide-react';
+import { isOrderAwaitingCustomerConfirmation, type RepairOrder } from '../../types/orders';
 
 interface OrderListPanelProps {
   searchTerm: string;
@@ -169,6 +169,13 @@ export const OrderListPanel: React.FC<OrderListPanelProps> = ({
                         {statusMeta.label}
                       </span>
                     </div>
+
+                    {isOrderAwaitingCustomerConfirmation(order) && (
+                      <div className="order-confirm-warning-pill" role="status">
+                        <AlertTriangle size={12} />
+                        <span>Cảnh báo: Chờ khách xác nhận</span>
+                      </div>
+                    )}
 
                     <h3 className="card-device-name" title={order.deviceName}>
                       {order.deviceName}

@@ -329,26 +329,26 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="customers-actions-group">
           <button
             type="button"
             className="btn-secondary-refresh"
             onClick={fetchCustomersList}
             title="Làm mới dữ liệu"
+            aria-label="Làm mới dữ liệu"
           >
             <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-            Làm mới
+            <span className="btn-refresh-label">Làm mới</span>
           </button>
           {canManagePortalSupport && (
             <button
               type="button"
-              className="btn-secondary-refresh"
+              className="btn-secondary-refresh btn-portal-support"
               onClick={() => setIsSupportConfigModalOpen(true)}
               title="Cấu hình kênh hỗ trợ Portal (Hotline, Zalo)"
-              style={{ color: '#0284c7', borderColor: '#bae6fd', background: '#f0f9ff' }}
             >
               <PhoneCall size={16} />
-              Kênh hỗ trợ Portal
+              <span>Kênh hỗ trợ Portal</span>
             </button>
           )}
           {canManage && (
@@ -358,58 +358,34 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
               onClick={handleOpenCreateModal}
             >
               <Plus size={16} />
-              Thêm khách hàng
+              <span>Thêm khách hàng</span>
             </button>))
           )}
         </div>
       </div>
 
       {/* Sub-tab Navigation */}
-      <div className="customers-subtab-bar" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+      <div className="customers-subtab-bar" role="tablist" aria-label="Chế độ xem khách hàng">
         <button
           type="button"
+          role="tab"
+          aria-selected={activeCustomerSubTab === 'DIRECTORY'}
+          className={`customers-subtab-btn ${activeCustomerSubTab === 'DIRECTORY' ? 'active' : ''}`}
           onClick={() => setActiveCustomerSubTab('DIRECTORY')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '9px 18px',
-            borderRadius: '12px',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            border: activeCustomerSubTab === 'DIRECTORY' ? 'none' : '1px solid #cbd5e1',
-            cursor: 'pointer',
-            background: activeCustomerSubTab === 'DIRECTORY' ? '#2563eb' : '#ffffff',
-            color: activeCustomerSubTab === 'DIRECTORY' ? '#ffffff' : '#64748b',
-            boxShadow: activeCustomerSubTab === 'DIRECTORY' ? '0 4px 12px rgba(37,99,235,0.25)' : 'none',
-            transition: 'all 0.15s ease',
-          }}
         >
-          <Users size={16} />
-          Danh sách khách hàng ({customerPage?.totalElements || 0})
+          <Users size={15} aria-hidden="true" />
+          <span>Danh sách ({customerPage?.totalElements || 0})</span>
         </button>
 
         <button
           type="button"
+          role="tab"
+          aria-selected={activeCustomerSubTab === 'FEEDBACK'}
+          className={`customers-subtab-btn ${activeCustomerSubTab === 'FEEDBACK' ? 'active' : ''}`}
           onClick={() => setActiveCustomerSubTab('FEEDBACK')}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: '8px',
-            padding: '9px 18px',
-            borderRadius: '12px',
-            fontWeight: 700,
-            fontSize: '0.875rem',
-            border: activeCustomerSubTab === 'FEEDBACK' ? 'none' : '1px solid #cbd5e1',
-            cursor: 'pointer',
-            background: activeCustomerSubTab === 'FEEDBACK' ? '#2563eb' : '#ffffff',
-            color: activeCustomerSubTab === 'FEEDBACK' ? '#ffffff' : '#64748b',
-            boxShadow: activeCustomerSubTab === 'FEEDBACK' ? '0 4px 12px rgba(37,99,235,0.25)' : 'none',
-            transition: 'all 0.15s ease',
-          }}
         >
-          <MessageSquare size={16} />
-          Phản hồi & Đánh giá CSKH
+          <MessageSquare size={15} aria-hidden="true" />
+          <span>Đánh giá CSKH</span>
         </button>
       </div>
 
@@ -584,6 +560,136 @@ export const CustomersTab: React.FC<CustomersTabProps> = ({
               )}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card List (< 768px) */}
+        <div className="customers-mobile-list">
+          {loading && (!customerPage || customerPage.content.length === 0) ? (
+            <div className="customers-mobile-state">
+              <RefreshCw size={22} className="animate-spin" />
+              <span>Đang tải danh sách khách hàng...</span>
+            </div>
+          ) : errorMsg && (!customerPage || customerPage.content.length === 0) ? (
+            <div className="customers-mobile-state is-error">
+              <AlertCircle size={22} />
+              <span>{errorMsg}</span>
+            </div>
+          ) : !customerPage || customerPage.content.length === 0 ? (
+            <div className="customers-mobile-state">
+              <Users size={28} style={{ opacity: 0.5 }} />
+              <span>Không tìm thấy khách hàng nào phù hợp</span>
+            </div>
+          ) : (
+            customerPage.content.map((c) => (
+              <article key={c.id} className="customer-mobile-card">
+                {/* Hàng 1: Tên + Phân loại + Trạng thái */}
+                <div className="customer-card-top">
+                  <div className="customer-card-identity">
+                    <strong className="customer-card-name">{c.customerName}</strong>
+                    {c.type === 'COMPANY' ? (
+                      <span className="type-pill company">
+                        <Building2 size={11} />
+                        Doanh nghiệp
+                      </span>
+                    ) : (
+                      <span className="type-pill individual">
+                        <User size={11} />
+                        Cá nhân
+                      </span>
+                    )}
+                  </div>
+                  {c.active ? (
+                    <span className="status-pill active">
+                      <CheckCircle2 size={11} />
+                      Hoạt động
+                    </span>
+                  ) : (
+                    <span className="status-pill inactive">
+                      <XCircle size={11} />
+                      Ngừng
+                    </span>
+                  )}
+                </div>
+
+                {/* Hàng 2: SĐT bấm gọi + Địa chỉ rút gọn 1 dòng */}
+                <div className="customer-card-middle">
+                  {c.phone ? (
+                    <a
+                      href={`tel:${c.phone}`}
+                      className="customer-card-phone"
+                      title={`Gọi ${c.phone}`}
+                    >
+                      <Phone size={13} aria-hidden="true" />
+                      <span>{c.phone}</span>
+                    </a>
+                  ) : (
+                    <span className="customer-card-phone is-empty">
+                      <Phone size={13} aria-hidden="true" />
+                      <span>Chưa có SĐT</span>
+                    </span>
+                  )}
+                  {c.address && (
+                    <div className="customer-card-address" title={c.address}>
+                      <MapPin size={12} aria-hidden="true" />
+                      <span>{c.address}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Hàng 3: Mã khách trái + Nút thao tác phải */}
+                <div className="customer-card-bottom">
+                  <span
+                    className="customer-code-badge"
+                    title={c.customerCode}
+                    onClick={() => copyToClipboard(c.customerCode, 'Mã khách')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {c.customerCode.length > 15
+                      ? `${c.customerCode.slice(0, 12)}...`
+                      : c.customerCode}
+                  </span>
+
+                  <div className="actions-cell">
+                    <button
+                      type="button"
+                      className="btn-icon-action"
+                      title="Xem chi tiết & lịch sử"
+                      aria-label="Xem chi tiết"
+                      onClick={() => handleOpenDetailModal(c)}
+                    >
+                      <Eye size={15} />
+                    </button>
+                    {canManage && (
+                      <>
+                        {canAction('CUSTOMER_UPDATE') && (
+                          <button
+                            type="button"
+                            className="btn-icon-action"
+                            title="Chỉnh sửa hồ sơ"
+                            aria-label="Chỉnh sửa"
+                            onClick={() => handleOpenEditModal(c)}
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                        )}
+                        {canAction('CUSTOMER_STATUS_UPDATE') && (
+                          <button
+                            type="button"
+                            className={`btn-icon-action ${c.active ? 'danger' : 'success'}`}
+                            title={c.active ? 'Ngừng hoạt động' : 'Kích hoạt lại'}
+                            aria-label={c.active ? 'Ngừng hoạt động' : 'Kích hoạt lại'}
+                            onClick={() => setStatusTargetCustomer(c)}
+                          >
+                            <Power size={15} />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))
+          )}
         </div>
 
         {/* Pagination Bar */}

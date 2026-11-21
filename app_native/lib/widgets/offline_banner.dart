@@ -3,6 +3,7 @@ import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:provider/provider.dart';
 
 import '../theme/app_colors.dart';
+import '../theme/app_motion.dart';
 import '../utils/network_provider.dart';
 import '../utils/pending_sync_provider.dart';
 
@@ -25,7 +26,12 @@ class OfflineBanner extends StatelessWidget {
               child: SafeArea(
                 bottom: false,
                 child: AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
+                  duration: AppMotion.resolveDuration(
+                    context,
+                    AppMotion.normal,
+                  ),
+                  switchInCurve: AppMotion.easeEnter,
+                  switchOutCurve: AppMotion.easeExit,
                   child:
                       network.isOffline ||
                           pendingSync.hasPending ||

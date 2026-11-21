@@ -12,6 +12,9 @@ class AppBackButton extends StatelessWidget {
   final double size;
   final double iconSize;
   final String? tooltip;
+  final Color? backgroundColor;
+  final Color? borderColor;
+  final Color? iconColor;
 
   const AppBackButton({
     super.key,
@@ -21,12 +24,24 @@ class AppBackButton extends StatelessWidget {
     this.size = 38,
     this.iconSize = 19,
     this.tooltip = 'Quay lại',
+    this.backgroundColor,
+    this.borderColor,
+    this.iconColor,
   });
 
   @override
   Widget build(BuildContext context) {
     final effectiveDark =
         isDark ?? (Theme.of(context).brightness == Brightness.dark);
+    final resolvedBg =
+        backgroundColor ??
+        (effectiveDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC));
+    final resolvedBorder =
+        borderColor ??
+        (effectiveDark ? AppColors.borderDark : const Color(0xFFE2E8F0));
+    final resolvedIcon =
+        iconColor ??
+        (effectiveDark ? AppColors.textPrimaryDark : const Color(0xFF334155));
 
     Widget button = Material(
       color: Colors.transparent,
@@ -37,22 +52,17 @@ class AppBackButton extends StatelessWidget {
           width: size,
           height: size,
           decoration: BoxDecoration(
-            color: effectiveDark
-                ? const Color(0xFF1E293B)
-                : const Color(0xFFF8FAFC),
+            color: resolvedBg,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color:
-                  effectiveDark ? AppColors.borderDark : const Color(0xFFE2E8F0),
+              color: resolvedBorder,
             ),
           ),
           child: Center(
             child: Icon(
               icon ?? LucideIcons.chevronLeft,
               size: iconSize,
-              color: effectiveDark
-                  ? AppColors.textPrimaryDark
-                  : const Color(0xFF334155),
+              color: resolvedIcon,
             ),
           ),
         ),

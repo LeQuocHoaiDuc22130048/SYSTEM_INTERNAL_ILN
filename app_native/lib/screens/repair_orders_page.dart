@@ -1272,42 +1272,89 @@ class _OrderCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // ── Dòng phụ: Kỹ thuật viên phụ trách & Mô tả lỗi ngắn ──
+            // ── Dòng phụ: Kỹ thuật viên phụ trách, Mô tả lỗi ngắn & Cảnh báo xác nhận ──
             Row(
               children: [
-                Icon(
-                  Icons.engineering_outlined,
-                  size: 14,
-                  color: secondaryColor,
-                ),
-                const SizedBox(width: 5),
-                Flexible(
-                  child: Text(
-                    assigneeText,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: primaryColor,
-                    ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.engineering_outlined,
+                        size: 14,
+                        color: secondaryColor,
+                      ),
+                      const SizedBox(width: 5),
+                      Flexible(
+                        child: Text(
+                          assigneeText,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: primaryColor,
+                          ),
+                        ),
+                      ),
+                      if (order.description != null &&
+                          order.description!.trim().isNotEmpty) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Text(
+                            '•',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: secondaryColor,
+                            ),
+                          ),
+                        ),
+                        Flexible(
+                          child: Text(
+                            order.description!.trim(),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: secondaryColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
-                if (order.description != null &&
-                    order.description!.trim().isNotEmpty) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Text(
-                      '•',
-                      style: TextStyle(fontSize: 12, color: secondaryColor),
+                if (order.isAwaitingCustomerConfirmation) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 2,
                     ),
-                  ),
-                  Expanded(
-                    child: Text(
-                      order.description!.trim(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12, color: secondaryColor),
+                    decoration: BoxDecoration(
+                      color: AppColors.warningLight,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: AppColors.warning.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 12,
+                          color: AppColors.warning,
+                        ),
+                        SizedBox(width: 3),
+                        Text(
+                          'Chờ xác nhận',
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFFB45309),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -1649,6 +1696,57 @@ class _OrderDetailSheet extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
+                    if (order.isAwaitingCustomerConfirmation) ...[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.warningLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.warning.withValues(alpha: 0.4),
+                          ),
+                        ),
+                        child: const Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Icon(
+                              Icons.warning_amber_rounded,
+                              size: 18,
+                              color: AppColors.warning,
+                            ),
+                            SizedBox(width: 8),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Cảnh báo: Chờ xác nhận từ khách hàng',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                      color: Color(0xFF92400E),
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    'Đơn hàng này chưa được khách hàng xác nhận phương án sửa chữa hoặc báo giá.',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFFB45309),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ],
                     // ── Cụm 1: Thông tin khách hàng ──
                     _buildClusterCard(
                       isDark: isDark,

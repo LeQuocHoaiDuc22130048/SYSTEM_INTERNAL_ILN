@@ -1,13 +1,16 @@
 import { usePermissionCheck } from '../utils/permissionContext';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import type { Customer } from '../types/customer';
 import type { RepairOrder } from '../types/orders';
 import { getCustomerOrderCandidates, linkRepairOrderCustomer } from '../utils/customerApi';
+import { useDialogA11y } from '../hooks/useMotion';
 
 interface Props { customer: Customer; onClose: () => void; onLinked: () => void }
 
 export function CustomerOrderLinkModal({ customer, onClose, onLinked }: Props) {
   const canAction = usePermissionCheck();
+  const dialogRef = useRef<HTMLFormElement>(null);
+  useDialogA11y(true, onClose, dialogRef);
   const [keyword, setKeyword] = useState('');
   const [unlinkedOnly, setUnlinkedOnly] = useState(canAction('CUSTOMER_ASSIGN'));
   const [page, setPage] = useState(0);
@@ -53,8 +56,18 @@ export function CustomerOrderLinkModal({ customer, onClose, onLinked }: Props) {
   }
 
   return (
-    <div className="customer-modal-backdrop" style={{ zIndex: 1200 }}>
-      {(canAction('CUSTOMER_ASSIGN') || canAction('CUSTOMER_TRANSFER')) && (<form className="customer-modal-card" role="dialog" aria-modal="true" aria-labelledby="link-order-title" onSubmit={submit}>
+    <div className="customer-modal-backdrop" style={{ zIndex: 1200 }} onClick={onClose}>
+      {(canAction('CUSTOMER_ASSIGN') || canAction('CUSTOMER_TRANSFER')) && (
+        <form
+          ref={dialogRef}
+          className="customer-modal-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="link-order-title"
+          tabIndex={-1}
+          onClick={(e) => e.stopPropagation()}
+          onSubmit={submit}
+        >
         <div className="customer-modal-header"><h3 id="link-order-title">Gán đơn đã có</h3></div>
         <div className="customer-modal-body">
           <p>Khách hàng nhận đơn: <strong>{customer.customerName}</strong> ({customer.customerCode})</p>
