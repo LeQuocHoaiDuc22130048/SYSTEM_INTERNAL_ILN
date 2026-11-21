@@ -29,6 +29,7 @@ import {
   Inbox,
   ArrowUpDown,
   AlertTriangle,
+  FileText,
 } from 'lucide-react';
 import type { UserInfo } from '../../mockData';
 import { isOrderAwaitingCustomerConfirmation } from '../../types/orders';
@@ -38,6 +39,7 @@ import type {
   CustomerOrderDetailResponse,
   CustomerAccountProfileResponse,
 } from '../../types/customer';
+import type { QuotationResponse } from '../../types/quotation';
 import {
   trackPortalOrder,
   getMyCustomerOrders,
@@ -48,6 +50,9 @@ import {
   updateCustomerAccountProfile,
   uploadCustomerAvatar,
 } from '../../utils/portalApi';
+import { getMyCustomerQuotations } from '../../utils/quotationApi';
+import { getPortalSupportConfig } from '../../utils/portalConfigApi';
+import { CustomerQuotationModal } from './CustomerQuotationModal';
 import './CustomerPortalApp.css';
 
 interface CustomerPortalAppProps {
@@ -85,6 +90,14 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
   const [orders, setOrders] = useState<CustomerOrderResponse[]>([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [orderSearchKeyword, setOrderSearchKeyword] = useState('');
+
+  // Customer Quotations State
+  const [quotations, setQuotations] = useState<QuotationResponse[]>([]);
+  const [activeQuotationModal, setActiveQuotationModal] = useState<{
+    quotation: QuotationResponse;
+    initialOrderId?: string | null;
+  } | null>(null);
+  const [portalHotline, setPortalHotline] = useState<string>('0964 266 771');
 
   // Filter & Sort States
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL');
@@ -150,11 +163,88 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
     setOrdersLoading(false);
   }, [isAuth]);
 
+  const fetchQuotations = useCallback(async () => {
+    if (!isAuth) return;
+    const res = await getMyCustomerQuotations({ size: 50 });
+    if (res.success && res.data) {
+      setQuotations(res.data.content || []);
+    }
+  }, [isAuth]);
+
+  useEffect(() => {
+    getPortalSupportConfig()
+      .then((cfg) => {
+        if (cfg?.hotlineNumber) {
+          setPortalHotline(cfg.hotlineNumber);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     if (isAuth && activeTab === 'orders' && !selectedOrder) {
       fetchOrders();
+      fetchQuotations();
     }
-  }, [isAuth, activeTab, selectedOrder, fetchOrders]);
+  }, [isAuth, activeTab, selectedOrder, fetchOrders, fetchQuotations]);
+
+  useEffect(() => {
+    if (isAuth) {
+      fetchQuotations();
+    }
+  }, [isAuth, fetchQuotations]);
+
+  const findQuotationForOrder = useCallback(
+    (orderId: string): QuotationResponse | undefined => {
+      const matching = quotations.filter((q) =>
+        q.items.some((item) => item.repairOrderId === orderId)
+      );
+      if (matching.length === 0) return undefined;
+      return (
+        matching.find((q) => q.status === 'SENT') ||
+        matching.find((q) => q.status === 'APPROVED' || q.status === 'PARTIAL_APPROVED') ||
+        matching[0]
+      );
+    },
+    [quotations]
+  );
+
+  const pendingQuotations = useMemo(
+    () => quotations.filter((q) => q.status === 'SENT'),
+    [quotations]
+  );
+
+  const payableQuotations = useMemo(
+    () =>
+      quotations.filter(
+        (q) =>
+          (q.status === 'APPROVED' || q.status === 'PARTIAL_APPROVED') &&
+          q.totalApprovedAmount > 0 &&
+          !q.paymentProofs?.some((p) => p.status === 'VERIFIED')
+      ),
+    [quotations]
+  );
+
+  const handleQuotationUpdated = useCallback(
+    (updated: QuotationResponse) => {
+      setQuotations((prev) => {
+        const exists = prev.some((q) => q.id === updated.id);
+        return exists ? prev.map((q) => (q.id === updated.id ? updated : q)) : [updated, ...prev];
+      });
+      setActiveQuotationModal((prev) =>
+        prev && prev.quotation.id === updated.id ? { ...prev, quotation: updated } : prev
+      );
+      void fetchOrders();
+      if (selectedOrder && isAuth) {
+        getMyCustomerOrderDetail(selectedOrder.id).then((res) => {
+          if (res.success && res.data) {
+            setSelectedOrder(res.data);
+          }
+        });
+      }
+    },
+    [fetchOrders, selectedOrder, isAuth]
+  );
 
   // Handle Quick Track Submit
   const handleTrackSubmit = async (e: React.FormEvent) => {
@@ -946,17 +1036,43 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                 </div>
               </div>
 
-              <div style={{ fontSize: '0.82rem', color: '#64748b', textAlign: 'right' }}>
-                {(selectedOrder.receivedAt || selectedOrder.receivedDate) && (
-                  <div>
-                    Ngày nhận: {new Date((selectedOrder.receivedAt || selectedOrder.receivedDate) as string).toLocaleDateString('vi-VN')}
-                  </div>
-                )}
-                {(selectedOrder.estimatedDone || selectedOrder.expectedDeliveryDate) && (
-                  <div>
-                    Dự kiến giao: {new Date((selectedOrder.estimatedDone || selectedOrder.expectedDeliveryDate) as string).toLocaleDateString('vi-VN')}
-                  </div>
-                )}
+              <div style={{ fontSize: '0.82rem', color: '#64748b', textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                <div>
+                  {(selectedOrder.receivedAt || selectedOrder.receivedDate) && (
+                    <div>
+                      Ngày nhận: {new Date((selectedOrder.receivedAt || selectedOrder.receivedDate) as string).toLocaleDateString('vi-VN')}
+                    </div>
+                  )}
+                  {(selectedOrder.estimatedDone || selectedOrder.expectedDeliveryDate) && (
+                    <div>
+                      Dự kiến giao: {new Date((selectedOrder.estimatedDone || selectedOrder.expectedDeliveryDate) as string).toLocaleDateString('vi-VN')}
+                    </div>
+                  )}
+                </div>
+                {isAuth && (() => {
+                  const matchedQuotation = findQuotationForOrder(selectedOrder.id);
+                  if (!matchedQuotation) return null;
+                  const isSent = matchedQuotation.status === 'SENT';
+                  return (
+                    <button
+                      type="button"
+                      className={`portal-quote-open-btn ${isSent ? 'is-pending' : ''}`}
+                      onClick={() =>
+                        setActiveQuotationModal({
+                          quotation: matchedQuotation,
+                          initialOrderId: selectedOrder.id,
+                        })
+                      }
+                    >
+                      <FileText size={15} />
+                      <span>
+                        {isSent
+                          ? `Xác nhận báo giá (${matchedQuotation.quoteCode})`
+                          : `Xem báo giá & Thanh toán (${matchedQuotation.quoteCode})`}
+                      </span>
+                    </button>
+                  );
+                })()}
               </div>
             </div>
 
@@ -1180,6 +1296,80 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
         ) : (
           /* VIEW 3: MY ORDERS LIST (When Authenticated) */
           <div>
+            {/* PENDING & PAYABLE QUOTATIONS BANNER */}
+            {(pendingQuotations.length > 0 || payableQuotations.length > 0) && (
+              <div className="portal-quotations-banner-list">
+                {pendingQuotations.map((q) => (
+                  <div key={q.id} className="portal-quotation-banner is-pending">
+                    <div className="pq-banner-left">
+                      <div className="pq-banner-icon">
+                        <FileText size={20} />
+                      </div>
+                      <div className="pq-banner-info">
+                        <div className="pq-banner-title-row">
+                          <span className="pq-banner-badge">Chờ xác nhận</span>
+                          <strong>Báo giá {q.quoteCode}</strong>
+                          <span className="pq-banner-meta">
+                            • {q.items.length} thiết bị ({q.items.map((it) => it.orderCode).join(', ')})
+                          </span>
+                        </div>
+                        <p className="pq-banner-sub">
+                          Tổng chi phí dự kiến:{' '}
+                          <strong>{q.totalEstimatedAmount.toLocaleString('vi-VN')} đ</strong>.
+                          Vui lòng kiểm tra lỗi kỹ thuật và chọn gói bảo hành để tiến hành sửa chữa.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="pq-banner-cta"
+                      onClick={() => setActiveQuotationModal({ quotation: q })}
+                    >
+                      Xem & Xác nhận ngay
+                    </button>
+                  </div>
+                ))}
+
+                {payableQuotations.map((q) => {
+                  const hasPendingProof = q.paymentProofs?.some((p) => p.status === 'PENDING_VERIFY');
+                  return (
+                    <div key={q.id} className="portal-quotation-banner is-payment">
+                      <div className="pq-banner-left">
+                        <div className="pq-banner-icon payment">
+                          <FileText size={20} />
+                        </div>
+                        <div className="pq-banner-info">
+                          <div className="pq-banner-title-row">
+                            <span className="pq-banner-badge payment">
+                              {hasPendingProof ? 'Đang đối soát CK' : 'Chờ thanh toán'}
+                            </span>
+                            <strong>Báo giá {q.quoteCode}</strong>
+                            <span className="pq-banner-meta">
+                              • {q.items.filter((i) => i.decision === 'APPROVED').length}/{q.items.length} thiết bị đã duyệt
+                            </span>
+                          </div>
+                          <p className="pq-banner-sub">
+                            Số tiền thanh toán:{' '}
+                            <strong>{q.totalApprovedAmount.toLocaleString('vi-VN')} đ</strong>.
+                            {hasPendingProof
+                              ? ' Chứng từ của bạn đã được gửi và đang chờ kế toán xác nhận.'
+                              : ' Bạn có thể quét mã VietQR và tải lên ảnh chuyển khoản khi thuận tiện.'}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        className="pq-banner-cta secondary"
+                        onClick={() => setActiveQuotationModal({ quotation: q })}
+                      >
+                        {hasPendingProof ? 'Xem chứng từ' : 'Thanh toán / QR'}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* METRICS KPI OVERVIEW */}
             {orders.length > 0 && (
               <div className="portal-metrics-overview">
@@ -1453,12 +1643,36 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
                           <span className="order-code-badge">{ord.orderCode}</span>
                           {renderStatusBadge(ord.status, ord.statusLabel || ord.friendlyStatus)}
                         </div>
-                        {isOrderAwaitingCustomerConfirmation(ord) && (
-                          <div className="portal-confirm-warning-pill" role="status">
-                            <AlertTriangle size={12} />
-                            <span>Chờ xác nhận</span>
-                          </div>
-                        )}
+                        {(() => {
+                          const matchedQ = findQuotationForOrder(ord.id);
+                          if (matchedQ && matchedQ.status === 'SENT') {
+                            return (
+                              <button
+                                type="button"
+                                className="portal-card-quote-pill"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveQuotationModal({
+                                    quotation: matchedQ,
+                                    initialOrderId: ord.id,
+                                  });
+                                }}
+                              >
+                                <FileText size={12} />
+                                <span>Có báo giá mới ({matchedQ.quoteCode}) — Nhấn để duyệt</span>
+                              </button>
+                            );
+                          }
+                          if (isOrderAwaitingCustomerConfirmation(ord)) {
+                            return (
+                              <div className="portal-confirm-warning-pill" role="status">
+                                <AlertTriangle size={12} />
+                                <span>Chờ xác nhận</span>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
                         <h4 className="order-title">
                           {ord.orderTitle || ord.deviceName || ord.deviceType || 'Đơn sửa chữa thiết bị'}
                         </h4>
@@ -1818,6 +2032,17 @@ export const CustomerPortalApp: React.FC<CustomerPortalAppProps> = ({
             </form>
           </div>
         </div>
+      )}
+
+      {/* CUSTOMER QUOTATION CONFIRMATION & PAYMENT MODAL */}
+      {activeQuotationModal && (
+        <CustomerQuotationModal
+          quotation={activeQuotationModal.quotation}
+          hotlineNumber={portalHotline}
+          initialOrderId={activeQuotationModal.initialOrderId}
+          onClose={() => setActiveQuotationModal(null)}
+          onUpdated={handleQuotationUpdated}
+        />
       )}
 
       {/* LIGHTBOX PREVIEW MODAL */}

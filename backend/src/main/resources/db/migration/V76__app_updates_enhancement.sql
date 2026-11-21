@@ -16,7 +16,7 @@ WHERE platform = 'IOS'
   AND download_url = 'https://apps.apple.com/app/id6740000000';
 
 -- Update default customer portal support phone number to 0964 266 771
-UPDATE portal_support_config
+UPDATE portal_support_configs
 SET hotline_number = '0964 266 771',
     hotline_label = 'Liên hệ kỹ thuật'
 WHERE hotline_number = '0909000000';

@@ -33,4 +33,12 @@ public class UpdatePortalSupportConfigRequest {
     private Double longitude;
 
     private String mapImageUrl;
+
+    private String bankName;
+
+    private String bankBin;
+
+    private String bankAccountNumber;
+
+    private String bankAccountHolder;
 }

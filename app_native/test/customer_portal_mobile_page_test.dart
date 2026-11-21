@@ -38,7 +38,7 @@ void main() {
     return null;
   });
 
-  testWidgets('CustomerPortalMobilePage renders VIP card, search bar, filters and empty state', (tester) async {
+  testWidgets('CustomerPortalMobilePage renders app banner, profile partner info, search bar, filters and empty state', (tester) async {
     tester.view.physicalSize = const Size(390, 844);
     tester.view.devicePixelRatio = 1;
     addTearDown(() => tester.view.resetPhysicalSize());
@@ -66,6 +66,41 @@ void main() {
           jsonEncode({
             'content': [],
             'totalElements': 0,
+          }),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/banners') {
+        return http.Response(
+          jsonEncode([
+            {
+              'id': 'b1',
+              'badgeText': 'ƯU ĐÃI DỊCH VỤ',
+              'title': 'Bảo trì biến tần định kỳ',
+              'subtitle': 'Giảm 25% phí kiểm tra & vệ sinh công nghiệp',
+              'buttonText': 'Đặt lịch ngay',
+              'actionType': 'BOOKING',
+              'isActive': true,
+              'displayOrder': 1,
+            },
+          ]),
+          200,
+          headers: {'content-type': 'application/json; charset=utf-8'},
+        );
+      }
+      if (request.url.path == '/api/v1/customer/account-profile') {
+        return http.Response(
+          jsonEncode({
+            'success': true,
+            'data': {
+              'customerName': 'Cong Ty Tnhh Tu Dong Hoa Bien Tany',
+              'customerCode': 'KH-6f791dd82cd54f6ea4fd1bfe97860701',
+              'contactName': 'Anh Bientan',
+              'phone': '0988776655',
+              'email': 'admin@autotech.vn',
+              'username': 'khachhangtest',
+            },
           }),
           200,
           headers: {'content-type': 'application/json; charset=utf-8'},
@@ -102,13 +137,11 @@ void main() {
     expect(find.text('CỔNG KHÁCH HÀNG'), findsOneWidget);
     expect(find.text('Theo dõi tiến độ sửa chữa thiết bị'), findsOneWidget);
 
-    // Verify VIP Membership Card
-    expect(find.text('ĐỐI TÁC DOANH NGHIỆP'), findsOneWidget);
-    expect(find.text('24/7'), findsOneWidget);
-    expect(find.text('Cong Ty Tnhh Tu Dong Hoa Bien Tany'), findsOneWidget);
-    expect(find.text('Gọi kỹ thuật'), findsWidgets);
-    expect(find.byIcon(LucideIcons.phoneCall), findsWidgets);
-    expect(find.byIcon(LucideIcons.copy), findsOneWidget);
+    // Verify Banner Management carousel replaces old VIP hero & metrics card
+    expect(find.text('Bảo trì biến tần định kỳ'), findsOneWidget);
+    expect(find.text('Đơn sửa chữa'), findsNothing);
+    expect(find.text('Đang thực hiện'), findsNothing);
+    expect(find.text('ĐỐI TÁC DOANH NGHIỆP'), findsNothing);
     expect(find.text('Chat Zalo Tiếp Nhận'), findsNothing);
 
     // Verify Search Bar & Quick Filters
@@ -122,16 +155,33 @@ void main() {
     expect(find.text('Chưa có đơn sửa chữa nào'), findsOneWidget);
     expect(find.text('Liên hệ gửi máy mới'), findsOneWidget);
 
-    // Verify Popup Menu has logout
+    // Verify Profile dialog contains moved partner identity, copyable customer code, and call tech button
     final popupBtn = find.byType(PopupMenuButton<String>);
     expect(popupBtn, findsOneWidget);
     await tester.tap(popupBtn);
     await tester.pumpAndSettle();
 
+    expect(find.text('Hồ sơ cá nhân'), findsOneWidget);
     expect(find.text('Đổi mật khẩu'), findsOneWidget);
     expect(find.text('Đăng xuất'), findsOneWidget);
 
+    await tester.tap(find.text('Hồ sơ cá nhân'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('ĐỐI TÁC DOANH NGHIỆP'), findsOneWidget);
+    expect(find.text('24/7'), findsOneWidget);
+    expect(find.text('Cong Ty Tnhh Tu Dong Hoa Bien Tany'), findsWidgets);
+    await tester.ensureVisible(find.text('#KH-6f791dd82cd54f6ea4fd1bfe97860701'));
+    expect(find.text('#KH-6f791dd82cd54f6ea4fd1bfe97860701'), findsOneWidget);
+    expect(find.text('Gọi kỹ thuật'), findsOneWidget);
+    expect(find.byIcon(LucideIcons.copy), findsOneWidget);
+
+    await tester.tap(find.byIcon(LucideIcons.x));
+    await tester.pumpAndSettle();
+
     // Tap logout in menu
+    await tester.tap(popupBtn);
+    await tester.pumpAndSettle();
     await tester.tap(find.text('Đăng xuất'));
     await tester.pumpAndSettle();
 
@@ -258,7 +308,19 @@ void main() {
     expect(find.text('Schneider ATV310HD11N4E (Biến tần 3 pha)'), findsOneWidget);
     expect(find.text('SN-SCH-99812'), findsWidgets);
     expect(find.text('Tình trạng: Nổ IGBT nhánh U, mất nguồn 24V'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Đã thay thế module IGBT và kích thử xung'),
+      find.byType(ListView).last,
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Đã thay thế module IGBT và kích thử xung'), findsOneWidget);
+    await tester.dragUntilVisible(
+      find.text('Kỹ thuật viên: Lê Hoàng Nam'),
+      find.byType(ListView).last,
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('Kỹ thuật viên: Lê Hoàng Nam'), findsOneWidget);
     expect(find.text('KTV. Nguyễn Văn An'), findsNothing);
     expect(find.text('Đã kiểm thử QC'), findsNothing);
@@ -338,6 +400,7 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(() => tester.view.resetPhysicalSize());
 
+    String currentEmail = 'tuan@bientan.vn';
     final mockClient = MockClient((request) async {
       if (request.url.path == '/api/v1/auth/login') {
         return http.Response(
@@ -373,7 +436,7 @@ void main() {
                 'username': 'khachhangtest',
                 'contactName': 'Nguyễn Văn Tuấn',
                 'phone': '0987654321',
-                'email': 'tuan@bientan.vn',
+                'email': currentEmail,
                 'avatarUrl': '',
                 'customerId': 'cust-1',
                 'customerCode': 'KH-TEST-01',
@@ -387,6 +450,7 @@ void main() {
           );
         } else if (request.method == 'PUT') {
           final body = jsonDecode(request.body) as Map<String, dynamic>;
+          currentEmail = body['email']?.toString() ?? currentEmail;
           return http.Response(
             jsonEncode({
               'success': true,
@@ -432,9 +496,6 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify contact name appears on VIP card
-    expect(find.text('Đại diện: Nguyễn Văn Tuấn'), findsOneWidget);
-
     // Open popup menu and tap 'Hồ sơ cá nhân'
     final popupBtn = find.byType(PopupMenuButton<String>);
     await tester.tap(popupBtn);
@@ -444,11 +505,14 @@ void main() {
     await tester.tap(find.text('Hồ sơ cá nhân'));
     await tester.pumpAndSettle();
 
-    // Verify profile dialog opened
+    // Verify profile dialog opened with moved enterprise details
     expect(find.text('Thông tin tài khoản'), findsOneWidget);
-    expect(find.text('KH-TEST-01'), findsOneWidget);
+    expect(find.text('ĐỐI TÁC DOANH NGHIỆP'), findsOneWidget);
+    await tester.ensureVisible(find.text('#KH-TEST-01'));
+    expect(find.text('#KH-TEST-01'), findsOneWidget);
     expect(find.text('0312345678'), findsOneWidget);
     expect(find.text('123 Đường ABC, TP.HCM'), findsOneWidget);
+    expect(find.text('Nguyễn Văn Tuấn'), findsWidgets);
 
     // Contact name and phone editing fields are hidden; shown read-only in info card
     expect(find.text('Tên người liên hệ *'), findsNothing);
@@ -470,9 +534,14 @@ void main() {
     await tester.tap(find.widgetWithText(ElevatedButton, 'Lưu thay đổi'));
     await tester.pumpAndSettle();
 
-    // Verify SnackBar and preserved contact name on card
+    // Verify SnackBar and preserved read-only contact info when re-opening profile dialog
     expect(find.text('Cập nhật thông tin tài khoản thành công!'), findsOneWidget);
-    expect(find.text('Đại diện: Nguyễn Văn Tuấn'), findsOneWidget);
+    await tester.tap(popupBtn);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hồ sơ cá nhân'));
+    await tester.pumpAndSettle();
+    expect(find.text('Nguyễn Văn Tuấn'), findsWidgets);
+    expect(find.text('contact@bientan.vn'), findsOneWidget);
   });
 
   testWidgets('CustomerPortalMobilePage displays application logo, distinct status badges, and supports time/device filtering', (tester) async {
@@ -671,7 +740,19 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    // Verify full customer code format (#KH-0667c50aa720) is rendered
+    // Open profile dialog where customer code is now located
+    await tester.tap(find.byType(PopupMenuButton<String>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Hồ sơ cá nhân'));
+    await tester.pumpAndSettle();
+
+    // Verify full customer code format (#KH-0667c50aa720) is rendered and copyable
+    await tester.dragUntilVisible(
+      find.text('#KH-0667c50aa720'),
+      find.byType(ListView).last,
+      const Offset(0, -180),
+    );
+    await tester.pumpAndSettle();
     expect(find.text('#KH-0667c50aa720'), findsOneWidget);
 
     // Tap copy button on customer code

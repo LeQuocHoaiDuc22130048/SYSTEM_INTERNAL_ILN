@@ -5,11 +5,15 @@ import 'package:provider/provider.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:image_picker/image_picker.dart';
+import '../models/app_banner.dart';
+import '../models/repair_quotation.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_motion.dart';
 import '../utils/api_client.dart';
 import '../utils/auth_provider.dart';
+import '../widgets/app_banner_carousel.dart';
 import '../widgets/customer/order_confirmation_sheet.dart';
+import '../widgets/customer_quotation_sheet.dart';
 
 class CustomerPortalMobilePage extends StatefulWidget {
   const CustomerPortalMobilePage({
@@ -29,6 +33,9 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   bool _isLoading = true;
   String? _error;
   List<Map<String, dynamic>> _orders = [];
+  List<RepairQuotationModel> _quotations = [];
+  List<AppBanner> _banners = const [];
+  bool _isLoadingBanners = true;
   Map<String, dynamic>? _accountProfile;
   late final ImagePicker _imagePicker = widget.imagePicker ?? ImagePicker();
 
@@ -71,6 +78,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   void initState() {
     super.initState();
     _fetchOrders();
+    _fetchQuotations();
+    _fetchBanners();
     _fetchSupportConfig();
     _fetchAccountProfile();
     _fetchMyFeedbacks();
@@ -118,6 +127,282 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _fetchQuotations() async {
+    final api = context.read<AuthProvider>().api;
+    try {
+      final res = await api.get(
+        '/api/v1/customer/quotations',
+        queryParameters: {'size': 50},
+      );
+      if (!mounted) return;
+      if (res is Map<String, dynamic> && res['content'] is List) {
+        setState(() {
+          _quotations = (res['content'] as List)
+              .whereType<Map<String, dynamic>>()
+              .map(RepairQuotationModel.fromJson)
+              .toList();
+        });
+      }
+    } catch (_) {
+      // Bỏ qua nếu chưa có báo giá
+    }
+  }
+
+  Future<void> _fetchBanners() async {
+    final api = context.read<AuthProvider>().api;
+    try {
+      final res = await api.get('/api/v1/banners');
+      final rawList = res is Map<String, dynamic> && res['content'] is List
+          ? res['content'] as List
+          : (res is List ? res : const []);
+      final loaded = rawList
+          .whereType<Map<String, dynamic>>()
+          .map((item) {
+            try {
+              return AppBanner.fromJson(item);
+            } catch (_) {
+              return null;
+            }
+          })
+          .whereType<AppBanner>()
+          .where((b) => b.isActive)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _banners = loaded.isNotEmpty ? loaded : const [AppBanner.defaultBanner];
+        _isLoadingBanners = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        if (_banners.isEmpty) {
+          _banners = const [AppBanner.defaultBanner];
+        }
+        _isLoadingBanners = false;
+      });
+    }
+  }
+
+  Future<void> _handleCustomerBannerAction(AppBannerButton btn) async {
+    if (btn.actionType == 'BOOKING') {
+      _showNewRequestDialog();
+    } else if (btn.actionType == 'REPAIR_ORDER') {
+      if (mounted) setState(() => _currentNavIndex = 0);
+    } else if (btn.actionType == 'SCREEN') {
+      final value = (btn.actionValue ?? '').trim().toLowerCase();
+      if (!mounted) return;
+      if (value.contains('profile') || value.contains('hồ sơ')) {
+        await _showProfileDialog();
+      } else if (value.contains('feedback') || value.contains('phản hồi')) {
+        setState(() => _currentNavIndex = 1);
+      } else if (value.contains('warranty') || value.contains('bảo hành')) {
+        setState(() => _currentNavIndex = 2);
+      } else if (value.contains('support') || value.contains('hỗ trợ')) {
+        setState(() => _currentNavIndex = 3);
+      } else {
+        setState(() => _currentNavIndex = 0);
+      }
+    }
+  }
+
+  RepairQuotationModel? _findQuotationForOrder(String orderId) {
+    final matching = _quotations
+        .where((q) => q.items.any((it) => it.repairOrderId == orderId))
+        .toList();
+    if (matching.isEmpty) return null;
+    for (final q in matching) {
+      if (q.status == 'SENT') return q;
+    }
+    for (final q in matching) {
+      if (q.status == 'APPROVED' || q.status == 'PARTIAL_APPROVED') return q;
+    }
+    return matching.first;
+  }
+
+  void _openQuotationModal(
+    RepairQuotationModel quotation, {
+    String? initialOrderId,
+  }) {
+    showCustomerQuotationSheet(
+      context: context,
+      quotation: quotation,
+      hotlineNumber: _hotlineNumber,
+      initialOrderId: initialOrderId,
+      onMakeCall: _makePhoneCall,
+      onUpdated: (updated) {
+        if (!mounted) return;
+        setState(() {
+          final idx = _quotations.indexWhere((q) => q.id == updated.id);
+          if (idx >= 0) {
+            _quotations[idx] = updated;
+          } else {
+            _quotations.insert(0, updated);
+          }
+        });
+        _fetchOrders();
+      },
+    );
+  }
+
+  Widget _buildPendingQuotationsBanners() {
+    final pending = _quotations.where((q) => q.status == 'SENT').toList();
+    final payable = _quotations
+        .where(
+          (q) =>
+              (q.status == 'APPROVED' || q.status == 'PARTIAL_APPROVED') &&
+              q.totalApprovedAmount > 0 &&
+              !q.hasVerifiedPayment,
+        )
+        .toList();
+    if (pending.isEmpty && payable.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      children: [
+        ...pending.map(
+          (q) => Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFFFFBEB), Color(0xFFFEF3C7)],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFFCD34D)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFDE047),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: const Text(
+                        'Chờ xác nhận',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF92400E),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Báo giá ${q.quoteCode} (${q.items.length} thiết bị)',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Chi phí dự kiến: ${formatVnd(q.totalEstimatedAmount)} • ${q.items.map((e) => e.orderCode).join(', ')}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF475569),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF143266),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () => _openQuotationModal(q),
+                    icon: const Icon(LucideIcons.fileText, size: 16),
+                    label: const Text(
+                      'Xem & Xác nhận báo giá ngay',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        ...payable.map(
+          (q) => Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFEFF6FF), Color(0xFFDBEAFE)],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFF93C5FD)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        q.hasPendingProof
+                            ? '${q.quoteCode} • Đang đối soát CK'
+                            : '${q.quoteCode} • Chờ thanh toán',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF1E3A8A),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Tổng duyệt: ${formatVnd(q.totalApprovedAmount)}',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF334155),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2563EB),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  onPressed: () => _openQuotationModal(q),
+                  child: Text(
+                    q.hasPendingProof ? 'Xem chứng từ' : 'VietQR / Tải CK',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+      ],
+    );
   }
 
   Future<void> _fetchSupportConfig() async {
@@ -1506,6 +1791,58 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                                 style: TextStyle(fontSize: 12, color: Color(0xFF2563EB), fontWeight: FontWeight.w600),
                               ),
                             ),
+                            const SizedBox(height: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF0F172A), Color(0xFF172554)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: const Color(0xFF1E40AF).withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(LucideIcons.crown, size: 11, color: Color(0xFFFBBF24)),
+                                  const SizedBox(width: 5),
+                                  const Text(
+                                    'ĐỐI TÁC DOANH NGHIỆP',
+                                    style: TextStyle(
+                                      color: Color(0xFFFCD34D),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                  Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 8),
+                                    width: 1,
+                                    height: 10,
+                                    color: Colors.white.withValues(alpha: 0.25),
+                                  ),
+                                  Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF10B981),
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    '24/7',
+                                    style: TextStyle(
+                                      color: Color(0xFF34D399),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1555,14 +1892,40 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Row(
+                            Row(
                               children: [
-                                Icon(LucideIcons.building2, size: 16, color: Color(0xFF2563EB)),
-                                SizedBox(width: 8),
-                                Expanded(
+                                const Icon(LucideIcons.building2, size: 16, color: Color(0xFF2563EB)),
+                                const SizedBox(width: 8),
+                                const Expanded(
                                   child: Text(
                                     'Thông tin doanh nghiệp đối tác',
                                     style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E3A8A)),
+                                  ),
+                                ),
+                                InkWell(
+                                  onTap: () => _makePhoneCall(_hotlineNumber),
+                                  borderRadius: BorderRadius.circular(16),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2563EB),
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    child: const Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Icon(LucideIcons.phoneCall, size: 11, color: Colors.white),
+                                        SizedBox(width: 4),
+                                        Text(
+                                          'Gọi kỹ thuật',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 10.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ],
@@ -1573,8 +1936,73 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                               _buildProfileInfoRow('Người liên hệ:', contactName),
                             if (contactPhone.isNotEmpty)
                               _buildProfileInfoRow('Số điện thoại:', _formatProfilePhone(contactPhone)),
-                            if (customerCode.isNotEmpty)
-                              _buildProfileInfoRow('Mã khách hàng:', customerCode),
+                            if (contactName.isNotEmpty && contactName != customerName)
+                              _buildProfileInfoRow('Đại diện:', contactName),
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  const SizedBox(
+                                    width: 100,
+                                    child: Text(
+                                      'Mã khách hàng:',
+                                      style: TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: InkWell(
+                                      onTap: () {
+                                        final codeDisplay = customerCode.isNotEmpty
+                                            ? customerCode
+                                            : (username.isNotEmpty ? username : 'Chưa cập nhật');
+                                        Clipboard.setData(ClipboardData(text: codeDisplay));
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('Đã sao chép mã khách hàng: #$codeDisplay'),
+                                            duration: const Duration(seconds: 2),
+                                            behavior: SnackBarBehavior.floating,
+                                          ),
+                                        );
+                                      },
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white,
+                                          borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: const Color(0xFFBFDBFE)),
+                                        ),
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Flexible(
+                                              child: Text(
+                                                '#${customerCode.isNotEmpty ? customerCode : (username.isNotEmpty ? username : 'Chưa cập nhật')}',
+                                                style: const TextStyle(
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                  color: Color(0xFF1E3A8A),
+                                                  fontFamily: 'monospace',
+                                                ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 6),
+                                            const Icon(
+                                              LucideIcons.copy,
+                                              size: 12,
+                                              color: Color(0xFF2563EB),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                             if (companyTaxCode.isNotEmpty)
                               _buildProfileInfoRow('Mã số thuế:', companyTaxCode),
                             if (companyAddress.isNotEmpty)
@@ -2088,7 +2516,6 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     final companyName = _accountProfile?['customerName']?.toString() ?? user?.name ?? 'Khách hàng';
     final contactName = _accountProfile?['contactName']?.toString() ?? '';
     final avatarUrl = _accountProfile?['avatarUrl']?.toString() ?? user?.avatar;
-    final initials = _getInitials(contactName.isNotEmpty ? contactName : companyName);
     final rawPhone = (_accountProfile?['phone']?.toString() ?? '').trim().isNotEmpty
         ? _accountProfile!['phone'].toString().trim()
         : ((user?.phone?.trim().isNotEmpty == true)
@@ -2292,463 +2719,8 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
           const SizedBox(width: 10),
         ],
       ),
-      body: _buildCurrentBody(companyName, contactName, initials, user?.username, avatarUrl),
+      body: _buildCurrentBody(),
       bottomNavigationBar: _buildBottomNavigation(),
-    );
-  }
-
-  // VIP Enterprise Hero Card (Redesigned matching Stitch Screen 1)
-  Widget _buildVipMembershipCard(
-    String companyName,
-    String contactName,
-    String initials,
-    String? username,
-    String? avatarUrl,
-  ) {
-    final customerCode = _accountProfile?['customerCode']?.toString() ?? '';
-    final codeDisplay = customerCode.isNotEmpty ? customerCode : (username ?? 'Chưa cập nhật');
-
-    final completed = _completedCount;
-    final inProgress = _inProgressCount;
-    final total = _orders.length;
-
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(24),
-        gradient: const LinearGradient(
-          colors: [
-            Color(0xFF182944), // Deep Navy
-            AppColors.brandNavy,
-            AppColors.brandBlue,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brandNavy.withValues(alpha: 0.35),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-        border: Border.all(color: AppColors.brandBlue.withValues(alpha: 0.45)),
-      ),
-      child: Stack(
-        children: [
-          // Ambient blurred glow circles
-          Positioned(
-            right: -20,
-            top: -20,
-            child: Container(
-              width: 140,
-              height: 140,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.brandCyan.withValues(alpha: 0.14),
-              ),
-            ),
-          ),
-          Positioned(
-            left: -20,
-            bottom: -20,
-            child: Container(
-              width: 130,
-              height: 130,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.brandBlue.withValues(alpha: 0.22),
-              ),
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(18),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Row: Merged Single-Line Status Tag & VIP Badge
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(LucideIcons.crown, size: 11, color: Color(0xFFFBBF24)),
-                      const SizedBox(width: 5),
-                      const Text(
-                        'ĐỐI TÁC DOANH NGHIỆP',
-                        style: TextStyle(
-                          color: Color(0xFFFCD34D),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.5,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 8),
-                        width: 1,
-                        height: 10,
-                        color: Colors.white.withValues(alpha: 0.25),
-                      ),
-                      Container(
-                        width: 6,
-                        height: 6,
-                        decoration: const BoxDecoration(
-                          color: Color(0xFF10B981),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Text(
-                        '24/7',
-                        style: TextStyle(
-                          color: Color(0xFF34D399),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-
-                // Company Identity Block
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    GestureDetector(
-                      onTap: () => _showProfileDialog(),
-                      child: Container(
-                        width: 48,
-                        height: 48,
-                        padding: const EdgeInsets.all(2),
-                        decoration: BoxDecoration(
-                          gradient: const LinearGradient(
-                            colors: [AppColors.brandNavy, AppColors.brandCyan],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                          borderRadius: BorderRadius.circular(14),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.25),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
-                            ),
-                          ],
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF182944),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
-                            child: (avatarUrl != null && avatarUrl.isNotEmpty)
-                                ? Image.network(
-                                    context.read<AuthProvider>().api.resolveUrl(avatarUrl),
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (ctx, err, stack) => Center(
-                                      child: Text(
-                                        initials,
-                                        style: const TextStyle(
-                                          color: AppColors.brandCyan,
-                                          fontSize: 17,
-                                          fontWeight: FontWeight.w900,
-                                          fontFamily: 'monospace',
-                                        ),
-                                      ),
-                                    ),
-                                  )
-                                : Center(
-                                    child: Text(
-                                      initials,
-                                      style: const TextStyle(
-                                        color: AppColors.brandCyan,
-                                        fontSize: 17,
-                                        fontWeight: FontWeight.w900,
-                                        fontFamily: 'monospace',
-                                      ),
-                                    ),
-                                  ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: GestureDetector(
-                                  onTap: () => _showProfileDialog(),
-                                  child: Text(
-                                    companyName,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      height: 1.25,
-                                    ),
-                                    maxLines: 2,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              // Action Button "Gọi kỹ thuật" tương phản cao trên nền navy (kính mờ + viền trắng)
-                              InkWell(
-                                onTap: () => _makePhoneCall(_hotlineNumber),
-                                borderRadius: BorderRadius.circular(16),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.18),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(color: Colors.white.withValues(alpha: 0.75), width: 1.2),
-                                    boxShadow: [
-                                      BoxShadow(
-                                        color: Colors.black.withValues(alpha: 0.15),
-                                        blurRadius: 4,
-                                        offset: const Offset(0, 1),
-                                      ),
-                                    ],
-                                  ),
-                                  child: const Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(LucideIcons.phoneCall, size: 12, color: Colors.white),
-                                      SizedBox(width: 5),
-                                      Text(
-                                        'Gọi kỹ thuật',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 10.5,
-                                          fontWeight: FontWeight.w800,
-                                          letterSpacing: 0.2,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 5),
-                          Row(
-                            children: [
-                              Flexible(
-                                child: InkWell(
-                                  onTap: () {
-                                    Clipboard.setData(ClipboardData(text: codeDisplay));
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(
-                                        content: Text('Đã sao chép mã khách hàng: #$codeDisplay'),
-                                        duration: const Duration(seconds: 2),
-                                        behavior: SnackBarBehavior.floating,
-                                      ),
-                                    );
-                                  },
-                                  borderRadius: BorderRadius.circular(8),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3.5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.12),
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'Mã: ',
-                                          style: TextStyle(
-                                            color: Colors.white.withValues(alpha: 0.75),
-                                            fontSize: 11,
-                                          ),
-                                        ),
-                                        Flexible(
-                                          child: Text(
-                                            '#$codeDisplay',
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 11,
-                                              fontWeight: FontWeight.bold,
-                                              fontFamily: 'monospace',
-                                            ),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 5),
-                                        Icon(
-                                          LucideIcons.copy,
-                                          size: 11,
-                                          color: Colors.white.withValues(alpha: 0.85),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (contactName.isNotEmpty && contactName != companyName) ...[
-                            const SizedBox(height: 3),
-                            Text(
-                              'Đại diện: $contactName',
-                              style: TextStyle(
-                                color: Colors.white.withValues(alpha: 0.9),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-
-                // Quick Metrics Bar (3 columns)
-                Container(
-                  padding: const EdgeInsets.only(top: 12),
-                  decoration: BoxDecoration(
-                    border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.12))),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedFilter = 'ALL'),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _selectedFilter == 'ALL'
-                                  ? Colors.white.withValues(alpha: 0.16)
-                                  : Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(12),
-                              border: _selectedFilter == 'ALL'
-                                  ? Border.all(color: Colors.white.withValues(alpha: 0.4))
-                                  : null,
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  total < 10 ? '0$total' : '$total',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: Colors.white,
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Đơn sửa chữa',
-                                  style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedFilter = 'COMPLETED'),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _selectedFilter == 'COMPLETED'
-                                  ? Colors.white.withValues(alpha: 0.16)
-                                  : Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(12),
-                              border: _selectedFilter == 'COMPLETED'
-                                  ? Border.all(color: const Color(0xFF34D399).withValues(alpha: 0.6))
-                                  : null,
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  completed < 10 ? '0$completed' : '$completed',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF34D399),
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Sẵn sàng nhận',
-                                  style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedFilter = 'IN_PROGRESS'),
-                          borderRadius: BorderRadius.circular(12),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: _selectedFilter == 'IN_PROGRESS'
-                                  ? Colors.white.withValues(alpha: 0.16)
-                                  : Colors.white.withValues(alpha: 0.06),
-                              borderRadius: BorderRadius.circular(12),
-                              border: _selectedFilter == 'IN_PROGRESS'
-                                  ? Border.all(color: const Color(0xFF60A5FA).withValues(alpha: 0.6))
-                                  : null,
-                            ),
-                            child: Column(
-                              children: [
-                                Text(
-                                  inProgress < 10 ? '0$inProgress' : '$inProgress',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w900,
-                                    color: Color(0xFF60A5FA),
-                                    fontFamily: 'monospace',
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  'Đang thực hiện',
-                                  style: TextStyle(fontSize: 10, color: Colors.white.withValues(alpha: 0.7)),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -3311,6 +3283,64 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                         ),
                       ],
 
+                      if (_findQuotationForOrder(ord['id']?.toString() ?? '')
+                          case final matchedQ?)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: InkWell(
+                            onTap: () => _openQuotationModal(
+                              matchedQ,
+                              initialOrderId: ord['id']?.toString(),
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: matchedQ.status == 'SENT'
+                                    ? const Color(0xFFFEF3C7)
+                                    : const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(999),
+                                border: Border.all(
+                                  color: matchedQ.status == 'SENT'
+                                      ? const Color(0xFFF59E0B)
+                                      : const Color(0xFF93C5FD),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    LucideIcons.fileText,
+                                    size: 13,
+                                    color: matchedQ.status == 'SENT'
+                                        ? const Color(0xFF92400E)
+                                        : const Color(0xFF1D4ED8),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Flexible(
+                                    child: Text(
+                                      matchedQ.status == 'SENT'
+                                          ? 'Có báo giá mới (${matchedQ.quoteCode}) — Nhấn để duyệt'
+                                          : 'Xem báo giá & Thanh toán (${matchedQ.quoteCode})',
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: matchedQ.status == 'SENT'
+                                            ? const Color(0xFF92400E)
+                                            : const Color(0xFF1D4ED8),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+
                       // Order Title
                       Text(
                         orderTitle,
@@ -3485,12 +3515,16 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
                               children: [
                                 Icon(LucideIcons.star, size: 13, color: Color(0xFFD97706)),
                                 SizedBox(width: 6),
-                                Text(
-                                  'Gửi phản hồi / Đánh giá chất lượng đơn này',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF92400E),
+                                Flexible(
+                                  child: Text(
+                                    'Gửi phản hồi / Đánh giá chất lượng đơn này',
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: Color(0xFF92400E),
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
@@ -3950,13 +3984,7 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
   // BODY SWITCHER & SUB-SCREENS (Orders, Feedback, Warranty, Support)
   // ==========================================================================
 
-  Widget _buildCurrentBody(
-    String companyName,
-    String contactName,
-    String initials,
-    String? username,
-    String? avatarUrl,
-  ) {
+  Widget _buildCurrentBody() {
     if (_currentNavIndex == 1) {
       return _buildFeedbackBody();
     }
@@ -3966,21 +3994,17 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
     if (_currentNavIndex == 3) {
       return _buildSupportBody();
     }
-    return _buildOrdersBody(companyName, contactName, initials, username, avatarUrl);
+    return _buildOrdersBody();
   }
 
   // 1. Orders Body
-  Widget _buildOrdersBody(
-    String companyName,
-    String contactName,
-    String initials,
-    String? username,
-    String? avatarUrl,
-  ) {
+  Widget _buildOrdersBody() {
     return RefreshIndicator(
       onRefresh: () async {
         await Future.wait([
           _fetchOrders(),
+          _fetchQuotations(),
+          _fetchBanners(),
           _fetchSupportConfig(),
           _fetchAccountProfile(),
         ]);
@@ -3989,15 +4013,23 @@ class _CustomerPortalMobilePageState extends State<CustomerPortalMobilePage> {
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         children: [
-          // VIP MEMBERSHIP CARD
-          _buildVipMembershipCard(companyName, contactName, initials, username, avatarUrl),
+          // BANNER QUẢN LÝ ỨNG DỤNG
+          AppBannerCarousel(
+            banners: _banners,
+            baseUrl: context.read<AuthProvider>().api.activeBaseUrl,
+            showLoadingPlaceholder: _isLoadingBanners && _banners.isEmpty,
+            horizontalPadding: 0,
+            onActionTap: _handleCustomerBannerAction,
+          ),
           const SizedBox(height: 16),
 
           // SEARCH BAR & QUICK FILTERS
           _buildSearchBar(),
           const SizedBox(height: 12),
           _buildFilterTabs(),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
+
+          _buildPendingQuotationsBanners(),
 
           // SECTION HEADER
           Row(
@@ -6926,46 +6958,54 @@ class _OrderDetailSheetState extends State<_OrderDetailSheet> {
                       ],
                     ),
                     const SizedBox(height: 6),
-                    Text(
-                      steps[stepIdx],
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: (isCurrent || isDone) ? FontWeight.bold : FontWeight.w500,
-                        color: isCurrent
-                            ? const Color(0xFF1D4ED8)
-                            : (isDone ? const Color(0xFF047857) : const Color(0xFF94A3B8)),
+                    SizedBox(
+                      height: 28,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            steps[stepIdx],
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: (isCurrent || isDone) ? FontWeight.bold : FontWeight.w500,
+                              color: isCurrent
+                                  ? const Color(0xFF1D4ED8)
+                                  : (isDone ? const Color(0xFF047857) : const Color(0xFF94A3B8)),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (stepIdx == 0 && receivedDate.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              receivedDate,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF64748B),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ] else if (stepIdx == 4 && isDelivered && deliveryTime.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              deliveryTime,
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                fontSize: 8,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF059669),
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ],
                       ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
                     ),
-                    if (stepIdx == 0 && receivedDate.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        receivedDate,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ] else if (stepIdx == 4 && isDelivered && deliveryTime.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        deliveryTime,
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(
-                          fontSize: 8,
-                          fontWeight: FontWeight.w700,
-                          color: Color(0xFF059669),
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
                   ],
                 ),
               );

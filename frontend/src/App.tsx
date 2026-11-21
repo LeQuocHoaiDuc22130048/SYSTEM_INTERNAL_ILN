@@ -20,6 +20,7 @@ import { UpdateTab } from './components/UpdateTab';
 import { BannerTab } from './components/BannerTab';
 import { Sidebar } from './components/Sidebar';
 import { OrdersTab } from './components/OrdersTab';
+import { QuotationsTab } from './components/QuotationsTab';
 import { CustomersTab } from './components/CustomersTab';
 import { WarehouseTab } from './components/WarehouseTab';
 import { AccountsTab } from './components/AccountsTab';
@@ -39,7 +40,7 @@ import { exportAttendanceExcel } from './utils/excel';
 type DataSource = 'api' | 'error' | 'loading';
 
 /** Tab đang hiển thị */
-type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'customers' | 'warehouse' | 'locations' | 'accounts' | 'terminal' | 'media-cleanup';
+type ActiveTab = 'dashboard' | 'monthly' | 'daily' | 'devices' | 'updates' | 'banners' | 'orders' | 'quotations' | 'customers' | 'warehouse' | 'locations' | 'accounts' | 'terminal' | 'media-cleanup';
 
 /** Dữ liệu target để mở EditModal */
 interface EditModalTarget {
@@ -123,7 +124,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState<string>('');
 
   const [activeTab, setActiveTab] = useState<ActiveTab>(() => {
-    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'customers', 'warehouse', 'locations', 'accounts', 'terminal', 'media-cleanup'];
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'quotations', 'customers', 'warehouse', 'locations', 'accounts', 'terminal', 'media-cleanup'];
     const hash = window.location.hash.replace('#', '') as ActiveTab;
     if (validTabs.includes(hash)) return hash;
 
@@ -143,7 +144,7 @@ function App() {
 
   // Lắng nghe sự kiện hashchange khi người dùng bấm nút Back/Forward trên trình duyệt
   useEffect(() => {
-    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'customers', 'warehouse', 'locations', 'accounts', 'terminal', 'media-cleanup'];
+    const validTabs: ActiveTab[] = ['dashboard', 'monthly', 'daily', 'devices', 'updates', 'banners', 'orders', 'quotations', 'customers', 'warehouse', 'locations', 'accounts', 'terminal', 'media-cleanup'];
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') as ActiveTab;
       if (validTabs.includes(hash)) {
@@ -748,6 +749,12 @@ function App() {
             <OrdersTab
               showToast={showToast}
               currentUser={currentUser}
+            />
+          ) : activeTab === 'quotations' ? (
+            <QuotationsTab
+              showToast={showToast}
+              currentUser={currentUser}
+              refreshTrigger={refreshTrigger}
             />
           ) : activeTab === 'customers' ? (
             <CustomersTab

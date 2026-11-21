@@ -56,6 +56,18 @@ public class PortalSupportConfigService {
         if (request.getMapImageUrl() != null) {
             config.setMapImageUrl(request.getMapImageUrl().trim());
         }
+        if (request.getBankName() != null && !request.getBankName().isBlank()) {
+            config.setBankName(request.getBankName().trim());
+        }
+        if (request.getBankBin() != null && !request.getBankBin().isBlank()) {
+            config.setBankBin(request.getBankBin().trim());
+        }
+        if (request.getBankAccountNumber() != null && !request.getBankAccountNumber().isBlank()) {
+            config.setBankAccountNumber(request.getBankAccountNumber().trim());
+        }
+        if (request.getBankAccountHolder() != null && !request.getBankAccountHolder().isBlank()) {
+            config.setBankAccountHolder(request.getBankAccountHolder().trim());
+        }
         config.setUpdatedAt(LocalDateTime.now());
         config.setUpdatedBy(adminUserId);
 
@@ -77,6 +89,10 @@ public class PortalSupportConfigService {
                 .latitude(10.854611)
                 .longitude(106.703212)
                 .mapImageUrl("")
+                .bankName("MB Bank (Quân Đội)")
+                .bankBin("970422")
+                .bankAccountNumber("9964266771")
+                .bankAccountHolder("CONG TY TNHH KY THUAT CONG NGHE")
                 .updatedAt(LocalDateTime.now())
                 .build();
         return repository.save(defaultConfig);
@@ -101,6 +117,14 @@ public class PortalSupportConfigService {
         }
         Double lat = entity.getLatitude() != null ? entity.getLatitude() : 10.854611;
         Double lng = entity.getLongitude() != null ? entity.getLongitude() : 106.703212;
+        String bankName = entity.getBankName() != null && !entity.getBankName().isBlank()
+                ? entity.getBankName() : "MB Bank (Quân Đội)";
+        String bankBin = entity.getBankBin() != null && !entity.getBankBin().isBlank()
+                ? entity.getBankBin() : "970422";
+        String bankAccountNumber = entity.getBankAccountNumber() != null && !entity.getBankAccountNumber().isBlank()
+                ? entity.getBankAccountNumber() : "9964266771";
+        String bankAccountHolder = entity.getBankAccountHolder() != null && !entity.getBankAccountHolder().isBlank()
+                ? entity.getBankAccountHolder() : "CONG TY TNHH KY THUAT CONG NGHE";
 
         return PortalSupportConfigResponse.builder()
                 .hotlineNumber(phone)
@@ -113,6 +137,10 @@ public class PortalSupportConfigService {
                 .latitude(lat)
                 .longitude(lng)
                 .mapImageUrl(entity.getMapImageUrl())
+                .bankName(bankName)
+                .bankBin(bankBin)
+                .bankAccountNumber(bankAccountNumber)
+                .bankAccountHolder(bankAccountHolder)
                 .updatedAt(entity.getUpdatedAt())
                 .build();
     }

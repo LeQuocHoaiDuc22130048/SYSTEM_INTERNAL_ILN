@@ -11,6 +11,10 @@ export interface PortalSupportConfig {
   latitude?: number;
   longitude?: number;
   mapImageUrl?: string;
+  bankName?: string;
+  bankBin?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
   updatedAt?: string;
 }
 
@@ -25,6 +29,10 @@ export interface UpdatePortalSupportConfigRequest {
   latitude?: number;
   longitude?: number;
   mapImageUrl?: string;
+  bankName?: string;
+  bankBin?: string;
+  bankAccountNumber?: string;
+  bankAccountHolder?: string;
 }
 
 const API_BASE = '/api/v1';

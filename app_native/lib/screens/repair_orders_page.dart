@@ -22,6 +22,7 @@ import '../widgets/status_badge.dart';
 import '../widgets/video_player_dialog.dart';
 import '../widgets/image_preview_dialog.dart';
 import '../widgets/modal_top_bar.dart';
+import '../widgets/staff_quotation_sheet.dart';
 
 Future<void> showRepairOrderDetails(
   BuildContext context,
@@ -1992,6 +1993,12 @@ class _OrderDetailSheet extends StatelessWidget {
                         if (order.notes != null && order.notes!.isNotEmpty)
                           _DetailRow('Ghi chú', order.notes!),
                       ],
+                    ),
+                    StaffOrderQuotationCard(
+                      order: order,
+                      onOrderStatusChanged: () {
+                        context.read<BackendDataProvider>().loadRepairOrders();
+                      },
                     ),
                     if (order.media.isNotEmpty) ...[
                       const SizedBox(height: 4),
